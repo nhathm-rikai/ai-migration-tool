@@ -8,6 +8,13 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC VB6) tại `apps/api/src/modules/analysis`, chưa nối API/job hay đọc source thật. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 15/10/2026 — xác minh parser A01a trên Windows
+
+- Phạm vi feature / analysis / fixture tự tạo, không AI hoặc source khách hàng; source đã có trong commit `59f5b2d` (`paser VB6 & i18n`). Bước chốt này chỉ bổ sung bằng chứng kiểm chứng, không sửa parser hoặc FE.
+- `npm.cmd run check` pass trên **Windows x64, Node 24.16.0/npm 12.0.2**: format check, lint, typecheck, **160 API tests/17 files + 41 web tests/4 files**, build contracts/API/Vite. Chạy ngoài sandbox để test junction và HTTP loopback có quyền thực thi; không bỏ qua test.
+- Smoke bằng Node trên JavaScript vừa build trong `apps/api/dist` xác nhận cả 5 trigger review trước: keyword trước colon/comment vẫn tính code; End Sub/Function/Property sau colon đóng đúng procedure; dòng unclassified làm program incomplete; VBP hỏng giữ unsupported; UTF-32LE/BE bị từ chối. Chỉ dùng bytes giả lập trong bộ nhớ, không tạo report hoặc sửa fixture.
+- Bằng chứng này áp dụng thư viện Analyze tĩnh; chưa chứng minh KPI corpus <= 5%, baseline TL duyệt, source thật/LIVE, call graph, CLI/API/job Analyze hoặc native macOS/Linux. Kết luận reviewer sau commit được báo riêng trong chat.
+
 ## 15/10/2026 — hoàn thiện mẫu đa ngôn ngữ sau review
 
 - Dùng `portal-implement`; gate feature / Projects UI / fixture. Chỉnh ba đề xuất đã xác nhận: `LocaleProvider` đồng bộ `html.lang` bằng layout effect trước paint, lưu preference ở passive effect riêng; catalog export `viMessages`/`jaMessages` để tránh nhầm `vi` của Vitest; Việt hóa nhãn bước và nội dung Workspace/source/legacy, bỏ nhãn Fixture thừa ở hai locale.

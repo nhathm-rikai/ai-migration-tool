@@ -1,2 +1,5 @@
 # Migration checksums must not change with Windows checkout settings.
 *.sql text eol=lf
+
+# Analyzer fixtures are byte-exact (CP932, CRLF/LF, missing final newline).
+tests/fixtures/** -text

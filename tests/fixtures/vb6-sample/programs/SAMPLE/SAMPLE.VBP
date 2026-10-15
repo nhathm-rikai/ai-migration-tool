@@ -1,0 +1,14 @@
+Type=Exe
+Reference=*\G{00020430-0000-0000-C000-000000000046}#2.0#0#..\..\Windows\System32\stdole2.tlb#OLE Automation
+Object={12345678-0000-0000-0000-000000000001}#1.0#0; SPIN32.OCX
+Form=SAMPLEFORM.FRM
+Module=SampleRules; SAMPLE.BAS
+Module=Common; ..\..\cmn\Common.bas
+Module=Missing; MISSING.BAS
+Class=Legacy; LEGACY.CLS
+Startup="frmSample"
+ExeName32="SAMPLE.exe"
+Name="SampleProject"
+
+[MS Transaction Server]
+Form=IGNORED.FRM

@@ -78,6 +78,10 @@ Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name kh�
 
 [0001-initial.sql](migrations/0001-initial.sql) tạo bảng đầu tiên. [migrate.ts](src/db/migrate.ts) chạy migration có transaction, ghi tên/checksum trong `schema_migrations`, từ chối migration cũ bị đổi hoặc DB mới hơn source. Thêm migration mới khi đổi schema; không sửa file đã áp dụng. Không xóa DB đang dùng để né lỗi migration. Khi phân phối bản build phải giữ `apps/api/migrations` bên cạnh `dist`.
 
+## Analyze tĩnh (thư viện, chưa có API)
+
+`src/modules/analysis/` đọc bytes đã có sẵn trong bộ nhớ và trả inventory; không tự đọc filesystem, không gọi AI. Thứ tự đọc: `source-decoder.ts` → `source-text.ts` → `source-manifest.ts` → `vb6/vb6-line-lexer.ts` → `vb6/vb6-code-file.ts` → `source-inventory.ts`. Thêm ngôn ngữ: tạo analyzer theo `language-analyzer.ts`, đăng ký profile trong `source-profiles.ts`, thêm fixture/test; core không đổi. Metric và encoding theo [source-analysis](../../docs/engineering/specs/source-analysis.md); fixture ở `tests/fixtures/vb6-sample/`.
+
 ## Sửa file nào khi có task mới?
 
 - **Thêm description**: contract request/response → `0002-project-description.sql` → repository mapping → service nếu có policy → integration test, gồm upgrade DB có dữ liệu. Chưa cần tạo UI khi task chỉ BE.

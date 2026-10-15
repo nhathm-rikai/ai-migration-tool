@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { Project } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import { projectErrorMessage } from './project-messages';
+import { useLocale } from '../../shared/i18n/locale-context';
 
 type DetailState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; error: unknown }
   | { status: 'ready'; project: Project };
 export function ProjectDetail({
   id,
@@ -16,6 +17,8 @@ export function ProjectDetail({
   api: ProjectsApi;
   onClose: () => void;
 }) {
+  const { messages, formatDateTime } = useLocale();
+  const copy = messages.projects.detail;
   const [state, setState] = useState<DetailState>({ status: 'loading' });
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -29,7 +32,7 @@ export function ProjectDetail({
         if (!controller.signal.aborted)
           setState({
             status: 'error',
-            message: projectErrorMessage(error, 'get'),
+            error,
           });
       },
     );
@@ -38,58 +41,52 @@ export function ProjectDetail({
   return (
     <section className="panel detail-panel" aria-labelledby="detail-title">
       <div className="section-heading">
-        <h2 id="detail-title">Chi tiết dự án</h2>
+        <h2 id="detail-title">{copy.title}</h2>
         <button className="button small" onClick={onClose}>
-          Đóng chi tiết
+          {copy.close}
         </button>
       </div>
-      {state.status === 'loading' && <p role="status">Đang tải chi tiết…</p>}
+      {state.status === 'loading' && <p role="status">{copy.loading}</p>}
       {state.status === 'error' && (
         <div>
           <p role="alert" className="error">
-            {state.message}
+            {projectErrorMessage(state.error, 'get', messages.errors)}
           </p>
           <button
             className="button"
             onClick={() => setRetry((value) => value + 1)}
           >
-            Thử lại chi tiết
+            {copy.retry}
           </button>
         </div>
       )}
       {state.status === 'ready' && (
         <>
           <div className="project-title">
-            <span className="eyebrow">Tổng quan dự án</span>
+            <span className="eyebrow">{messages.projects.overview}</span>
             <h1>{state.project.name}</h1>
-            <p className="muted">
-              Thông tin dự án đã lưu trong không gian làm việc local.
-            </p>
+            <p className="muted">{copy.description}</p>
           </div>
           <dl className="project-metadata">
             <div>
-              <dt>Mã dự án</dt>
+              <dt>{copy.id}</dt>
               <dd className="mono">{state.project.id}</dd>
             </div>
             <div>
-              <dt>Dữ liệu</dt>
+              <dt>{copy.data}</dt>
               <dd>
-                {state.project.fixtureId} <span className="badge">DEMO</span>
+                {state.project.fixtureId}{' '}
+                <span className="badge">{messages.projects.demoBadge}</span>
               </dd>
             </div>
             <div>
-              <dt>Ngày tạo</dt>
-              <dd>
-                {new Date(state.project.createdAt).toLocaleString('vi-VN')}
-              </dd>
+              <dt>{copy.createdAt}</dt>
+              <dd>{formatDateTime(state.project.createdAt)}</dd>
             </div>
           </dl>
           <div className="notice">
-            <strong>Sẵn sàng quản lý dự án</strong>
-            <p>
-              Phân tích source, review và tạo báo cáo chưa khả dụng trong bản
-              này.
-            </p>
+            <strong>{copy.ready}</strong>
+            <p>{copy.unavailable}</p>
           </div>
         </>
       )}

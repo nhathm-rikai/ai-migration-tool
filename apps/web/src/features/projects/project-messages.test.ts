@@ -1,6 +1,38 @@
 import { expect, it } from 'vitest';
 import { ApiError } from '../../shared/api/api-error';
-import { projectErrorMessage } from './project-messages';
+import {
+  projectErrorMessage as resolveProjectErrorMessage,
+  type ProjectOperation,
+} from './project-messages';
+import { viMessages } from '../../shared/i18n/vi';
+import { jaMessages } from '../../shared/i18n/ja';
+
+const projectErrorMessage = (error: unknown, operation: ProjectOperation) =>
+  resolveProjectErrorMessage(error, operation, viMessages.errors);
+
+it('localizes Japanese error and recovery messages without translating backend codes', () => {
+  expect(
+    resolveProjectErrorMessage(
+      new ApiError('http', 'GET', 404, 'PROJECT_NOT_FOUND'),
+      'get',
+      jaMessages.errors,
+    ),
+  ).toBe('プロジェクトが見つかりません。');
+  expect(
+    resolveProjectErrorMessage(
+      new ApiError('network', 'POST'),
+      'create',
+      jaMessages.errors,
+    ),
+  ).toContain('再作成する前に');
+  expect(
+    resolveProjectErrorMessage(
+      new ApiError('http', 'GET', 404, 'UNKNOWN_ERROR'),
+      'get',
+      jaMessages.errors,
+    ),
+  ).toContain('リクエストを完了できません');
+});
 
 it('distinguishes a missing route from a missing project at the same HTTP status', () => {
   expect(

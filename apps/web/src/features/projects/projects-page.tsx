@@ -4,32 +4,30 @@ import { Icon } from '../../shared/ui/icon';
 import { useProjectList } from './use-project-list';
 import { CreateProjectForm } from './create-project-form';
 import { ProjectDetail } from './project-detail';
-
-const stages = [
-  { title: 'AI phân tích', description: 'Parser + AI Agent' },
-  { title: 'Assessment Report', description: 'Kết quả phân tích' },
-  { title: 'Review', description: 'SA/PM duyệt · Human Gate' },
-  { title: 'Proposal', description: 'Bản nháp đề xuất' },
-];
+import { useLocale } from '../../shared/i18n/locale-context';
+import { projectErrorMessage } from './project-messages';
 
 export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
+  const { messages } = useLocale();
+  const copy = messages.projects;
+  const stages = Object.entries(copy.stages);
   const list = useProjectList(api);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
-  const [notice, setNotice] = useState('');
+  const [created, setCreated] = useState(false);
   return (
     <main id="main-content" className="app-layout">
       <aside className="project-sidebar" aria-labelledby="list-title">
         <div className="sidebar-heading">
           <div>
-            <span className="eyebrow">Workspace</span>
-            <h2 id="list-title">Dự án của bạn</h2>
+            <span className="eyebrow">{copy.workspace}</span>
+            <h2 id="list-title">{copy.title}</h2>
           </div>
           <button
             className="button icon-button"
-            aria-label="Làm mới dự án"
+            aria-label={copy.refresh}
             disabled={list.state.status === 'loading'}
             onClick={list.refresh}
           >
@@ -40,24 +38,24 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
           className="button primary new-project"
           onClick={() => {
             setSelectedId(null);
-            setNotice('');
+            setCreated(false);
           }}
         >
-          <Icon name="plus" /> Tạo dự án mới
+          <Icon name="plus" /> {copy.createNew}
         </button>
-        <nav aria-label="Cây dự án" className="project-navigation">
+        <nav aria-label={copy.tree} className="project-navigation">
           {list.state.status === 'loading' && (
             <p className="sidebar-state" role="status">
-              Đang tải dự án…
+              {copy.loading}
             </p>
           )}
           {list.state.status === 'error' && (
             <div className="sidebar-state">
               <p role="alert" className="error">
-                {list.state.message}
+                {projectErrorMessage(list.state.error, 'list', messages.errors)}
               </p>
               <button className="button small" onClick={list.retry}>
-                Thử lại danh sách
+                {copy.retryList}
               </button>
             </div>
           )}
@@ -66,12 +64,8 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
               {list.state.page.items.length === 0 ? (
                 <div className="sidebar-state empty-state">
                   <Icon name="folder" />
-                  <h3>
-                    {list.cursor
-                      ? 'Không còn dự án ở trang này'
-                      : 'Chưa có dự án'}
-                  </h3>
-                  <p>Tạo dự án để bắt đầu không gian làm việc.</p>
+                  <h3>{list.cursor ? copy.noMore : copy.empty}</h3>
+                  <p>{copy.emptyHelp}</p>
                 </div>
               ) : (
                 <ul className="project-tree">
@@ -96,7 +90,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                             return next;
                           });
                           setSelectedId(project.id);
-                          setNotice('');
+                          setCreated(false);
                         }}
                       >
                         <span className="node-chevron">
@@ -121,19 +115,21 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                             }
                             onClick={() => setSelectedId(project.id)}
                           >
-                            <Icon name="file" /> Tổng quan dự án
+                            <Icon name="file" /> {copy.overview}
                           </button>
                         </li>
-                        {stages.map((stage) => (
-                          <li key={stage.title}>
+                        {stages.map(([stageId, stage]) => (
+                          <li key={stageId}>
                             <button
                               className="branch"
                               disabled
-                              title="Chưa khả dụng"
+                              title={copy.unavailable}
                             >
                               <Icon name="file" />
                               {stage.title}
-                              <span className="soon">Chưa có</span>
+                              <span className="soon">
+                                {copy.notAvailableYet}
+                              </span>
                             </button>
                           </li>
                         ))}
@@ -143,11 +139,11 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                 </ul>
               )}
               <div className="list-footer">
-                <span>{list.state.page.items.length} dự án trong trang</span>
+                <span>{copy.pageCount(list.state.page.items.length)}</span>
                 <div className="actions">
                   {list.cursor && (
                     <button className="button small" onClick={list.refresh}>
-                      Về trang đầu
+                      {copy.firstPage}
                     </button>
                   )}
                   {list.state.page.nextCursor && (
@@ -161,7 +157,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                           list.next(list.state.page.nextCursor);
                       }}
                     >
-                      Trang tiếp
+                      {copy.nextPage}
                     </button>
                   )}
                 </div>
@@ -170,37 +166,37 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
           )}
         </nav>
         <div className="sidebar-footer">
-          <span className="status-dot" /> Local workspace{' '}
-          <span className="chip demo">DEMO</span>
+          <span className="status-dot" /> {copy.localWorkspace}{' '}
+          <span className="chip demo">{copy.demoBadge}</span>
         </div>
       </aside>
       <div className="project-workspace">
         <div className="workspace-toolbar">
           <span className="breadcrumb">
-            Dự án <span aria-hidden="true">/</span>{' '}
-            <strong>{selectedId ? 'Tổng quan dự án' : 'Tạo dự án mới'}</strong>
+            {copy.breadcrumb} <span aria-hidden="true">/</span>{' '}
+            <strong>{selectedId ? copy.overview : copy.createNew}</strong>
           </span>
-          <span className="chip demo">Dữ liệu mẫu · Fixture</span>
+          <span className="chip demo">{copy.fixture}</span>
         </div>
-        <nav aria-label="Các bước đánh giá">
+        <nav aria-label={copy.assessmentSteps}>
           <ol className="stepper">
-            {stages.map((stage, index) => (
-              <li key={stage.title}>
+            {stages.map(([stageId, stage], index) => (
+              <li key={stageId}>
                 <button className="step" disabled>
                   <span className="step-number">{index + 1}</span>
                   <span>
                     <strong>{stage.title}</strong>
                     <small>{stage.description}</small>
-                    <span className="stage-status">Chưa khả dụng</span>
+                    <span className="stage-status">{copy.unavailable}</span>
                   </span>
                 </button>
               </li>
             ))}
           </ol>
         </nav>
-        {notice && (
+        {created && (
           <p role="status" className="success">
-            {notice}
+            {copy.created}
           </p>
         )}
         {selectedId ? (
@@ -216,15 +212,12 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
             onCreated={(project) => {
               setSelectedId(project.id);
               setExpandedIds((previous) => new Set([...previous, project.id]));
-              setNotice('Đã tạo dự án.');
+              setCreated(true);
               list.refresh();
             }}
           />
         )}
-        <footer className="page-footer">
-          Chế độ demo · Quản lý dự án qua API local. Phân tích, review và xuất
-          báo cáo chưa khả dụng.
-        </footer>
+        <footer className="page-footer">{copy.footer}</footer>
       </div>
     </main>
   );

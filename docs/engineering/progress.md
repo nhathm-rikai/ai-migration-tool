@@ -5,8 +5,46 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 ## Phạm vi hiện tại
 
 - Gate init FE + BE; Projects/UI/API/storage, fixture + fake runner. Fastify → service → repository, SQLite thật, TypeBox contracts.
-- Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Chưa Analyze/Understand, Claude CLI, LIVE/MS1 hoặc conversion.
+- Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC VB6) tại `apps/api/src/modules/analysis`, chưa nối API/job hay đọc source thật. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
+
+## 15/10/2026 — hoàn thiện mẫu đa ngôn ngữ sau review
+
+- Dùng `portal-implement`; gate feature / Projects UI / fixture. Chỉnh ba đề xuất đã xác nhận: `LocaleProvider` đồng bộ `html.lang` bằng layout effect trước paint, lưu preference ở passive effect riêng; catalog export `viMessages`/`jaMessages` để tránh nhầm `vi` của Vitest; Việt hóa nhãn bước và nội dung Workspace/source/legacy, bỏ nhãn Fixture thừa ở hai locale.
+- Cập nhật [mẫu đa ngôn ngữ](patterns/localization.md) với naming catalog, thuật ngữ dùng thống nhất, ngoại lệ viết tắt và thông báo chẩn đoán frontend/backend, cùng lý do tách hai effect. Không thêm dependency hoặc thay API/DB; giữ nguyên thay đổi parser/fixture của task khác.
+- Regression mới kiểm document language đã khớp khi passive effect của component con chạy lúc mount tiếng Nhật và đổi sang Việt, cùng phục hồi khi unmount. Test này fail trên implementation cũ, pass sau sửa; toàn bộ **41 FE tests/4 files** pass. `npm.cmd run lint -w @portal/web`, `npm.cmd run typecheck -w @portal/web`, `npm.cmd run build -w @portal/web`, `npm.cmd run format:check`, `node scripts/verify-repository.mjs` và `git -c core.autocrlf=false diff --check` pass.
+- Browser IAB: Việt/Nhật trên desktop 1280px và mobile 390px, nhãn Việt dài hơn vẫn không tràn ngang; reload giữ Nhật, `html.lang` đúng locale, console không error/warn. Chỉ xem UI/list qua API local đang có, không tạo/sửa project. Ảnh local tại `test-results/localization-baseline/vi-desktop.jpg` (Git ignored); Vite smoke riêng đã dừng, viewport/preference đã khôi phục.
+- Kiểm thực tế Windows x64, Node 24.16.0. Không chạy lại suite BE cho thay đổi chỉ FE này; chưa kiểm native macOS/Linux hoặc bản dịch với reviewer bản ngữ. Không đổi cấu trúc catalog theo feature hay thêm ICU/lazy loading trong phạm vi này.
+
+## 15/10/2026 — sửa 5 finding review parser (A01a)
+
+- Review tech lead `CHANGES_REQUIRED`, 5 finding P2; cả 5 tái hiện đúng trên code trước sửa và đã sửa kèm regression:
+  1. `Stop:`/`End:`/`Return:`/`Resume:`... trước comment bị coi là label → dòng code thành comment. Lexer loại reserved word đứng một mình khỏi label.
+  2. `x = 1: End Sub` không đóng procedure → cả file `unsupported`. Lexer trả `statementStarts` (mọi statement sau label/`:`; bỏ phần đầu dòng continuation); counter xét tất cả, mỗi dòng vật lý vẫn tính một lần (procedure một dòng `Sub A(): End Sub` cũng vậy).
+  3. Program `complete: true` khi còn `unclassifiedLines`. `complete` nay yêu cầu project parse được, mọi member analyzed và unclassified = 0.
+  4. `.vbp` hỏng thành project rỗng hoàn tất. Parser `.vbp` yêu cầu `Type=Exe|OleDll|OleExe|Control`, dòng không phải `key=value` ở section chính → `unsupported` (`PROJECT_TYPE_MISSING` / `PROJECT_LINE_UNRECOGNIZED` + dòng); inventory giữ program `status: unsupported`, cộng vào `unsupportedFiles`.
+  5. BOM UTF-32LE `FF FE 00 00` bị đọc là UTF-16LE. Decoder kiểm BOM UTF-32LE/BE trước UTF-16, trả `SOURCE_ENCODING_UNSUPPORTED`.
+- Kiểm chứng Linux x64, Node 22.22.0: lint, typecheck, test (**API 160/17 files**, analysis 86, web 33), build pass; prettier pass cho `apps/api`, `packages`, `tests`; `verify-repository` pass. Chưa chạy lại trên Windows/Node 24.16.0.
+
+## 15/10/2026 — thư viện Analyze tĩnh: decode, manifest, LoC VB6 (A01a)
+
+- Dùng `portal-implement`, scope feature / analysis / fixture tự tạo, không AI, không đọc source khách hàng. Theo `source-analysis-v1`.
+- `apps/api/src/modules/analysis/`: core trung lập ngôn ngữ gồm `source-decoder.ts` (BOM → override → default profile, CP932 qua `TextDecoder('windows-31j')` strict, NUL/không profile báo lỗi, ASCII ghi `ascii`), `source-text.ts` (tách CRLF/LF/CR, normalized LF, quote evidence), `source-manifest.ts` (raw/normalized SHA-256, snapshot hash gồm profile/decoder/normalization version), `source-inventory.ts` (inventory `source-inventory-v1`: file, program từ project file, unique vs per-program counters, coverage). Ranh giới ngôn ngữ ở `language-analyzer.ts`; `source-profiles.ts` chọn analyzer compiled-in theo profile ID, không load plugin lúc chạy.
+- `vb6/`: lexer dòng (string `""`, `'`, `Rem` đầu statement, `:`, label/line number, continuation code/comment), counter `vb6-physical-code-v1` (designer `.frm` theo VERSION/Begin-End/`Attribute VB_Name` top-level, Attribute = metadata, unclassified riêng), tách Sub/Function/Property Get/Let/Set; parse `.vbp` (member, Reference, Object; bỏ qua sau `[Section]`). Cấu trúc lỗi → `unsupported` có reason/dòng, không báo 0 LoC. Role: `.bas/.frm` code, `.vbp` project, `.frx` resource, `.cls/.ctl/...` unsupported, còn lại excluded. Member path khác hoa/thường được resolve và gắn `case-mismatch`.
+- Profile ID dùng `vb6-cp932-v1` thay `bsn-vb6-cp932-v1` của spec theo CORE-09 (không tên khách hàng trong code); spec cần cập nhật tên profile.
+- Fixture tự tạo `tests/fixtures/vb6-sample/` (CP932 mở rộng NEC/IBM, CRLF/LF, không newline cuối, designer, Attribute, Rem/string/colon/continuation, label, Declare, `#If`, Property, `.frx`, `.cls`, member thiếu/khác case). `.gitattributes` thêm `tests/fixtures/** -text`. Nhãn dòng viết tay trong test, **TL chưa duyệt** theo spec §5.
+- Kiểm chứng trên **Linux x64 (container), Node 22.22.0/npm 10.9.4**, clean `npm ci` (engine-strict tắt vì Node khác bản khóa): lint, typecheck, test (**API 140 tests/17 files**, web 33/3), build pass; prettier pass cho `apps/api`, `packages`, `tests`. `prettier --check .` toàn repo fail ở 4 file `apps/web/src/shared/i18n/*` đang được task FE khác sửa, ngoài scope. `node scripts/verify-repository.mjs` pass. Chưa chạy lại trên Windows/Node 24.16.0.
+- Chưa làm (A01b/tiếp theo): call graph tới `cmn/`, trích SQL/bảng Oracle, complexity, CLI chạy trên thư mục local, contract TypeBox/API/job Analyze, WorkspaceProvider. Đọc source BSN thật cần decoder được đối chiếu với người biết tiếng Nhật và điều kiện LIVE/DATA-03; chưa thực hiện.
+
+## 15/10/2026 — UI sáng cố định và đa ngôn ngữ Việt/Nhật
+
+- Dùng `portal-implement`; scope feature / Projects UI / API fixture, không source khách hàng hoặc AI thật. Bỏ toàn bộ state/control/palette tối và icon sun/moon; giữ `color-scheme: light`. Header thay bằng bộ chọn Tiếng Việt/日本語.
+- `shared/i18n/`: catalog Việt làm nguồn type `Messages`, catalog Nhật dùng `satisfies Messages`; đăng ký locale/name bản địa/Intl ở `locale.ts`. Nội dung màn hình, accessible label, placeholder, validation và error/recovery chuyển sang catalog; nội suy giới hạn dùng policy contracts. Giữ nguyên tên dự án, ID, fixture và public error code. Không đổi dependency/API/domain/DB trong task FE này.
+- LocaleProvider cập nhật `html.lang`, formatter thời gian và preference `portal.locale` đã validate; default Việt, storage không khả dụng thì giữ chuyển ngôn ngữ trong phiên. Form/list/detail giữ lỗi dạng dữ liệu và dịch khi render; success dùng state key/boolean. Đổi locale không reset input/selection/cursor/pending hoặc phát lại request/mutation.
+- Browser phát hiện context identity bị lệch khi Vite hot update sau build contracts. Đã tách context/hook sang `locale-context.ts`, provider chỉ export component. Rebuild contracts trong lúc giữ form tiếng Nhật đã nhập: input/locale giữ nguyên, không trắng trang, console không error/warn. Tài liệu [mẫu đa ngôn ngữ](patterns/localization.md), FE-09 và README hướng dẫn thêm locale/state đúng pattern; wrapper skill hiện có tiếp tục đọc rule FE chung.
+- `npm.cmd run check` cuối pass trên Windows x64, Node 24.16.0: format/lint/typecheck, **140 BE tests/17 files + 40 FE tests/4 files**, build contracts/API/Vite. Số BE gồm thư viện Analyze được task khác thêm đồng thời; task này không sửa phần đó. Test FE mới kiểm switch/persist/fallback/storage blocked, validation/error đang hiện, pending create chỉ POST một lần, giữ selection/success/date và không refetch khi đổi locale.
+- Browser smoke IAB với DB fixture temp riêng: đổi Việt/Nhật, validation dịch ngay, giữ tên Nhật khi chuyển, tạo/mở project, định dạng thời gian, reload vẫn chọn Nhật và mở lại đúng ID, đổi Việt vẫn giữ tên/ID và detail đang chọn; mobile 390px không tràn ngang, UI luôn sáng. Bằng chứng tại `test-results/localization/` (Git ignored). Japanese glyph dùng font fallback hệ thống; chưa có font CJK local đồng nhất đa OS, chưa kiểm native macOS/Linux hoặc bản dịch bởi reviewer bản ngữ.
+- `node scripts/verify-repository.mjs` và `git diff --check` pass. Chưa LIVE/MS1 hoặc phát hành; không sửa các thay đổi BE/fixtures/metadata của task khác đang có trong working tree.
 
 ## 15/10/2026 — chuẩn hóa policy và lỗi API làm mẫu cho Dev
 

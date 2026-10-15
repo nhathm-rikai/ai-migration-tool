@@ -6,8 +6,9 @@ import {
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
 import type { ProjectsApi } from '../../shared/api/projects-api';
-import { projectErrorMessage, projectMessages } from './project-messages';
+import { projectErrorMessage } from './project-messages';
 import { Icon } from '../../shared/ui/icon';
+import { useLocale } from '../../shared/i18n/locale-context';
 
 export function CreateProjectForm({
   api,
@@ -16,9 +17,13 @@ export function CreateProjectForm({
   api: ProjectsApi;
   onCreated: (project: Project) => void;
 }) {
+  const { messages } = useLocale();
+  const copy = messages.projects.create;
   const [name, setName] = useState('');
-  const [fieldError, setFieldError] = useState('');
-  const [submitError, setSubmitError] = useState('');
+  const [fieldInvalid, setFieldInvalid] = useState(false);
+  const [submitFailure, setSubmitFailure] = useState<{ error: unknown } | null>(
+    null,
+  );
   const [pending, setPending] = useState(false);
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
@@ -26,15 +31,15 @@ export function CreateProjectForm({
   async function submit() {
     if (active.current) return;
     const input = { name: name.trim(), fixtureId: PROJECT_FIXTURE_ID };
-    setSubmitError('');
+    setSubmitFailure(null);
     if (!Check(CreateProjectSchema, input)) {
-      setFieldError(projectMessages.nameInvalid);
+      setFieldInvalid(true);
       return;
     }
     const controller = new AbortController();
     active.current = controller;
     setPending(true);
-    setFieldError('');
+    setFieldInvalid(false);
     try {
       const project = await api.create(input, controller.signal);
       if (!controller.signal.aborted) {
@@ -42,8 +47,7 @@ export function CreateProjectForm({
         onCreated(project);
       }
     } catch (failure) {
-      if (!controller.signal.aborted)
-        setSubmitError(projectErrorMessage(failure, 'create'));
+      if (!controller.signal.aborted) setSubmitFailure({ error: failure });
     } finally {
       if (!controller.signal.aborted) {
         setPending(false);
@@ -53,12 +57,9 @@ export function CreateProjectForm({
   }
   return (
     <section className="panel create-panel" aria-labelledby="create-title">
-      <span className="eyebrow">Không gian làm việc</span>
-      <h1 id="create-title">Tạo dự án mới</h1>
-      <p className="muted">
-        Khởi tạo dự án để quản lý thông tin và chuẩn bị đánh giá hệ thống
-        legacy.
-      </p>
+      <span className="eyebrow">{copy.eyebrow}</span>
+      <h1 id="create-title">{messages.projects.createNew}</h1>
+      <p className="muted">{copy.description}</p>
       <form
         noValidate
         onSubmit={(event) => {
@@ -67,56 +68,57 @@ export function CreateProjectForm({
         }}
         aria-busy={pending}
       >
-        <label htmlFor="project-name">Tên dự án</label>
+        <label htmlFor="project-name">{copy.name}</label>
         <input
           id="project-name"
           autoComplete="off"
-          placeholder="Ví dụ: Hệ thống quản lý bán hàng"
+          placeholder={copy.placeholder}
           value={name}
           disabled={pending}
-          aria-invalid={Boolean(fieldError)}
+          aria-invalid={fieldInvalid}
           aria-describedby={
-            fieldError ? 'name-help create-field-error' : 'name-help'
+            fieldInvalid ? 'name-help create-field-error' : 'name-help'
           }
           onChange={(event) => {
             setName(event.target.value);
-            setFieldError('');
+            setFieldInvalid(false);
           }}
         />
         <p className="field-help" id="name-help">
-          {projectMessages.nameHelp}
+          {copy.nameHelp}
         </p>
         <div className="fixture-card">
           <span className="fixture-icon">
             <Icon name="folder" />
           </span>
           <div>
-            <strong>Dữ liệu mẫu VB6</strong>
+            <strong>{copy.sample}</strong>
             <p>
-              {PROJECT_FIXTURE_ID} · Chỉ lưu thông tin dự án, chưa đọc source.
+              {PROJECT_FIXTURE_ID} · {copy.sampleDescription}
             </p>
           </div>
         </div>
-        {fieldError && (
+        {fieldInvalid && (
           <p id="create-field-error" role="alert" className="error">
-            {fieldError}
+            {copy.nameInvalid}
           </p>
         )}
-        {submitError && (
+        {submitFailure && (
           <p role="alert" className="error">
-            {submitError}
+            {projectErrorMessage(
+              submitFailure.error,
+              'create',
+              messages.errors,
+            )}
           </p>
         )}
         <div className="form-actions">
           <button className="button primary" disabled={pending} type="submit">
-            {pending ? 'Đang tạo…' : 'Tạo dự án'}
+            {pending ? copy.pending : copy.submit}
           </button>
         </div>
       </form>
-      <p className="field-help">
-        Dự án được lưu trên máy này. Chọn dự án trong cây bên trái để mở lại
-        thông tin.
-      </p>
+      <p className="field-help">{copy.savedLocally}</p>
     </section>
   );
 }

@@ -2,6 +2,8 @@
 
 Gate **init / Projects UI / fixture + fake runner**. React 18 + Vite 6 + TypeScript strict. UI tạo, liệt kê/phân trang và xem chi tiết dự án qua API thật, dữ liệu lưu bằng SQLite ở backend. Không upload hoặc đọc source, không chạy Claude, không có Analyze/Review/Export thật.
 
+UI chỉ dùng giao diện sáng; bộ chọn ngôn ngữ Việt/Nhật ở header. Mặc định tiếng Việt, nhớ lựa chọn trong localStorage (`portal.locale`); nếu storage bị chặn thì vẫn đổi ngôn ngữ trong phiên. Xem [mẫu đa ngôn ngữ](../../docs/engineering/patterns/localization.md) để thêm bản dịch đúng type và giữ state khi chuyển locale.
+
 ## Chạy local
 
 Tại root repo, Node 24.16.0/npm 12.0.2:
@@ -24,7 +26,7 @@ npm run preview:web
 
 ## Tham khảo FE prototype
 
-Đã đọc bản FE Dev cung cấp trước khi init. Phần dùng lại: React/Vite, chia theo feature, palette sáng/tối, ý tưởng header + stepper và card/form. Không cần prototype để clone/build repo này.
+Đã đọc bản FE Dev cung cấp trước khi init. Phần dùng lại: React/Vite, chia theo feature, palette sáng, ý tưởng header + stepper và card/form. Đã bỏ lựa chọn sáng/tối theo yêu cầu; không cần prototype để clone/build repo này.
 
 Phần chưa mang sang:
 
@@ -38,13 +40,14 @@ Phiên bản React/Vite/plugin/types lấy từ lockfile prototype: React/React 
 
 ## Mở file nào?
 
-- [app.tsx](src/app/app.tsx): header và theme. [branding.ts](src/app/branding.ts): tên hiển thị/logo từ asset branding; không quyết định package/API/data path.
+- [app.tsx](src/app/app.tsx): header và bộ chọn ngôn ngữ, bọc UI bằng LocaleProvider. [branding.ts](src/app/branding.ts): tên sản phẩm/logo từ asset branding; không quyết định package/API/data path.
 - [styles.css](src/app/styles.css): palette, typography và component style bám thiết kế demo01, layout desktop/mobile và focus states. Be Vietnam Pro (400/500/600/700/800) và JetBrains Mono được phục vụ từ `public/fonts`; không import font từ mạng. Giấy phép SIL OFL đi kèm mỗi họ font, lấy từ Google Fonts (`google/fonts`, `ofl/bevietnampro` và `ofl/jetbrainsmono`). Logo là asset branding riêng trong repo, không phụ thuộc file demo bên ngoài lúc build/chạy.
 - [projects-page.tsx](src/features/projects/projects-page.tsx): cây điều hướng dự án với nút mở/thu nhánh, empty/loading/error, pagination, tạo mới và chọn detail ở vùng bên phải. Dùng danh sách/nút native cho điều hướng bàn phím; không giả lập ARIA tree khi chưa có keyboard model tương ứng. Thứ tự theo ID của API, không phải mới nhất trước. Đã bỏ bước Upload; bốn bước đánh giá còn lại dùng ô riêng và disabled với nhãn “Chưa khả dụng”. Cây điều hướng không giả lập file source hoặc kết quả chưa có API.
 - [create-project-form.tsx](src/features/projects/create-project-form.tsx): kiểm input theo schema, khóa submit đang chờ, giữ tên khi lỗi; tách validation field và lỗi submit. Không tự retry POST; mất kết nối/timeout/server lỗi hoặc response tạo sai định dạng phải nhắc làm mới danh sách để kiểm trước khi tạo lại.
 - [use-project-list.ts](src/features/projects/use-project-list.ts), [project-detail.tsx](src/features/projects/project-detail.tsx): request lifecycle, abort/ignore response cũ. Reload browser tải lại danh sách; lựa chọn detail chỉ sống trong phiên UI, chưa có deep link.
-- [projects-api.ts](src/shared/api/projects-api.ts): endpoint/DTO Projects. [api-client.ts](src/shared/api/api-client.ts): transport chung, validate success/error body từ `unknown`, timeout 15 giây bao gồm đọc body và cleanup cancellation. [api-error.ts](src/shared/api/api-error.ts): kind/method/status/code/requestId và kết quả ghi chưa xác nhận; không chứa UI copy hoặc raw server message. [project-messages.ts](src/features/projects/project-messages.ts): catalog theo feature, chọn thông báo theo code và thao tác; thiếu/code mới dùng fallback an toàn. Policy tên/fixture/default pagination lấy từ contracts.
-- [projects-page.test.tsx](src/features/projects/projects-page.test.tsx), [projects-api.test.ts](src/shared/api/projects-api.test.ts): luồng chính và failure/race path.
+- [projects-api.ts](src/shared/api/projects-api.ts): endpoint/DTO Projects. [api-client.ts](src/shared/api/api-client.ts): transport chung, validate success/error body từ `unknown`, timeout 15 giây bao gồm đọc body và cleanup cancellation. [api-error.ts](src/shared/api/api-error.ts): kind/method/status/code/requestId và kết quả ghi chưa xác nhận; không chứa UI copy hoặc raw server message. [project-messages.ts](src/features/projects/project-messages.ts): resolver chọn thông báo từ catalog đang dùng theo code và thao tác; thiếu/code mới dùng fallback an toàn. Policy tên/fixture/default pagination lấy từ contracts.
+- [locale-provider.tsx](src/shared/i18n/locale-provider.tsx), [locale.ts](src/shared/i18n/locale.ts): preference đã validate, `html.lang` và formatter ngày giờ. [locale-context.ts](src/shared/i18n/locale-context.ts): context/hook riêng để giữ identity qua hot reload. [vi.ts](src/shared/i18n/vi.ts)/[ja.ts](src/shared/i18n/ja.ts): catalog typed cho toàn bộ màn hình và lỗi; thêm locale theo mẫu engineering. Font Nhật dùng fallback hệ thống, không tải font ngoài lúc chạy.
+- [projects-page.test.tsx](src/features/projects/projects-page.test.tsx), [projects-api.test.ts](src/shared/api/projects-api.test.ts): luồng chính và failure/race path. [app.test.tsx](src/app/app.test.tsx): chuyển locale với state/pending/error đang tồn tại và preference không khả dụng.
 
 Khi thêm feature, theo [engineering](../../docs/engineering/README.md), đặc biệt FE-01/02/04/06/07, CORE-04/09 và QA-05/06. Không dùng UI state hoặc nút disabled thay ràng buộc backend. Backend không đổi schema/API trong task init FE này.
 

@@ -1,7 +1,7 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderWithLibrary,
   screen,
   waitFor,
   within,
@@ -12,6 +12,12 @@ import { ProjectDetail } from './project-detail';
 import { createProjectsApi } from '../../shared/api/projects-api';
 import { json, project } from '../../testing/fixtures';
 import type { Project } from '@portal/contracts';
+import type { ReactElement } from 'react';
+import { LocaleProvider } from '../../shared/i18n/locale-provider';
+
+function render(ui: ReactElement) {
+  return renderWithLibrary(ui, { wrapper: LocaleProvider });
+}
 
 describe('Projects UI', () => {
   it('opens projects from the navigation, collapses branches and returns to creation', async () => {

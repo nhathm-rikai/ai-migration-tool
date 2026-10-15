@@ -1,5 +1,7 @@
 # Mẫu nền tảng: policy và lỗi API
 
+UI đã hỗ trợ Việt/Nhật: xem [mẫu đa ngôn ngữ](localization.md). Catalog nội dung nằm tại `shared/i18n`; project error resolver nhận catalog theo locale, không giữ chuỗi đã dịch trong async state.
+
 Áp dụng cho Projects/UI/API fixture hiện tại và module mở rộng có cùng ranh giới. Rule gốc: CORE-11, BE-04/09, FE-08 và QA-10; tài liệu này chỉ dẫn tới implementation/test thật để Dev làm mẫu. Không phải yêu cầu dựng framework hoặc đưa mọi literal vào config.
 
 ## Giá trị cố định nằm ở đâu?

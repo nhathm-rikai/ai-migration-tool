@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { ProjectList } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
-import { projectErrorMessage } from './project-messages';
 
 type ListState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; error: unknown }
   | { status: 'ready'; page: ProjectList };
 export function useProjectList(api: ProjectsApi) {
   const [query, setQuery] = useState<{
@@ -24,7 +23,7 @@ export function useProjectList(api: ProjectsApi) {
         if (!controller.signal.aborted)
           setState({
             status: 'error',
-            message: projectErrorMessage(error, 'list'),
+            error,
           });
       },
     );

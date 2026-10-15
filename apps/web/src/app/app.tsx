@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { branding } from './branding';
 import { ProjectsPage } from '../features/projects/projects-page';
-import { Icon } from '../shared/ui/icon';
+import { LocaleProvider } from '../shared/i18n/locale-provider';
+import { useLocale } from '../shared/i18n/locale-context';
+import { isLocale, LOCALES } from '../shared/i18n/locale';
 
 export function App() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    return () => {
-      delete document.documentElement.dataset.theme;
-    };
-  }, [dark]);
+  return (
+    <LocaleProvider>
+      <AppShell />
+    </LocaleProvider>
+  );
+}
+
+function AppShell() {
+  const { locale, setLocale, messages } = useLocale();
   useEffect(() => {
     const original = document.title;
     document.title = branding.displayName;
@@ -21,7 +25,7 @@ export function App() {
   return (
     <>
       <a className="skip-link" href="#main-content">
-        Đến nội dung chính
+        {messages.app.skipToContent}
       </a>
       <header className="top">
         <div className="top-in">
@@ -30,18 +34,29 @@ export function App() {
           </div>
           <div className="brand">
             <strong>{branding.displayName}</strong>
-            <span>{branding.subtitle}</span>
+            <span>{messages.app.subtitle}</span>
           </div>
-          <span className="chip demo header-demo">DEMO · dữ liệu mẫu</span>
-          <button
-            className="button theme-toggle"
-            aria-label={dark ? 'Giao diện sáng' : 'Giao diện tối'}
-            aria-pressed={dark}
-            onClick={() => setDark((value) => !value)}
-          >
-            <Icon name={dark ? 'sun' : 'moon'} />
-            <span>{dark ? 'Giao diện sáng' : 'Giao diện tối'}</span>
-          </button>
+          <span className="chip demo header-demo">{messages.app.demo}</span>
+          <label className="language-picker">
+            <span>{messages.app.language}</span>
+            <select
+              value={locale}
+              onChange={(event) => {
+                if (isLocale(event.currentTarget.value))
+                  setLocale(event.currentTarget.value);
+              }}
+            >
+              {LOCALES.map((language) => (
+                <option
+                  key={language.code}
+                  value={language.code}
+                  lang={language.code}
+                >
+                  {language.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
       <ProjectsPage />

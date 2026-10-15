@@ -23,6 +23,7 @@ RIKAI là portal chạy local để chọn thư mục source legacy, phân tích
 5. Khi chưa biết sửa file nào: tra [ví dụ và bản đồ thay đổi](examples.md).
 6. Cách gọi skill trên từng công cụ: [tích hợp AI tool](tool-integration.md).
 7. Khi thêm API/UI hoặc rà soát hardcode: đọc [mẫu policy và lỗi API](patterns/api-errors-policy.md), lần theo source/test thật trước khi copy pattern sang module mới.
+8. UI đã có Việt/Nhật: theo [mẫu catalog và chuyển ngôn ngữ](patterns/localization.md) khi thêm nội dung, ngôn ngữ hoặc xử lý state đang hiển thị.
 
 ## Rule theo phạm vi
 

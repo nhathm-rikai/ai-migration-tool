@@ -1,0 +1,9 @@
+---
+description: RIKAI React UI conventions and behavior checks
+globs: "apps/web/**,tests/e2e/**"
+alwaysApply: false
+---
+
+Đọc `docs/engineering/rules/frontend.md` và `docs/engineering/rules/testing-review.md`.
+UI job/review phải theo version/state trong contracts và `docs/engineering/architecture.md`.
+Tra `docs/engineering/examples.md`; không import backend/process/filesystem vào UI.

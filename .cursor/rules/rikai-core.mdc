@@ -1,0 +1,14 @@
+---
+description: RIKAI shared engineering rules and implementation/review workflows
+alwaysApply: true
+---
+
+Khi làm code RIKAI, đọc `docs/engineering/README.md`, `docs/engineering/delivery-gates.md` và `docs/engineering/rules/core.md`.
+Kiến trúc trong `docs/engineering/architecture.md` là baseline; file thực tế và phần chưa triển khai được ghi trong `apps/api/README.md`.
+Implement dùng `portal-implement`; review dùng `portal-techlead-review` và không sửa file.
+Nếu skill chưa được discover, đọc trực tiếp workflow tương ứng trong `docs/engineering/workflows/`.
+Đọc thêm rule theo phạm vi README; các file .mdc chỉ dẫn tới rule gốc, không tạo convention riêng cho Cursor.
+Áp dụng CORE-09: source/config/test trung lập thương hiệu; UI/export dùng branding tách biệt. Tên skill không phải namespace sản phẩm.
+Áp dụng CORE-10: mục tiêu Windows/macOS/Linux; khi chạm path/process/native/scripts đọc `docs/engineering/platform-support.md`, báo nền tảng đã/chưa kiểm chứng.
+Xác định gate/feature và fake/live trước implement/review; không chặn vì thiếu việc LATER hoặc gate chưa tới. Chỉ đọc spec Analyze/Understand khi task liên quan.
+Không tự sửa source khách hàng, proposal, kế hoạch hoặc demo cũ để đạt coding convention.

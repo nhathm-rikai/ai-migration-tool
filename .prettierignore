@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+docs/
+.git/
+.agents/
+.claude/
+.cursor/
+AGENTS.md
+CLAUDE.md

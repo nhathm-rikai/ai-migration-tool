@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "understanding-v1",
+  "businessRules": [
+    {
+      "id": "BR-001",
+      "title": "Kiểm tra số tiền dương — fixture giả lập",
+      "statement": "Hàm trả True khi amount lớn hơn 0; ngược lại trả False.",
+      "basis": "observed",
+      "inputs": [
+        "amount: Currency"
+      ],
+      "outputs": [
+        "Boolean"
+      ],
+      "conditions": [
+        "amount > 0"
+      ],
+      "evidence": [
+        {
+          "path": "OrderRules.bas",
+          "startLine": 5,
+          "endLine": 5,
+          "quote": "    IsPositiveAmount = (amount > 0)"
+        }
+      ],
+      "openQuestionIds": []
+    }
+  ],
+  "designs": [
+    {
+      "id": "DS-001",
+      "title": "Tách phép kiểm tra thành hàm thuần",
+      "kind": "target_suggestion",
+      "summary": "Giữ phép so sánh số tiền trong hàm không có side effect để kiểm tra riêng; chưa chọn framework hoặc kiểu tiền tệ C#.",
+      "relatedBusinessRuleIds": [
+        "BR-001"
+      ],
+      "constraints": [
+        "Chưa xác định quy tắc precision/rounding của hệ thống đích."
+      ],
+      "evidence": [],
+      "openQuestionIds": [
+        "Q-001"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-001",
+      "question": "Hệ thống đích cần precision và rounding cho số tiền như thế nào?",
+      "relatedIds": [
+        "DS-001"
+      ],
+      "blocking": false
+    }
+  ]
+}

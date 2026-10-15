@@ -1,0 +1,11 @@
+---
+description: RIKAI backend, contracts, job runtime, data and integration test rules
+globs: "apps/api/**,packages/contracts/**"
+alwaysApply: false
+---
+
+Đọc `docs/engineering/rules/backend.md` và `docs/engineering/rules/testing-review.md`.
+Khi thay job/CLI/SSE: đọc `docs/engineering/rules/jobs-ai.md`.
+Khi thay database/path/artifact/evidence/review/export: đọc `docs/engineering/rules/data-evidence.md`.
+Tra `docs/engineering/examples.md` để biết file/lớp chịu trách nhiệm.
+Analyze/Understand đọc `docs/engineering/specs/source-analysis.md` và `understanding-contract.md` cùng thư mục. Review theo gate đã kích hoạt, không mặc định yêu cầu đủ MS1 ở PR init.

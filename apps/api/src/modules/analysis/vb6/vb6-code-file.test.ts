@@ -416,6 +416,30 @@ describe('SQL built in branches and properties', () => {
       0,
     ],
     [
+      'a second Else on the line, belonging to the outer single-line If',
+      [
+        's = "SELECT * FROM T"',
+        'If f Then If g Then s = s & "A" Else s = s & "B" Else s = s & "C"',
+        's = s & "Z"',
+      ],
+      ['TAZ:R', 'TBZ:R', 'TCZ:R'],
+      0,
+    ],
+    [
+      'two Else on a single line inside a multi-line If block',
+      [
+        's = "SELECT * FROM T"',
+        'If h Then',
+        '    If f Then If g Then s = s & "A" Else s = s & "B" Else s = s & "C"',
+        'Else',
+        '    s = s & "Y"',
+        'End If',
+        's = s & "Z"',
+      ],
+      ['TAZ:R', 'TBZ:R', 'TCZ:R', 'TYZ:R'],
+      0,
+    ],
+    [
       'nested single-line Ifs inside a multi-line If block',
       [
         's = "SELECT * FROM T"',

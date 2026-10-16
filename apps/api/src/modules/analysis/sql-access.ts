@@ -1,9 +1,9 @@
 // Language-neutral, lexical SQL table access detection over one SQL text
-// built by the language analyzer (metric `sql-access-v3`). It never guesses
+// built by the language analyzer (metric `sql-access-v4`). It never guesses
 // a table: when a table name touches a runtime value the access is reported
 // as dynamic instead. SQL string literals and comments are skipped.
 
-export const SQL_ACCESS_VERSION = 'sql-access-v3';
+export const SQL_ACCESS_VERSION = 'sql-access-v4';
 
 // CRUD, plus X for DDL on a table (CREATE/DROP/TRUNCATE/ALTER TABLE),
 // common for work tables built at runtime.

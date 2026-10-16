@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 16/10/2026 — sửa 1 finding review A01b lần 4
+
+- Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy.
+- Review `CHANGES_REQUIRED` (commit `42b51f9`): [P2] `If f Then If g Then A Else B Else C` gắn `Else` thứ hai vào `If g` đã có `Else`, sinh thêm bảng giả `TZ`. Đã tái hiện bằng test trước khi sửa.
+- SQL `sql-access-v4`: `Else` thuộc `If` một dòng gần nhất chưa có `Else`; `If` bên trong đã có `Else` được đóng trước (theo MS-VBAL §5.4.2.9, chưa chạy compiler VB6). Thêm 2 regression test (đứng riêng và nằm trong khối `If` nhiều dòng, có statement vô điều kiện phía sau).
+- Container Linux, Node 22: prettier, lint, typecheck, build, `verify-repository` pass; **217 test API** pass. Chưa chạy `npm.cmd run check` trên Windows sau thay đổi này.
+- Source thật: 0 lỗi decode/unclassified, 277/284 complete, JSON hợp schema, 0 SQL động; 2202 dòng bảng/CRUD và complexity mọi program không đổi so với `sql-access-v3` (15/15 khớp).
+
 ## 16/10/2026 — sửa 1 finding review A01b lần 3
 
 - Làm theo nội dung skill `portal-implement` (đọc SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy.

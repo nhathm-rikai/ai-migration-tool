@@ -184,9 +184,18 @@ export class Vb6StringTracker {
       } else if (isWord(first, 'elseif')) {
         this.branch(false);
         this.onEachPath(() => this.scan(tokens));
-      } else if (tokens.length === 1 && isWord(first, 'else'))
+      } else if (tokens.length === 1 && isWord(first, 'else')) {
+        // `Else` belongs to the nearest single-line If still without one
+        // (`If a Then If b Then x Else y Else z`): inner Ifs whose Else
+        // already came are complete and end here.
+        while (
+          singleLineBase !== null &&
+          this.frames.length > singleLineBase &&
+          this.frames.at(-1)?.hasElse
+        )
+          this.close();
         this.branch(true);
-      else if (isWord(first, 'select') && isWord(second, 'case')) {
+      } else if (isWord(first, 'select') && isWord(second, 'case')) {
         this.onEachPath(() => this.scan(tokens));
         this.open(false);
       } else if (isWord(first, 'case')) {

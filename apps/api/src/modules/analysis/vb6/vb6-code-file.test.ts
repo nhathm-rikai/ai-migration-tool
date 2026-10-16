@@ -232,10 +232,10 @@ describe('static facts', () => {
   it('extracts tables per operation and flags a runtime table name', () => {
     expect(result.sqlTables.map((t) => [t.table, t.operation, t.line])).toEqual(
       [
-        ['WKTABLE', 'C', 6],
-        ['HAN01.KMTANT', 'D', 8],
         ['HAN01.KMTANT', 'R', 4],
         ['KMBUMON', 'R', 4],
+        ['WKTABLE', 'C', 6],
+        ['HAN01.KMTANT', 'D', 8],
       ],
     );
     expect(result.dynamicSql).toEqual([
@@ -257,15 +257,114 @@ describe('static facts', () => {
     expect(result.procedures[0]?.decisionPoints).toBe(2);
   });
 
-  it('finds identifier uses outside strings and comments', () => {
+  it('finds identifier uses outside strings, comments and declarations', () => {
     const references = findVb6References('m/LOAD.BAS', lines, {
       form: false,
       names: new Set(['gettickcount', 'logtext', 'update']),
     });
     expect(references.map((r) => [r.name, r.line, r.procedureId])).toEqual([
-      ['GetTickCount', 1, null],
       ['GetTickCount', 10, 'm/LOAD.BAS#sub:Load'],
       ['LogText', 10, 'm/LOAD.BAS#sub:Load'],
     ]);
+  });
+});
+
+describe('SQL built across statements', () => {
+  const facts = (body: string[]) => {
+    const result = analyzeVb6CodeFile(
+      'M.BAS',
+      ['Sub P()', ...body, 'End Sub'],
+      { form: false },
+    );
+    if (result.status !== 'analyzed') throw new Error(result.status);
+    return {
+      tables: result.sqlTables.map(
+        (t) => `${t.table}:${t.operation}:${t.line}`,
+      ),
+      dynamic: result.dynamicSql.map((d) => `${d.operation}:${d.line}`),
+    };
+  };
+
+  it.each([
+    [
+      'joined literals',
+      ['s = "SELECT * FROM ORD" & "ERS"'],
+      ['ORDERS:R:2'],
+      [],
+    ],
+    [
+      'a name joined to a runtime value',
+      ['s = "SELECT * FROM ORD_" & tenant'],
+      [],
+      ['R:2'],
+    ],
+    [
+      'an unrelated literal after the SQL',
+      ['s = "SELECT * FROM "', 'MsgBox "HELLO"'],
+      [],
+      [],
+    ],
+    [
+      'a runtime value appended later',
+      ['s = "SELECT * FROM "', 's = s & tableName'],
+      [],
+      ['R:3'],
+    ],
+    [
+      'pieces across lines and continuations',
+      [
+        'strSQL = "SELECT A "',
+        'strSQL = strSQL & "FROM T1, " & _',
+        '    "T2 WHERE B = 1"',
+        'Call Exec(strSQL)',
+      ],
+      ['T1:R:3', 'T2:R:4'],
+      [],
+    ],
+    [
+      'a reused variable',
+      ['s = "DELETE FROM T1"', 'Exec s', 's = "UPDATE T2 SET A = 1"'],
+      ['T1:D:2', 'T2:U:4'],
+      [],
+    ],
+    [
+      'a literal passed to a call',
+      ['db.ExecuteSQL ("DROP TABLE W1")'],
+      ['W1:X:2'],
+      [],
+    ],
+    [
+      'parts kept in other variables',
+      ['f = " FROM T1"', 's = "SELECT A" & f'],
+      ['T1:R:2'],
+      [],
+    ],
+  ])('handles %s', (_label, body, tables, dynamic) => {
+    expect(facts(body)).toEqual({ tables, dynamic });
+  });
+});
+
+describe('recursive calls', () => {
+  const uses = (lines: string[]) =>
+    findVb6References('M.BAS', lines, {
+      form: false,
+      names: new Set(['recur', 'walk']),
+    }).map((r) => `${r.name}:${r.line}`);
+
+  it('keeps a recursive call but not the return-value assignment', () => {
+    expect(
+      uses([
+        'Function Recur(n As Long) As Long',
+        '    If n > 0 Then Recur = Recur(n - 1)',
+        '    Recur = Recur + 1',
+        'End Function',
+      ]),
+    ).toEqual(['Recur:2']);
+  });
+
+  it('keeps Sub recursion written as a statement or with Call', () => {
+    expect(
+      uses(['Sub Walk(n)', '    Walk n - 1', '    Call Walk(0)', 'End Sub']),
+    ).toEqual(['Walk:2', 'Walk:3']);
   });
 });

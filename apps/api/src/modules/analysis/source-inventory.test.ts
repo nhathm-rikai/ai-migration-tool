@@ -264,3 +264,48 @@ it('writes one CSV row per program with a BOM and quoted cells', () => {
   expect(header?.startsWith('\uFEFFprojectPath,name,status')).toBe(true);
   expect(row?.startsWith('P.VBP,"A, B",parsed,true,0,0,0,0')).toBe(true);
 });
+
+it.each(['=1+1', '+1', '-1', '@SUM(A1)', '\t=1'])(
+  'exports the program name %j as text, not a formula',
+  (name) => {
+    const inventory = buildSourceInventory({
+      profile: profile(),
+      files: [
+        {
+          relativePath: 'P.VBP',
+          bytes: Buffer.from(`Type=Exe\r\nName="${name}"\r\n`),
+        },
+      ],
+    });
+    const row = programSummaryCsv(inventory).split('\r\n')[1] ?? '';
+    expect(row.split(',')[1]).toBe(`'${name}`);
+  },
+);
+
+it('keeps recursive calls in the program call graph', () => {
+  const inventory = buildSourceInventory({
+    profile: profile(),
+    files: [
+      {
+        relativePath: 'P.VBP',
+        bytes: Buffer.from('Type=Exe\r\nModule=M; M.BAS\r\n'),
+      },
+      {
+        relativePath: 'M.BAS',
+        bytes: Buffer.from(
+          'Function Recur(n As Long) As Long\r\n    If n > 0 Then Recur = Recur(n - 1)\r\nEnd Function\r\n',
+        ),
+      },
+    ],
+  });
+  expect(inventory.programs[0]?.analysis?.calls).toEqual([
+    {
+      from: 'M.BAS#function:Recur',
+      name: 'Recur',
+      resolution: 'local',
+      targets: ['M.BAS#function:Recur'],
+      line: 2,
+      count: 1,
+    },
+  ]);
+});

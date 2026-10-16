@@ -1,16 +1,16 @@
-// Language-neutral, lexical SQL table access detection over the string
-// literals of one procedure (metric `sql-access-v0`). It never guesses a
-// table: when a table position is filled by a runtime expression the access
-// is reported as dynamic instead.
+// Language-neutral, lexical SQL table access detection over one SQL text
+// built by the language analyzer (metric `sql-access-v1`). It never guesses
+// a table: when a table name touches a runtime value the access is reported
+// as dynamic instead. SQL string literals and comments are skipped.
 
-export const SQL_ACCESS_VERSION = 'sql-access-v0';
+export const SQL_ACCESS_VERSION = 'sql-access-v1';
 
 // CRUD, plus X for DDL on a table (CREATE/DROP/TRUNCATE/ALTER TABLE),
 // common for work tables built at runtime.
 export type SqlOperation = 'C' | 'R' | 'U' | 'D' | 'X';
 
-// A literal fragment, or null where a non-literal expression was
-// concatenated into the string.
+// The pieces of one SQL text, concatenated exactly as written: a literal
+// fragment, or null where a runtime value was concatenated.
 export type SqlSegment = { text: string | null; line: number };
 
 export type SqlTableAccess = {
@@ -57,7 +57,7 @@ function buildStream(segments: readonly SqlSegment[]) {
   const starts: { offset: number; line: number }[] = [];
   for (const segment of segments) {
     starts.push({ offset: text.length, line: segment.line });
-    text += (segment.text ?? DYNAMIC) + ' ';
+    text += segment.text ?? DYNAMIC;
   }
   const lineAt = (offset: number) => {
     let line = starts[0]?.line ?? 0;
@@ -70,11 +70,45 @@ function buildStream(segments: readonly SqlSegment[]) {
   return { text, lineAt };
 }
 
+// Blanks SQL string literals ('...' with '' escapes) and comments, keeping
+// offsets, so keywords inside them are not read as statements.
+function maskLiteralsAndComments(text: string): string {
+  let masked = '';
+  let i = 0;
+  const blank = (end: number) => {
+    masked += text.slice(i, end).replace(/[^\n]/g, ' ');
+    i = end;
+  };
+  while (i < text.length) {
+    if (text[i] === "'") {
+      let end = i + 1;
+      for (; end < text.length; end += 1)
+        if (text[end] === "'") {
+          if (text[end + 1] !== "'") break;
+          end += 1;
+        }
+      blank(Math.min(end + 1, text.length));
+    } else if (text.startsWith('--', i)) {
+      const end = text.indexOf('\n', i);
+      blank(end < 0 ? text.length : end);
+    } else if (text.startsWith('/*', i)) {
+      const end = text.indexOf('*/', i + 2);
+      blank(end < 0 ? text.length : end + 2);
+    } else {
+      masked += text[i];
+      i += 1;
+    }
+  }
+  return masked;
+}
+
 export function detectSqlAccess(segments: readonly SqlSegment[]): {
   tables: SqlTableAccess[];
   dynamic: DynamicSqlUse[];
 } {
-  const { text, lineAt } = buildStream(segments);
+  const stream = buildStream(segments);
+  const text = maskLiteralsAndComments(stream.text);
+  const { lineAt } = stream;
   const tables: SqlTableAccess[] = [];
   const dynamic: DynamicSqlUse[] = [];
 
@@ -84,19 +118,26 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
     operation: SqlOperation,
     list: boolean,
   ): void {
-    const line = lineAt(index);
     let rest = text.slice(index);
+    // Each table is reported at the line where its own name is written.
+    const line = () => lineAt(text.length - rest.length);
     for (;;) {
       rest = rest.replace(/^\s+/, '');
       if (rest.startsWith(DYNAMIC)) {
-        dynamic.push({ operation, line });
+        dynamic.push({ operation, line: line() });
         return;
       }
       const match = new RegExp(`^(${IDENT})`).exec(rest);
       const name = match?.[1];
       if (!match || !name || STOP_WORDS.has(name.toLowerCase())) return;
+      // `ORD_` & tenant: the real name is only known at runtime.
+      const next = rest.slice(match[0].length, match[0].length + 2);
+      if (next.startsWith(DYNAMIC) || next === `.${DYNAMIC}`) {
+        dynamic.push({ operation, line: line() });
+        return;
+      }
       if (!PSEUDO_TABLES.has(name.toLowerCase()))
-        tables.push({ table: name.toUpperCase(), operation, line });
+        tables.push({ table: name.toUpperCase(), operation, line: line() });
       rest = rest.slice(match[0].length);
       if (!list) return;
       // Optional alias, then a comma continues the FROM list.

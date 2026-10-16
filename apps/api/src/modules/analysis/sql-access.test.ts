@@ -34,3 +34,33 @@ describe('detectSqlAccess', () => {
     expect(at('UPDATE done').tables).toEqual([]);
   });
 });
+
+describe('detectSqlAccess on concatenated text', () => {
+  it('joins literals exactly as written', () => {
+    expect(at('SELECT * FROM ORD', 'ERS').tables).toEqual([
+      { table: 'ORDERS', operation: 'R', line: 1 },
+    ]);
+  });
+
+  it.each([
+    ['a name prefix', ['SELECT * FROM ORD_', null]],
+    ['a schema prefix', ['UPDATE HAN01.', null, ' SET A = 1']],
+  ])('reports %s joined to a runtime value as dynamic', (_label, texts) => {
+    const result = at(...texts);
+    expect(result.tables).toEqual([]);
+    expect(result.dynamic).toHaveLength(1);
+  });
+
+  it('skips SQL string literals and comments', () => {
+    expect(at("SELECT 'DELETE FROM SECRET' AS TXT FROM ORDERS").tables).toEqual(
+      [{ table: 'ORDERS', operation: 'R', line: 1 }],
+    );
+    expect(
+      at('SELECT * FROM ORDERS /* JOIN SECRET ON 1=1 */ -- DROP TABLE X')
+        .tables,
+    ).toEqual([{ table: 'ORDERS', operation: 'R', line: 1 }]);
+    expect(at("SELECT A FROM T1 WHERE B = '", null, "'").tables).toEqual([
+      { table: 'T1', operation: 'R', line: 1 },
+    ]);
+  });
+});

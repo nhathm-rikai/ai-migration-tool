@@ -9,6 +9,13 @@ import type {
   SqlTableFact,
 } from '../language-analyzer.js';
 import { detectSqlAccess, type SqlSegment } from '../sql-access.js';
+import {
+  findNameUses,
+  splitStatements,
+  tokenizeVb6,
+  Vb6StringTracker,
+  type CodePiece,
+} from './vb6-statement.js';
 import { lexVb6Line, type Vb6Continuation } from './vb6-line-lexer.js';
 
 // Counts metric vb6-physical-code-v1 for one .bas/.frm, splits procedures
@@ -22,7 +29,6 @@ const PROCEDURE_END = /^end\s+(sub|function|property)\b/i;
 const DECISION = /^(?:if|elseif|case(?!\s+else\b)|for|do|while)\b/i;
 const DECLARE =
   /^(?:(public|private|global)\s+)?declare\s+(?:sub|function)\s+([A-Za-z][A-Za-z0-9_]*)\s+lib\s+"([^"]*)"/i;
-const IDENTIFIER = /(?<![.\w])[A-Za-z][A-Za-z0-9_]*/g;
 
 const FORM_VERSION = /^version\s+\d/i;
 const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
@@ -64,62 +70,6 @@ function procedureKind(keyword: string): string {
   return keyword.toLowerCase().replace(/\s+/, '-');
 }
 
-// Splits one line of code into string literals and the code between them.
-function splitLiterals(code: string): { literals: string[]; gaps: string[] } {
-  const literals: string[] = [];
-  const gaps: string[] = [];
-  let gap = '';
-  for (let i = 0; i < code.length; i += 1) {
-    if (code[i] !== '"') {
-      gap += code[i];
-      continue;
-    }
-    gaps.push(gap);
-    gap = '';
-    let literal = '';
-    for (i += 1; i < code.length; i += 1) {
-      if (code[i] === '"') {
-        if (code[i + 1] === '"') {
-          literal += '"';
-          i += 1;
-        } else break;
-      } else literal += code[i];
-    }
-    literals.push(literal);
-  }
-  gaps.push(gap);
-  return { literals, gaps };
-}
-
-const TRIVIAL_GAP = /^[\s&_]*$/;
-// `x = "..."` or `x = x & "..."` builds a string; anything else concatenated
-// before a literal is a runtime value.
-const ACCUMULATE =
-  /^\s*(?:set\s+)?([A-Za-z][A-Za-z0-9_.]*)\s*=\s*(?:\1\s*&\s*)?$/i;
-
-// String literals of a line as SQL segments; a runtime expression joined by
-// `&` between or around literals becomes a null (dynamic) segment.
-function sqlSegments(code: string, line: number): SqlSegment[] {
-  const { literals, gaps } = splitLiterals(code);
-  if (literals.length === 0) return [];
-  const segments: SqlSegment[] = [];
-  const prefix = gaps[0] ?? '';
-  if (/\S\s*&\s*$/.test(prefix) && !ACCUMULATE.test(prefix))
-    segments.push({ text: null, line });
-  literals.forEach((literal, index) => {
-    if (index > 0 && !TRIVIAL_GAP.test(gaps[index] ?? ''))
-      segments.push({ text: null, line });
-    segments.push({ text: literal, line });
-  });
-  if (/&/.test(gaps.at(-1) ?? '') && !TRIVIAL_GAP.test(gaps.at(-1) ?? ''))
-    segments.push({ text: null, line });
-  return segments;
-}
-
-function stripLiterals(code: string): string {
-  return splitLiterals(code).gaps.join(' ');
-}
-
 export function analyzeVb6CodeFile(
   relativePath: string,
   lines: string[],
@@ -156,7 +106,35 @@ function scanVb6CodeFile(
   }
 
   const closed: OpenProcedure[] = [];
-  const sqlByOwner = new Map<string | null, SqlSegment[]>();
+  const sqlByOwner = new Map<string | null, SqlSegment[][]>();
+  const trackers = new Map<string | null, Vb6StringTracker>();
+  const trackerFor = (ownerId: string | null) => {
+    let tracker = trackers.get(ownerId);
+    if (!tracker) {
+      tracker = new Vb6StringTracker((segments) => {
+        const units = sqlByOwner.get(ownerId) ?? [];
+        units.push(segments);
+        sqlByOwner.set(ownerId, units);
+      });
+      trackers.set(ownerId, tracker);
+    }
+    return tracker;
+  };
+  // A logical statement: physical pieces joined across ` _` continuations.
+  let pending: { pieces: CodePiece[]; owner: OpenProcedure | null } | null =
+    null;
+  const finishStatement = () => {
+    if (!pending) return;
+    const ownerId = pending.owner?.id ?? null;
+    const ownerName = pending.owner?.name.toLowerCase() ?? null;
+    for (const statement of splitStatements(tokenizeVb6(pending.pieces))) {
+      trackerFor(ownerId).statement(statement);
+      if (options.names)
+        for (const use of findNameUses(statement, options.names, ownerName))
+          references.push({ procedureId: ownerId, ...use });
+    }
+    pending = null;
+  };
   const externalDeclarations: ExternalDeclaration[] = [];
   const labels: SourceLabel[] = [];
   const references: CodeReference[] = [];
@@ -181,13 +159,17 @@ function scanVb6CodeFile(
     else if (lexed.kind === 'comment') counters.commentOnlyLines += 1;
     else if (lexed.kind === 'unclassified') counters.unclassifiedLines += 1;
     if (lexed.label) labels.push({ name: lexed.label, line: lineNumber });
-    if (lexed.kind !== 'code') continue;
+    if (lexed.kind !== 'code') {
+      finishStatement();
+      continue;
+    }
 
     counters.codeLines += 1;
     // A physical line counts once, for the procedure open at its start or
     // the first one opened on it; `x = 1: End Sub` still closes the block.
     let owner: OpenProcedure | null = open;
     let decisions = 0;
+    const closedHere: OpenProcedure[] = [];
     for (const text of lexed.statementStarts) {
       const start = PROCEDURE_START.exec(text);
       const end = PROCEDURE_END.exec(text);
@@ -228,6 +210,7 @@ function scanVb6CodeFile(
           return unsupported('PROCEDURE_END_UNMATCHED', lineNumber);
         open.endLine = lineNumber;
         closed.push(open);
+        closedHere.push(open);
         open = null;
       }
     }
@@ -235,31 +218,37 @@ function scanVb6CodeFile(
       owner.codeLines += 1;
       owner.decisionPoints += decisions;
     }
-    const ownerId = owner?.id ?? null;
-    const segments = sqlSegments(lexed.code, lineNumber);
-    if (segments.length > 0)
-      sqlByOwner.set(ownerId, [
-        ...(sqlByOwner.get(ownerId) ?? []),
-        ...segments,
-      ]);
-    if (options.names)
-      for (const match of stripLiterals(lexed.code).matchAll(IDENTIFIER))
-        if (options.names.has(match[0].toLowerCase()))
-          references.push({
-            procedureId: ownerId,
-            name: match[0],
-            line: lineNumber,
-          });
+    pending ??= { pieces: [], owner };
+    pending.pieces.push({
+      text:
+        lexed.continuation === 'code'
+          ? lexed.code.replace(/_\s*$/, '')
+          : lexed.code,
+      line: lineNumber,
+    });
+    if (lexed.continuation !== 'code') finishStatement();
+    for (const procedure of closedHere) trackers.get(procedure.id)?.flush();
   }
   if (open) return unsupported('PROCEDURE_NOT_CLOSED', open.startLine);
+  finishStatement();
+  trackers.get(null)?.flush();
 
   const sqlTables: SqlTableFact[] = [];
   const dynamicSql: DynamicSqlFact[] = [];
-  for (const [procedureId, segments] of sqlByOwner) {
-    const detected = detectSqlAccess(segments);
-    sqlTables.push(...detected.tables.map((t) => ({ ...t, procedureId })));
-    dynamicSql.push(...detected.dynamic.map((d) => ({ ...d, procedureId })));
-  }
+  // A value inlined into another (strSQL = strSELECT & strFROM) is also
+  // emitted on its own; the same fact is kept once.
+  const seen = new Set<string>();
+  const once = (key: string) => !seen.has(key) && Boolean(seen.add(key));
+  for (const [procedureId, units] of sqlByOwner)
+    for (const segments of units) {
+      const detected = detectSqlAccess(segments);
+      for (const t of detected.tables)
+        if (once(`${procedureId}|${t.table}|${t.operation}|${t.line}`))
+          sqlTables.push({ ...t, procedureId });
+      for (const d of detected.dynamic)
+        if (once(`${procedureId}|*|${d.operation}|${d.line}`))
+          dynamicSql.push({ ...d, procedureId });
+    }
   const procedures = closed.map((procedure): ProcedureMetrics => ({
     id: procedure.id,
     kind: procedure.kind,

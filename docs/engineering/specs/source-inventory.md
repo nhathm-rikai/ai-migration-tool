@@ -8,8 +8,8 @@
 |---|---|---|
 | `schemaVersion` | `source-inventory-v1` | Hình dạng JSON. Thêm trường optional giữ version; đổi tên, bỏ hoặc đổi nghĩa trường phải tăng version. |
 | `metricVersion` | `vb6-physical-code-v1` | Cách đếm dòng, theo [source-analysis](source-analysis.md) §4. |
-| `sqlAccessVersion` | `sql-access-v0` | Cách trích bảng/CRUD. |
-| `callGraphVersion` | `call-graph-v0` | Cách nối lời gọi procedure. |
+| `sqlAccessVersion` | `sql-access-v1` | Cách dựng chuỗi SQL và trích bảng/CRUD. |
+| `callGraphVersion` | `call-graph-v1` | Cách nối lời gọi procedure, có lời gọi đệ quy. |
 | `complexityVersion` | `complexity-v0-draft` | Công thức điểm complexity, bản nháp chờ TL chốt. |
 
 Số liệu khác version không được trộn trong cùng report.
@@ -19,7 +19,7 @@ Số liệu khác version không được trộn trong cùng report.
 - `manifest`: path, vai trò, hash, encoding, số dòng theo [source-analysis](source-analysis.md) §2–3.
 - `analysis` (file code): `counters`, `procedures[]` (ID `<path>#<kind>:<name>`, `visibility`, dòng bắt đầu/kết thúc, `codeLines`, `decisionPoints`), `fileLevelCodeLines`.
 - `sqlTables[]`: bảng, thao tác `C|R|U|D|X`, dòng, procedure. `X` là DDL trên bảng (CREATE/DROP/TRUNCATE/ALTER TABLE), thường gặp với bảng tạm.
-- `dynamicSql[]`: vị trí tên bảng là biểu thức runtime. Parser gắn cờ, không đoán tên bảng.
+- `dynamicSql[]`: tên bảng là giá trị runtime, hoặc dính liền với giá trị runtime (`"FROM ORD_" & tenant`, `"UPDATE HAN01." & t`). Parser gắn cờ, không đoán tên bảng.
 - `externalDeclarations[]`: procedure khai báo từ thư viện native (VB6 `Declare ... Lib`, ví dụ Win32 API).
 - `labels[]`: label/số dòng dùng làm đích `GoTo`/`On Error`.
 
@@ -43,8 +43,13 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 
 ## 4. Giới hạn của phân tích lexical
 
-- Tìm tên procedure theo identifier ngoài string/comment. Lời gọi qua object (`Form1.Foo`, `obj.Method`) không nối được. Biến cục bộ trùng tên procedure global có thể bị nối nhầm.
-- SQL chỉ lấy từ string literal trong cùng procedure, theo thứ tự dòng. SQL truyền qua tham số sang procedure khác (ví dụ một hàm `ExecSql(strSQL)` dùng chung) được ghi ở nơi tạo chuỗi, không ở nơi thực thi.
+- Tìm tên procedure theo identifier ngoài string/comment, bỏ qua dòng khai báo (`Sub/Function/Property/Declare`). Trong chính procedure `F`, `F = ...` và `F` đứng trơn trong biểu thức là giá trị trả về; `F(...)`, `Call F` và `F args` ở đầu statement là lời gọi đệ quy. Lời gọi qua object (`Form1.Foo`, `obj.Method`) không nối được. Biến cục bộ trùng tên procedure global có thể bị nối nhầm.
+- Chuỗi SQL được dựng lại theo từng statement (đã nối dòng ` _`), trong một procedure:
+  - Literal nối bằng `&`/`+` được ghép đúng như viết, không chèn khoảng trắng (`"ORD" & "ERS"` là `ORDERS`).
+  - `x = "..."` giữ giá trị cho biến `x`; `x = x & ...` nối tiếp; gán lại `x` hoặc hết procedure thì giá trị cũ được phân tích như một câu SQL. Biến chứa phần SQL khác được ghép vào (`s = strSELECT & strFROM`).
+  - Biến không biết giá trị, lời gọi hàm, phần tử mảng là giá trị runtime. Chuỗi không gán vào biến (tham số `MsgBox`, `ExecuteSQL(...)`) là câu riêng, không ghép với SQL khác.
+- Trong câu SQL, string literal `'...'` và comment `--`, `/* */` bị bỏ qua khi tìm keyword.
+- SQL truyền qua tham số sang procedure khác (ví dụ một hàm `ExecSql(strSQL)` dùng chung) được ghi ở nơi tạo chuỗi, không ở nơi thực thi.
 - Đọc sequence (`SELECT seq.NEXTVAL FROM DUAL`) không sinh bảng.
 - Tên bảng giữ nguyên như trong source (`HAN01.KMTANT` và `KMTANT` là hai dòng). Gộp theo schema mặc định cần quyết định của TL.
 
@@ -70,4 +75,4 @@ npm run build -w @portal/contracts && npm run build -w @portal/api
 node apps/api/dist/cli/analyze-source.js --root <thư mục source> --out <inventory.json> [--summary <programs.csv>]
 ```
 
-CLI chỉ đọc source, bỏ qua symlink và file trên 16 MB (ghi vào `skipped`), từ chối ghi output vào trong thư mục source. `--summary` ghi một dòng mỗi program (CSV UTF-8 có BOM để mở bằng Excel). JSON vẫn là nguồn chuẩn.
+CLI chỉ đọc source, bỏ qua symlink và file trên 16 MB (ghi vào `skipped`). Trước khi đọc và ngay trước khi ghi, CLI so đường dẫn vật lý (đã giải symlink/junction, kể cả thư mục cha chưa tồn tại) và từ chối khi output nằm trong thư mục source hoặc `--out` và `--summary` là cùng một file. `--summary` ghi một dòng mỗi program (CSV UTF-8 có BOM để mở bằng Excel); ô text bắt đầu bằng `=`, `+`, `-`, `@`, tab hoặc CR được thêm `'` phía trước để Excel không hiểu thành công thức. JSON vẫn là nguồn chuẩn.

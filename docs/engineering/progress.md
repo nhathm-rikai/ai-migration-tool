@@ -8,6 +8,16 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 16/10/2026 — sửa 6 finding review A01b
+
+- Review `CHANGES_REQUIRED` (commit `83892a9`): cả 6 finding tái hiện được bằng dữ liệu giả lập trước khi sửa.
+- [P1] CLI so đường dẫn vật lý (giải symlink/junction, kể cả thư mục cha chưa tồn tại) trước khi đọc và ngay trước khi ghi; từ chối output trong source và `--out`/`--summary` trùng file vật lý. Code ở `apps/api/src/cli/output-guard.ts`, test dùng junction trên Windows, symlink trên macOS/Linux.
+- SQL `sql-access-v1`: dựng chuỗi theo statement/biến (`x = x & ...`, biến ghép biến, nối dòng ` _`), literal ghép đúng như viết, chuỗi không thuộc SQL không bị ghép vào; tên bảng dính giá trị runtime → `dynamicSql`; bỏ qua string `'...'` và comment `--`, `/* */` trong SQL; dòng của từng bảng là dòng viết tên bảng.
+- Call graph `call-graph-v1`: giữ lời gọi đệ quy; `F = ...` và `F` trơn trong `F` là giá trị trả về; dòng khai báo không tính là lời gọi.
+- CSV: ô text bắt đầu `= + - @`, tab, CR được thêm `'` (OWASP CSV injection).
+- Container Linux, Node 22: prettier, lint, typecheck, build pass; **200 test API** pass. Test FE trong container lỗi do bản `apps/web` trong container cũ hơn máy, không liên quan thay đổi này; cần `npm.cmd run check` trên Windows.
+- Source thật: 0 lỗi decode/unclassified, 277/284 complete, JSON hợp schema; complexity 15 program pilot không đổi (15/15). CRUD tìm thêm bảng ghép qua biến (ví dụ `KTUJNL2` trong KTBO0020).
+
 ## 15/10/2026 — hoàn thiện parser theo output P1 (A01b)
 
 - Dùng `portal-implement`; scope feature / analysis / CLI dev. Không đổi FE, HTTP contract, DB hay dependency. Source khách hàng chỉ đọc trên máy, không copy vào repo.

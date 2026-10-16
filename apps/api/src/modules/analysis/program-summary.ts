@@ -26,8 +26,14 @@ const COLUMNS = [
   'complexityLevel',
 ] as const;
 
+// Text that a spreadsheet would read as a formula (OWASP CSV injection) is
+// prefixed with an apostrophe so Excel shows it as text.
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function csvCell(value: string | number | boolean | null): string {
-  const text = value === null ? '' : String(value);
+  if (value === null) return '';
+  if (typeof value !== 'string') return String(value);
+  const text = FORMULA_START.test(value) ? `'${value}` : value;
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 

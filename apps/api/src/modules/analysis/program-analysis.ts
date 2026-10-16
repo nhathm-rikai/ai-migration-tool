@@ -10,7 +10,7 @@ import type { SqlOperation } from './sql-access.js';
 // is lexical; a name that matches several procedures stays ambiguous instead
 // of being guessed.
 
-export const CALL_GRAPH_VERSION = 'call-graph-v0';
+export const CALL_GRAPH_VERSION = 'call-graph-v1';
 export const COMPLEXITY_VERSION = 'complexity-v0-draft';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
@@ -106,8 +106,6 @@ export function callableNames(analyses: readonly AnalyzedFile[]): Set<string> {
 type Callable = {
   id: string;
   relativePath: string;
-  // Lines that define the callable; a use there is not a call.
-  definitionLine: number;
   global: boolean;
   external: { name: string; library: string } | null;
 };
@@ -126,7 +124,6 @@ function buildCalls(files: readonly ProgramFile[]) {
       add(procedure.name, {
         id: procedure.id,
         relativePath: file.relativePath,
-        definitionLine: procedure.startLine,
         global: procedure.visibility === 'global',
         external: null,
       });
@@ -134,7 +131,6 @@ function buildCalls(files: readonly ProgramFile[]) {
       add(declaration.name, {
         id: `${file.relativePath}#declare:${declaration.name}`,
         relativePath: file.relativePath,
-        definitionLine: declaration.line,
         global: declaration.visibility === 'global',
         external: { name: declaration.name, library: declaration.library },
       });
@@ -148,17 +144,10 @@ function buildCalls(files: readonly ProgramFile[]) {
       const key = reference.name.toLowerCase();
       const from = reference.procedureId ?? fileOwner(file.relativePath);
       const localTargets = local?.get(key) ?? [];
-      const candidates = (
-        localTargets.length > 0 ? localTargets : (globals.get(key) ?? [])
-      ).filter(
-        (callable) =>
-          // The definition itself, and VB-style assignment of a function's
-          // return value inside its own body, are not calls.
-          !(
-            callable.relativePath === file.relativePath &&
-            callable.definitionLine === reference.line
-          ) && callable.id !== from,
-      );
+      // Declarations and return-value assignments were already left out
+      // by the analyzer, so a self-reference here is real recursion.
+      const candidates =
+        localTargets.length > 0 ? localTargets : (globals.get(key) ?? []);
       if (candidates.length === 0) continue;
       const [first] = candidates;
       const resolution: CallResolution =

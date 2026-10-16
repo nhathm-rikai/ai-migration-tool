@@ -1,15 +1,17 @@
 // Developer/TL command: builds a source inventory for a local folder and
-// writes it as JSON. Read-only on the source; never follows symlinks and
-// refuses to write the report inside the analyzed folder.
+// writes it as JSON. Read-only on the source; never follows symlinks while
+// reading and refuses outputs whose physical path is inside the analyzed
+// folder or that collide with each other (see output-guard.ts).
 //
 //   node apps/api/dist/cli/analyze-source.js --root <dir> --out <file.json>
 //     [--profile vb6-cp932-v1] [--summary <programs.csv>]
 import { lstat, readdir, readFile, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { programSummaryCsv } from '../modules/analysis/program-summary.js';
 import { buildSourceInventory } from '../modules/analysis/source-inventory.js';
 import { findSourceProfile } from '../modules/analysis/source-profiles.js';
+import { checkOutputs } from './output-guard.js';
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 
@@ -40,11 +42,6 @@ async function collectFiles(root: string) {
   return { files, skipped };
 }
 
-function isInside(parent: string, child: string): boolean {
-  const path = relative(parent, child);
-  return path === '' || (!path.startsWith('..') && !isAbsolute(path));
-}
-
 export async function main(argv: string[]): Promise<number> {
   const { values } = parseArgs({
     args: argv,
@@ -65,12 +62,20 @@ export async function main(argv: string[]): Promise<number> {
   const root = resolve(values.root);
   const out = resolve(values.out);
   const summary = values.summary ? resolve(values.summary) : null;
-  if (isInside(root, out) || (summary && isInside(root, summary))) {
-    console.error('The report must be written outside the source folder.');
+  const outputs = summary ? [out, summary] : [out];
+  const refused = await checkOutputs(root, outputs);
+  if (refused) {
+    console.error(refused);
     return 2;
   }
   const { files, skipped } = await collectFiles(root);
   const inventory = buildSourceInventory({ profile, files });
+  // Checked again right before writing: links may change while reading.
+  const changed = await checkOutputs(root, outputs);
+  if (changed) {
+    console.error(changed);
+    return 2;
+  }
   await writeFile(out, JSON.stringify({ ...inventory, skipped }, null, 2));
   if (summary) await writeFile(summary, programSummaryCsv(inventory));
   const { totals } = inventory;

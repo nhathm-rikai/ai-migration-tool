@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { LineCounters } from '../language-analyzer.js';
 import { decodeSourceBytes } from '../source-decoder.js';
 import { splitSourceLines } from '../source-text.js';
-import { analyzeVb6CodeFile } from './vb6-code-file.js';
+import { analyzeVb6CodeFile, findVb6References } from './vb6-code-file.js';
 
 const FIXTURE = new URL(
   '../../../../../../tests/fixtures/vb6-sample/',
@@ -55,33 +55,41 @@ describe('fixture SAMPLE.BAS (CP932, CRLF)', () => {
         id: 'programs/SAMPLE/SAMPLE.BAS#function:CalcTotal',
         kind: 'function',
         name: 'CalcTotal',
+        visibility: 'global',
         startLine: 13,
         endLine: 20,
         codeLines: 6,
+        decisionPoints: 1,
       },
       {
         id: 'programs/SAMPLE/SAMPLE.BAS#sub:ShowMessage',
         kind: 'sub',
         name: 'ShowMessage',
+        visibility: 'private',
         startLine: 22,
         endLine: 29,
         codeLines: 5,
+        decisionPoints: 0,
       },
       {
         id: 'programs/SAMPLE/SAMPLE.BAS#property-get:Count',
         kind: 'property-get',
         name: 'Count',
+        visibility: 'global',
         startLine: 31,
         endLine: 33,
         codeLines: 3,
+        decisionPoints: 0,
       },
       {
         id: 'programs/SAMPLE/SAMPLE.BAS#property-let:Count',
         kind: 'property-let',
         name: 'Count',
+        visibility: 'global',
         startLine: 34,
         endLine: 36,
         codeLines: 3,
+        decisionPoints: 0,
       },
     ]);
   });
@@ -197,5 +205,67 @@ describe('structure errors are unsupported, never zero LoC', () => {
         { form: false },
       ),
     ).toMatchObject({ procedures: [], fileLevelCodeLines: 2 });
+  });
+});
+
+describe('static facts', () => {
+  const lines = [
+    'Private Declare Function GetTickCount Lib "kernel32" () As Long',
+    'Public Sub Load(ByVal tableName As String)',
+    '    Dim strSQL As String',
+    '    strSQL = "SELECT A.F001, B.F002 FROM HAN01.KMTANT A, KMBUMON B "',
+    '    strSQL = strSQL & " WHERE A.F001 = :F001"',
+    '    strSQL = "INSERT INTO WKTABLE (F001) SELECT F001 FROM DUAL"',
+    '    strSQL = "UPDATE " & tableName & " SET F001 = 1"',
+    '    strSQL = "DELETE FROM HAN01.KMTANT WHERE F001 = 1"',
+    'Retry:',
+    '    If GetTickCount() > 0 Then Call LogText("UPDATE done")',
+    '    Select Case 1',
+    '    Case 1: x = 1',
+    '    Case Else: x = 2',
+    '    End Select',
+    'End Sub',
+  ];
+  const result = analyzeVb6CodeFile('m/LOAD.BAS', lines, { form: false });
+  if (result.status !== 'analyzed') throw new Error(result.status);
+
+  it('extracts tables per operation and flags a runtime table name', () => {
+    expect(result.sqlTables.map((t) => [t.table, t.operation, t.line])).toEqual(
+      [
+        ['WKTABLE', 'C', 6],
+        ['HAN01.KMTANT', 'D', 8],
+        ['HAN01.KMTANT', 'R', 4],
+        ['KMBUMON', 'R', 4],
+      ],
+    );
+    expect(result.dynamicSql).toEqual([
+      { operation: 'U', line: 7, procedureId: 'm/LOAD.BAS#sub:Load' },
+    ]);
+  });
+
+  it('records Declare, labels and decision points', () => {
+    expect(result.externalDeclarations).toEqual([
+      {
+        name: 'GetTickCount',
+        library: 'kernel32',
+        visibility: 'private',
+        line: 1,
+      },
+    ]);
+    expect(result.labels).toEqual([{ name: 'Retry', line: 9 }]);
+    // If + Case 1; Case Else and Select Case are not counted.
+    expect(result.procedures[0]?.decisionPoints).toBe(2);
+  });
+
+  it('finds identifier uses outside strings and comments', () => {
+    const references = findVb6References('m/LOAD.BAS', lines, {
+      form: false,
+      names: new Set(['gettickcount', 'logtext', 'update']),
+    });
+    expect(references.map((r) => [r.name, r.line, r.procedureId])).toEqual([
+      ['GetTickCount', 1, null],
+      ['GetTickCount', 10, 'm/LOAD.BAS#sub:Load'],
+      ['LogText', 10, 'm/LOAD.BAS#sub:Load'],
+    ]);
   });
 });

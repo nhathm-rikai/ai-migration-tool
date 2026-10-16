@@ -82,6 +82,8 @@ Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name kh�
 
 `src/modules/analysis/` đọc bytes đã có sẵn trong bộ nhớ và trả inventory; không tự đọc filesystem, không gọi AI. Thứ tự đọc: `source-decoder.ts` → `source-text.ts` → `source-manifest.ts` → `vb6/vb6-line-lexer.ts` → `vb6/vb6-code-file.ts` → `source-inventory.ts`. Thêm ngôn ngữ: tạo analyzer theo `language-analyzer.ts`, đăng ký profile trong `source-profiles.ts`, thêm fixture/test; core không đổi. Metric và encoding theo [source-analysis](../../docs/engineering/specs/source-analysis.md); fixture ở `tests/fixtures/vb6-sample/`.
 
+Sau `source-inventory.ts`, `sql-access.ts` trích bảng/CRUD và `program-analysis.ts` dựng call graph, CRUD, metrics và complexity v0 theo program. Hình dạng JSON và giới hạn theo [source-inventory](../../docs/engineering/specs/source-inventory.md); schema ở `@portal/contracts`. Lệnh dev/TL: `node apps/api/dist/cli/analyze-source.js --root <source> --out <inventory.json> [--summary <programs.csv>]` (chỉ đọc source, chưa nối API/job).
+
 ## Sửa file nào khi có task mới?
 
 - **Thêm description**: contract request/response → `0002-project-description.sql` → repository mapping → service nếu có policy → integration test, gồm upgrade DB có dữ liệu. Chưa cần tạo UI khi task chỉ BE.

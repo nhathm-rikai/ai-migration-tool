@@ -1,7 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  SourceInventorySchema,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
+import { Check, Errors } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
+import { programSummaryCsv } from './program-summary.js';
 import { buildSourceInventory } from './source-inventory.js';
 import { findSourceProfile, type SourceProfile } from './source-profiles.js';
 
@@ -98,6 +104,13 @@ describe('buildSourceInventory on the vb6-sample fixture', () => {
       'stdole2.tlb',
       'SPIN32.OCX',
     ]);
+  });
+
+  it('matches the published source-inventory-v1 schema', () => {
+    // Compile-time: the producer type is assignable to the contract.
+    const document: SourceInventoryDocument = inventory;
+    expect([...Errors(SourceInventorySchema, document)]).toEqual([]);
+    expect(Check(SourceInventorySchema, document)).toBe(true);
   });
 
   it('is deterministic for the same bytes and profile', () => {
@@ -204,4 +217,50 @@ it('records a UTF-32 file as a decode error, not as analyzed code', () => {
     errorFiles: 1,
     analyzedCodeFiles: 0,
   });
+});
+
+it('marks modules listed by several programs as shared and links calls', () => {
+  const text = (relativePath: string, body: string) => ({
+    relativePath,
+    bytes: Buffer.from(body.replaceAll('\n', '\r\n')),
+  });
+  const inventory = buildSourceInventory({
+    profile: profile(),
+    files: [
+      text('a/A.VBP', 'Type=Exe\nModule=A; A.BAS\nModule=C; ..\\cmn\\C.TXT\n'),
+      text('b/B.VBP', 'Type=Exe\nModule=C; ..\\cmn\\C.TXT\n'),
+      text('a/A.BAS', 'Sub Main()\n    LogIt\nEnd Sub\n'),
+      text(
+        'cmn/C.TXT',
+        'Public Sub LogIt()\n    x = "SELECT 1 FROM T1"\nEnd Sub\n',
+      ),
+    ],
+  });
+  const program = inventory.programs.find((p) => p.projectPath === 'a/A.VBP');
+  expect(program?.members.map((m) => [m.relativePath, m.shared])).toEqual([
+    ['a/A.BAS', false],
+    ['cmn/C.TXT', true],
+  ]);
+  expect(program?.analysis?.calls).toMatchObject([
+    { name: 'LogIt', resolution: 'program', targets: ['cmn/C.TXT#sub:LogIt'] },
+  ]);
+  expect(program?.analysis?.crud).toMatchObject([
+    { table: 'T1', operations: ['R'], viaSharedOnly: true },
+  ]);
+  expect(program?.analysis?.metrics.ownCodeLines).toBe(3);
+});
+
+it('writes one CSV row per program with a BOM and quoted cells', () => {
+  const inventory = buildSourceInventory({
+    profile: profile(),
+    files: [
+      {
+        relativePath: 'P.VBP',
+        bytes: Buffer.from('Type=Exe\r\nName="A, B"\r\n'),
+      },
+    ],
+  });
+  const [header, row] = programSummaryCsv(inventory).split('\r\n');
+  expect(header?.startsWith('\uFEFFprojectPath,name,status')).toBe(true);
+  expect(row?.startsWith('P.VBP,"A, B",parsed,true,0,0,0,0')).toBe(true);
 });

@@ -1,17 +1,28 @@
 import type {
   CodeFileAnalysis,
+  CodeReference,
+  DynamicSqlFact,
+  ExternalDeclaration,
   LineCounters,
   ProcedureMetrics,
+  SourceLabel,
+  SqlTableFact,
 } from '../language-analyzer.js';
+import { detectSqlAccess, type SqlSegment } from '../sql-access.js';
 import { lexVb6Line, type Vb6Continuation } from './vb6-line-lexer.js';
 
-// Counts metric vb6-physical-code-v1 for one .bas/.frm and splits procedures
-// (specs/source-analysis.md §4).
+// Counts metric vb6-physical-code-v1 for one .bas/.frm, splits procedures
+// (specs/source-analysis.md §4) and collects static facts: SQL table
+// access, Declare (Win32 API), labels, decision points, identifier uses.
 
 const ATTRIBUTE = /^attribute\s/i;
 const PROCEDURE_START =
-  /^(?:(?:public|private|friend|static)\s+)*(sub|function|property\s+(?:get|let|set))\s+([A-Za-z][A-Za-z0-9_]*)/i;
+  /^((?:(?:public|private|friend|static)\s+)*)(sub|function|property\s+(?:get|let|set))\s+([A-Za-z][A-Za-z0-9_]*)/i;
 const PROCEDURE_END = /^end\s+(sub|function|property)\b/i;
+const DECISION = /^(?:if|elseif|case(?!\s+else\b)|for|do|while)\b/i;
+const DECLARE =
+  /^(?:(public|private|global)\s+)?declare\s+(?:sub|function)\s+([A-Za-z][A-Za-z0-9_]*)\s+lib\s+"([^"]*)"/i;
+const IDENTIFIER = /(?<![.\w])[A-Za-z][A-Za-z0-9_]*/g;
 
 const FORM_VERSION = /^version\s+\d/i;
 const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
@@ -53,26 +64,102 @@ function procedureKind(keyword: string): string {
   return keyword.toLowerCase().replace(/\s+/, '-');
 }
 
+// Splits one line of code into string literals and the code between them.
+function splitLiterals(code: string): { literals: string[]; gaps: string[] } {
+  const literals: string[] = [];
+  const gaps: string[] = [];
+  let gap = '';
+  for (let i = 0; i < code.length; i += 1) {
+    if (code[i] !== '"') {
+      gap += code[i];
+      continue;
+    }
+    gaps.push(gap);
+    gap = '';
+    let literal = '';
+    for (i += 1; i < code.length; i += 1) {
+      if (code[i] === '"') {
+        if (code[i + 1] === '"') {
+          literal += '"';
+          i += 1;
+        } else break;
+      } else literal += code[i];
+    }
+    literals.push(literal);
+  }
+  gaps.push(gap);
+  return { literals, gaps };
+}
+
+const TRIVIAL_GAP = /^[\s&_]*$/;
+// `x = "..."` or `x = x & "..."` builds a string; anything else concatenated
+// before a literal is a runtime value.
+const ACCUMULATE =
+  /^\s*(?:set\s+)?([A-Za-z][A-Za-z0-9_.]*)\s*=\s*(?:\1\s*&\s*)?$/i;
+
+// String literals of a line as SQL segments; a runtime expression joined by
+// `&` between or around literals becomes a null (dynamic) segment.
+function sqlSegments(code: string, line: number): SqlSegment[] {
+  const { literals, gaps } = splitLiterals(code);
+  if (literals.length === 0) return [];
+  const segments: SqlSegment[] = [];
+  const prefix = gaps[0] ?? '';
+  if (/\S\s*&\s*$/.test(prefix) && !ACCUMULATE.test(prefix))
+    segments.push({ text: null, line });
+  literals.forEach((literal, index) => {
+    if (index > 0 && !TRIVIAL_GAP.test(gaps[index] ?? ''))
+      segments.push({ text: null, line });
+    segments.push({ text: literal, line });
+  });
+  if (/&/.test(gaps.at(-1) ?? '') && !TRIVIAL_GAP.test(gaps.at(-1) ?? ''))
+    segments.push({ text: null, line });
+  return segments;
+}
+
+function stripLiterals(code: string): string {
+  return splitLiterals(code).gaps.join(' ');
+}
+
 export function analyzeVb6CodeFile(
   relativePath: string,
   lines: string[],
   options: { form: boolean },
 ): CodeFileAnalysis {
+  return scanVb6CodeFile(relativePath, lines, options).analysis;
+}
+
+export function findVb6References(
+  relativePath: string,
+  lines: string[],
+  options: { form: boolean; names: ReadonlySet<string> },
+): CodeReference[] {
+  return scanVb6CodeFile(relativePath, lines, options).references;
+}
+
+function scanVb6CodeFile(
+  relativePath: string,
+  lines: string[],
+  options: { form: boolean; names?: ReadonlySet<string> },
+): { analysis: CodeFileAnalysis; references: CodeReference[] } {
+  const unsupported = (reason: string, line: number | null) => ({
+    analysis: { status: 'unsupported' as const, reason, line },
+    references: [],
+  });
   const counters = emptyCounters(lines.length);
   let codeStart = 0;
   if (options.form) {
     const designerEnd = findDesignerEnd(lines);
     if (designerEnd === null)
-      return {
-        status: 'unsupported',
-        reason: 'FORM_DESIGNER_BOUNDARY_NOT_FOUND',
-        line: null,
-      };
+      return unsupported('FORM_DESIGNER_BOUNDARY_NOT_FOUND', null);
     counters.designerLines = designerEnd;
     codeStart = designerEnd;
   }
 
   const closed: OpenProcedure[] = [];
+  const sqlByOwner = new Map<string | null, SqlSegment[]>();
+  const externalDeclarations: ExternalDeclaration[] = [];
+  const labels: SourceLabel[] = [];
+  const references: CodeReference[] = [];
   let open: OpenProcedure | null = null;
   let incoming: Vb6Continuation = 'none';
   let metadataContinues = false;
@@ -93,73 +180,111 @@ export function analyzeVb6CodeFile(
     if (lexed.kind === 'blank') counters.blankLines += 1;
     else if (lexed.kind === 'comment') counters.commentOnlyLines += 1;
     else if (lexed.kind === 'unclassified') counters.unclassifiedLines += 1;
+    if (lexed.label) labels.push({ name: lexed.label, line: lineNumber });
     if (lexed.kind !== 'code') continue;
 
     counters.codeLines += 1;
     // A physical line counts once, for the procedure open at its start or
     // the first one opened on it; `x = 1: End Sub` still closes the block.
     let owner: OpenProcedure | null = open;
+    let decisions = 0;
     for (const text of lexed.statementStarts) {
       const start = PROCEDURE_START.exec(text);
       const end = PROCEDURE_END.exec(text);
+      if (DECISION.test(text)) decisions += 1;
+      const declare = DECLARE.exec(text);
+      if (declare)
+        externalDeclarations.push({
+          name: declare[2] ?? '',
+          library: declare[3] ?? '',
+          visibility:
+            declare[1]?.toLowerCase() === 'private' || options.form
+              ? 'private'
+              : 'global',
+          line: lineNumber,
+        });
       if (start) {
-        if (open)
-          return {
-            status: 'unsupported',
-            reason: 'PROCEDURE_NOT_CLOSED',
-            line: lineNumber,
-          };
-        const kind = procedureKind(start[1] ?? '');
-        const name = start[2] ?? '';
+        if (open) return unsupported('PROCEDURE_NOT_CLOSED', lineNumber);
+        const kind = procedureKind(start[2] ?? '');
+        const name = start[3] ?? '';
         open = {
           id: `${relativePath}#${kind}:${name}`,
           kind,
           name,
+          visibility: /\bprivate\b/i.test(start[1] ?? '')
+            ? 'private'
+            : options.form
+              ? 'public'
+              : 'global',
           startLine: lineNumber,
           endLine: lineNumber,
           codeLines: 0,
+          decisionPoints: 0,
           block: kind.split('-')[0] ?? kind,
         };
         owner ??= open;
       } else if (end) {
         if (!open || open.block !== end[1]?.toLowerCase())
-          return {
-            status: 'unsupported',
-            reason: 'PROCEDURE_END_UNMATCHED',
-            line: lineNumber,
-          };
+          return unsupported('PROCEDURE_END_UNMATCHED', lineNumber);
         open.endLine = lineNumber;
         closed.push(open);
         open = null;
       }
     }
-    if (owner) owner.codeLines += 1;
+    if (owner) {
+      owner.codeLines += 1;
+      owner.decisionPoints += decisions;
+    }
+    const ownerId = owner?.id ?? null;
+    const segments = sqlSegments(lexed.code, lineNumber);
+    if (segments.length > 0)
+      sqlByOwner.set(ownerId, [
+        ...(sqlByOwner.get(ownerId) ?? []),
+        ...segments,
+      ]);
+    if (options.names)
+      for (const match of stripLiterals(lexed.code).matchAll(IDENTIFIER))
+        if (options.names.has(match[0].toLowerCase()))
+          references.push({
+            procedureId: ownerId,
+            name: match[0],
+            line: lineNumber,
+          });
   }
-  if (open)
-    return {
-      status: 'unsupported',
-      reason: 'PROCEDURE_NOT_CLOSED',
-      line: open.startLine,
-    };
+  if (open) return unsupported('PROCEDURE_NOT_CLOSED', open.startLine);
 
-  const procedures = closed.map(
-    ({ id, kind, name, startLine, endLine, codeLines }): ProcedureMetrics => ({
-      id,
-      kind,
-      name,
-      startLine,
-      endLine,
-      codeLines,
-    }),
-  );
+  const sqlTables: SqlTableFact[] = [];
+  const dynamicSql: DynamicSqlFact[] = [];
+  for (const [procedureId, segments] of sqlByOwner) {
+    const detected = detectSqlAccess(segments);
+    sqlTables.push(...detected.tables.map((t) => ({ ...t, procedureId })));
+    dynamicSql.push(...detected.dynamic.map((d) => ({ ...d, procedureId })));
+  }
+  const procedures = closed.map((procedure): ProcedureMetrics => ({
+    id: procedure.id,
+    kind: procedure.kind,
+    name: procedure.name,
+    visibility: procedure.visibility,
+    startLine: procedure.startLine,
+    endLine: procedure.endLine,
+    codeLines: procedure.codeLines,
+    decisionPoints: procedure.decisionPoints,
+  }));
   const procedureCodeLines = procedures.reduce(
     (sum, procedure) => sum + procedure.codeLines,
     0,
   );
   return {
-    status: 'analyzed',
-    counters,
-    procedures,
-    fileLevelCodeLines: counters.codeLines - procedureCodeLines,
+    analysis: {
+      status: 'analyzed',
+      counters,
+      procedures,
+      fileLevelCodeLines: counters.codeLines - procedureCodeLines,
+      sqlTables,
+      dynamicSql,
+      externalDeclarations,
+      labels,
+    },
+    references,
   };
 }

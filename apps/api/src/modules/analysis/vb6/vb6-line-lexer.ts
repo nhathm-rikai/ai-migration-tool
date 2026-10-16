@@ -12,7 +12,11 @@ export type Vb6Line = {
   firstStatement: string | null;
   // Every statement that starts on this line (after a label or ':'),
   // trimmed and non-empty; the continued head of a statement is excluded.
-  statementStarts: string[];
+  statementStarts: readonly string[];
+  // Code before any comment (label removed); '' for non-code lines.
+  code: string;
+  // Label or line number that starts the line, if any.
+  label: string | null;
   continuation: Vb6Continuation;
 };
 
@@ -39,12 +43,17 @@ const STATEMENT_KEYWORDS = new Set([
 const REM = /^rem(?:\s|$)/i;
 const CONTINUATION = /(?:^|\s)_$/;
 
-function stripLabel(text: string): string {
+function stripLabel(text: string): { rest: string; label: string | null } {
   const match = LABEL.exec(text);
   if (!match || STATEMENT_KEYWORDS.has(match[1]?.toLowerCase() ?? ''))
-    return text;
-  return text.slice(match[0].length);
+    return { rest: text, label: null };
+  return {
+    rest: text.slice(match[0].length),
+    label: match[0].trim().replace(/:$/, ''),
+  };
 }
+
+const NON_CODE = { statementStarts: [], code: '', label: null } as const;
 
 // Returns the index where a comment starts (or -1), whether a string is left
 // open, and the ':'-separated statements before the comment.
@@ -93,24 +102,25 @@ export function lexVb6Line(text: string, incoming: Vb6Continuation): Vb6Line {
     return {
       kind: 'blank',
       firstStatement: null,
-      statementStarts: [],
+      ...NON_CODE,
       continuation: 'none',
     };
   if (incoming === 'comment')
     return {
       kind: 'comment',
       firstStatement: null,
-      statementStarts: [],
+      ...NON_CODE,
       continuation: CONTINUATION.test(text.trimEnd()) ? 'comment' : 'none',
     };
 
-  const rest = incoming === 'none' ? stripLabel(text) : text;
+  const { rest, label } =
+    incoming === 'none' ? stripLabel(text) : { rest: text, label: null };
   const { commentStart, openString, statements } = scan(rest);
   if (openString)
     return {
       kind: 'unclassified',
       firstStatement: null,
-      statementStarts: [],
+      ...NON_CODE,
       continuation: 'none',
     };
 
@@ -134,6 +144,8 @@ export function lexVb6Line(text: string, incoming: Vb6Continuation): Vb6Line {
       .slice(incoming === 'none' ? 0 : 1)
       .map((statement) => statement.trim())
       .filter((statement) => statement !== ''),
+    code: commentStart >= 0 ? rest.slice(0, commentStart) : rest,
+    label,
     continuation,
   };
 }

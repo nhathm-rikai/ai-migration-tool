@@ -5,8 +5,19 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 ## Phạm vi hiện tại
 
 - Gate init FE + BE; Projects/UI/API/storage, fixture + fake runner. Fastify → service → repository, SQLite thật, TypeBox contracts.
-- Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC VB6) tại `apps/api/src/modules/analysis`, chưa nối API/job hay đọc source thật. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
+- Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
+
+## 15/10/2026 — hoàn thiện parser theo output P1 (A01b)
+
+- Dùng `portal-implement`; scope feature / analysis / CLI dev. Không đổi FE, HTTP contract, DB hay dependency. Source khách hàng chỉ đọc trên máy, không copy vào repo.
+- SQL/CRUD lexical `sql-access-v0`: bảng từ string literal theo procedure (INSERT/SELECT…FROM/JOIN/UPDATE/DELETE, DDL `X` cho bảng tạm); tên bảng là biểu thức runtime → `dynamicSql`, không đoán. Thêm `Declare` (API native), label, `decisionPoints`, `visibility`.
+- Program: `shared` cho file nhiều program dùng; call graph `call-graph-v0` (local/program/external/ambiguous, không chọn bừa khi trùng tên); CRUD từ code riêng + procedure shared gọi tới được; metrics và complexity `complexity-v0-draft` (nháp, TL chốt). Schema TypeBox `source-inventory-v1` trong contracts, test kiểm inventory khớp schema. Đặc tả [source-inventory](specs/source-inventory.md).
+- CLI `analyze-source`: walk thư mục, bỏ symlink/file > 16 MB, từ chối output trong thư mục source, `--summary` xuất CSV theo program.
+- Sửa khi chạy source thật: key `.vbp` có ngoặc (`FavorPentiumPro(tm)=0`), module khai báo trong `.vbp` dạng `.TXT` được phân tích như code.
+- Container Linux, Node 22: prettier (apps/api, packages, tests), lint, typecheck, **174 BE tests/19 files** (cả FE tests trong `npm test`), build, `verify-repository` pass. Chưa chạy `npm.cmd run check` trên Windows sau thay đổi này.
+- Source thật (784 file, 284 `.vbp`): 0 lỗi decode, 0 dòng unclassified, 277/284 program complete (7 thiếu `cmn/SFTP.bas`), JSON hợp lệ schema. 1336/1357 procedure gọi ExecuteSQL/CreateDynaset có bảng; phần còn lại là sequence từ DUAL hoặc SQL truyền qua tham số. 15 program pilot: complexity v0 khớp Low/Medium/High 15/15 (ngưỡng chọn theo chính danh sách này).
+- Còn mở: TL chốt Executable/SQL LoC, công thức complexity, gộp tên bảng có/không schema; xlsx export; đếm tay 1.5; nối API/job.
 
 ## 15/10/2026 — xác minh parser A01a trên Windows
 

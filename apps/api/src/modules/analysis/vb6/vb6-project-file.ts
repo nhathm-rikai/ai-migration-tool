@@ -62,7 +62,8 @@ function parseComponent(value: string): ProjectExternalReference {
 // A VB6 project starts its main section with Type=<project type>; any other
 // content is reported unsupported instead of an empty, "complete" program.
 const PROJECT_TYPES = new Set(['exe', 'oledll', 'oleexe', 'control']);
-const KEY_VALUE = /^[A-Za-z][A-Za-z0-9_]*\s*=/;
+// Keys may contain punctuation, e.g. `FavorPentiumPro(tm)=0`.
+const KEY_VALUE = /^[^=\s][^=]*=/;
 
 export function parseVb6ProjectFile(lines: string[]): ProjectFileAnalysis {
   let name: string | null = null;

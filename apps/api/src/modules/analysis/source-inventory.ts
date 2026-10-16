@@ -1,5 +1,8 @@
+import { SOURCE_INVENTORY_SCHEMA_VERSION } from '@portal/contracts';
 import type {
   CodeFileAnalysis,
+  CodeReference,
+  SourceFileRole,
   LineCounters,
   ProjectExternalReference,
   ProjectMember,
@@ -15,12 +18,21 @@ import {
 } from './source-decoder.js';
 import { SOURCE_NORMALIZATION_VERSION } from './source-text.js';
 import type { SourceProfile } from './source-profiles.js';
+import {
+  analyzeProgram,
+  CALL_GRAPH_VERSION,
+  callableNames,
+  COMPLEXITY_VERSION,
+  type ProgramAnalysis,
+  type ProgramFile,
+} from './program-analysis.js';
+import { SQL_ACCESS_VERSION } from './sql-access.js';
 
 // Language-neutral inventory: per-file counters/procedures, programs from
 // project files and coverage. Pure function over bytes already read by the
 // workspace layer; it never touches the filesystem or calls AI.
 
-export const SOURCE_INVENTORY_SCHEMA_VERSION = 'source-inventory-v1';
+export { SOURCE_INVENTORY_SCHEMA_VERSION };
 
 export type InventoryFile = {
   manifest: ManifestEntry;
@@ -41,6 +53,9 @@ export type InventoryProgramMember = ProjectMember & {
   relativePath: string | null;
   resolution: MemberResolution;
   fileStatus: MemberFileStatus | null;
+  // Listed by more than one program (e.g. a common module); its LoC is not
+  // the program's own.
+  shared: boolean;
 };
 
 export type InventoryProgram = {
@@ -57,6 +72,8 @@ export type InventoryProgram = {
   // True only when the project parsed, every member resolved to an analyzed
   // file and no line was left unclassified.
   complete: boolean;
+  // Call graph, CRUD, metrics and draft complexity; null when not parsed.
+  analysis: ProgramAnalysis | null;
 };
 
 export type SourceInventory = {
@@ -66,6 +83,9 @@ export type SourceInventory = {
   metricVersion: string;
   decoderVersion: string;
   normalizationVersion: string;
+  sqlAccessVersion: string;
+  callGraphVersion: string;
+  complexityVersion: string;
   snapshotHash: string;
   files: InventoryFile[];
   programs: InventoryProgram[];
@@ -122,33 +142,38 @@ export function buildSourceInventory(input: {
   encodingOverrides?: ReadonlyMap<string, ProfileEncoding>;
 }): SourceInventory {
   const { analyzer } = input.profile;
-  const files = new Map<string, InventoryFile>();
-  const projects: { path: string; lines: string[] }[] = [];
-
+  const sources = new Map<string, Uint8Array>();
+  const byLowerPath = new Map<string, string[]>();
   for (const source of input.files) {
-    if (files.has(source.relativePath))
+    if (sources.has(source.relativePath))
       throw new Error(`Duplicate source path: ${source.relativePath}`);
-    const role = analyzer.fileRole(source.relativePath);
-    const override = input.encodingOverrides?.get(source.relativePath);
-    const { entry, lines } = createManifestEntry({
-      relativePath: source.relativePath,
+    sources.set(source.relativePath, source.bytes);
+    const key = source.relativePath.toLowerCase();
+    byLowerPath.set(key, [
+      ...(byLowerPath.get(key) ?? []),
+      source.relativePath,
+    ]);
+  }
+
+  const files = new Map<string, InventoryFile>();
+  const codeLines = new Map<string, string[]>();
+  function addFile(relativePath: string, role: SourceFileRole) {
+    const override = input.encodingOverrides?.get(relativePath);
+    const result = createManifestEntry({
+      relativePath,
       role,
-      bytes: source.bytes,
+      bytes: sources.get(relativePath) ?? new Uint8Array(),
       profileEncoding: input.profile.defaultEncoding,
       ...(override ? { override } : {}),
     });
-    let analysis: CodeFileAnalysis | null = null;
-    if (lines && role === 'code')
-      analysis = analyzer.analyzeCodeFile(source.relativePath, lines.lines);
-    if (lines && role === 'project')
-      projects.push({ path: source.relativePath, lines: lines.lines });
-    files.set(source.relativePath, { manifest: entry, analysis });
-  }
-
-  const byLowerPath = new Map<string, string[]>();
-  for (const path of files.keys()) {
-    const key = path.toLowerCase();
-    byLowerPath.set(key, [...(byLowerPath.get(key) ?? []), path]);
+    const analysis =
+      result.lines && role === 'code'
+        ? analyzer.analyzeCodeFile(relativePath, result.lines.lines)
+        : null;
+    files.set(relativePath, { manifest: result.entry, analysis });
+    if (analysis?.status === 'analyzed' && result.lines)
+      codeLines.set(relativePath, result.lines.lines);
+    return result.lines;
   }
 
   function resolveMember(
@@ -160,70 +185,143 @@ export function buildSourceInventory(input: {
       relativePath: null,
       resolution,
       fileStatus: null,
+      shared: false,
     });
     const relative = analyzer.toRelativeMemberPath(member.declaredPath);
     if (relative === null) return unresolved('absolute-path');
     const baseDir = projectPath.split('/').slice(0, -1).join('/');
     const joined = joinRelative(baseDir, relative);
     if (joined === null) return unresolved('outside-root');
-    const exact = files.get(joined);
-    if (exact)
+    if (sources.has(joined))
       return {
         ...member,
         relativePath: joined,
         resolution: 'resolved',
-        fileStatus: memberFileStatus(exact),
+        fileStatus: null,
+        shared: false,
       };
     // Legacy Windows projects often differ only in case from the real file.
     const candidates = byLowerPath.get(joined.toLowerCase()) ?? [];
-    const [candidate] = candidates;
     if (candidates.length > 1) return unresolved('ambiguous');
-    const file = candidate === undefined ? undefined : files.get(candidate);
-    if (candidate === undefined || !file) return unresolved('missing');
+    const [candidate] = candidates;
+    if (candidate === undefined) return unresolved('missing');
     return {
       ...member,
       relativePath: candidate,
       resolution: 'case-mismatch',
-      fileStatus: memberFileStatus(file),
+      fileStatus: null,
+      shared: false,
     };
   }
 
-  const programs = projects.map(({ path, lines }): InventoryProgram => {
-    const parsed = analyzer.parseProjectFile(lines);
-    if (parsed.status === 'unsupported')
+  // Projects first: a file the project declares as code (e.g. a module kept
+  // as .TXT) is analyzed as code even if its extension is not allowlisted.
+  const parsedProjects = [...sources.keys()]
+    .filter((path) => analyzer.fileRole(path) === 'project')
+    .map((path) => {
+      const lines = addFile(path, 'project');
+      const parsed = lines ? analyzer.parseProjectFile(lines.lines) : null;
+      return {
+        path,
+        parsed,
+        members:
+          parsed?.status === 'parsed'
+            ? parsed.members.map((member) => resolveMember(path, member))
+            : [],
+      };
+    });
+  const declaredCode = new Set(
+    parsedProjects.flatMap(({ members }) =>
+      members
+        .filter(
+          (member) =>
+            member.relativePath !== null &&
+            analyzer.roleForProjectMember(member.kind) === 'code',
+        )
+        .map((member) => member.relativePath ?? ''),
+    ),
+  );
+  for (const path of sources.keys()) {
+    if (files.has(path)) continue;
+    const role = analyzer.fileRole(path);
+    addFile(
+      path,
+      role === 'excluded' && declaredCode.has(path) ? 'code' : role,
+    );
+  }
+
+  const programCount = new Map<string, number>();
+  for (const { members } of parsedProjects)
+    for (const path of new Set(members.map((member) => member.relativePath)))
+      if (path !== null)
+        programCount.set(path, (programCount.get(path) ?? 0) + 1);
+
+  // Each code file is scanned once for uses of any callable name.
+  const analyzedFiles = [...files.values()].flatMap((file) =>
+    file.analysis?.status === 'analyzed' ? [file.analysis] : [],
+  );
+  const names = callableNames(analyzedFiles);
+  const references = new Map<string, CodeReference[]>();
+  for (const [path, lines] of codeLines)
+    references.set(path, analyzer.findReferences(path, lines, names));
+
+  const programs = parsedProjects.map(
+    ({ path, parsed, members: resolved }): InventoryProgram => {
+      if (parsed?.status !== 'parsed')
+        return {
+          projectPath: path,
+          status: 'unsupported',
+          issue: parsed
+            ? { reason: parsed.reason, line: parsed.line }
+            : { reason: 'PROJECT_NOT_DECODED', line: null },
+          name: null,
+          members: [],
+          externalReferences: [],
+          counters: zeroCounters(),
+          complete: false,
+          analysis: null,
+        };
+      const members = resolved.map((member) => {
+        const file = member.relativePath
+          ? files.get(member.relativePath)
+          : undefined;
+        return {
+          ...member,
+          fileStatus: file ? memberFileStatus(file) : null,
+          shared: (programCount.get(member.relativePath ?? '') ?? 0) > 1,
+        };
+      });
+      const programFiles: ProgramFile[] = [];
+      const counters = zeroCounters();
+      const counted = new Set<string>();
+      for (const member of members) {
+        if (!member.relativePath || counted.has(member.relativePath)) continue;
+        counted.add(member.relativePath);
+        const analysis = files.get(member.relativePath)?.analysis;
+        if (analysis?.status !== 'analyzed') continue;
+        addCounters(counters, analysis.counters);
+        programFiles.push({
+          relativePath: member.relativePath,
+          shared: member.shared,
+          analysis,
+          references: references.get(member.relativePath) ?? [],
+        });
+      }
       return {
         projectPath: path,
-        status: 'unsupported',
-        issue: { reason: parsed.reason, line: parsed.line },
-        name: null,
-        members: [],
-        externalReferences: [],
-        counters: zeroCounters(),
-        complete: false,
+        status: 'parsed',
+        issue: null,
+        name: parsed.name,
+        members,
+        externalReferences: parsed.externalReferences,
+        counters,
+        complete:
+          members.every((member) => member.fileStatus === 'analyzed') &&
+          counters.unclassifiedLines === 0,
+        analysis: analyzeProgram(programFiles, parsed.externalReferences),
       };
-    const members = parsed.members.map((member) => resolveMember(path, member));
-    const counters = zeroCounters();
-    const counted = new Set<string>();
-    for (const member of members) {
-      if (!member.relativePath || counted.has(member.relativePath)) continue;
-      counted.add(member.relativePath);
-      const analysis = files.get(member.relativePath)?.analysis;
-      if (analysis?.status === 'analyzed')
-        addCounters(counters, analysis.counters);
-    }
-    return {
-      projectPath: path,
-      status: 'parsed',
-      issue: null,
-      name: parsed.name,
-      members,
-      externalReferences: parsed.externalReferences,
-      counters,
-      complete:
-        members.every((member) => member.fileStatus === 'analyzed') &&
-        counters.unclassifiedLines === 0,
-    };
-  });
+    },
+  );
 
   const inventoryFiles = [...files.values()];
   const uniqueCounters = zeroCounters();
@@ -239,6 +337,9 @@ export function buildSourceInventory(input: {
     metricVersion: analyzer.metricVersion,
     decoderVersion: SOURCE_DECODER_VERSION,
     normalizationVersion: SOURCE_NORMALIZATION_VERSION,
+    sqlAccessVersion: SQL_ACCESS_VERSION,
+    callGraphVersion: CALL_GRAPH_VERSION,
+    complexityVersion: COMPLEXITY_VERSION,
     snapshotHash: computeSnapshotHash(entries, input.profile.id),
     files: inventoryFiles,
     programs,

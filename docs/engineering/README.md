@@ -40,6 +40,7 @@ RIKAI là portal chạy local để chọn thư mục source legacy, phân tích
 ## Đặc tả khi làm Analyze/Understand
 
 - [Đọc source, encoding, evidence và LoC](specs/source-analysis.md): CP932 cho profile BSN; binary không decode; metric `vb6-physical-code-v1` và cách đối chiếu baseline.
+- [Source inventory](specs/source-inventory.md): JSON `source-inventory-v1` cho agent/report: SQL/CRUD, call graph, complexity v0 và CLI.
 - [Hợp đồng BR/Design](specs/understanding-contract.md): payload AI, metadata do backend tạo, semantic validation và review.
 - [JSON Schema](contracts/understanding-payload.schema.json) và [sample sạch](contracts/understanding-example.json): dùng để implement/test contract khi init, không phải code engine đã chạy.
 

@@ -8,6 +8,15 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 16/10/2026 — sửa 5 finding review A01b lần 2
+
+- Review `CHANGES_REQUIRED` (commit `8632c9e`): cả 5 finding tái hiện được trước khi sửa.
+- [P1] Guard chỉ coi segment `..` nguyên vẹn là đi ra ngoài (tên `..notes.bas` là file con). [P1] So file ID (dev + inode/NTFS file ID) của output với file source vừa đọc và giữa hai output, nên hardlink bị từ chối; output ghi vào file tạm cùng thư mục rồi rename đè, không ghi xuyên qua file cũ.
+- SQL `sql-access-v2`: If/ElseIf/Else và Select Case được theo như các đường chạy riêng (tối đa 8, quá thì gộp và phần khác nhau thành giá trị runtime), không ghép chữ của hai nhánh loại trừ nhau; property `obj.SQL = obj.SQL & ...` được theo dõi như biến.
+- Call graph `call-graph-v2`: tên có hậu tố `$` (`F$()`) nối về `Function F$`, giữ phân biệt gọi đệ quy với gán giá trị trả về.
+- Container Linux, Node 22: prettier, lint, typecheck, build pass; **213 test API** pass. Chưa chạy `npm.cmd run check` trên Windows sau thay đổi này.
+- Source thật: 0 lỗi decode/unclassified, 277/284 complete, JSON hợp schema, 0 SQL động; complexity 15 program pilot không đổi (15/15).
+
 ## 16/10/2026 — sửa 6 finding review A01b
 
 - Review `CHANGES_REQUIRED` (commit `83892a9`): cả 6 finding tái hiện được bằng dữ liệu giả lập trước khi sửa.

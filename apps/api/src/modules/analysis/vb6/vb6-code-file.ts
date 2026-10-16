@@ -127,8 +127,9 @@ function scanVb6CodeFile(
     if (!pending) return;
     const ownerId = pending.owner?.id ?? null;
     const ownerName = pending.owner?.name.toLowerCase() ?? null;
-    for (const statement of splitStatements(tokenizeVb6(pending.pieces))) {
-      trackerFor(ownerId).statement(statement);
+    const statements = splitStatements(tokenizeVb6(pending.pieces));
+    trackerFor(ownerId).line(statements);
+    for (const statement of statements) {
       if (options.names)
         for (const use of findNameUses(statement, options.names, ownerName))
           references.push({ procedureId: ownerId, ...use });

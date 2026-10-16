@@ -10,7 +10,7 @@ import type { SqlOperation } from './sql-access.js';
 // is lexical; a name that matches several procedures stays ambiguous instead
 // of being guessed.
 
-export const CALL_GRAPH_VERSION = 'call-graph-v1';
+export const CALL_GRAPH_VERSION = 'call-graph-v2';
 export const COMPLEXITY_VERSION = 'complexity-v0-draft';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;

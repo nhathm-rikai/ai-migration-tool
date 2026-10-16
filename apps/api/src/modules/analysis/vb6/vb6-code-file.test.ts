@@ -368,3 +368,124 @@ describe('recursive calls', () => {
     ).toEqual(['Walk:2', 'Walk:3']);
   });
 });
+
+describe('SQL built in branches and properties', () => {
+  const facts = (body: string[]) => {
+    const result = analyzeVb6CodeFile(
+      'M.BAS',
+      ['Sub P()', ...body, 'End Sub'],
+      {
+        form: false,
+      },
+    );
+    if (result.status !== 'analyzed') throw new Error(result.status);
+    return {
+      tables: result.sqlTables.map((t) => `${t.table}:${t.operation}`).sort(),
+      dynamic: result.dynamicSql.length,
+    };
+  };
+
+  it.each([
+    [
+      'If/Else appending different words',
+      [
+        's = "SELECT * FROM "',
+        'If flag Then',
+        '    s = s & "ORD"',
+        'Else',
+        '    s = s & "ERS"',
+        'End If',
+      ],
+      ['ERS:R', 'ORD:R'],
+      0,
+    ],
+    [
+      'a single-line If/Else',
+      ['s = "SELECT * FROM "', 'If f Then s = s & "ORD" Else s = s & "ERS"'],
+      ['ERS:R', 'ORD:R'],
+      0,
+    ],
+    [
+      'Select Case branches',
+      [
+        's = "DELETE FROM T"',
+        'Select Case k',
+        'Case 1: s = s & "1"',
+        'Case Else: s = s & "2"',
+        'End Select',
+      ],
+      ['T1:D', 'T2:D'],
+      0,
+    ],
+    [
+      'an optional clause after the table',
+      [
+        's = "SELECT A FROM T1"',
+        'If f Then',
+        '    s = s & " WHERE B = 1"',
+        'End If',
+        's = s & " ORDER BY A"',
+      ],
+      ['T1:R'],
+      0,
+    ],
+    [
+      'an optional suffix that could join the table name',
+      [
+        's = "SELECT A FROM T"',
+        'If f Then s = s & " WHERE B = 1"',
+        's = s & "X ORDER BY A"',
+      ],
+      ['T:R', 'TX:R'],
+      0,
+    ],
+    [
+      'more branches than paths kept apart',
+      [
+        's = "SELECT A FROM T1 WHERE 1 = 1"',
+        ...[1, 2, 3, 4].map((n) => `If f${n} Then s = s & " AND C${n} = 1"`),
+        's = s & " ORDER BY A"',
+      ],
+      ['T1:R'],
+      0,
+    ],
+    [
+      'merged paths that leave the table name open',
+      [
+        's = "SELECT A FROM "',
+        ...[1, 2, 3, 4].map((n) => `If f${n} Then s = s & "T${n}"`),
+        's = s & " ORDER BY A"',
+      ],
+      null,
+      1,
+    ],
+    [
+      'a property built by appending',
+      ['obj.SQL = "SELECT * FROM ORD"', 'obj.SQL = obj.SQL & "ERS"'],
+      ['ORDERS:R'],
+      0,
+    ],
+  ])('handles %s', (_label, body, tables, dynamic) => {
+    const result = facts(body);
+    // null: tables of single paths may be reported, only dynamic is checked.
+    if (tables) expect(result.tables).toEqual(tables);
+    expect(result.dynamic).toBe(dynamic);
+  });
+});
+
+it('links calls written with the $ type character', () => {
+  expect(
+    findVb6References(
+      'M.BAS',
+      [
+        'Function F$()',
+        '    F$ = F$()',
+        'End Function',
+        'Sub Main()',
+        '    x = F$()',
+        'End Sub',
+      ],
+      { form: false, names: new Set(['f']) },
+    ).map((r) => `${r.name}:${r.line}`),
+  ).toEqual(['F:2', 'F:5']);
+});

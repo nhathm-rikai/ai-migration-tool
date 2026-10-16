@@ -5,13 +5,13 @@
 //
 //   node apps/api/dist/cli/analyze-source.js --root <dir> --out <file.json>
 //     [--profile vb6-cp932-v1] [--summary <programs.csv>]
-import { lstat, readdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { programSummaryCsv } from '../modules/analysis/program-summary.js';
 import { buildSourceInventory } from '../modules/analysis/source-inventory.js';
 import { findSourceProfile } from '../modules/analysis/source-profiles.js';
-import { checkOutputs } from './output-guard.js';
+import { checkOutputs, writeReplacing } from './output-guard.js';
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 
@@ -20,6 +20,7 @@ type Skipped = { relativePath: string; reason: 'symlink' | 'too-large' };
 async function collectFiles(root: string) {
   const files: { relativePath: string; bytes: Uint8Array }[] = [];
   const skipped: Skipped[] = [];
+  const identities = new Set<string>();
   async function walk(dir: string): Promise<void> {
     const entries = await readdir(dir, { withFileTypes: true });
     entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -31,15 +32,16 @@ async function collectFiles(root: string) {
       } else if (entry.isDirectory()) {
         await walk(absolute);
       } else if (entry.isFile()) {
-        const { size } = await lstat(absolute);
-        if (size > MAX_FILE_BYTES)
+        const { size, dev, ino } = await lstat(absolute, { bigint: true });
+        identities.add(`${dev}:${ino}`);
+        if (size > BigInt(MAX_FILE_BYTES))
           skipped.push({ relativePath, reason: 'too-large' });
         else files.push({ relativePath, bytes: await readFile(absolute) });
       }
     }
   }
   await walk(root);
-  return { files, skipped };
+  return { files, skipped, identities };
 }
 
 export async function main(argv: string[]): Promise<number> {
@@ -68,16 +70,17 @@ export async function main(argv: string[]): Promise<number> {
     console.error(refused);
     return 2;
   }
-  const { files, skipped } = await collectFiles(root);
+  const { files, skipped, identities } = await collectFiles(root);
   const inventory = buildSourceInventory({ profile, files });
-  // Checked again right before writing: links may change while reading.
-  const changed = await checkOutputs(root, outputs);
+  // Checked again right before writing, now also against hard links to the
+  // files just read; links may change while reading.
+  const changed = await checkOutputs(root, outputs, identities);
   if (changed) {
     console.error(changed);
     return 2;
   }
-  await writeFile(out, JSON.stringify({ ...inventory, skipped }, null, 2));
-  if (summary) await writeFile(summary, programSummaryCsv(inventory));
+  await writeReplacing(out, JSON.stringify({ ...inventory, skipped }, null, 2));
+  if (summary) await writeReplacing(summary, programSummaryCsv(inventory));
   const { totals } = inventory;
   console.log(
     [

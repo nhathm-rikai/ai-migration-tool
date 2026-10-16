@@ -1,9 +1,9 @@
 // Language-neutral, lexical SQL table access detection over one SQL text
-// built by the language analyzer (metric `sql-access-v1`). It never guesses
+// built by the language analyzer (metric `sql-access-v2`). It never guesses
 // a table: when a table name touches a runtime value the access is reported
 // as dynamic instead. SQL string literals and comments are skipped.
 
-export const SQL_ACCESS_VERSION = 'sql-access-v1';
+export const SQL_ACCESS_VERSION = 'sql-access-v2';
 
 // CRUD, plus X for DDL on a table (CREATE/DROP/TRUNCATE/ALTER TABLE),
 // common for work tables built at runtime.
@@ -11,7 +11,13 @@ export type SqlOperation = 'C' | 'R' | 'U' | 'D' | 'X';
 
 // The pieces of one SQL text, concatenated exactly as written: a literal
 // fragment, or null where a runtime value was concatenated.
-export type SqlSegment = { text: string | null; line: number };
+// `boundary`: the runtime part is either empty or starts a new word, so the
+// literal text before it is complete.
+export type SqlSegment = {
+  text: string | null;
+  line: number;
+  boundary?: boolean;
+};
 
 export type SqlTableAccess = {
   table: string;
@@ -25,6 +31,7 @@ export type DynamicSqlUse = {
 };
 
 const DYNAMIC = '\u0001';
+const GAP = '\u0002';
 const IDENT = '[A-Za-z_][A-Za-z0-9_$#]*(?:\\.[A-Za-z_][A-Za-z0-9_$#]*)?';
 const STOP_WORDS = new Set([
   'where',
@@ -57,7 +64,7 @@ function buildStream(segments: readonly SqlSegment[]) {
   const starts: { offset: number; line: number }[] = [];
   for (const segment of segments) {
     starts.push({ offset: text.length, line: segment.line });
-    text += segment.text ?? DYNAMIC;
+    text += segment.text ?? (segment.boundary ? GAP : DYNAMIC);
   }
   const lineAt = (offset: number) => {
     let line = starts[0]?.line ?? 0;
@@ -123,16 +130,22 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
     const line = () => lineAt(text.length - rest.length);
     for (;;) {
       rest = rest.replace(/^\s+/, '');
-      if (rest.startsWith(DYNAMIC)) {
+      if (rest.startsWith(DYNAMIC) || rest.startsWith(GAP)) {
         dynamic.push({ operation, line: line() });
         return;
       }
       const match = new RegExp(`^(${IDENT})`).exec(rest);
       const name = match?.[1];
       if (!match || !name || STOP_WORDS.has(name.toLowerCase())) return;
-      // `ORD_` & tenant: the real name is only known at runtime.
+      // `ORD_` & tenant: the real name is only known at runtime. A gap may
+      // also be empty, so a word right after it could join the name.
       const next = rest.slice(match[0].length, match[0].length + 2);
-      if (next.startsWith(DYNAMIC) || next === `.${DYNAMIC}`) {
+      if (
+        next.startsWith(DYNAMIC) ||
+        next === `.${DYNAMIC}` ||
+        next === `.${GAP}` ||
+        (next[0] === GAP && /[A-Za-z0-9_$#.]/.test(next[1] ?? ''))
+      ) {
         dynamic.push({ operation, line: line() });
         return;
       }
@@ -155,7 +168,10 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
       { regex: /\binsert\s+into\s+/gi, operation: 'C', list: false },
       {
         // The table may be followed by SET or be a dynamic placeholder.
-        regex: new RegExp(`\\bupdate\\s+(?=\\S+\\s+set\\b|${DYNAMIC})`, 'gi'),
+        regex: new RegExp(
+          `\\bupdate\\s+(?=\\S+\\s+set\\b|${DYNAMIC}|${GAP})`,
+          'gi',
+        ),
         operation: 'U',
         list: false,
       },

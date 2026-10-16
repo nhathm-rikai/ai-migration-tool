@@ -406,6 +406,30 @@ describe('SQL built in branches and properties', () => {
       0,
     ],
     [
+      'nested single-line Ifs, all closed before the next line',
+      [
+        's = "SELECT * FROM T"',
+        'If f Then If g Then s = s & "A" Else s = s & "B"',
+        's = s & "Z"',
+      ],
+      ['TAZ:R', 'TBZ:R', 'TZ:R'],
+      0,
+    ],
+    [
+      'nested single-line Ifs inside a multi-line If block',
+      [
+        's = "SELECT * FROM T"',
+        'If h Then',
+        '    If f Then If g Then s = s & "A" Else s = s & "B"',
+        '    s = s & "Z"',
+        'Else',
+        '    s = s & "Y"',
+        'End If',
+      ],
+      ['TAZ:R', 'TBZ:R', 'TY:R', 'TZ:R'],
+      0,
+    ],
+    [
       'Select Case branches',
       [
         's = "DELETE FROM T"',

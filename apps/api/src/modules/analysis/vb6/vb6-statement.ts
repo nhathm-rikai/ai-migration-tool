@@ -170,13 +170,17 @@ export class Vb6StringTracker {
 
   // One logical line, already split into statements.
   line(statements: readonly (readonly Token[])[]): void {
-    let singleLineIf = false;
+    // Depth before the first single-line If; every frame opened above it
+    // (nested `If a Then If b Then ...`) ends with this line, while frames
+    // of an enclosing multi-line block stay open.
+    let singleLineBase: number | null = null;
     statements.forEach((tokens, index) => {
       const [first, second] = tokens;
       if (isWord(first, 'if') && isWord(tokens.at(-1), 'then')) {
         this.onEachPath(() => this.scan(tokens));
+        if (singleLineBase === null && index < statements.length - 1)
+          singleLineBase = this.frames.length;
         this.open(true);
-        singleLineIf ||= index < statements.length - 1;
       } else if (isWord(first, 'elseif')) {
         this.branch(false);
         this.onEachPath(() => this.scan(tokens));
@@ -195,7 +199,8 @@ export class Vb6StringTracker {
         this.close();
       else this.onEachPath(() => this.statement(tokens));
     });
-    if (singleLineIf) this.close();
+    if (singleLineBase !== null)
+      while (this.frames.length > singleLineBase) this.close();
   }
 
   // Emits every value still held, e.g. at the end of a procedure.

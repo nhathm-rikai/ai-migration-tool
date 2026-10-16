@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 16/10/2026 — sửa 1 finding review A01b lần 3
+
+- Làm theo nội dung skill `portal-implement` (đọc SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy.
+- Review `CHANGES_REQUIRED` (commit `0f1679e`): [P2] `If f Then If g Then ... Else ...` mở hai nhánh nhưng cuối dòng chỉ đóng một, nên dòng sau chỉ cập nhật một nhánh (ra `T` thay vì `TZ`). Đã tái hiện bằng test trước khi sửa.
+- SQL `sql-access-v3`: mọi `If` một dòng, kể cả lồng nhau, đóng hết ở cuối dòng; khối `If` nhiều dòng bao ngoài vẫn mở. Thêm 2 regression test (đứng riêng và nằm trong khối `If` nhiều dòng).
+- Container Linux, Node 22: prettier, lint, typecheck, build, `verify-repository` pass; **215 test API** pass. Chưa chạy `npm.cmd run check` trên Windows sau thay đổi này.
+- Source thật: 0 lỗi decode/unclassified, 277/284 complete, JSON hợp schema, 0 SQL động; 2202 dòng bảng/CRUD và complexity của mọi program không đổi so với `sql-access-v2` (15/15 khớp).
+
 ## 16/10/2026 — sửa 5 finding review A01b lần 2
 
 - Review `CHANGES_REQUIRED` (commit `8632c9e`): cả 5 finding tái hiện được trước khi sửa.
@@ -29,7 +37,7 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 
 ## 15/10/2026 — hoàn thiện parser theo output P1 (A01b)
 
-- Dùng `portal-implement`; scope feature / analysis / CLI dev. Không đổi FE, HTTP contract, DB hay dependency. Source khách hàng chỉ đọc trên máy, không copy vào repo.
+- Làm theo `docs/engineering/workflows/implement.md` (phiên cloud không gọi được skill `portal-implement`); scope feature / analysis / CLI dev. Không đổi FE, HTTP contract, DB hay dependency. Source khách hàng chỉ đọc trên máy, không copy vào repo.
 - SQL/CRUD lexical `sql-access-v0`: bảng từ string literal theo procedure (INSERT/SELECT…FROM/JOIN/UPDATE/DELETE, DDL `X` cho bảng tạm); tên bảng là biểu thức runtime → `dynamicSql`, không đoán. Thêm `Declare` (API native), label, `decisionPoints`, `visibility`.
 - Program: `shared` cho file nhiều program dùng; call graph `call-graph-v0` (local/program/external/ambiguous, không chọn bừa khi trùng tên); CRUD từ code riêng + procedure shared gọi tới được; metrics và complexity `complexity-v0-draft` (nháp, TL chốt). Schema TypeBox `source-inventory-v1` trong contracts, test kiểm inventory khớp schema. Đặc tả [source-inventory](specs/source-inventory.md).
 - CLI `analyze-source`: walk thư mục, bỏ symlink/file > 16 MB, từ chối output trong thư mục source, `--summary` xuất CSV theo program.

@@ -18,12 +18,17 @@ const COLUMNS = [
   'reachableSharedProcedures',
   'tables',
   'crud',
+  'normalizedTables',
+  'normalizedCrud',
   'dynamicSql',
   'components',
   'externalApis',
   'ambiguousCalls',
   'complexityScore',
   'complexityLevel',
+  'normalizedComplexityScore',
+  'normalizedComplexityLevel',
+  'tableNameMapping',
 ] as const;
 
 // Text that a spreadsheet would read as a formula (OWASP CSV injection) is
@@ -37,7 +42,16 @@ function csvCell(value: string | number | boolean | null): string {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
+const crudCell = (
+  entries: readonly { table: string; operations: string[] }[],
+) =>
+  entries
+    .map((entry) => `${entry.table}:${entry.operations.join('')}`)
+    .join(' ');
+
 export function programSummaryCsv(inventory: SourceInventory): string {
+  const { defaultSchema, status } = inventory.tableNames;
+  const mapping = defaultSchema ? `${defaultSchema} (${status})` : status;
   const rows = inventory.programs.map((program) => {
     const analysis = program.analysis;
     const metrics = analysis?.metrics;
@@ -58,10 +72,9 @@ export function programSummaryCsv(inventory: SourceInventory): string {
       maxProcedureDecisionPoints: metrics?.maxProcedureDecisionPoints ?? null,
       reachableSharedProcedures: metrics?.reachableSharedProcedures ?? null,
       tables: metrics?.tables ?? null,
-      crud:
-        analysis?.crud
-          .map((entry) => `${entry.table}:${entry.operations.join('')}`)
-          .join(' ') ?? null,
+      crud: analysis ? crudCell(analysis.crud) : null,
+      normalizedTables: metrics?.normalizedTables ?? null,
+      normalizedCrud: analysis ? crudCell(analysis.normalizedCrud) : null,
       dynamicSql: metrics?.dynamicSql ?? null,
       components: metrics?.components ?? null,
       externalApis: metrics?.externalApis ?? null,
@@ -70,6 +83,9 @@ export function programSummaryCsv(inventory: SourceInventory): string {
           .length ?? null,
       complexityScore: analysis?.complexity.score ?? null,
       complexityLevel: analysis?.complexity.level ?? null,
+      normalizedComplexityScore: analysis?.normalizedComplexity.score ?? null,
+      normalizedComplexityLevel: analysis?.normalizedComplexity.level ?? null,
+      tableNameMapping: analysis ? mapping : null,
     };
     return COLUMNS.map((column) => csvCell(row[column])).join(',');
   });

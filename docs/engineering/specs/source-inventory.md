@@ -11,6 +11,7 @@
 | `sqlAccessVersion` | `sql-access-v4` | Cách dựng chuỗi SQL (theo biến, nhánh, property) và trích bảng/CRUD. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
 | `complexityVersion` | `complexity-v0-draft` | Công thức điểm complexity, bản nháp chờ TL chốt. |
+| `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
 
 Số liệu khác version không được trộn trong cùng report.
 
@@ -36,7 +37,8 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
   - `program`: procedure `global` của file khác trong program.
   - `external`: procedure native đã `Declare`.
   - `ambiguous`: nhiều đích cùng tên. Giữ mọi đích trong `targets`, không chọn một.
-- `crud[]`: bảng × thao tác từ code riêng và từ procedure shared **gọi tới được** từ code riêng. `evidence` là vị trí gặp đầu tiên. `viaSharedOnly` cho biết bảng chỉ được truy cập qua module dùng chung.
+- `crud[]`: bảng × thao tác từ code riêng và từ procedure shared **gọi tới được** từ code riêng, tên bảng giữ như trong source. `evidence` là vị trí gặp đầu tiên. `viaSharedOnly` cho biết bảng chỉ được truy cập qua module dùng chung.
+- `normalizedCrud[]`: cùng dữ liệu sau mapping tên bảng (mục 4.1). Mỗi dòng là một object được giả định là cùng một bảng; `names` liệt kê các tên trong source đã gộp vào. `metrics.normalizedTables` và `normalizedComplexity` tính trên góc nhìn này; `metrics.tables` và `complexity` vẫn tính trên tên như trong source.
 - `externalApis[]`: API native thực sự được gọi tới.
 - `metrics`: số file/dòng/procedure riêng, decision points, số procedure shared gọi tới được, số bảng, SQL động, số component (OCX) trong project, số API native.
 - `complexity`: xem mục 5.
@@ -52,7 +54,14 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 - Trong câu SQL, string literal `'...'` và comment `--`, `/* */` bị bỏ qua khi tìm keyword.
 - SQL truyền qua tham số sang procedure khác (ví dụ một hàm `ExecSql(strSQL)` dùng chung) được ghi ở nơi tạo chuỗi, không ở nơi thực thi.
 - Đọc sequence (`SELECT seq.NEXTVAL FROM DUAL`) không sinh bảng.
-- Tên bảng giữ nguyên như trong source (`HAN01.KMTANT` và `KMTANT` là hai dòng). Gộp theo schema mặc định cần quyết định của TL.
+- Tên bảng trong `sqlTables`/`crud` giữ như trong source, chữ hoa (chỉ nhận identifier không có dấu nháy kép, vốn không phân biệt hoa thường). `HAN01.KMTANT` và `KMTANT` là hai dòng.
+
+### 4.1. Mapping tên bảng (`table-name-v1`)
+
+- Inventory ghi `tableNames = { version, defaultSchema, status }` để tái lập. CLI nhận `--default-schema <schema>`: schema mà tên không ghi schema resolve tới với kết nối được phân tích (ví dụ user đăng nhập). Không cấu hình thì `status = unconfigured` và chỉ gộp chữ hoa/thường.
+- `status = assumed` (mặc định khi có schema): mapping là giả định. Oracle resolve tên không ghi schema theo `CURRENT_SCHEMA` của session (có thể khác user đăng nhập) rồi tới private/public synonym; source không cho biết các điều này. Chỉ dùng `--schema-confirmed` (`status = confirmed`) sau khi người quản lý DB xác nhận.
+- Quy tắc: phần tên không có dấu nháy chuyển chữ hoa, phần trong `"..."` giữ nguyên; `<defaultSchema>.X` thành `X`; schema khác giữ nguyên. Hai tên gộp là cùng **tên tham chiếu được giả định**, chưa chứng minh cùng object đích (một tên có thể là synonym).
+- Một lần chạy dùng một schema cho mọi program. Corpus có program kết nối bằng user khác thì phải chạy riêng hoặc chờ mapping theo program.
 
 ## 5. Complexity v0 (bản nháp)
 
@@ -73,7 +82,7 @@ Mức: `low` < 40 ≤ `medium` < 55 ≤ `high`. Ngưỡng được chọn để 
 
 ```text
 npm run build -w @portal/contracts && npm run build -w @portal/api
-node apps/api/dist/cli/analyze-source.js --root <thư mục source> --out <inventory.json> [--summary <programs.csv>]
+node apps/api/dist/cli/analyze-source.js --root <thư mục source> --out <inventory.json> [--summary <programs.csv>] [--default-schema <schema> [--schema-confirmed]]
 ```
 
-CLI chỉ đọc source, bỏ qua symlink và file trên 16 MB (ghi vào `skipped`). Trước khi đọc và ngay trước khi ghi, CLI so đường dẫn vật lý (đã giải symlink/junction, kể cả thư mục cha chưa tồn tại) và từ chối khi output nằm trong thư mục source, là hard link tới file source vừa đọc, hoặc `--out` và `--summary` là cùng một file (so cả path và file ID). Output được ghi vào file tạm cùng thư mục rồi rename đè, không ghi xuyên qua file cũ. `--summary` ghi một dòng mỗi program (CSV UTF-8 có BOM để mở bằng Excel); ô text bắt đầu bằng `=`, `+`, `-`, `@`, tab hoặc CR được thêm `'` phía trước để Excel không hiểu thành công thức. JSON vẫn là nguồn chuẩn.
+CLI chỉ đọc source, bỏ qua symlink và file trên 16 MB (ghi vào `skipped`). Trước khi đọc và ngay trước khi ghi, CLI so đường dẫn vật lý (đã giải symlink/junction, kể cả thư mục cha chưa tồn tại) và từ chối khi output nằm trong thư mục source, là hard link tới file source vừa đọc, hoặc `--out` và `--summary` là cùng một file (so cả path và file ID). Output được ghi vào file tạm cùng thư mục rồi rename đè, không ghi xuyên qua file cũ. `--summary` ghi một dòng mỗi program (CSV UTF-8 có BOM để mở bằng Excel), có cả cột trước mapping (`tables`, `crud`, `complexityScore`) và sau mapping (`normalizedTables`, `normalizedCrud`, `normalizedComplexityScore`) cùng cột `tableNameMapping` ghi schema và trạng thái; ô text bắt đầu bằng `=`, `+`, `-`, `@`, tab hoặc CR được thêm `'` phía trước để Excel không hiểu thành công thức. JSON vẫn là nguồn chuẩn.

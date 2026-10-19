@@ -202,6 +202,37 @@ const ProgramMemberSchema = Type.Object(
   Strict,
 );
 
+const CrudEntryFields = {
+  table: Type.String(),
+  operations: Type.Array(SqlOperationSchema, { minItems: 1 }),
+  evidence: Type.Object({ relativePath: Type.String(), line: Line }, Strict),
+  viaSharedOnly: Type.Boolean(),
+};
+
+const ComplexitySchema = Type.Object(
+  {
+    version: Type.String(),
+    score: Type.Integer({ minimum: 0, maximum: 100 }),
+    level: Type.Union([
+      Type.Literal('low'),
+      Type.Literal('medium'),
+      Type.Literal('high'),
+    ]),
+    parts: Type.Object(
+      {
+        size: Type.Number(),
+        decisions: Type.Number(),
+        tables: Type.Number(),
+        dynamicSql: Type.Number(),
+        components: Type.Number(),
+        externalApis: Type.Number(),
+      },
+      Strict,
+    ),
+  },
+  Strict,
+);
+
 const ProgramAnalysisSchema = Type.Object(
   {
     calls: Type.Array(
@@ -222,18 +253,18 @@ const ProgramAnalysisSchema = Type.Object(
         Strict,
       ),
     ),
-    crud: Type.Array(
-      Type.Object(
-        {
-          table: Type.String(),
-          operations: Type.Array(SqlOperationSchema, { minItems: 1 }),
-          evidence: Type.Object(
-            { relativePath: Type.String(), line: Line },
-            Strict,
-          ),
-          viaSharedOnly: Type.Boolean(),
-        },
-        Strict,
+    crud: Type.Array(Type.Object(CrudEntryFields, Strict)),
+    // CRUD after table name mapping (`tableNames`); `names` are the names
+    // written in the source that were merged. Optional for older inventories.
+    normalizedCrud: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            ...CrudEntryFields,
+            names: Type.Array(Type.String(), { minItems: 1 }),
+          },
+          Strict,
+        ),
       ),
     ),
     externalApis: Type.Array(
@@ -248,35 +279,15 @@ const ProgramAnalysisSchema = Type.Object(
         maxProcedureDecisionPoints: Count,
         reachableSharedProcedures: Count,
         tables: Count,
+        normalizedTables: Type.Optional(Count),
         dynamicSql: Count,
         components: Count,
         externalApis: Count,
       },
       Strict,
     ),
-    complexity: Type.Object(
-      {
-        version: Type.String(),
-        score: Type.Integer({ minimum: 0, maximum: 100 }),
-        level: Type.Union([
-          Type.Literal('low'),
-          Type.Literal('medium'),
-          Type.Literal('high'),
-        ]),
-        parts: Type.Object(
-          {
-            size: Type.Number(),
-            decisions: Type.Number(),
-            tables: Type.Number(),
-            dynamicSql: Type.Number(),
-            components: Type.Number(),
-            externalApis: Type.Number(),
-          },
-          Strict,
-        ),
-      },
-      Strict,
-    ),
+    complexity: ComplexitySchema,
+    normalizedComplexity: Type.Optional(ComplexitySchema),
   },
   Strict,
 );
@@ -324,6 +335,21 @@ export const SourceInventorySchema = Type.Object(
     sqlAccessVersion: Type.String(),
     callGraphVersion: Type.String(),
     complexityVersion: Type.String(),
+    // Optional for inventories written before table name mapping existed.
+    tableNames: Type.Optional(
+      Type.Object(
+        {
+          version: Type.String(),
+          defaultSchema: Nullable(Type.String()),
+          status: Type.Union([
+            Type.Literal('unconfigured'),
+            Type.Literal('assumed'),
+            Type.Literal('confirmed'),
+          ]),
+        },
+        Strict,
+      ),
+    ),
     snapshotHash: Sha256,
     files: Type.Array(
       Type.Object(

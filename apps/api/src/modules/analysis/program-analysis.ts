@@ -4,6 +4,11 @@ import type {
   ProjectExternalReference,
 } from './language-analyzer.js';
 import type { SqlOperation } from './sql-access.js';
+import {
+  normalizeTableName,
+  UNCONFIGURED_TABLE_NAMES,
+  type TableNameMapping,
+} from './table-names.js';
 
 // Language-neutral, per-program facts built from per-file analyses: call
 // graph, CRUD matrix, size metrics and a draft complexity score. Everything
@@ -38,6 +43,10 @@ export type CrudEntry = {
   viaSharedOnly: boolean;
 };
 
+// CRUD after table name mapping: one row per assumed database object, with
+// the names written in the source that were merged into it.
+export type NormalizedCrudEntry = CrudEntry & { names: string[] };
+
 export type ProgramMetrics = {
   ownFiles: number;
   ownCodeLines: number;
@@ -47,6 +56,8 @@ export type ProgramMetrics = {
   // Procedures of shared files reachable from the program's own code.
   reachableSharedProcedures: number;
   tables: number;
+  // Distinct tables after table name mapping.
+  normalizedTables: number;
   dynamicSql: number;
   components: number;
   externalApis: number;
@@ -70,9 +81,14 @@ export type ComplexityScore = {
 export type ProgramAnalysis = {
   calls: ProgramCall[];
   crud: CrudEntry[];
+  normalizedCrud: NormalizedCrudEntry[];
   externalApis: { name: string; library: string }[];
   metrics: ProgramMetrics;
+  // Uses `tables` (names as written); `normalizedComplexity` uses
+  // `normalizedTables`, so both views stay visible while the mapping is an
+  // assumption.
   complexity: ComplexityScore;
+  normalizedComplexity: ComplexityScore;
 };
 
 export type ProgramFile = {
@@ -205,6 +221,45 @@ function reachable(
 
 const OPERATION_ORDER: SqlOperation[] = ['C', 'R', 'U', 'D', 'X'];
 
+const sortOperations = (operations: SqlOperation[]) =>
+  operations.sort(
+    (a, b) => OPERATION_ORDER.indexOf(a) - OPERATION_ORDER.indexOf(b),
+  );
+
+// `crud` is in first-access order, so each merged row keeps the evidence of
+// the first access to any of its names.
+function normalizeCrud(
+  crud: readonly CrudEntry[],
+  mapping: TableNameMapping,
+): NormalizedCrudEntry[] {
+  const merged = new Map<string, NormalizedCrudEntry>();
+  for (const entry of crud) {
+    const table = normalizeTableName(entry.table, mapping);
+    const existing = merged.get(table);
+    if (!existing) {
+      merged.set(table, {
+        ...entry,
+        table,
+        operations: [...entry.operations],
+        names: [entry.table],
+      });
+      continue;
+    }
+    for (const operation of entry.operations)
+      if (!existing.operations.includes(operation))
+        existing.operations.push(operation);
+    existing.names.push(entry.table);
+    existing.viaSharedOnly &&= entry.viaSharedOnly;
+  }
+  return [...merged.values()]
+    .map((entry) => ({
+      ...entry,
+      operations: sortOperations(entry.operations),
+      names: entry.names.sort(),
+    }))
+    .sort((a, b) => a.table.localeCompare(b.table));
+}
+
 function scale(value: number, full: number, weight: number): number {
   return Math.min(weight, (weight * Math.log1p(value)) / Math.log1p(full));
 }
@@ -241,6 +296,7 @@ export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
 export function analyzeProgram(
   files: readonly ProgramFile[],
   externalReferences: readonly ProjectExternalReference[],
+  tableNames: TableNameMapping = UNCONFIGURED_TABLE_NAMES,
 ): ProgramAnalysis {
   const { calls, callables } = buildCalls(files);
   const reached = reachable(files, calls);
@@ -275,10 +331,8 @@ export function analyzeProgram(
       if (!file.shared) entry.viaSharedOnly = false;
     }
   }
-  for (const entry of crud.values())
-    entry.operations.sort(
-      (a, b) => OPERATION_ORDER.indexOf(a) - OPERATION_ORDER.indexOf(b),
-    );
+  for (const entry of crud.values()) sortOperations(entry.operations);
+  const normalizedCrud = normalizeCrud([...crud.values()], tableNames);
 
   const externalApis = new Map<string, { name: string; library: string }>();
   for (const call of calls)
@@ -306,6 +360,7 @@ export function analyzeProgram(
     ),
     reachableSharedProcedures,
     tables: crud.size,
+    normalizedTables: normalizedCrud.length,
     dynamicSql,
     components: externalReferences.filter(
       (reference) => reference.kind === 'component',
@@ -315,10 +370,15 @@ export function analyzeProgram(
   return {
     calls,
     crud: [...crud.values()].sort((a, b) => a.table.localeCompare(b.table)),
+    normalizedCrud,
     externalApis: [...externalApis.values()].sort((a, b) =>
       a.name.localeCompare(b.name),
     ),
     metrics,
     complexity: scoreComplexity(metrics),
+    normalizedComplexity: scoreComplexity({
+      ...metrics,
+      tables: metrics.normalizedTables,
+    }),
   };
 }

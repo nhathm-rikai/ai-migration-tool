@@ -5,12 +5,18 @@
 //
 //   node apps/api/dist/cli/analyze-source.js --root <dir> --out <file.json>
 //     [--profile vb6-cp932-v1] [--summary <programs.csv>]
+//     [--default-schema <schema> [--schema-confirmed]]
+//
+// --default-schema: schema that unqualified table names resolve to for the
+// analyzed connection (e.g. the login user). Used only for the merged CRUD
+// view, recorded as an assumption unless --schema-confirmed is given.
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { programSummaryCsv } from '../modules/analysis/program-summary.js';
 import { buildSourceInventory } from '../modules/analysis/source-inventory.js';
 import { findSourceProfile } from '../modules/analysis/source-profiles.js';
+import { createTableNameMapping } from '../modules/analysis/table-names.js';
 import { checkOutputs, writeReplacing } from './output-guard.js';
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -52,12 +58,22 @@ export async function main(argv: string[]): Promise<number> {
       out: { type: 'string' },
       summary: { type: 'string' },
       profile: { type: 'string', default: 'vb6-cp932-v1' },
+      'default-schema': { type: 'string' },
+      'schema-confirmed': { type: 'boolean', default: false },
     },
   });
   const profile = findSourceProfile(values.profile);
-  if (!values.root || !values.out || !profile) {
+  const schema = values['default-schema'] ?? null;
+  const tableNames = createTableNameMapping(schema, values['schema-confirmed']);
+  if (
+    !values.root ||
+    !values.out ||
+    !profile ||
+    !tableNames ||
+    (values['schema-confirmed'] && schema === null)
+  ) {
     console.error(
-      'Usage: analyze-source --root <dir> --out <file.json> [--profile vb6-cp932-v1] [--summary <programs.csv>]',
+      'Usage: analyze-source --root <dir> --out <file.json> [--profile vb6-cp932-v1] [--summary <programs.csv>] [--default-schema <schema> [--schema-confirmed]]',
     );
     return 2;
   }
@@ -71,7 +87,7 @@ export async function main(argv: string[]): Promise<number> {
     return 2;
   }
   const { files, skipped, identities } = await collectFiles(root);
-  const inventory = buildSourceInventory({ profile, files });
+  const inventory = buildSourceInventory({ profile, files, tableNames });
   // Checked again right before writing, now also against hard links to the
   // files just read; links may change while reading.
   const changed = await checkOutputs(root, outputs, identities);

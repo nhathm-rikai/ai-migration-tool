@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 19/10/2026 — mapping tên bảng theo schema (giả định)
+
+- Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy. Theo review bản đề xuất 2 (`analysis/de-xuat-tl-analyze-vb6.md` trong thư mục dự án, ngoài repo): gộp schema được duyệt có điều kiện.
+- `table-name-v1`: CLI nhận `--default-schema <schema>` (và `--schema-confirmed` khi người quản lý DB đã xác nhận); inventory ghi `tableNames = { version, defaultSchema, status }`, mặc định `assumed`. Không cấu hình thì `unconfigured`. Schema không gắn cứng trong code (CORE-09).
+- Giữ tên như trong source ở `sqlTables`/`crud`, `metrics.tables`, `complexity`. Thêm góc nhìn sau mapping: `normalizedCrud` (kèm `names` gốc), `metrics.normalizedTables`, `normalizedComplexity`; CSV thêm cột tương ứng và `tableNameMapping`. Chỉ đổi chữ hoa với identifier không có dấu nháy. Contract thêm trường optional, giữ `source-inventory-v1`.
+- Container Linux, Node 22: prettier, lint, typecheck, build, `verify-repository` pass; **233 test API** pass; smoke CLI: schema sai hoặc `--schema-confirmed` thiếu schema trả mã 2. Chưa chạy `npm.cmd run check` trên Windows sau thay đổi này.
+- Source thật với `--default-schema HAN01`: JSON hợp schema; số liệu theo tên gốc không đổi. Sau mapping: 195 → 130 tên bảng, 45/284 program giảm số bảng, 5/284 program đổi mức complexity (low 105, medium 143, high 36); 15 program pilot không đổi mức. 7 program chưa complete vẫn được đánh dấu `complete = false`.
+
 ## 16/10/2026 — sửa 1 finding review A01b lần 4
 
 - Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy.
@@ -81,7 +89,7 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 
 ## 15/10/2026 — thư viện Analyze tĩnh: decode, manifest, LoC VB6 (A01a)
 
-- Dùng `portal-implement`, scope feature / analysis / fixture tự tạo, không AI, không đọc source khách hàng. Theo `source-analysis-v1`.
+- Làm theo `docs/engineering/workflows/implement.md` (phiên cloud không gọi được skill `portal-implement`), scope feature / analysis / fixture tự tạo, không AI, không đọc source khách hàng. Theo `source-analysis-v1`.
 - `apps/api/src/modules/analysis/`: core trung lập ngôn ngữ gồm `source-decoder.ts` (BOM → override → default profile, CP932 qua `TextDecoder('windows-31j')` strict, NUL/không profile báo lỗi, ASCII ghi `ascii`), `source-text.ts` (tách CRLF/LF/CR, normalized LF, quote evidence), `source-manifest.ts` (raw/normalized SHA-256, snapshot hash gồm profile/decoder/normalization version), `source-inventory.ts` (inventory `source-inventory-v1`: file, program từ project file, unique vs per-program counters, coverage). Ranh giới ngôn ngữ ở `language-analyzer.ts`; `source-profiles.ts` chọn analyzer compiled-in theo profile ID, không load plugin lúc chạy.
 - `vb6/`: lexer dòng (string `""`, `'`, `Rem` đầu statement, `:`, label/line number, continuation code/comment), counter `vb6-physical-code-v1` (designer `.frm` theo VERSION/Begin-End/`Attribute VB_Name` top-level, Attribute = metadata, unclassified riêng), tách Sub/Function/Property Get/Let/Set; parse `.vbp` (member, Reference, Object; bỏ qua sau `[Section]`). Cấu trúc lỗi → `unsupported` có reason/dòng, không báo 0 LoC. Role: `.bas/.frm` code, `.vbp` project, `.frx` resource, `.cls/.ctl/...` unsupported, còn lại excluded. Member path khác hoa/thường được resolve và gắn `case-mismatch`.
 - Profile ID dùng `vb6-cp932-v1` thay `bsn-vb6-cp932-v1` của spec theo CORE-09 (không tên khách hàng trong code); spec cần cập nhật tên profile.

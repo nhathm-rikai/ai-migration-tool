@@ -139,6 +139,7 @@ describe('scoreComplexity (draft v0)', () => {
     maxProcedureDecisionPoints: 0,
     reachableSharedProcedures: 0,
     tables: 0,
+    normalizedTables: 0,
     dynamicSql: 0,
     components: 0,
     externalApis: 0,

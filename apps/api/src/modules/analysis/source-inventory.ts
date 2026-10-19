@@ -27,6 +27,10 @@ import {
   type ProgramFile,
 } from './program-analysis.js';
 import { SQL_ACCESS_VERSION } from './sql-access.js';
+import {
+  UNCONFIGURED_TABLE_NAMES,
+  type TableNameMapping,
+} from './table-names.js';
 
 // Language-neutral inventory: per-file counters/procedures, programs from
 // project files and coverage. Pure function over bytes already read by the
@@ -86,6 +90,9 @@ export type SourceInventory = {
   sqlAccessVersion: string;
   callGraphVersion: string;
   complexityVersion: string;
+  // How table names were merged for `normalizedCrud`, so the view can be
+  // reproduced; an assumption unless `status` is confirmed.
+  tableNames: TableNameMapping;
   snapshotHash: string;
   files: InventoryFile[];
   programs: InventoryProgram[];
@@ -140,7 +147,9 @@ export function buildSourceInventory(input: {
   profile: SourceProfile;
   files: readonly { relativePath: string; bytes: Uint8Array }[];
   encodingOverrides?: ReadonlyMap<string, ProfileEncoding>;
+  tableNames?: TableNameMapping;
 }): SourceInventory {
+  const tableNames = input.tableNames ?? UNCONFIGURED_TABLE_NAMES;
   const { analyzer } = input.profile;
   const sources = new Map<string, Uint8Array>();
   const byLowerPath = new Map<string, string[]>();
@@ -318,7 +327,11 @@ export function buildSourceInventory(input: {
         complete:
           members.every((member) => member.fileStatus === 'analyzed') &&
           counters.unclassifiedLines === 0,
-        analysis: analyzeProgram(programFiles, parsed.externalReferences),
+        analysis: analyzeProgram(
+          programFiles,
+          parsed.externalReferences,
+          tableNames,
+        ),
       };
     },
   );
@@ -340,6 +353,7 @@ export function buildSourceInventory(input: {
     sqlAccessVersion: SQL_ACCESS_VERSION,
     callGraphVersion: CALL_GRAPH_VERSION,
     complexityVersion: COMPLEXITY_VERSION,
+    tableNames,
     snapshotHash: computeSnapshotHash(entries, input.profile.id),
     files: inventoryFiles,
     programs,

@@ -8,6 +8,7 @@ import {
 import { Check, Errors } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
 import { programSummaryCsv } from './program-summary.js';
+import { createTableNameMapping } from './table-names.js';
 import { buildSourceInventory } from './source-inventory.js';
 import { findSourceProfile, type SourceProfile } from './source-profiles.js';
 
@@ -248,6 +249,85 @@ it('marks modules listed by several programs as shared and links calls', () => {
     { table: 'T1', operations: ['R'], viaSharedOnly: true },
   ]);
   expect(program?.analysis?.metrics.ownCodeLines).toBe(3);
+});
+
+it('keeps names as written and adds the merged CRUD view', () => {
+  const tableNames = createTableNameMapping('HAN01');
+  if (!tableNames) throw new Error('mapping');
+  const files = [
+    {
+      relativePath: 'P.VBP',
+      bytes: Buffer.from('Type=Exe\r\nModule=M; M.BAS\r\n'),
+    },
+    {
+      relativePath: 'M.BAS',
+      bytes: Buffer.from(
+        [
+          'Sub P()',
+          '    a = "SELECT * FROM HAN01.KMTANT"',
+          '    b = "UPDATE kmtant SET F = 1"',
+          '    c = "DELETE FROM OTHER.KMTANT"',
+          'End Sub',
+          '',
+        ].join('\r\n'),
+      ),
+    },
+  ];
+  const inventory = buildSourceInventory({
+    profile: profile(),
+    files,
+    tableNames,
+  });
+  const analysis = inventory.programs[0]?.analysis;
+  expect(inventory.tableNames).toEqual({
+    version: 'table-name-v1',
+    defaultSchema: 'HAN01',
+    status: 'assumed',
+  });
+  expect(analysis?.crud.map((entry) => entry.table)).toEqual([
+    'HAN01.KMTANT',
+    'KMTANT',
+    'OTHER.KMTANT',
+  ]);
+  expect(analysis?.normalizedCrud).toEqual([
+    {
+      table: 'KMTANT',
+      operations: ['R', 'U'],
+      names: ['HAN01.KMTANT', 'KMTANT'],
+      evidence: { relativePath: 'M.BAS', line: 2 },
+      viaSharedOnly: false,
+    },
+    {
+      table: 'OTHER.KMTANT',
+      operations: ['D'],
+      names: ['OTHER.KMTANT'],
+      evidence: { relativePath: 'M.BAS', line: 4 },
+      viaSharedOnly: false,
+    },
+  ]);
+  expect(analysis?.metrics).toMatchObject({ tables: 3, normalizedTables: 2 });
+  expect(analysis?.normalizedComplexity.parts.tables).toBeLessThan(
+    analysis?.complexity.parts.tables ?? 0,
+  );
+  expect(Check(SourceInventorySchema, inventory)).toBe(true);
+
+  const [header, row] = programSummaryCsv(inventory).split('\r\n');
+  const cells = Object.fromEntries(
+    (header ?? '')
+      .replace('\uFEFF', '')
+      .split(',')
+      .map((column, index) => [column, row?.split(',')[index]]),
+  );
+  expect(cells).toMatchObject({
+    tables: '3',
+    normalizedTables: '2',
+    normalizedCrud: 'KMTANT:RU OTHER.KMTANT:D',
+    tableNameMapping: 'HAN01 (assumed)',
+  });
+
+  const unmapped = buildSourceInventory({ profile: profile(), files });
+  expect(unmapped.tableNames.status).toBe('unconfigured');
+  expect(unmapped.programs[0]?.analysis?.metrics.normalizedTables).toBe(3);
 });
 
 it('writes one CSV row per program with a BOM and quoted cells', () => {

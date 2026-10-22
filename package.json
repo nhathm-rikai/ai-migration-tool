@@ -17,26 +17,29 @@
     "dev": "npm run build -w @portal/contracts && npm run dev -w @portal/api",
     "build": "npm run build -w @portal/contracts && npm run build -w @portal/api && npm run build -w @portal/web",
     "start": "npm run start -w @portal/api",
-    "typecheck": "npm run build -w @portal/contracts && npm run typecheck --workspaces",
-    "lint": "npm run build -w @portal/contracts && eslint apps/api packages/contracts apps/web",
+    "typecheck": "npm run build -w @portal/contracts && npm run typecheck --workspaces && tsc -p tests/e2e",
+    "lint": "npm run build -w @portal/contracts && eslint apps/api packages/contracts apps/web tests/e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm run build -w @portal/contracts && npm run test -w @portal/api && npm run test -w @portal/web",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "dev:web": "npm run build -w @portal/contracts && npm run dev -w @portal/web",
-    "preview:web": "npm run preview -w @portal/web"
+    "preview:web": "npm run preview -w @portal/web",
+    "e2e": "node scripts/e2e.mjs",
+    "e2e:self-check": "node scripts/e2e.mjs --self-check"
   },
   "devDependencies": {
-    "@types/node": "24.19.2",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
     "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.2",
     "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
-    "vitest": "5.0.4",
-    "eslint-plugin-react-hooks": "7.1.1"
+    "vitest": "5.0.4"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,

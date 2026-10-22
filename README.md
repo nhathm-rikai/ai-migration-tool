@@ -31,6 +31,16 @@ npm.cmd start
 
 `check` chạy format check → lint → typecheck → test → build. `start` chạy bản đã build, không tự build lại. `dev` build contracts rồi watch backend; **sửa contracts thì dừng và chạy lại `dev`** để cập nhật bản compiled dùng chung.
 
+### E2E browser (fixture)
+
+```powershell
+npx.cmd playwright install chromium
+npm.cmd run e2e
+npm.cmd run e2e:self-check
+```
+
+`playwright install` tải Chromium một lần vào cache của user (ngoài repo; Linux có thể cần `--with-deps`). `e2e` build toàn bộ, chạy API đã build và `vite preview` trên port loopback trống, SQLite trong thư mục temp riêng, seed một project demo qua API rồi chạy Playwright headless (`tests/e2e`). Kết thúc luôn dừng hai process, xóa thư mục temp, kiểm port đã đóng và DB trong data directory cá nhân không đổi. Report HTML ở `test-results/e2e/report`, trace/screenshot khi fail ở `test-results/e2e/artifacts` (đã ignore). `e2e:self-check` chạy hai kịch bản fail có chủ đích (assertion sai, API dừng giữa chừng) và chỉ pass khi cả hai exit nonzero, có trace/report và không rò. Không gọi Claude/AI, không dùng source khách hàng. `PORTAL_WEB_PORT` đổi port Vite; proxy dùng `PORTAL_PORT` như API.
+
 `npm ci` cần kết nối tải package lần đầu. Postinstall của esbuild được cho phép theo đúng phiên bản trong `allowScripts`. `better-sqlite3@13.0.3` đã kèm binary Windows; cấu hình tắt install script của đúng phiên bản này để npm 12 không tự chạy `node-gyp rebuild` và yêu cầu C++ toolchain. Khi nâng driver cần kiểm lại chính sách này. Driver SQLite được kiểm chứng trực tiếp bằng integration test, không thay bằng mock.
 
 ## Tài liệu
@@ -51,7 +61,8 @@ docs/engineering/        # convention gốc, specs, workflow, progress
 .agents/skills/          # portal-implement, portal-techlead-review
 .claude/skills/          # cùng workflow; explicit invocation
 .cursor/rules/           # wrapper theo scope
-scripts/                 # kiểm cấu trúc repo, link và skill
+scripts/                 # kiểm cấu trúc repo, link và skill; harness E2E
+tests/e2e/               # Playwright smoke trên fixture
 AGENTS.md, CLAUDE.md      # hướng dẫn coding độc lập
 package.json             # workspaces và scripts chung
 package-lock.json        # lockfile duy nhất

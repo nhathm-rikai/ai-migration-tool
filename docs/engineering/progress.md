@@ -8,6 +8,13 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — T00 harness E2E fixture
+
+- Làm theo các bước của `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE-10, QA-05/06/07/09, platform support). Gate init/fixture, không Claude, không source khách hàng. Nhánh `feat/t00-e2e-fixture-harness` từ `1d49deb`; T00 không import contract C01 (nhánh `feat/c01-analyze-run-contracts`) nên không chờ C01 merge.
+- Thêm `@playwright/test` 1.64.0 (bản đã phát hành hơn 2 tuần) ở root. `scripts/e2e.mjs`: một lệnh build → API compiled + `vite preview` trên port loopback trống, `PORTAL_DATA_DIR` trong temp riêng → seed project demo qua API → Playwright headless → teardown luôn chạy (dừng process, xóa temp, kiểm port đóng, fingerprint `portal.db` trong data directory mặc định không đổi). Spec `tests/e2e/projects.spec.ts`: list project seed, tạo project qua UI, reload và mở lại detail. Trace/screenshot khi fail, report HTML trong `test-results/e2e` (ignore).
+- `e2e:self-check`: assertion cố ý fail và API bị dừng trước test; pass chỉ khi cả hai exit nonzero, có `trace.zip` + report, không rò port/temp/DB cá nhân. Vite đọc `PORTAL_PORT`/`PORTAL_WEB_PORT` (mặc định giữ 4310/5173/4173). Root `typecheck`/`lint` bao gồm `tests/e2e`.
+- Windows x64, Node 24.16.0/npm 12.0.2, Chromium Playwright 1248: `npm run e2e` pass (1 test), `npm run e2e:self-check` pass, `npm run check` pass. Chưa kiểm macOS/Linux; `child.kill()` chỉ dừng process trực tiếp (API, vite preview không spawn con), hai process chạy bằng `node`, không qua shell. Chưa có CI.
+
 ## 19/10/2026 — mapping tên bảng theo schema (giả định)
 
 - Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy. Theo review bản đề xuất 2 (`analysis/de-xuat-tl-analyze-vb6.md` trong thư mục dự án, ngoài repo): gộp schema được duyệt có điều kiện.

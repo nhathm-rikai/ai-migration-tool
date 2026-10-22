@@ -6,7 +6,7 @@ Yêu cầu đích: **Windows, macOS và Linux**. Đây là yêu cầu cho Portal
 
 - Đã có bằng chứng backend fixture trên máy Windows x64, Node 24.16.0/npm 12.0.2: install, checks, SQLite native, HTTP và reopen dữ liệu.
 - Linux/macOS là mục tiêu phải hỗ trợ, **chưa được kiểm chứng**. Chưa chốt OS version tối thiểu, Linux distro/libc và các tổ hợp x64/ARM64 sẽ phân phối. Chốt trước release cho nền tảng đó; không gọi chung “Linux supported” chỉ vì pass trên một distro.
-- Chưa có installer hay CLI thật. Test fake hoặc giả lập `platform` chỉ chứng minh logic lựa chọn nhánh; không thay test filesystem/native/process trên OS đích.
+- Chưa có installer hay adapter Claude CLI thật. CLI Analyze tĩnh đã có và chạy độc lập với Portal. Test fake hoặc giả lập `platform` chỉ chứng minh logic lựa chọn nhánh; không thay test filesystem/native/process trên OS đích.
 - Đã có resolver data directory tại `apps/api/src/platform/data-directory.ts`: Windows LOCALAPPDATA/AppData fallback, macOS Application Support và Linux XDG. Có unit test chọn path cho ba OS và containment/junction trên Windows; chưa thay thế smoke native macOS/Linux. README backend hiện dùng ví dụ PowerShell và ghi cách gọi npm trên OS khác.
 
 ## Quy ước khi viết/sửa code

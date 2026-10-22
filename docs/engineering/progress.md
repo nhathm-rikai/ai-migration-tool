@@ -8,6 +8,22 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — đồng bộ docs, tạm hoãn source map
+
+- Giữ các hiệu chỉnh tài liệu theo source đang có: Projects UI/API, thư viện/CLI Analyze VB6, mapping schema, E2E fixture và trạng thái module chưa tích hợp; sửa thứ tự trích SQL trong README backend. Không đổi runtime/contract/dependency.
+- Theo yêu cầu người dùng, cất bản đồ Markdown/HTML và phần tích hợp README/workflow/checker vào stash `3437adf` (`WIP source-map docs and viewer - paused 2026-10-22`). Stash giữ snapshot đầy đủ trước khi tách; working tree giữ các hiệu chỉnh docs nêu trên và không còn link phụ thuộc source map. Có thể khôi phục từ stash khi tiếp tục.
+- UA để sau, chưa cài hay tích hợp. Kiểm tài liệu bằng format check, link/skill/workspace checker và `git diff --check`; không chạy lại runtime tests cho thay đổi docs-only.
+
+## 22/10/2026 — T00 harness E2E fixture
+
+- Làm theo các bước của `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE-10, QA-05/06/07/09, platform support). Gate init/fixture, không Claude, không source khách hàng. Nhánh `feat/t00-e2e-fixture-harness` từ `1d49deb`; T00 không import contract C01 (nhánh `feat/c01-analyze-run-contracts`) nên không chờ C01 merge.
+- Thêm `@playwright/test` 1.64.0 (bản đã phát hành hơn 2 tuần) ở root. `scripts/e2e.mjs`: một lệnh build → API compiled + `vite preview` trên port loopback trống, `PORTAL_DATA_DIR` trong temp riêng → seed project demo qua API → Playwright headless → teardown luôn chạy (dừng process, xóa temp, kiểm port đóng, fingerprint `portal.db` trong data directory mặc định không đổi). Spec `tests/e2e/projects.spec.ts`: list project seed, tạo project qua UI, reload và mở lại detail. Trace/screenshot khi fail, report HTML trong `test-results/e2e` (ignore).
+- `e2e:self-check`: assertion cố ý fail và API bị dừng trước test; pass chỉ khi cả hai exit nonzero, có `trace.zip` + report, không rò port/temp/DB cá nhân. Vite đọc `PORTAL_PORT`/`PORTAL_WEB_PORT` (mặc định giữ 4310/5173/4173). Root `typecheck`/`lint` bao gồm `tests/e2e`.
+- Sửa finding P2 review `394ce65` (đã tái hiện: `PLAYWRIGHT_BROWSERS_PATH` rỗng → cả hai kịch bản fail ở `browserType.launch` mà self-check vẫn exit 0): self-check chạy smoke đối chứng trước và dừng nếu không pass; mỗi kịch bản được chấm từ JSON report (đúng 1 test, đúng title, message chứa dấu hiệu lỗi cố ý, không chứa lỗi hạ tầng, có trace/report, không rò). Thêm kịch bản regression thiếu browser phải bị chấm là lỗi hạ tầng; đã kiểm bỏ danh sách lỗi hạ tầng thì self-check fail. Thiếu browser: `e2e` và `e2e:self-check` đều exit 1.
+- Sửa finding P2 review `ddadc2d`: nhánh `rejectedFor` (kịch bản thiếu browser) bỏ qua leak. Leak (port/temp/DB cá nhân) nay luôn tính cho mọi kịch bản qua `scenarioProblems`; self-check chạy `selfTestJudging` trên kết quả giả lập trước khi mở browser (gồm ca bị từ chối đúng vì hạ tầng nhưng có leak phải fail). Mutation trả `[]` cho nhánh từ chối làm self-check fail ngay ở bước này.
+- Ghi chú baseline (không thuộc T00): `tests/fixtures/vb6-sample/programs/SAMPLE/BUILD.LOG` bị `*.log` trong `.gitignore` loại nên checkout sạch thiếu file, 1/233 test API fail; máy local có file nên `npm run check` pass. Đã sửa riêng ở `10e332f` (đã merge vào master) và merge master vào nhánh T00.
+- Windows x64, Node 24.16.0/npm 12.0.2, Chromium Playwright 1248: `npm run e2e` pass (1 test), `npm run e2e:self-check` pass, `npm run check` pass. Chưa kiểm macOS/Linux; `child.kill()` chỉ dừng process trực tiếp (API, vite preview không spawn con), hai process chạy bằng `node`, không qua shell. Chưa có CI.
+
 ## 22/10/2026 — Cho Claude tự chọn skill implement
 
 - Dùng `portal-implement` và `skill-creator`; scope cấu hình coding agent và tài liệu, không đổi runtime sản phẩm. Theo yêu cầu người dùng, đặt `disable-model-invocation: false` cho Claude `portal-implement`; `portal-techlead-review` tiếp tục gọi tường minh và review-only.

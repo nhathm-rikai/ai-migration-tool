@@ -52,7 +52,7 @@ apps/
     features/                    # projects/, jobs/, artifacts/, reviews/
     shared/api/                  # api-client.ts, SSE client
     shared/ui/                   # component hiển thị dùng chung
-packages/contracts/src/          # project.schema.ts, job.schema.ts, artifact.schema.ts, error.schema.ts
+packages/contracts/src/          # project/source-registration/run/artifact/error schema, analyze-api.ts, fixtures/
 tests/e2e/                       # browser test bằng fixture sạch
 tests/fixtures/                  # source giả lập và expected result nhỏ
 docs/engineering/                # bộ hướng dẫn này

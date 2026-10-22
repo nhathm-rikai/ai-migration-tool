@@ -8,6 +8,22 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — Cho Claude tự chọn skill implement
+
+- Dùng `portal-implement` và `skill-creator`; scope cấu hình coding agent và tài liệu, không đổi runtime sản phẩm. Theo yêu cầu người dùng, đặt `disable-model-invocation: false` cho Claude `portal-implement`; `portal-techlead-review` tiếp tục gọi tường minh và review-only.
+- Đồng bộ AGENTS.md, CLAUDE.md, hướng dẫn tích hợp và validator metadata theo policy riêng của từng skill. Không thay workflow/rule gốc hoặc wrapper Codex.
+- Kiểm chứng trên Windows: `node scripts/verify-repository.mjs` pass (36 documents, 306 links, 4 skill frontmatters); Prettier check sáu file thay đổi và `git diff --check` pass sau sửa format validator. Chưa smoke discovery/tự chọn trong session Claude mới; bật policy không bảo đảm model luôn tự chọn skill. Không chạy test sản phẩm vì không đổi code/runtime sản phẩm.
+
+## 22/10/2026 — C01 hợp đồng Analyze source/run/artifact
+
+- Làm theo workflow `portal-implement`; gate FEATURE:jobs/storage/analysis, dữ liệu fixture, không route/DB/runtime mới. Baseline `1d49deb`, nhánh `feat/c01-analyze-run-contracts`.
+- Contracts: `source-registration.schema.ts` (PUT/GET source, mapping `unconfigured|assumed|confirmed`, summary không có root tuyệt đối), `run.schema.ts` (Run union theo 7 status, config khóa gồm profile/mapping/phiên bản analyzer/limits, start + `Idempotency-Key`, retry `current-source|reuse-snapshot`, list/current/cancel, runtime status, SSE event), `artifact.schema.ts` (ref + envelope inventory theo exact version), `analyze-api.ts` (bảng operation: method/path/schema/status/mã lỗi), `AnalyzeApiErrorCodeSchema` + HTTP status. Fixture sạch qua subpath `@portal/contracts/fixtures`. Đặc tả: [analyze-run-contract](specs/analyze-run-contract.md).
+- Quyết định: Project DTO không đổi; project demo có source `fixture` revision 1, PUT source trên demo trả `409 PROJECT_MODE_CONFLICT`; project `mode: 'local'` chốt trong B03 kèm migration. Runtime cần recovery trả `503`. `stateVersion` chỉ tăng khi đổi status. Mã analyze tách khỏi catalog Projects đến khi BE/FE có route/màn hình dùng.
+- Contracts có test riêng (`npm run test -w @portal/contracts`, đã thêm vào `npm test`): 36 test cho C01-AC01/AC02/AC03, negative field/ID/status/config, bảng operation. Windows x64, Node 24.16.0/npm 12.0.2: `npm run check` pass (format, lint, typecheck, test contracts 36 + API 233 + web 41, build).
+- Sửa 2 finding P2 review `f5345e4` (đã tái hiện trước khi sửa): cancel trả 202 khi `cancelling`, 200 khi `cancelled` (`successStatuses`, `cancelRunSuccessStatus`, BE-03); Run `reuse-snapshot` bắt buộc `retryOfRunId` + `sourceSnapshotId` ở mọi status, run `current-source` queued không có snapshot; thêm fixture `reuseSnapshotRunFixture`, request reuse trỏ tới run gốc có snapshot; 39 test contracts.
+- Sửa regression P2 review `f28e020`: `runVariants` nhận `currentSnapshot: TSchema` nên `Run.sourceSnapshotId` nhánh `current-source` thành `unknown` (runtime vẫn đúng). Giữ generic `S extends TSchema`; thêm `run.types.test.ts` (`expectTypeOf`, chạy trong typecheck) khóa type snapshot/status, đã xác nhận test này fail trên `f28e020`.
+- Chưa làm (task sau): route/service/migration B03/B04/B07/B09, message VI/JA F01/F02/F03, project `local`. Limits trong fixture là số giữ chỗ, số thật chốt sau spike JOB-07.
+
 ## 19/10/2026 — mapping tên bảng theo schema (giả định)
 
 - Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy. Theo review bản đề xuất 2 (`analysis/de-xuat-tl-analyze-vb6.md` trong thư mục dự án, ngoài repo): gộp schema được duyệt có điều kiện.

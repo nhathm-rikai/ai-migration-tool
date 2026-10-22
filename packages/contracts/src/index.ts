@@ -3,3 +3,7 @@ export * from './project-policy.js';
 export * from './error.schema.js';
 export * from './health.schema.js';
 export * from './source-inventory.schema.js';
+export * from './source-registration.schema.js';
+export * from './run.schema.js';
+export * from './artifact.schema.js';
+export * from './analyze-api.js';

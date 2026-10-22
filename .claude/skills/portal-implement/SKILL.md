@@ -1,7 +1,7 @@
 ---
 name: portal-implement
 description: Implements portal features using shared rules, delivery gates, company-neutral naming and cross-platform boundaries. Use when explicitly asked to implement or fix a feature in this project.
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Portal implement

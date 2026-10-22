@@ -8,6 +8,12 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — đồng bộ docs, tạm hoãn source map
+
+- Giữ các hiệu chỉnh tài liệu theo source đang có: Projects UI/API, thư viện/CLI Analyze VB6, mapping schema, E2E fixture và trạng thái module chưa tích hợp; sửa thứ tự trích SQL trong README backend. Không đổi runtime/contract/dependency.
+- Theo yêu cầu người dùng, cất bản đồ Markdown/HTML và phần tích hợp README/workflow/checker vào stash `3437adf` (`WIP source-map docs and viewer - paused 2026-10-22`). Stash giữ snapshot đầy đủ trước khi tách; working tree giữ các hiệu chỉnh docs nêu trên và không còn link phụ thuộc source map. Có thể khôi phục từ stash khi tiếp tục.
+- UA để sau, chưa cài hay tích hợp. Kiểm tài liệu bằng format check, link/skill/workspace checker và `git diff --check`; không chạy lại runtime tests cho thay đổi docs-only.
+
 ## 22/10/2026 — T00 harness E2E fixture
 
 - Làm theo các bước của `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE-10, QA-05/06/07/09, platform support). Gate init/fixture, không Claude, không source khách hàng. Nhánh `feat/t00-e2e-fixture-harness` từ `1d49deb`; T00 không import contract C01 (nhánh `feat/c01-analyze-run-contracts`) nên không chờ C01 merge.

@@ -4,7 +4,7 @@ Dev mở rộng nền tảng bắt đầu từ [mẫu policy và lỗi API](docs
 
 Thư mục chứa file này là **root repo sản phẩm**. Backend đã init trong [apps/api](apps/api/README.md); schema/DTO dùng chung nằm trong `packages/contracts`. Đọc **README backend trước**, sau đó lần theo module Projects. Repo tự đủ: không cần proposal, demo HTML, source khách hàng hay tài liệu ở parent directory.
 
-Phạm vi hiện tại: **init FE + BE / Projects + SQLite / fixture + fake runner**. UI tạo/list/xem project qua API; chưa đọc source thật, Analyze/Understand hoặc tích hợp Claude CLI. Đây chưa phải bản release cho Sales.
+Phạm vi hiện tại: **Projects UI/API + SQLite demo; thư viện và CLI Analyze VB6 độc lập; E2E browser fixture**. UI tạo/list/xem project; Analyze CLI đọc source local và xuất JSON/CSV, chưa nối vào API/job/UI. Chưa Understand/Claude CLI, review/export workflow hoặc conversion. Đây chưa phải bản release cho Sales.
 
 ## Chạy trên máy Dev
 
@@ -70,4 +70,4 @@ package-lock.json        # lockfile duy nhất
 
 `apps/web` đã init; dùng palette/shell của prototype làm tham khảo, Projects dùng contracts/API thật. Các bước chưa có backend được ghi “Chưa khả dụng”. API vẫn chạy độc lập với FE.
 
-Đã khởi tạo Git cục bộ tại repo này, chưa stage/commit, remote, push hoặc CI. `.gitignore` loại dependencies/build/cache, secrets, DB/log, source khách hàng và tài liệu cá nhân. Khi chia sẻ, chỉ dùng repo này; không thêm parent workspace vào repo. Kiểm cấu trúc/link/skill bằng `node scripts/verify-repository.mjs`; sau build chạy `node scripts/smoke-backend.mjs` để kiểm compiled startup/migration/reopen từ cwd bên ngoài.
+Repo đã có lịch sử Git cục bộ; trạng thái chia sẻ/CI không được suy ra từ việc có commit. `.gitignore` loại dependencies/build/cache, secrets, DB/log, source khách hàng và tài liệu cá nhân. Khi chia sẻ, chỉ dùng repo này; không thêm parent workspace vào repo. Kiểm cấu trúc/link/skill bằng `node scripts/verify-repository.mjs`; sau build chạy `node scripts/smoke-backend.mjs` để kiểm compiled startup/migration/reopen từ cwd bên ngoài.

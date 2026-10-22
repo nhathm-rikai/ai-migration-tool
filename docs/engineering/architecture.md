@@ -23,7 +23,7 @@ Một project có nhiều run. Mỗi run khóa một snapshot source, cấu hìn
 
 ## 3. Cấu trúc source đích
 
-Ngày 14/10/2026 đã tạo `apps/api` và `packages/contracts`: Projects API/service/repository, config, DB/migrations, error handler và fake AgentRunner dùng trong test. [README backend](../../apps/api/README.md) chỉ rõ file thật và lệnh chạy. Cây bên dưới gồm cả các module **chưa triển khai**; UI Projects đã được thêm tại `apps/web` ngày 15/10; CLI/jobs/analysis/artifacts/reviews chưa được triển khai. Projects hiện chỉ nhận `fixtureId`, chưa đăng ký source root thật.
+Source hiện có Projects UI/API/service/repository, config, DB/migrations, error handler, fake AgentRunner cho test, thư viện/CLI Analyze VB6 độc lập và harness E2E fixture. Xem [README backend](../../apps/api/README.md) để mở file thật. Cây bên dưới là **cấu trúc đích**, gồm cả module chưa triển khai: jobs, Analysis API/UI, artifacts, reviews và adapter Claude CLI. Projects hiện chỉ nhận `fixtureId`, chưa đăng ký source root thật.
 
 ```text
 apps/

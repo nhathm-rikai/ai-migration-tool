@@ -1,5 +1,7 @@
 # Dev nên mở file nào?
 
+Analyze tĩnh đã có ở thư viện/CLI độc lập. Các ví dụ Analysis job và Claude CLI trong trang này vẫn là thiết kế tích hợp tương lai.
+
 Ngày 14/10/2026 đã init **backend Projects fixture**. Phần 1 dẫn file thật; các mục jobs/CLI/SSE/Analyze bên dưới vẫn là bản đồ thiết kế cho task tương lai. Cách chạy/API/edge case hiện có ở [README backend](../../apps/api/README.md). Không coi snippet hoặc module dự kiến là tính năng đã chạy.
 
 Ngày 15/10 đã có [FE Projects](../../apps/web/README.md). Khi thêm API/UI, theo [mẫu policy và lỗi API](patterns/api-errors-policy.md) để lần theo policy chung, public error code, transport, thông báo theo feature và failure tests. Các ví dụ jobs/CLI/Analyze vẫn là thiết kế đích.

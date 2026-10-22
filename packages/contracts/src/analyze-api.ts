@@ -16,6 +16,7 @@ import {
   RunParamsSchema,
   RunSchema,
   RuntimeStatusSchema,
+  type Run,
   StartRunHeadersSchema,
   StartRunSchema,
 } from './run.schema.js';
@@ -34,7 +35,8 @@ export type AnalyzeOperationErrorCode = ApiErrorCode | AnalyzeApiErrorCode;
 type Operation = {
   method: 'GET' | 'PUT' | 'POST';
   path: string;
-  successStatus: 200 | 202;
+  // Every 2xx the operation answers; see cancelRunSuccessStatus.
+  successStatuses: readonly (200 | 202)[];
   params?: TSchema;
   querystring?: TSchema;
   headers?: TSchema;
@@ -56,7 +58,7 @@ export const ANALYZE_API_OPERATIONS = {
   getProjectSource: {
     method: 'GET',
     path: `${ProjectsPath}/source`,
-    successStatus: 200,
+    successStatuses: [200],
     params: ProjectParamsSchema,
     querystring: EmptyQuerySchema,
     response: ProjectSourceResponseSchema,
@@ -66,7 +68,7 @@ export const ANALYZE_API_OPERATIONS = {
   putProjectSource: {
     method: 'PUT',
     path: `${ProjectsPath}/source`,
-    successStatus: 200,
+    successStatuses: [200],
     params: ProjectParamsSchema,
     querystring: EmptyQuerySchema,
     body: PutProjectSourceSchema,
@@ -85,7 +87,7 @@ export const ANALYZE_API_OPERATIONS = {
   startRun: {
     method: 'POST',
     path: `${ProjectsPath}/runs`,
-    successStatus: 202,
+    successStatuses: [202],
     params: ProjectParamsSchema,
     querystring: EmptyQuerySchema,
     headers: StartRunHeadersSchema,
@@ -108,7 +110,7 @@ export const ANALYZE_API_OPERATIONS = {
   listRuns: {
     method: 'GET',
     path: `${ProjectsPath}/runs`,
-    successStatus: 200,
+    successStatuses: [200],
     params: ProjectParamsSchema,
     querystring: ListRunsQuerySchema,
     response: RunListSchema,
@@ -118,7 +120,7 @@ export const ANALYZE_API_OPERATIONS = {
   getCurrentRun: {
     method: 'GET',
     path: `${ProjectsPath}/runs/current`,
-    successStatus: 200,
+    successStatuses: [200],
     params: ProjectParamsSchema,
     querystring: EmptyQuerySchema,
     response: CurrentRunResponseSchema,
@@ -128,7 +130,7 @@ export const ANALYZE_API_OPERATIONS = {
   getRun: {
     method: 'GET',
     path: `${ProjectsPath}/runs/:runId`,
-    successStatus: 200,
+    successStatuses: [200],
     params: RunParamsSchema,
     querystring: EmptyQuerySchema,
     response: RunSchema,
@@ -138,7 +140,8 @@ export const ANALYZE_API_OPERATIONS = {
   cancelRun: {
     method: 'POST',
     path: `${ProjectsPath}/runs/:runId/cancel`,
-    successStatus: 200,
+    // 202 while cancelling, 200 once cancelled.
+    successStatuses: [202, 200],
     params: RunParamsSchema,
     querystring: EmptyQuerySchema,
     body: CancelRunSchema,
@@ -149,7 +152,7 @@ export const ANALYZE_API_OPERATIONS = {
   getRuntimeStatus: {
     method: 'GET',
     path: '/api/v1/runtime/status',
-    successStatus: 200,
+    successStatuses: [200],
     querystring: EmptyQuerySchema,
     response: RuntimeStatusSchema,
     contentType: 'application/json',
@@ -158,7 +161,7 @@ export const ANALYZE_API_OPERATIONS = {
   streamRunEvents: {
     method: 'GET',
     path: `${ProjectsPath}/runs/:runId/events`,
-    successStatus: 200,
+    successStatuses: [200],
     params: RunParamsSchema,
     querystring: EmptyQuerySchema,
     response: RunEventSchema,
@@ -168,7 +171,7 @@ export const ANALYZE_API_OPERATIONS = {
   listRunArtifacts: {
     method: 'GET',
     path: `${ProjectsPath}/runs/:runId/artifacts`,
-    successStatus: 200,
+    successStatuses: [200],
     params: RunParamsSchema,
     querystring: EmptyQuerySchema,
     response: ArtifactListSchema,
@@ -178,7 +181,7 @@ export const ANALYZE_API_OPERATIONS = {
   getArtifactVersion: {
     method: 'GET',
     path: `${ProjectsPath}/artifacts/:artifactId/versions/:version`,
-    successStatus: 200,
+    successStatuses: [200],
     params: ArtifactVersionParamsSchema,
     querystring: EmptyQuerySchema,
     response: ArtifactEnvelopeSchema,
@@ -192,3 +195,8 @@ export type AnalyzeOperationId = keyof typeof ANALYZE_API_OPERATIONS;
 // `Location` header of startRun: the run detail path.
 export const runLocation = (projectId: string, runId: string) =>
   `/api/v1/projects/${projectId}/runs/${runId}`;
+
+// cancelRun answers 202 while the stop is still in progress (`cancelling`)
+// and 200 once the run is `cancelled`.
+export const cancelRunSuccessStatus = (run: Run): 200 | 202 =>
+  run.status === 'cancelling' ? 202 : 200;

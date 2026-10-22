@@ -28,6 +28,7 @@ import {
   SourceInventorySchema,
   StartRunHeadersSchema,
   StartRunSchema,
+  cancelRunSuccessStatus,
 } from './index.js';
 import * as fixtures from './fixtures/index.js';
 
@@ -49,6 +50,7 @@ describe('C01-AC01 run payloads', () => {
 
   it('accepts retry, demo, list, current and event payloads', () => {
     expectValid(RunSchema, fixtures.retryRunFixture);
+    expectValid(RunSchema, fixtures.reuseSnapshotRunFixture);
     expectValid(RunSchema, fixtures.demoQueuedRunFixture);
     expectValid(RunListSchema, fixtures.runListFixture);
     expectValid(RunListSchema, { items: [], nextCursor: null });
@@ -107,6 +109,45 @@ describe('C01-AC01 run payloads', () => {
       finishedAt: '2026-10-22T02:00:09.000Z',
     });
     expectInvalid(RunSchema, { ...fixtures.queuedRunFixture, stateVersion: 0 });
+  });
+
+  it('requires the parent run and snapshot when a snapshot is reused', () => {
+    const reuse = fixtures.reuseSnapshotRunFixture;
+    expectInvalid(RunSchema, { ...reuse, retryOfRunId: null });
+    expectInvalid(RunSchema, { ...reuse, sourceSnapshotId: null });
+    expectInvalid(RunSchema, {
+      ...reuse,
+      retryOfRunId: null,
+      sourceSnapshotId: null,
+    });
+    for (const run of Object.values(fixtures.RUN_FIXTURES_BY_STATUS)) {
+      const asReuse = {
+        ...run,
+        sourceStrategy: 'reuse-snapshot',
+        retryOfRunId: fixtures.FIXTURE_IDS.runs.failed,
+      };
+      expectInvalid(RunSchema, { ...asReuse, sourceSnapshotId: null });
+      expectValid(RunSchema, {
+        ...asReuse,
+        sourceSnapshotId: fixtures.FIXTURE_IDS.snapshot,
+      });
+    }
+    // A run on the current source has no snapshot before it starts.
+    expectInvalid(RunSchema, {
+      ...fixtures.queuedRunFixture,
+      sourceSnapshotId: fixtures.FIXTURE_IDS.snapshot,
+    });
+  });
+
+  it('pairs the reuse request with a parent that has a snapshot', () => {
+    const parentId = fixtures.retryWithSnapshotFixture.retryOfRunId;
+    const parent = Object.values(fixtures.RUN_FIXTURES_BY_STATUS).find(
+      (run) => run.id === parentId,
+    );
+    expect(parent?.sourceSnapshotId).toBe(
+      fixtures.reuseSnapshotRunFixture.sourceSnapshotId,
+    );
+    expect(fixtures.reuseSnapshotRunFixture.retryOfRunId).toBe(parentId);
   });
 
   it('rejects an invalid locked config', () => {
@@ -443,13 +484,21 @@ describe('C01 operation table', () => {
     expect(new Set(routes).size).toBe(routes.length);
   });
 
-  it('describes a 202 start and 200 for everything else', () => {
-    expect(ANALYZE_API_OPERATIONS.startRun.successStatus).toBe(202);
+  it('answers 202 for accepted work and 200 for completed queries', () => {
+    expect(ANALYZE_API_OPERATIONS.startRun.successStatuses).toEqual([202]);
+    expect(ANALYZE_API_OPERATIONS.cancelRun.successStatuses).toEqual([
+      202, 200,
+    ]);
     expect(
       Object.entries(ANALYZE_API_OPERATIONS)
-        .filter(([id]) => id !== 'startRun')
-        .every(([, operation]) => operation.successStatus === 200),
+        .filter(([id]) => id !== 'startRun' && id !== 'cancelRun')
+        .every(([, operation]) => operation.successStatuses.join() === '200'),
     ).toBe(true);
+  });
+
+  it('answers cancel with 202 while cancelling and 200 once cancelled', () => {
+    expect(cancelRunSuccessStatus(fixtures.cancellingRunFixture)).toBe(202);
+    expect(cancelRunSuccessStatus(fixtures.cancelledRunFixture)).toBe(200);
   });
 
   it('validates each fixture against the response schema of its operation', () => {

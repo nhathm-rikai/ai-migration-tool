@@ -1,4 +1,4 @@
-import { Type, type Static } from 'typebox';
+import { Type, type Static, type TProperties, type TSchema } from 'typebox';
 import { ProjectIdSchema } from './project.schema.js';
 import { PROJECT_FIXTURE_ID } from './project-policy.js';
 import {
@@ -140,66 +140,87 @@ const RunBase = {
   // +1 on every status transition only; stage changes do not bump it.
   stateVersion: Positive,
   source: RunSourceSchema,
-  sourceStrategy: SourceStrategySchema,
-  retryOfRunId: Nullable(RunIdSchema),
-  // Set from queued for `reuse-snapshot`, during running otherwise.
-  sourceSnapshotId: Nullable(SnapshotIdSchema),
   config: AnalyzeRunConfigSchema,
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
 };
 
+// Each status exists twice: a run on the current source gets its snapshot
+// while running (`currentSnapshot` per status); a run that reuses a snapshot
+// is always a retry and carries that snapshot from queued on.
+const runVariants = <F extends TProperties>(
+  fields: F,
+  currentSnapshot: TSchema,
+) =>
+  [
+    Type.Object(
+      {
+        ...RunBase,
+        ...fields,
+        sourceStrategy: Type.Literal('current-source'),
+        retryOfRunId: Nullable(RunIdSchema),
+        sourceSnapshotId: currentSnapshot,
+      },
+      Strict,
+    ),
+    Type.Object(
+      {
+        ...RunBase,
+        ...fields,
+        sourceStrategy: Type.Literal('reuse-snapshot'),
+        retryOfRunId: RunIdSchema,
+        sourceSnapshotId: SnapshotIdSchema,
+      },
+      Strict,
+    ),
+  ] as const;
+
 const NoError = { errorCode: Type.Null() };
+const OptionalSnapshot = Nullable(SnapshotIdSchema);
 
 export const RunSchema = Type.Union([
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('queued'),
       stage: Type.Null(),
       startedAt: Type.Null(),
       finishedAt: Type.Null(),
     },
-    Strict,
+    Type.Null(),
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('running'),
       stage: AnalyzeStageSchema,
       startedAt: TimestampSchema,
       finishedAt: Type.Null(),
     },
-    Strict,
+    OptionalSnapshot,
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('cancelling'),
       stage: Nullable(AnalyzeStageSchema),
       startedAt: TimestampSchema,
       finishedAt: Type.Null(),
     },
-    Strict,
+    OptionalSnapshot,
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('succeeded'),
-      sourceSnapshotId: SnapshotIdSchema,
       stage: Type.Null(),
       startedAt: TimestampSchema,
       finishedAt: TimestampSchema,
     },
-    Strict,
+    SnapshotIdSchema,
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       status: Type.Literal('failed'),
       errorCode: RunErrorCodeSchema,
       // Last stage reached before the failure.
@@ -207,11 +228,10 @@ export const RunSchema = Type.Union([
       startedAt: TimestampSchema,
       finishedAt: TimestampSchema,
     },
-    Strict,
+    OptionalSnapshot,
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('cancelled'),
       stage: Type.Null(),
@@ -219,11 +239,10 @@ export const RunSchema = Type.Union([
       startedAt: Nullable(TimestampSchema),
       finishedAt: TimestampSchema,
     },
-    Strict,
+    OptionalSnapshot,
   ),
-  Type.Object(
+  ...runVariants(
     {
-      ...RunBase,
       ...NoError,
       status: Type.Literal('interrupted'),
       stage: Nullable(AnalyzeStageSchema),
@@ -231,7 +250,7 @@ export const RunSchema = Type.Union([
       // Time the startup recovery marked the run.
       finishedAt: TimestampSchema,
     },
-    Strict,
+    OptionalSnapshot,
   ),
 ]);
 

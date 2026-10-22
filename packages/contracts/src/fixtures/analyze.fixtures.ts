@@ -38,6 +38,7 @@ export const FIXTURE_IDS = {
     cancelled: '0a1b2c3d-0006-4000-8000-000000000006',
     interrupted: '0a1b2c3d-0007-4000-8000-000000000007',
     retry: '0a1b2c3d-0008-4000-8000-000000000008',
+    reuseSnapshot: '0a1b2c3d-0009-4000-8000-000000000009',
   },
 } as const;
 
@@ -92,10 +93,11 @@ export const startRunFixture = {
   retryOfRunId: null,
 } as const satisfies StartRunInput;
 
+// Retries the interrupted run, which has a snapshot to reuse.
 export const retryWithSnapshotFixture = {
   kind: 'analyze',
   source: { strategy: 'reuse-snapshot' },
-  retryOfRunId: FIXTURE_IDS.runs.failed,
+  retryOfRunId: FIXTURE_IDS.runs.interrupted,
 } as const satisfies StartRunInput;
 
 export const retryWithNewSourceFixture = {
@@ -242,6 +244,23 @@ export const retryRunFixture = {
   finishedAt: null,
   createdAt: '2026-10-22T02:05:00.000Z',
   updatedAt: '2026-10-22T02:05:00.000Z',
+} as const satisfies Run;
+
+// Queued result of retryWithSnapshotFixture: the snapshot is known at once.
+export const reuseSnapshotRunFixture = {
+  ...runBase,
+  id: FIXTURE_IDS.runs.reuseSnapshot,
+  sourceStrategy: 'reuse-snapshot',
+  retryOfRunId: FIXTURE_IDS.runs.interrupted,
+  status: 'queued',
+  stateVersion: 1,
+  stage: null,
+  sourceSnapshotId: FIXTURE_IDS.snapshot,
+  errorCode: null,
+  startedAt: null,
+  finishedAt: null,
+  createdAt: '2026-10-22T03:20:00.000Z',
+  updatedAt: '2026-10-22T03:20:00.000Z',
 } as const satisfies Run;
 
 // A demo project analyzes the bundled fixture; the config has no mapping.

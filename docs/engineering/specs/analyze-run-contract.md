@@ -59,7 +59,7 @@ Run DTO theo từng status (schema là union, field mâu thuẫn status bị t�
 
 | status | stage | startedAt | finishedAt | sourceSnapshotId | errorCode |
 |---|---|---|---|---|---|
-| queued | null | null | null | null (reuse-snapshot: có) | null |
+| queued | null | null | null | null | null |
 | running | snapshot/inventory/publish | có | null | nullable | null |
 | cancelling | nullable | có | null | nullable | null |
 | succeeded | null | có | có | **bắt buộc** | null |
@@ -67,13 +67,14 @@ Run DTO theo từng status (schema là union, field mâu thuẫn status bị t�
 | cancelled | null | null nếu hủy khi queued | có | nullable | null |
 | interrupted | stage cuối, nullable | có | thời điểm recovery đánh dấu | nullable | null |
 
+- Bảng trên là cho `sourceStrategy: 'current-source'` (`retryOfRunId` nullable). Với `'reuse-snapshot'`, ở **mọi** status `retryOfRunId` và `sourceSnapshotId` bắt buộc có giá trị (snapshot của run gốc, gắn ngay từ queued); schema từ chối nếu thiếu một trong hai.
 - Transition theo [architecture §6](../architecture.md#6-vòng-đời-job). `stateVersion` bắt đầu 1, **chỉ tăng khi đổi status**; stage cập nhật không tăng version (SSE `sequence` sắp thứ tự). Client so `stateVersion` rồi `updatedAt` để bỏ response cũ.
 - `RunErrorCode`: `SOURCE_UNREADABLE`, `SOURCE_FORBIDDEN`, `SOURCE_CHANGED`, `SOURCE_LIMIT_EXCEEDED`, `SOURCE_PROFILE_UNSUPPORTED`, `ANALYSIS_OUTPUT_INVALID`, `ARTIFACT_WRITE_FAILED`, `TIMEOUT`, `STOP_UNCONFIRMED` (cancelling → failed khi không xác nhận dừng được), `INTERNAL_ERROR`. Run lỗi vẫn là run, khác lỗi request.
 - Không có phần trăm tiến độ; UI hiển thị stage.
 
 ## 5. Cancel, runtime, SSE (API 5–6)
 
-- `POST .../runs/:runId/cancel` body `{ expectedStateVersion }`, trả 200 + Run: queued → `cancelled`; running → `cancelling`; đang `cancelling`/`cancelled` → trả run hiện tại (idempotent, bỏ qua version). Terminal khác hoặc version lệch khi run còn active → `409 RUN_STATE_CONFLICT`; client GET lại rồi quyết định.
+- `POST .../runs/:runId/cancel` body `{ expectedStateVersion }`, trả Run kèm status theo kết quả (BE-03): **202** khi việc hủy còn đang xử lý (run trả về là `cancelling`), **200** khi đã hủy xong (`cancelled`). queued → `cancelled` (200); running → `cancelling` (202); đang `cancelling`/`cancelled` → trả run hiện tại với 202/200 tương ứng (idempotent, bỏ qua version). BE chọn status bằng `cancelRunSuccessStatus(run)`; `successStatuses` trong bảng operation liệt kê mọi 2xx. Terminal khác hoặc version lệch khi run còn active → `409 RUN_STATE_CONFLICT`; client GET lại rồi quyết định.
 - `GET /runtime/status`: `{ status: 'ready', reasonCode: null }` hoặc `{ status: 'recovery_required', reasonCode: 'PROCESS_CLEANUP_UNCONFIRMED' }`. Không trả PID, path, command hay credential.
 - `GET .../runs/:runId/events`: `text/event-stream`, event name `run`, `id` = `sequence`, `data` = `RunEvent { runId, sequence, stateVersion, status, stage, occurredAt }`. State commit trước event. Không raw stdout/log, không token trên query (transport credential theo B01/F00). Reconnect: GET run là nguồn chính thức, bỏ event có `stateVersion` cũ hơn.
 

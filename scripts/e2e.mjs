@@ -326,8 +326,9 @@ const INFRASTRUCTURE_ERRORS = [
 ];
 
 // Problems that keep a run from proving `expect`; empty when it does.
+// Leaks are checked separately in scenarioProblems.
 function judgeRun(result, expect) {
-  const problems = [...result.leaks];
+  const problems = [];
   if (expect.outcome === 'pass' && result.testExit !== 0)
     problems.push(`test run exited ${result.testExit}, expected 0`);
   if (expect.outcome === 'fail' && result.testExit === 0)
@@ -373,6 +374,70 @@ function traces(directory) {
   return readdirSync(directory, { recursive: true })
     .map(String)
     .filter((name) => name.endsWith('trace.zip'));
+}
+
+// Every problem of one scenario run. Leaks (port, temp, personal DB) always
+// count, also for a scenario whose expected outcome is a rejected run.
+function scenarioProblems(scenario, result) {
+  const leaks = result.leaks.map((leak) => `leak: ${leak}`);
+  const found = judgeRun(result, scenario.expect);
+  if (!scenario.rejectedFor) return [...leaks, ...found];
+  const rejected = found.some((problem) =>
+    problem.startsWith(scenario.rejectedFor),
+  );
+  return rejected
+    ? leaks
+    : [...leaks, `judge did not reject the run (${JSON.stringify(found)})`];
+}
+
+// Checks scenarioProblems on synthetic results before any browser run, so a
+// judging bug cannot turn a leak or a broken run into a passing self-check.
+function selfTestJudging() {
+  const failed = (message, leaks = []) => ({
+    testExit: 1,
+    leaks,
+    outputDir: '',
+    reportDir: '',
+    tests: [{ title: 'intentional failure', status: 'failed', message }],
+  });
+  const rejectScenario = {
+    rejectedFor: 'failed on infrastructure',
+    expect: {
+      outcome: 'fail',
+      title: 'intentional failure',
+      messageIncludes: ['toBeVisible'],
+    },
+  };
+  const control = { expect: { outcome: 'pass', title: 'intentional failure' } };
+  const missingBrowser = "browserType.launch: Executable doesn't exist";
+  const cases = [
+    {
+      name: 'infrastructure rejected without leaks passes',
+      problems: scenarioProblems(rejectScenario, failed(missingBrowser)),
+      expectProblems: false,
+    },
+    {
+      name: 'infrastructure rejected with a leak fails',
+      problems: scenarioProblems(
+        rejectScenario,
+        failed(missingBrowser, ['port 12345 still open']),
+      ),
+      expectProblems: true,
+    },
+    {
+      name: 'run that is not rejected fails',
+      problems: scenarioProblems(rejectScenario, failed('toBeVisible failed')),
+      expectProblems: true,
+    },
+    {
+      name: 'failed control run fails',
+      problems: scenarioProblems(control, failed('toBeVisible failed')),
+      expectProblems: true,
+    },
+  ];
+  return cases
+    .filter((item) => item.problems.length > 0 !== item.expectProblems)
+    .map((item) => `${item.name}: got ${JSON.stringify(item.problems)}`);
 }
 
 async function main() {
@@ -445,31 +510,27 @@ async function main() {
       },
     },
   ];
-  const problems = [];
+  const problems = selfTestJudging().map(
+    (problem) => `judge self-test: ${problem}`,
+  );
   for (const scenario of scenarios) {
+    if (problems.length) break;
     log(`self-check: ${scenario.name}`);
     const emptyBrowsers = scenario.missingBrowser
       ? mkdtempSync(join(tmpdir(), 'portal-e2e-no-browser-'))
       : undefined;
     let found;
     try {
-      found = judgeRun(
+      found = scenarioProblems(
+        scenario,
         await harness({
           ...scenario,
           env: emptyBrowsers ? { PLAYWRIGHT_BROWSERS_PATH: emptyBrowsers } : {},
         }),
-        scenario.expect,
       );
     } finally {
       if (emptyBrowsers)
         rmSync(emptyBrowsers, { recursive: true, force: true });
-    }
-    if (scenario.rejectedFor) {
-      if (!found.some((problem) => problem.startsWith(scenario.rejectedFor)))
-        problems.push(
-          `${scenario.name}: judge did not reject the run (${JSON.stringify(found)})`,
-        );
-      continue;
     }
     problems.push(...found.map((problem) => `${scenario.name}: ${problem}`));
     // Without a working control run the other scenarios prove nothing.

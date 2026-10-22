@@ -21,7 +21,7 @@
     "lint": "npm run build -w @portal/contracts && eslint apps/api packages/contracts apps/web tests/e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "npm run build -w @portal/contracts && npm run test -w @portal/api && npm run test -w @portal/web",
+    "test": "npm run build -w @portal/contracts && npm run test -w @portal/contracts && npm run test -w @portal/api && npm run test -w @portal/web",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "dev:web": "npm run build -w @portal/contracts && npm run dev -w @portal/web",
     "preview:web": "npm run preview -w @portal/web",

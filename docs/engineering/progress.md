@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — C01 hợp đồng Analyze source/run/artifact
+
+- Làm theo workflow `portal-implement`; gate FEATURE:jobs/storage/analysis, dữ liệu fixture, không route/DB/runtime mới. Baseline `1d49deb`, nhánh `feat/c01-analyze-run-contracts`.
+- Contracts: `source-registration.schema.ts` (PUT/GET source, mapping `unconfigured|assumed|confirmed`, summary không có root tuyệt đối), `run.schema.ts` (Run union theo 7 status, config khóa gồm profile/mapping/phiên bản analyzer/limits, start + `Idempotency-Key`, retry `current-source|reuse-snapshot`, list/current/cancel, runtime status, SSE event), `artifact.schema.ts` (ref + envelope inventory theo exact version), `analyze-api.ts` (bảng operation: method/path/schema/status/mã lỗi), `AnalyzeApiErrorCodeSchema` + HTTP status. Fixture sạch qua subpath `@portal/contracts/fixtures`. Đặc tả: [analyze-run-contract](specs/analyze-run-contract.md).
+- Quyết định: Project DTO không đổi; project demo có source `fixture` revision 1, PUT source trên demo trả `409 PROJECT_MODE_CONFLICT`; project `mode: 'local'` chốt trong B03 kèm migration. Runtime cần recovery trả `503`. `stateVersion` chỉ tăng khi đổi status. Mã analyze tách khỏi catalog Projects đến khi BE/FE có route/màn hình dùng.
+- Contracts có test riêng (`npm run test -w @portal/contracts`, đã thêm vào `npm test`): 36 test cho C01-AC01/AC02/AC03, negative field/ID/status/config, bảng operation. Windows x64, Node 24.16.0/npm 12.0.2: `npm run check` pass (format, lint, typecheck, test contracts 36 + API 233 + web 41, build).
+- Chưa làm (task sau): route/service/migration B03/B04/B07/B09, message VI/JA F01/F02/F03, project `local`. Limits trong fixture là số giữ chỗ, số thật chốt sau spike JOB-07.
+
 ## 19/10/2026 — mapping tên bảng theo schema (giả định)
 
 - Làm theo nội dung skill `portal-implement` (SKILL.md, delivery gates, workflow implement, CORE, DATA, QA); phiên cloud không gọi skill trực tiếp. Scope feature / analysis, source thật chỉ đọc trên máy. Theo review bản đề xuất 2 (`analysis/de-xuat-tl-analyze-vb6.md` trong thư mục dự án, ngoài repo): gộp schema được duyệt có điều kiện.

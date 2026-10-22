@@ -148,9 +148,9 @@ const RunBase = {
 // Each status exists twice: a run on the current source gets its snapshot
 // while running (`currentSnapshot` per status); a run that reuses a snapshot
 // is always a retry and carries that snapshot from queued on.
-const runVariants = <F extends TProperties>(
+const runVariants = <F extends TProperties, S extends TSchema>(
   fields: F,
-  currentSnapshot: TSchema,
+  currentSnapshot: S,
 ) =>
   [
     Type.Object(

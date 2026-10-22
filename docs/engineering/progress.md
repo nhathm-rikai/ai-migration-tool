@@ -8,6 +8,12 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 22/10/2026 — Cho Claude tự chọn skill implement
+
+- Dùng `portal-implement` và `skill-creator`; scope cấu hình coding agent và tài liệu, không đổi runtime sản phẩm. Theo yêu cầu người dùng, đặt `disable-model-invocation: false` cho Claude `portal-implement`; `portal-techlead-review` tiếp tục gọi tường minh và review-only.
+- Đồng bộ AGENTS.md, CLAUDE.md, hướng dẫn tích hợp và validator metadata theo policy riêng của từng skill. Không thay workflow/rule gốc hoặc wrapper Codex.
+- Kiểm chứng trên Windows: `node scripts/verify-repository.mjs` pass (36 documents, 306 links, 4 skill frontmatters); Prettier check sáu file thay đổi và `git diff --check` pass sau sửa format validator. Chưa smoke discovery/tự chọn trong session Claude mới; bật policy không bảo đảm model luôn tự chọn skill. Không chạy test sản phẩm vì không đổi code/runtime sản phẩm.
+
 ## 22/10/2026 — C01 hợp đồng Analyze source/run/artifact
 
 - Làm theo workflow `portal-implement`; gate FEATURE:jobs/storage/analysis, dữ liệu fixture, không route/DB/runtime mới. Baseline `1d49deb`, nhánh `feat/c01-analyze-run-contracts`.

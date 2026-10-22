@@ -21,6 +21,8 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { outputFolder: required('E2E_REPORT_DIR'), open: 'never' }],
+    // Read by the self-check to confirm why a run failed.
+    ['json', { outputFile: required('E2E_JSON_REPORT') }],
   ],
   use: {
     baseURL: required('E2E_BASE_URL'),

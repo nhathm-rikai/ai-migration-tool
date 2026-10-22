@@ -12,6 +12,7 @@ import { once } from 'node:events';
 import {
   existsSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -160,7 +161,7 @@ async function stopOwned(owned) {
 }
 
 // One full harness run: start, seed, test, teardown, leak checks.
-async function harness({ grep, crashApiBeforeTests = false }) {
+async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
   const owned = { children: [] };
   const directory = mkdtempSync(join(tmpdir(), 'portal-e2e-'));
   const personalBefore = await personalDatabaseFingerprint();
@@ -168,6 +169,7 @@ async function harness({ grep, crashApiBeforeTests = false }) {
   const webPort = await freePort();
   const outputDir = join(resultsDir, 'artifacts');
   const reportDir = join(resultsDir, 'report');
+  const jsonReport = join(resultsDir, 'results.json');
   let testExit = 1;
   let failure;
   const stopOnSignal = () => {
@@ -230,6 +232,7 @@ async function harness({ grep, crashApiBeforeTests = false }) {
     }
 
     rmSync(outputDir, { recursive: true, force: true });
+    rmSync(jsonReport, { force: true });
     testExit = await run(
       process.execPath,
       [
@@ -248,6 +251,8 @@ async function harness({ grep, crashApiBeforeTests = false }) {
           E2E_SEED_PROJECT_NAME: seedName,
           E2E_OUTPUT_DIR: outputDir,
           E2E_REPORT_DIR: reportDir,
+          E2E_JSON_REPORT: jsonReport,
+          ...env,
         },
       },
     );
@@ -271,7 +276,96 @@ async function harness({ grep, crashApiBeforeTests = false }) {
     for (const leak of leaks) console.error(`[e2e] LEAK: ${leak}`);
     throw failure;
   }
-  return { testExit, leaks, outputDir, reportDir };
+  return {
+    testExit,
+    leaks,
+    outputDir,
+    reportDir,
+    tests: readTests(jsonReport),
+  };
+}
+
+// Flattened test results of the Playwright JSON report; null when the run
+// produced no report at all.
+function readTests(file) {
+  if (!existsSync(file)) return null;
+  const tests = [];
+  const visit = (suite) => {
+    for (const spec of suite.specs ?? [])
+      for (const test of spec.tests ?? [])
+        tests.push({
+          title: spec.title,
+          status: test.results.at(-1)?.status ?? 'skipped',
+          message: test.results
+            .flatMap((result) => result.errors ?? [])
+            .map((error) => error.message ?? '')
+            .join('\n')
+            // Strip ANSI colour codes before matching messages.
+            // eslint-disable-next-line no-control-regex
+            .replace(/\u001b\[[0-9;]*m/g, ''),
+        });
+    for (const child of suite.suites ?? []) visit(child);
+  };
+  const report = JSON.parse(readFileSync(file, 'utf8'));
+  for (const suite of report.suites ?? []) visit(suite);
+  for (const error of report.errors ?? [])
+    tests.push({
+      title: '(global)',
+      status: 'failed',
+      message: error.message ?? '',
+    });
+  return tests;
+}
+
+// Infrastructure failures (no browser, unreachable page) are not the failure
+// a scenario is meant to prove.
+const INFRASTRUCTURE_ERRORS = [
+  'browserType.launch',
+  "Executable doesn't exist",
+  'net::ERR_CONNECTION_REFUSED',
+];
+
+// Problems that keep a run from proving `expect`; empty when it does.
+function judgeRun(result, expect) {
+  const problems = [...result.leaks];
+  if (expect.outcome === 'pass' && result.testExit !== 0)
+    problems.push(`test run exited ${result.testExit}, expected 0`);
+  if (expect.outcome === 'fail' && result.testExit === 0)
+    problems.push('test run passed but must fail');
+  if (!result.tests) {
+    problems.push('no JSON report: Playwright did not run the tests');
+    return problems;
+  }
+  const ran = result.tests.filter((test) => test.status !== 'skipped');
+  if (ran.length !== 1 || ran[0].title !== expect.title) {
+    problems.push(
+      `expected exactly "${expect.title}" to run, got ${JSON.stringify(ran.map((test) => test.title))}`,
+    );
+    return problems;
+  }
+  const [test] = ran;
+  const excerpt = test.message.slice(0, 300);
+  if (expect.outcome === 'pass' && test.status !== 'passed')
+    problems.push(`"${test.title}" ${test.status}: ${excerpt}`);
+  if (expect.outcome === 'fail') {
+    if (test.status !== 'failed')
+      problems.push(`"${test.title}" is ${test.status}, expected failed`);
+    const infrastructure = INFRASTRUCTURE_ERRORS.find((marker) =>
+      test.message.includes(marker),
+    );
+    if (infrastructure)
+      problems.push(
+        `failed on infrastructure (${infrastructure}), not on the scenario`,
+      );
+    for (const marker of expect.messageIncludes)
+      if (!test.message.includes(marker))
+        problems.push(`failure message lacks "${marker}": ${excerpt}`);
+    if (traces(result.outputDir).length === 0)
+      problems.push(`no trace.zip in ${result.outputDir}`);
+    if (!existsSync(join(result.reportDir, 'index.html')))
+      problems.push('no HTML report');
+  }
+  return problems;
 }
 
 function traces(directory) {
@@ -306,33 +400,87 @@ async function main() {
         : 0;
   }
 
-  // Each scenario must fail the test run, leave a trace and leak nothing.
+  // A control smoke must pass first, so a broken environment (no browser,
+  // no server) fails the self-check instead of passing as an expected
+  // failure. Each injected failure is then judged on the JSON report: the
+  // right test failed for the injected reason, with trace/report, no leaks.
+  const smoke = 'create, list and reopen a project';
   const scenarios = [
-    { name: 'failing assertion', grep: '@self-check' },
+    {
+      name: 'control smoke',
+      grep: '@smoke',
+      expect: { outcome: 'pass', title: smoke },
+    },
+    {
+      name: 'failing assertion',
+      grep: '@self-check',
+      expect: {
+        outcome: 'fail',
+        title: 'intentional failure',
+        messageIncludes: ['toBeVisible', 'not on this page'],
+      },
+    },
     {
       name: 'API stopped before tests',
       grep: '@smoke',
       crashApiBeforeTests: true,
+      expect: {
+        outcome: 'fail',
+        title: smoke,
+        // The seeded project never shows because the list request fails.
+        messageIncludes: ['toBeVisible', 'E2E seed project'],
+      },
+    },
+    {
+      // Regression: a run that never reaches the assertion (no browser) must
+      // be rejected by the judge, not counted as the expected failure.
+      name: 'missing browser is rejected',
+      grep: '@self-check',
+      missingBrowser: true,
+      rejectedFor: 'failed on infrastructure',
+      expect: {
+        outcome: 'fail',
+        title: 'intentional failure',
+        messageIncludes: ['toBeVisible', 'not on this page'],
+      },
     },
   ];
   const problems = [];
   for (const scenario of scenarios) {
-    log(`self-check: ${scenario.name} (a failing test run is expected)`);
-    const result = await harness(scenario);
-    if (result.testExit === 0)
-      problems.push(`${scenario.name}: test run passed but must fail`);
-    if (traces(result.outputDir).length === 0)
-      problems.push(`${scenario.name}: no trace.zip in ${result.outputDir}`);
-    if (!existsSync(join(result.reportDir, 'index.html')))
-      problems.push(`${scenario.name}: no HTML report`);
-    problems.push(...result.leaks.map((leak) => `${scenario.name}: ${leak}`));
+    log(`self-check: ${scenario.name}`);
+    const emptyBrowsers = scenario.missingBrowser
+      ? mkdtempSync(join(tmpdir(), 'portal-e2e-no-browser-'))
+      : undefined;
+    let found;
+    try {
+      found = judgeRun(
+        await harness({
+          ...scenario,
+          env: emptyBrowsers ? { PLAYWRIGHT_BROWSERS_PATH: emptyBrowsers } : {},
+        }),
+        scenario.expect,
+      );
+    } finally {
+      if (emptyBrowsers)
+        rmSync(emptyBrowsers, { recursive: true, force: true });
+    }
+    if (scenario.rejectedFor) {
+      if (!found.some((problem) => problem.startsWith(scenario.rejectedFor)))
+        problems.push(
+          `${scenario.name}: judge did not reject the run (${JSON.stringify(found)})`,
+        );
+      continue;
+    }
+    problems.push(...found.map((problem) => `${scenario.name}: ${problem}`));
+    // Without a working control run the other scenarios prove nothing.
+    if (scenario.expect.outcome === 'pass' && found.length) break;
   }
   for (const problem of problems)
     console.error(`[e2e] SELF-CHECK FAIL: ${problem}`);
   log(
     problems.length
       ? 'self-check failed'
-      : `self-check passed: failures exit nonzero with trace/report, no leaks; ` +
+      : `self-check passed: control smoke passed; each injected failure failed for its own reason with trace/report; no leaks; ` +
           `${process.platform}/${process.arch} ${process.version}`,
   );
   return problems.length ? 1 : 0;

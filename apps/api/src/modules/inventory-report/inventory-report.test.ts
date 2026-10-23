@@ -177,6 +177,47 @@ describe('buildInventoryReport', () => {
   });
 });
 
+it('keeps absolute member paths out of the JSON and the workbook', () => {
+  const profile = findSourceProfile('vb6-cp932-v1');
+  if (!profile) throw new Error('setup');
+  const doc: unknown = JSON.parse(
+    JSON.stringify(
+      buildSourceInventory({
+        profile,
+        files: [
+          text('p/P.VBP', [
+            'Type=Exe',
+            'Module=S; C:\\review-private\\SECRET.BAS',
+            'Module=U; \\\\server\\share\\U.BAS',
+            'Form=/home/someone/F.FRM',
+          ]),
+        ],
+      }),
+    ),
+  );
+  const report = buildInventoryReport(doc as SourceInventoryDocument, ['P']);
+  expect(report.members.map((m) => [m.declaredPath, m.resolution])).toEqual([
+    ['<absolute path>/SECRET.BAS', 'absolute-path'],
+    ['<absolute path>/U.BAS', 'absolute-path'],
+    ['<absolute path>/F.FRM', 'absolute-path'],
+  ]);
+  expect(
+    report.warnings
+      .filter((w) => w.code === 'MEMBER_ABSOLUTE_PATH')
+      .map((w) => w.relativePath),
+  ).toEqual([
+    '<absolute path>/SECRET.BAS',
+    '<absolute path>/U.BAS',
+    '<absolute path>/F.FRM',
+  ]);
+  const exported = [
+    JSON.stringify(report),
+    ...unzip(writeXlsx(inventoryReportSheets(report))).values(),
+  ].join('\n');
+  for (const secret of ['review-private', 'server', 'someone', 'C:\\'])
+    expect(exported).not.toContain(secret);
+});
+
 describe('inventory report workbook', () => {
   const report = buildInventoryReport(inventory(), ['PA', 'PB']);
   const parts = unzip(writeXlsx(inventoryReportSheets(report)));

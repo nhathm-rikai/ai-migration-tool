@@ -205,6 +205,18 @@ function addCounters(sum: LineCounters, add: LineCounters): void {
   for (const key of COUNTER_KEYS) sum[key] += add[key];
 }
 
+// A member path written as absolute (drive `C:\...`, UNC `\\server\...`,
+// rooted `/...` or `\...`) names a place on someone's machine; the report
+// keeps only the file name, and the resolution says it was absolute.
+const ABSOLUTE_PATH = /^(?:[A-Za-z]:|[\\/])/;
+export const REDACTED_PREFIX = '<absolute path>/';
+
+export function redactAbsolutePath(path: string): string {
+  const trimmed = path.trim();
+  if (!ABSOLUTE_PATH.test(trimmed)) return path;
+  return REDACTED_PREFIX + (trimmed.split(/[\\/]/).at(-1) ?? '');
+}
+
 // Program ID: project file name without extension (`KUN/KUNO0020.vbp` →
 // `KUNO0020`), compared without case.
 export function programId(projectPath: string): string {
@@ -328,7 +340,11 @@ export function buildInventoryReport(
   });
 
   const members = selected.flatMap(({ id, program }) =>
-    program.members.map((member) => ({ programId: id, ...member })),
+    program.members.map((member) => ({
+      programId: id,
+      ...member,
+      declaredPath: redactAbsolutePath(member.declaredPath),
+    })),
   );
 
   const files = selectedPaths.flatMap((path) => {
@@ -506,9 +522,9 @@ export function buildInventoryReport(
         warn(
           `MEMBER_${member.resolution.toUpperCase().replaceAll('-', '_')}`,
           id,
-          member.relativePath ?? member.declaredPath,
+          member.relativePath ?? redactAbsolutePath(member.declaredPath),
           null,
-          `${member.kind} ${member.declaredPath}`,
+          `${member.kind} ${redactAbsolutePath(member.declaredPath)}`,
         );
     for (const call of program.analysis?.calls ?? [])
       if (call.resolution === 'ambiguous')

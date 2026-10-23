@@ -35,6 +35,20 @@ describe('writeXlsx', () => {
     expect(xml).toContain('<col min="2" max="2" width="30" customWidth="1"/>');
   });
 
+  it('widens a column so its whole header shows', () => {
+    const xml =
+      unzip(
+        writeXlsx([
+          {
+            name: 'W',
+            columns: [{ header: 'unclassifiedLines', width: 8 }],
+            rows: [],
+          },
+        ]),
+      ).get('xl/worksheets/sheet1.xml') ?? '';
+    expect(xml).toContain('<col min="1" max="1" width="21" customWidth="1"/>');
+  });
+
   it.each(['=HYPERLINK("http://x","y")', '+1', '-1', '@SUM(A1)', '\t=1'])(
     'keeps %j as quoted text, never a formula',
     (value) => {

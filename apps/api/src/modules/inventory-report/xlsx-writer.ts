@@ -24,6 +24,9 @@ const FORMULA_START = /^[=+\-@\t\r]/;
 const INVALID_XML = /[^\t\n\r -퟿-�\u{10000}-\u{10FFFF}]/gu;
 const SHEET_NAME = /^[^[\]:*?/\\]{1,31}$/;
 
+// Characters added to a header's length for bold text and the filter button.
+const HEADER_MARGIN = 4;
+
 // Style indexes in styles.xml.
 const STYLE_HEADER = 1;
 const STYLE_QUOTED = 2;
@@ -42,6 +45,12 @@ export function columnName(index: number): string {
   for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26))
     name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
   return name;
+}
+
+// Wide enough for the whole (bold) header on one line; a narrower requested
+// width would cut the header off.
+export function columnWidth(column: SheetColumn): number {
+  return Math.max(column.width ?? 14, column.header.length + HEADER_MARGIN);
 }
 
 function cellXml(ref: string, value: CellValue, header: boolean): string {
@@ -79,7 +88,7 @@ function sheetXml(sheet: Sheet): string {
   const cols = sheet.columns
     .map(
       (column, c) =>
-        `<col min="${c + 1}" max="${c + 1}" width="${column.width ?? 14}" customWidth="1"/>`,
+        `<col min="${c + 1}" max="${c + 1}" width="${columnWidth(column)}" customWidth="1"/>`,
     )
     .join('');
   return (

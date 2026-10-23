@@ -81,7 +81,7 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
     table(
       'Summary',
       [
-        ['Item', 28, (row) => row[0]],
+        ['Item', 40, (row) => row[0]],
         ['Value', 90, (row) => row[1]],
       ],
       summary,

@@ -203,6 +203,33 @@ describe('structure errors are unsupported, never zero LoC', () => {
     ],
     [['VERSION 1.0 CLASS', 'BEGIN', 'Attribute VB_Name = "c"'], 'unbalanced'],
     [['VERSION 1.0 CLASS', 'BEGIN', 'END', 'Option Explicit'], 'no VB_Name'],
+    [['VERSION 1.0 CLASS', 'Attribute VB_Name = "c"'], 'no BEGIN'],
+    [
+      [
+        'VERSION 1.0 CLASS',
+        'BEGIN',
+        'END',
+        'Sub Load()',
+        '    s = "DELETE FROM T1"',
+        'End Sub',
+        'Attribute VB_Name = "c"',
+        'Sub After()',
+        'End Sub',
+      ],
+      'code between END and VB_Name',
+    ],
+    [
+      [
+        'VERSION 1.0 CLASS',
+        'BEGIN',
+        '  MultiUse = -1',
+        '  Begin VB.Label l',
+        '  End',
+        'END',
+        'Attribute VB_Name = "c"',
+      ],
+      'nested block',
+    ],
   ])('class %j (%s)', (lines) => {
     expect(analyzeVb6CodeFile('C.CLS', lines, { module: 'class' })).toEqual({
       status: 'unsupported',

@@ -37,21 +37,10 @@ const DECLARE =
 
 const FORM_VERSION = /^version\s+\d/i;
 const CLASS_VERSION = /^version\s+\d+\.\d+\s+class$/i;
-// A class header opens with a bare BEGIN; form controls name a type.
-const DESIGNER_BEGIN = /^(?:begin|beginproperty)(?:\s|$)/i;
+const CLASS_BEGIN = /^begin$/i;
+const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
 const DESIGNER_END = /^(?:end|endproperty)$/i;
 const FORM_NAME_ATTRIBUTE = /^attribute\s+vb_name\s*=/i;
-
-const HEADERS: Record<
-  Exclude<Vb6ModuleKind, 'standard'>,
-  { version: RegExp; notFound: string }
-> = {
-  form: { version: FORM_VERSION, notFound: 'FORM_DESIGNER_BOUNDARY_NOT_FOUND' },
-  class: {
-    version: CLASS_VERSION,
-    notFound: 'CLASS_HEADER_BOUNDARY_NOT_FOUND',
-  },
-};
 
 type OpenProcedure = ProcedureMetrics & { block: string };
 
@@ -67,12 +56,32 @@ function emptyCounters(physicalLines: number): LineCounters {
   };
 }
 
-// The designer of an exported form, or the header of an exported class, runs
-// from VERSION to the line before the top-level `Attribute VB_Name`;
-// Begin/End nesting must be balanced there.
-function findDesignerEnd(lines: string[], version: RegExp): number | null {
+// The header of an exported class is exactly `VERSION x.y CLASS`, one bare
+// BEGIN ... END block of class properties, then `Attribute VB_Name`. Any
+// other line outside the block (e.g. code before VB_Name) makes it unknown.
+function findClassHeaderEnd(lines: string[]): number | null {
+  const expected = [CLASS_VERSION, CLASS_BEGIN];
+  let inBlock = false;
+  for (const [index, line] of lines.entries()) {
+    const text = line.trim();
+    if (text === '') continue;
+    const next = expected.shift();
+    if (next) {
+      if (!next.test(text)) return null;
+      inBlock = next === CLASS_BEGIN;
+    } else if (inBlock) {
+      if (DESIGNER_BEGIN.test(text) || CLASS_BEGIN.test(text)) return null;
+      if (DESIGNER_END.test(text)) inBlock = false;
+    } else return FORM_NAME_ATTRIBUTE.test(text) ? index : null;
+  }
+  return null;
+}
+
+// The designer of an exported form runs from VERSION to the line before the
+// top-level `Attribute VB_Name`; Begin/End nesting must be balanced there.
+function findDesignerEnd(lines: string[]): number | null {
   const first = lines.findIndex((line) => line.trim() !== '');
-  if (first < 0 || !version.test(lines[first]?.trim() ?? '')) return null;
+  if (first < 0 || !FORM_VERSION.test(lines[first]?.trim() ?? '')) return null;
   let depth = 0;
   for (const [index, line] of lines.entries()) {
     const text = line.trim();
@@ -117,12 +126,18 @@ function scanVb6CodeFile(
   const counters = emptyCounters(lines.length);
   const objectModule = options.module !== 'standard';
   let codeStart = 0;
-  if (options.module !== 'standard') {
-    const header = HEADERS[options.module];
-    const designerEnd = findDesignerEnd(lines, header.version);
-    if (designerEnd === null) return unsupported(header.notFound, null);
+  if (options.module === 'form') {
+    const designerEnd = findDesignerEnd(lines);
+    if (designerEnd === null)
+      return unsupported('FORM_DESIGNER_BOUNDARY_NOT_FOUND', null);
     counters.designerLines = designerEnd;
     codeStart = designerEnd;
+  } else if (options.module === 'class') {
+    const headerEnd = findClassHeaderEnd(lines);
+    if (headerEnd === null)
+      return unsupported('CLASS_HEADER_BOUNDARY_NOT_FOUND', null);
+    counters.designerLines = headerEnd;
+    codeStart = headerEnd;
   }
 
   const closed: OpenProcedure[] = [];

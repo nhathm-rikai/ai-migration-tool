@@ -5,7 +5,9 @@ import type { CellValue, Sheet } from './xlsx-writer.js';
 // of the JSON report, same values and order. The JSON stays the source of
 // truth; lists are joined with "; " in one cell.
 
-const list = (values: readonly string[]) => values.join('; ');
+// An empty list is an empty cell, not an empty string.
+const list = (values: readonly string[]) =>
+  values.length > 0 ? values.join('; ') : null;
 const flag = (value: boolean) => (value ? 'yes' : 'no');
 
 function table<T>(

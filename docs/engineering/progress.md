@@ -12,6 +12,8 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 
 - Review model chỉ đọc (holdout 7/10, High 1/3, 7/25 program sát ngưỡng, `dynamicSql` = 0 ở cả 25 program). Người dùng chọn phương án A: phân loại tham khảo. Dùng `portal-implement`; nhánh `feat/p1-close-05-complexity-v0` từ `d4c85df`.
 - Giữ công thức, trọng số, ngưỡng 40/55 và làm tròn; `COMPLEXITY_VERSION` thành `complexity-v0`. `ComplexityScore.reviewFlags`: `high`, `near-threshold` (điểm chưa làm tròn cách ngưỡng ≤ 3); contract thêm field optional. Report: `complexityReviewFlags`, cờ `known-mismatch` từ file `--complexity-review` (dữ liệu corpus, ngoài repo), cảnh báo `COMPLEXITY_REFERENCE_ONLY` thay `COMPLEXITY_DRAFT` khi version không còn `-draft`, cùng `COMPLEXITY_HIGH`/`NEAR_THRESHOLD`/`KNOWN_MISMATCH`. Spec [source-inventory](specs/source-inventory.md) §5 ghi phạm vi dùng: không tự động tính effort/báo giá, review bổ sung xử lý file, ghi DB, transaction.
+- XLSX writer ghi chuỗi rỗng thành ô trống (trước đó là ô text rỗng, ví dụ danh sách cờ rỗng).
+- Sinh lại inventory + report 15 Pilot và 10 holdout (Windows x64, Node 24.16.0): điểm/mức không đổi; Pilot có 4 cờ `high`, 3 `near-threshold`; holdout gắn đủ 3 `known-mismatch`. API 313 test, contracts 42, lint, typecheck, build pass; openpyxl 58/58.
 - Deferred: model v1 (bảng bị ghi, transaction, xử lý file) là task sau, cần tập nhãn mới; chưa sửa trọng số.
 
 ## 23/10/2026 — P1-CLOSE-03 báo cáo JSON/XLSX cho 15 Pilot

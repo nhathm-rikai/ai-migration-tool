@@ -54,7 +54,8 @@ export function columnWidth(column: SheetColumn): number {
 }
 
 function cellXml(ref: string, value: CellValue, header: boolean): string {
-  if (value === null) return '';
+  // An empty string is written as an empty cell.
+  if (value === null || value === '') return '';
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`Cell ${ref} is not finite`);
     return `<c r="${ref}"><v>${value}</v></c>`;

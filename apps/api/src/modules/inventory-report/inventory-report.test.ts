@@ -322,4 +322,10 @@ describe('inventory report workbook', () => {
     );
     expect(sheetXml(2)).not.toContain('<f>');
   });
+
+  it('leaves an empty list as an empty cell', () => {
+    // PA and PB have no complexity review flag.
+    for (let index = 1; index <= 12; index += 1)
+      expect(sheetXml(index)).not.toContain('<t xml:space="preserve"></t>');
+  });
 });

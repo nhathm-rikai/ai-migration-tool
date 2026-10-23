@@ -38,7 +38,7 @@ describe('fixture SAMPLE.BAS (CP932, CRLF)', () => {
   const result = analyzeVb6CodeFile(
     'programs/SAMPLE/SAMPLE.BAS',
     fixtureLines('programs/SAMPLE/SAMPLE.BAS'),
-    { form: false },
+    { module: 'standard' },
   );
 
   it('matches the hand labels exactly', () => {
@@ -100,7 +100,7 @@ describe('fixture SAMPLEFORM.FRM (designer, no final newline)', () => {
     const result = analyzeVb6CodeFile(
       'programs/SAMPLE/SAMPLEFORM.FRM',
       fixtureLines('programs/SAMPLE/SAMPLEFORM.FRM'),
-      { form: true },
+      { module: 'form' },
     );
     expect(result).toMatchObject({
       status: 'analyzed',
@@ -113,7 +113,104 @@ describe('fixture SAMPLEFORM.FRM (designer, no final newline)', () => {
   });
 });
 
+describe('fixture LEGACY.CLS (class header, CP932)', () => {
+  const lines = fixtureLines('programs/SAMPLE/LEGACY.CLS');
+  const result = analyzeVb6CodeFile('programs/SAMPLE/LEGACY.CLS', lines, {
+    module: 'class',
+  });
+
+  it('excludes the class header and matches the hand labels exactly', () => {
+    expect(result).toMatchObject({
+      status: 'analyzed',
+      counters: countersFromLabels('DDDDDDDDMMMMMCKCCCBCCCBCCCCCCCCCC'),
+      fileLevelCodeLines: 4,
+    });
+  });
+
+  it('keeps class members reachable only through the object', () => {
+    expect(result.status === 'analyzed' && result.procedures).toEqual([
+      {
+        id: 'programs/SAMPLE/LEGACY.CLS#sub:Class_Initialize',
+        kind: 'sub',
+        name: 'Class_Initialize',
+        visibility: 'private',
+        startLine: 20,
+        endLine: 22,
+        codeLines: 3,
+        decisionPoints: 0,
+      },
+      {
+        id: 'programs/SAMPLE/LEGACY.CLS#property-get:Name',
+        kind: 'property-get',
+        name: 'Name',
+        visibility: 'public',
+        startLine: 24,
+        endLine: 26,
+        codeLines: 3,
+        decisionPoints: 0,
+      },
+      {
+        id: 'programs/SAMPLE/LEGACY.CLS#property-let:Name',
+        kind: 'property-let',
+        name: 'Name',
+        visibility: 'public',
+        startLine: 27,
+        endLine: 30,
+        codeLines: 4,
+        decisionPoints: 1,
+      },
+      {
+        id: 'programs/SAMPLE/LEGACY.CLS#function:Load',
+        kind: 'function',
+        name: 'Load',
+        visibility: 'public',
+        startLine: 31,
+        endLine: 33,
+        codeLines: 3,
+        decisionPoints: 0,
+      },
+    ]);
+    expect(result.status === 'analyzed' && result.externalDeclarations).toEqual(
+      [
+        {
+          name: 'GetTickCount',
+          library: 'kernel32',
+          visibility: 'private',
+          line: 17,
+        },
+      ],
+    );
+  });
+
+  it('finds uses inside class members', () => {
+    expect(
+      findVb6References('programs/SAMPLE/LEGACY.CLS', lines, {
+        module: 'class',
+        names: new Set(['gettickcount']),
+      }).map((r) => [r.name, r.line, r.procedureId]),
+    ).toEqual([
+      ['GetTickCount', 32, 'programs/SAMPLE/LEGACY.CLS#function:Load'],
+    ]);
+  });
+});
+
 describe('structure errors are unsupported, never zero LoC', () => {
+  it.each([
+    [['BEGIN', 'END', 'Attribute VB_Name = "c"'], 'no VERSION'],
+    [
+      ['VERSION 5.00', 'BEGIN', 'END', 'Attribute VB_Name = "c"'],
+      'form VERSION',
+    ],
+    [['VERSION 1.0 CLASS', 'BEGIN', 'Attribute VB_Name = "c"'], 'unbalanced'],
+    [['VERSION 1.0 CLASS', 'BEGIN', 'END', 'Option Explicit'], 'no VB_Name'],
+  ])('class %j (%s)', (lines) => {
+    expect(analyzeVb6CodeFile('C.CLS', lines, { module: 'class' })).toEqual({
+      status: 'unsupported',
+      reason: 'CLASS_HEADER_BOUNDARY_NOT_FOUND',
+      line: null,
+    });
+  });
+
   it.each([
     [['Begin VB.Form f', 'End', 'Attribute VB_Name = "f"'], 'no VERSION'],
     [
@@ -125,7 +222,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
       'no VB_Name',
     ],
   ])('form %j (%s)', (lines) => {
-    expect(analyzeVb6CodeFile('F.FRM', lines, { form: true })).toEqual({
+    expect(analyzeVb6CodeFile('F.FRM', lines, { module: 'form' })).toEqual({
       status: 'unsupported',
       reason: 'FORM_DESIGNER_BOUNDARY_NOT_FOUND',
       line: null,
@@ -138,7 +235,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
     [['Sub A()', 'End Function'], 'PROCEDURE_END_UNMATCHED', 2],
     [['x = 1', 'End Sub'], 'PROCEDURE_END_UNMATCHED', 2],
   ])('module %j', (lines, reason, line) => {
-    expect(analyzeVb6CodeFile('M.BAS', lines, { form: false })).toEqual({
+    expect(analyzeVb6CodeFile('M.BAS', lines, { module: 'standard' })).toEqual({
       status: 'unsupported',
       reason,
       line,
@@ -148,7 +245,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
   it('counts a keyword statement before a comment as code', () => {
     expect(
       analyzeVb6CodeFile('M.BAS', ['Sub A()', "    Stop: ' pause", 'End Sub'], {
-        form: false,
+        module: 'standard',
       }),
     ).toMatchObject({
       counters: { codeLines: 3, commentOnlyLines: 0 },
@@ -163,7 +260,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
   ])('closes %s on a line ending with ": %s"', (signature, end, kind) => {
     expect(
       analyzeVb6CodeFile('M.BAS', [signature, `    x = 1: ${end}`, 'y = 2'], {
-        form: false,
+        module: 'standard',
       }),
     ).toMatchObject({
       status: 'analyzed',
@@ -176,7 +273,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
   it('counts a one-line procedure once', () => {
     expect(
       analyzeVb6CodeFile('M.BAS', ['Private Sub A(): End Sub'], {
-        form: false,
+        module: 'standard',
       }),
     ).toMatchObject({
       counters: { codeLines: 1 },
@@ -189,7 +286,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
     const result = analyzeVb6CodeFile(
       'M.BAS',
       ['Sub A()', 's = "open', 'End Sub'],
-      { form: false },
+      { module: 'standard' },
     );
     expect(result).toMatchObject({
       counters: { codeLines: 2, unclassifiedLines: 1, physicalLines: 3 },
@@ -202,7 +299,7 @@ describe('structure errors are unsupported, never zero LoC', () => {
       analyzeVb6CodeFile(
         'M.BAS',
         ['Public Declare Sub Sleep Lib "kernel32" (ByVal ms As Long)', 'End'],
-        { form: false },
+        { module: 'standard' },
       ),
     ).toMatchObject({ procedures: [], fileLevelCodeLines: 2 });
   });
@@ -226,7 +323,9 @@ describe('static facts', () => {
     '    End Select',
     'End Sub',
   ];
-  const result = analyzeVb6CodeFile('m/LOAD.BAS', lines, { form: false });
+  const result = analyzeVb6CodeFile('m/LOAD.BAS', lines, {
+    module: 'standard',
+  });
   if (result.status !== 'analyzed') throw new Error(result.status);
 
   it('extracts tables per operation and flags a runtime table name', () => {
@@ -259,7 +358,7 @@ describe('static facts', () => {
 
   it('finds identifier uses outside strings, comments and declarations', () => {
     const references = findVb6References('m/LOAD.BAS', lines, {
-      form: false,
+      module: 'standard',
       names: new Set(['gettickcount', 'logtext', 'update']),
     });
     expect(references.map((r) => [r.name, r.line, r.procedureId])).toEqual([
@@ -274,7 +373,7 @@ describe('SQL built across statements', () => {
     const result = analyzeVb6CodeFile(
       'M.BAS',
       ['Sub P()', ...body, 'End Sub'],
-      { form: false },
+      { module: 'standard' },
     );
     if (result.status !== 'analyzed') throw new Error(result.status);
     return {
@@ -347,7 +446,7 @@ describe('SQL built across statements', () => {
 describe('recursive calls', () => {
   const uses = (lines: string[]) =>
     findVb6References('M.BAS', lines, {
-      form: false,
+      module: 'standard',
       names: new Set(['recur', 'walk']),
     }).map((r) => `${r.name}:${r.line}`);
 
@@ -375,7 +474,7 @@ describe('SQL built in branches and properties', () => {
       'M.BAS',
       ['Sub P()', ...body, 'End Sub'],
       {
-        form: false,
+        module: 'standard',
       },
     );
     if (result.status !== 'analyzed') throw new Error(result.status);
@@ -533,7 +632,7 @@ it('links calls written with the $ type character', () => {
         '    x = F$()',
         'End Sub',
       ],
-      { form: false, names: new Set(['f']) },
+      { module: 'standard', names: new Set(['f']) },
     ).map((r) => `${r.name}:${r.line}`),
   ).toEqual(['F:2', 'F:5']);
 });

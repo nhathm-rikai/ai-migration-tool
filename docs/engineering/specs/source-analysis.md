@@ -8,8 +8,8 @@ Kiểm tra read-only ngày 13/10/2026 trên bộ source khách hàng ngoài repo
 
 Profile `bsn-vb6-cp932-v1`:
 
-- Text source v1: `.bas`, `.frm`, `.vbp`. `.cls` chưa có trong corpus kiểm tra; báo unsupported nếu gặp, chỉ mở hỗ trợ sau khi có fixture/parser test.
-- `.bas`, `.frm`: parse code và tính LoC. `.vbp`: parse tham chiếu project/dependency, không cộng vào LoC code VB6.
+- Text source v1: `.bas`, `.frm`, `.cls`, `.vbp`. Corpus BSN kiểm ngày 23/10/2026 không có `.cls` (0 file, không `.vbp` nào khai báo `Class=`); hỗ trợ `.cls` theo phạm vi WBS, chỉ được kiểm trên fixture tự tạo. Loại VB6 khác (`.ctl`, `.dsr`, `.pag`, `.dob`, `.vbg`...) báo unsupported.
+- `.bas`, `.frm`, `.cls`: parse code và tính LoC. `.vbp`: parse tham chiếu project/dependency, không cộng vào LoC code VB6.
 - `.frx`: inventory resource binary theo tên/hash nếu cần; không decode thành text, không gửi thẳng cho AI.
 - `.log`, `.scc`, `.txt`, build output và config agent không nằm trong text source allowlist mặc định. Tài liệu nghiệp vụ cần nhập theo luồng riêng khi được yêu cầu.
 - Root ngoài workspace đã đăng ký, symlink/junction thoát root, secret và file quá giới hạn: báo loại trừ/lỗi, không đọc bừa. Manifest ghi lý do và counts; coverage không giả định bằng 100%.
@@ -55,6 +55,7 @@ Quy tắc lexical:
 - Nhiều statement cách `:` trên cùng dòng vẫn tính 1. Dòng continuation `_` được tính theo từng dòng vật lý có code, không gộp thành một.
 - Dòng chỉ có label/line number và comment tính commentOnly; label đứng riêng không có comment là code line theo metric v1. Phải có fixture cho hai tình huống.
 - `.frm`: vùng designer từ đầu file đến ngay trước dòng top-level `Attribute VB_Name`; Attribute đó thuộc metadata. Parser phải xác định ranh giới theo cấu trúc export, không tìm substring mù; thiếu/không xác định ranh giới → unsupported, không cộng designer thành code.
+- `.cls`: header export (`VERSION x.y CLASS`, khối `BEGIN ... END` property của class) tính `designerLines`, ranh giới như `.frm`: đến ngay trước `Attribute VB_Name` top-level; thiếu/không cân bằng → unsupported `CLASS_HEADER_BOUNDARY_NOT_FOUND`. Phần sau như `.bas`. Member không `Private` của class/form chỉ gọi qua object (visibility `public`), `Declare` trong class/form là private.
 - `.bas`: toàn file là vùng code ngoại trừ export Attribute. Attribute ẩn trong procedure vẫn là metadata; số dòng evidence không bị dồn lại.
 - Theo function/procedure: tính codeLines từ chữ ký tới End tương ứng, gồm declaration/body/end, bỏ comment/blank/Attribute. `Sub`, `Function`, `Property Get/Let/Set` có ID riêng; code ngoài procedure tính `fileLevelCodeLines`. Tổng procedure codeLines + fileLevelCodeLines bằng codeLines của file khi coverage đầy đủ.
 

@@ -8,6 +8,13 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 23/10/2026 — P1-CLOSE-01 hỗ trợ `.cls`
+
+- Làm theo `portal-implement`; gate FEATURE:analysis, dữ liệu fixture, không đổi contract/route/DB. Nhánh `feat/p1-close-01-cls-support` từ `aea55ff`. Quét read-only source VB6 khách hàng ngoài repo: 284 `.vbp`, 308 `.frm`, 149 `.bas`, 6 `.frx`, 0 `.cls`, không `.vbp` nào có `Class=`. Người dùng chọn giữ phạm vi WBS (portal dùng cho nhiều source).
+- `vb6-code-file.ts`: option `module: 'standard' | 'form' | 'class'` thay `form: boolean`. Header class (`VERSION x.y CLASS`, khối `BEGIN ... END` trần) tính `designerLines` với ranh giới như form; lỗi ranh giới → `CLASS_HEADER_BOUNDARY_NOT_FOUND`. Class là object module: member không `Private` có visibility `public`, `Declare` là private. `vb6.analyzer.ts`: `.cls` thành role `code`; `.ctl/.dsr/...` vẫn unsupported. Member `Class=` với extension khác `.cls` giữ role theo extension (không đoán header).
+- Fixture `LEGACY.CLS` viết lại thành class đủ header/Attribute/Declare/Event/Property Get-Let/Friend, CP932 + CRLF; nhãn dòng viết tay trong test, **TL chưa duyệt**. Metric giữ `vb6-physical-code-v1` vì đếm `.bas/.frm` không đổi; run cũ có `.cls` unsupported sẽ khác run mới cùng profile.
+- Giới hạn: chưa có `.cls` thật để đối chiếu; `Attribute VB_PredeclaredId = True` (default instance gọi không cần object) chưa được coi là global trong call graph.
+
 ## 22/10/2026 — đồng bộ docs, tạm hoãn source map
 
 - Giữ các hiệu chỉnh tài liệu theo source đang có: Projects UI/API, thư viện/CLI Analyze VB6, mapping schema, E2E fixture và trạng thái module chưa tích hợp; sửa thứ tự trích SQL trong README backend. Không đổi runtime/contract/dependency.

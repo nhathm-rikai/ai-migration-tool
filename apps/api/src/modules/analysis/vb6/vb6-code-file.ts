@@ -18,9 +18,14 @@ import {
 } from './vb6-statement.js';
 import { lexVb6Line, type Vb6Continuation } from './vb6-line-lexer.js';
 
-// Counts metric vb6-physical-code-v1 for one .bas/.frm, splits procedures
-// (specs/source-analysis.md §4) and collects static facts: SQL table
-// access, Declare (Win32 API), labels, decision points, identifier uses.
+// Counts metric vb6-physical-code-v1 for one .bas/.frm/.cls, splits
+// procedures (specs/source-analysis.md §4) and collects static facts: SQL
+// table access, Declare (Win32 API), labels, decision points, identifier uses.
+
+// standard: .bas; form: .frm; class: .cls. Forms and classes are object
+// modules: they start with an exported header and their members are reached
+// through an object.
+export type Vb6ModuleKind = 'standard' | 'form' | 'class';
 
 const ATTRIBUTE = /^attribute\s/i;
 const PROCEDURE_START =
@@ -31,9 +36,22 @@ const DECLARE =
   /^(?:(public|private|global)\s+)?declare\s+(?:sub|function)\s+([A-Za-z][A-Za-z0-9_]*)\s+lib\s+"([^"]*)"/i;
 
 const FORM_VERSION = /^version\s+\d/i;
-const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
+const CLASS_VERSION = /^version\s+\d+\.\d+\s+class$/i;
+// A class header opens with a bare BEGIN; form controls name a type.
+const DESIGNER_BEGIN = /^(?:begin|beginproperty)(?:\s|$)/i;
 const DESIGNER_END = /^(?:end|endproperty)$/i;
 const FORM_NAME_ATTRIBUTE = /^attribute\s+vb_name\s*=/i;
+
+const HEADERS: Record<
+  Exclude<Vb6ModuleKind, 'standard'>,
+  { version: RegExp; notFound: string }
+> = {
+  form: { version: FORM_VERSION, notFound: 'FORM_DESIGNER_BOUNDARY_NOT_FOUND' },
+  class: {
+    version: CLASS_VERSION,
+    notFound: 'CLASS_HEADER_BOUNDARY_NOT_FOUND',
+  },
+};
 
 type OpenProcedure = ProcedureMetrics & { block: string };
 
@@ -49,11 +67,12 @@ function emptyCounters(physicalLines: number): LineCounters {
   };
 }
 
-// The designer of an exported form runs from VERSION to the line before the
-// top-level `Attribute VB_Name`; Begin/End nesting must be balanced there.
-function findDesignerEnd(lines: string[]): number | null {
+// The designer of an exported form, or the header of an exported class, runs
+// from VERSION to the line before the top-level `Attribute VB_Name`;
+// Begin/End nesting must be balanced there.
+function findDesignerEnd(lines: string[], version: RegExp): number | null {
   const first = lines.findIndex((line) => line.trim() !== '');
-  if (first < 0 || !FORM_VERSION.test(lines[first]?.trim() ?? '')) return null;
+  if (first < 0 || !version.test(lines[first]?.trim() ?? '')) return null;
   let depth = 0;
   for (const [index, line] of lines.entries()) {
     const text = line.trim();
@@ -73,7 +92,7 @@ function procedureKind(keyword: string): string {
 export function analyzeVb6CodeFile(
   relativePath: string,
   lines: string[],
-  options: { form: boolean },
+  options: { module: Vb6ModuleKind },
 ): CodeFileAnalysis {
   return scanVb6CodeFile(relativePath, lines, options).analysis;
 }
@@ -81,7 +100,7 @@ export function analyzeVb6CodeFile(
 export function findVb6References(
   relativePath: string,
   lines: string[],
-  options: { form: boolean; names: ReadonlySet<string> },
+  options: { module: Vb6ModuleKind; names: ReadonlySet<string> },
 ): CodeReference[] {
   return scanVb6CodeFile(relativePath, lines, options).references;
 }
@@ -89,18 +108,19 @@ export function findVb6References(
 function scanVb6CodeFile(
   relativePath: string,
   lines: string[],
-  options: { form: boolean; names?: ReadonlySet<string> },
+  options: { module: Vb6ModuleKind; names?: ReadonlySet<string> },
 ): { analysis: CodeFileAnalysis; references: CodeReference[] } {
   const unsupported = (reason: string, line: number | null) => ({
     analysis: { status: 'unsupported' as const, reason, line },
     references: [],
   });
   const counters = emptyCounters(lines.length);
+  const objectModule = options.module !== 'standard';
   let codeStart = 0;
-  if (options.form) {
-    const designerEnd = findDesignerEnd(lines);
-    if (designerEnd === null)
-      return unsupported('FORM_DESIGNER_BOUNDARY_NOT_FOUND', null);
+  if (options.module !== 'standard') {
+    const header = HEADERS[options.module];
+    const designerEnd = findDesignerEnd(lines, header.version);
+    if (designerEnd === null) return unsupported(header.notFound, null);
     counters.designerLines = designerEnd;
     codeStart = designerEnd;
   }
@@ -181,7 +201,7 @@ function scanVb6CodeFile(
           name: declare[2] ?? '',
           library: declare[3] ?? '',
           visibility:
-            declare[1]?.toLowerCase() === 'private' || options.form
+            declare[1]?.toLowerCase() === 'private' || objectModule
               ? 'private'
               : 'global',
           line: lineNumber,
@@ -196,7 +216,7 @@ function scanVb6CodeFile(
           name,
           visibility: /\bprivate\b/i.test(start[1] ?? '')
             ? 'private'
-            : options.form
+            : objectModule
               ? 'public'
               : 'global',
           startLine: lineNumber,

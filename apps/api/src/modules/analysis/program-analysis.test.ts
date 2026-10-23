@@ -45,7 +45,9 @@ const SOURCES: Record<string, { shared: boolean; lines: string[] }> = {
 
 function programFiles(): ProgramFile[] {
   const analyses = Object.entries(SOURCES).map(([path, source]) => {
-    const analysis = analyzeVb6CodeFile(path, source.lines, { form: false });
+    const analysis = analyzeVb6CodeFile(path, source.lines, {
+      module: 'standard',
+    });
     if (analysis.status !== 'analyzed') throw new Error(path);
     return { path, source, analysis };
   });
@@ -55,7 +57,7 @@ function programFiles(): ProgramFile[] {
     shared: source.shared,
     analysis,
     references: findVb6References(path, source.lines, {
-      form: false,
+      module: 'standard',
       names,
     }),
   }));

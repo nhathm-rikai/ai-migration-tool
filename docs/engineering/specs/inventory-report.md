@@ -38,7 +38,7 @@ Mọi cảnh báo của tập đã chọn được giữ, không lọc: `TABLE_N
 ## 5. An toàn
 
 - Ô text luôn là inline string, không bao giờ là công thức; text bắt đầu bằng `=`, `+`, `-`, `@`, tab hoặc CR có thêm quote prefix nên vẫn là text khi người dùng sửa ô.
-- Báo cáo chỉ có path tương đối và hash từ inventory; không chứa source code hay lệnh chạy. Member khai báo bằng đường dẫn tuyệt đối (`C:\...`, UNC `\\server\...`, `/...`, `\...`) chỉ giữ tên file dạng `<absolute path>/SECRET.BAS` trong `members` và `warnings`; `resolution: absolute-path` cho biết trạng thái.
+- Báo cáo chỉ có path tương đối và hash từ inventory; không chứa source code hay lệnh chạy. Member khai báo bằng đường dẫn tuyệt đối (`C:\...`, UNC `\\server\...`, `/...`, `\...`) chỉ giữ tên file dạng `<absolute path>/SECRET.BAS` trong `members` và `warnings`; `resolution: absolute-path` cho biết trạng thái. Cùng quy tắc cho `externalReferences` (`identifier`, `fileName`, `description`) và `externalApis[].library` (`Declare ... Lib "C:\...\X.DLL"`).
 - Header XLSX đậm, cột rộng tối thiểu bằng độ dài header + 4 ký tự để không bị cắt.
 - CLI bắt buộc `--source-root` (thư mục đã tạo inventory) và từ chối output nằm trong đó, kể cả qua alias/junction, trước khi đọc inventory và ngay trước khi ghi.
 

@@ -443,13 +443,24 @@ export function buildInventoryReport(
   const externalReferences = selected.flatMap(({ id, program }) =>
     program.externalReferences.map((reference) => ({
       programId: id,
-      ...reference,
+      kind: reference.kind,
+      identifier: redactAbsolutePath(reference.identifier),
+      fileName:
+        reference.fileName === null
+          ? null
+          : redactAbsolutePath(reference.fileName),
+      description:
+        reference.description === null
+          ? null
+          : redactAbsolutePath(reference.description),
     })),
   );
+  // `Declare ... Lib "C:\...\X.DLL"` keeps only the library file name.
   const externalApis = selected.flatMap(({ id, program }) =>
     (program.analysis?.externalApis ?? []).map((api) => ({
       programId: id,
-      ...api,
+      name: api.name,
+      library: redactAbsolutePath(api.library),
     })),
   );
 

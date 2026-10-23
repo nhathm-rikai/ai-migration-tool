@@ -177,7 +177,7 @@ describe('buildInventoryReport', () => {
   });
 });
 
-it('keeps absolute member paths out of the JSON and the workbook', () => {
+it('keeps absolute paths out of the JSON and the workbook', () => {
   const profile = findSourceProfile('vb6-cp932-v1');
   if (!profile) throw new Error('setup');
   const doc: unknown = JSON.parse(
@@ -187,19 +187,47 @@ it('keeps absolute member paths out of the JSON and the workbook', () => {
         files: [
           text('p/P.VBP', [
             'Type=Exe',
+            'Module=M; M.BAS',
             'Module=S; C:\\review-private\\SECRET.BAS',
             'Module=U; \\\\server\\share\\U.BAS',
             'Form=/home/someone/F.FRM',
+            'Object={00000000-0000-0000-0000-000000000001}#1.0#0; C:\\review-private\\SECRET.OCX',
+            'Object={00000000-0000-0000-0000-000000000002}#1.0#0; \\\\server\\share\\U.OCX',
+            'Object={00000000-0000-0000-0000-000000000003}#1.0#0; "/home/someone/X.OCX"',
+          ]),
+          text('p/M.BAS', [
+            'Private Declare Function A1 Lib "C:\\review-private\\SECRET.DLL" () As Long',
+            'Private Declare Function A2 Lib "\\\\server\\share\\U.DLL" () As Long',
+            'Private Declare Function A3 Lib "/home/someone/libx.so" () As Long',
+            'Sub Main()',
+            '    x = A1(): y = A2(): z = A3()',
+            'End Sub',
           ]),
         ],
       }),
     ),
   );
   const report = buildInventoryReport(doc as SourceInventoryDocument, ['P']);
-  expect(report.members.map((m) => [m.declaredPath, m.resolution])).toEqual([
-    ['<absolute path>/SECRET.BAS', 'absolute-path'],
-    ['<absolute path>/U.BAS', 'absolute-path'],
-    ['<absolute path>/F.FRM', 'absolute-path'],
+  expect(
+    report.members
+      .filter((m) => m.resolution === 'absolute-path')
+      .map((m) => m.declaredPath),
+  ).toEqual([
+    '<absolute path>/SECRET.BAS',
+    '<absolute path>/U.BAS',
+    '<absolute path>/F.FRM',
+  ]);
+  expect(
+    report.externalReferences.map((r) => [r.identifier, r.fileName]),
+  ).toEqual([
+    ['{00000000-0000-0000-0000-000000000001}', '<absolute path>/SECRET.OCX'],
+    ['{00000000-0000-0000-0000-000000000002}', '<absolute path>/U.OCX'],
+    ['{00000000-0000-0000-0000-000000000003}', '<absolute path>/X.OCX'],
+  ]);
+  expect(report.externalApis.map((a) => [a.name, a.library])).toEqual([
+    ['A1', '<absolute path>/SECRET.DLL'],
+    ['A2', '<absolute path>/U.DLL'],
+    ['A3', '<absolute path>/libx.so'],
   ]);
   expect(
     report.warnings

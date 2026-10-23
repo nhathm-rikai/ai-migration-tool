@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 23/10/2026 — P1-CLOSE-03 báo cáo JSON/XLSX cho 15 Pilot
+
+- Dùng skill `portal-implement`; gate FEATURE:analysis + core export, dữ liệu thật read-only. Nhánh `feat/p1-close-03-pilot-report` từ `b28faa7` (nhánh P1-CLOSE-02, chưa merge). B14 chưa có code export nên làm core dùng lại được, không route/job/UI/HTML.
+- `modules/inventory-report/`: `inventory-report.ts` dựng báo cáo `inventory-report-v1` từ inventory đã validate (không parse source), chọn program theo tên file project, từ chối ID thiếu/lặp/khớp nhiều; `inventory-report-workbook.ts` bố cục 12 sheet; `xlsx-writer.ts` ghi XLSX tối thiểu không thêm dependency (inline string, quote prefix cho text dạng công thức, header đậm/freeze/autofilter, ZIP deterministic). CLI `export-inventory-report`. `writeReplacing` nhận thêm bytes. Đặc tả: [inventory-report](specs/inventory-report.md).
+- Test: 28 test (chọn program, totals per-program/unique với file dùng chung, truy vết file/procedure/dòng, đủ cảnh báo, XML escape, cắt ô dài, công thức thành text, workbook đọc lại qua ZIP/CRC).
+- Chạy thật (Windows x64, Node 24.16.0): analyze-source read-only trên source khách hàng ngoài repo (784 file, 284 program, 277 complete) rồi export 15 Pilot: 15/15 complete, 65 file (khớp danh sách hash 22/10), 1.399 procedure, unique codeLines 37.093, tổng per-program 62.548. Kiểm độc lập bằng openpyxl 3.1.5: 45/45 check. Output và evidence ở thư mục outputs ngoài repo.
+- Giới hạn: chỉ kiểm XLSX bằng openpyxl, chưa mở bằng Excel/LibreOffice; nhãn breakdown theo function chưa được TL duyệt; complexity draft và mapping bảng `assumed` giữ nguyên nhãn.
+
 ## 23/10/2026 — P1-CLOSE-02 LoC breakdown theo function
 
 - Làm theo `portal-implement`; gate FEATURE:analysis, dữ liệu fixture. Nhánh `feat/p1-close-02-procedure-loc` tách từ `feat/p1-close-01-cls-support` (`4341d1a`, chưa merge) vì cùng sửa `vb6-code-file.ts`.

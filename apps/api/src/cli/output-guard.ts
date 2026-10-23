@@ -79,7 +79,7 @@ export async function checkOutputs(
 // through.
 export async function writeReplacing(
   path: string,
-  data: string,
+  data: string | Uint8Array,
 ): Promise<void> {
   const temporary = join(
     dirname(path),

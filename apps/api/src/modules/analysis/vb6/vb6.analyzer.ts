@@ -38,6 +38,7 @@ function moduleKind(relativePath: string): Vb6ModuleKind {
 export const vb6Analyzer: LanguageAnalyzer = {
   languageId: 'vb6',
   metricVersion: 'vb6-physical-code-v1',
+  procedureLinesVersion: 'vb6-procedure-lines-v1',
   fileRole: (relativePath) => ROLES[extension(relativePath)] ?? 'excluded',
   analyzeCodeFile: (relativePath, lines) =>
     analyzeVb6CodeFile(relativePath, lines, {

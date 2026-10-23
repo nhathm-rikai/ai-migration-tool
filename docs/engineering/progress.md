@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 23/10/2026 — P1-CLOSE-02 LoC breakdown theo function
+
+- Làm theo `portal-implement`; gate FEATURE:analysis, dữ liệu fixture. Nhánh `feat/p1-close-02-procedure-loc` tách từ `feat/p1-close-01-cls-support` (`4341d1a`, chưa merge) vì cùng sửa `vb6-code-file.ts`.
+- Định nghĩa `vb6-procedure-lines-v1` ở [source-analysis](specs/source-analysis.md) §4.1: Executable = codeLines của `vb6-physical-code-v1` (gồm chữ ký/Dim/End); Physical/Executable/Comment/Blank/Metadata/Unclassified loại trừ nhau; SQL là tập con của Executable, không cộng vào tổng.
+- Counter: `ProcedureMetrics` thêm `physicalLines`, `commentOnlyLines`, `blankLines`, `metadataLines`, `unclassifiedLines`, `sqlLines`. `detectSqlAccess` trả `lines` (dòng có literal của chuỗi có statement). Inventory ghi `procedureLinesVersion`; contract thêm các trường optional để đọc được inventory cũ (`source-inventory-v1` giữ nguyên). Run config C01 chưa khóa `procedureLinesVersion`: cần thêm khi nối job Analyze.
+- Fixture `tests/fixtures/vb6-procedure-lines/ORDERS.BAS` (CP932/CRLF: Attribute trong procedure, comment có từ khóa SQL, SQL qua ` _` và `s = s & ...`, `MsgBox` không phải SQL, bảng runtime, procedure một dòng); nhãn tay từng dòng trong `vb6-procedure-lines.test.ts`, **TL chưa duyệt**. Bổ sung nhãn breakdown cho procedure của `SAMPLE.BAS`/`LEGACY.CLS` từ nhãn dòng có sẵn.
+- Windows x64, Node 24.16.0: API 255 test, contracts 42 test, typecheck, lint pass. Giới hạn: SQL dùng chung detector lexical của CRUD nên sai số của CRUD (ví dụ chữ `delete` trong thông báo) cũng ảnh hưởng `sqlLines`; chưa đối chiếu source thật.
+
 ## 23/10/2026 — P1-CLOSE-01 hỗ trợ `.cls`
 
 - Làm theo `portal-implement`; gate FEATURE:analysis, dữ liệu fixture, không đổi contract/route/DB. Nhánh `feat/p1-close-01-cls-support` từ `aea55ff`. Quét read-only source VB6 khách hàng ngoài repo: 284 `.vbp`, 308 `.frm`, 149 `.bas`, 6 `.frx`, 0 `.cls`, không `.vbp` nào có `Class=`. Người dùng chọn giữ phạm vi WBS (portal dùng cho nhiều source).

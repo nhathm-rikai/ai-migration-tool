@@ -111,8 +111,19 @@ const ProcedureSchema = Type.Object(
     ]),
     startLine: Line,
     endLine: Line,
+    // Executable lines (code lines of `metricVersion`).
     codeLines: Count,
     decisionPoints: Count,
+    // Breakdown of startLine..endLine, `procedureLinesVersion`; optional for
+    // inventories written before it. physicalLines = codeLines +
+    // commentOnlyLines + blankLines + metadataLines + unclassifiedLines;
+    // sqlLines are code lines writing SQL text, a subset of codeLines.
+    physicalLines: Type.Optional(Count),
+    commentOnlyLines: Type.Optional(Count),
+    blankLines: Type.Optional(Count),
+    metadataLines: Type.Optional(Count),
+    unclassifiedLines: Type.Optional(Count),
+    sqlLines: Type.Optional(Count),
   },
   Strict,
 );
@@ -330,6 +341,8 @@ export const SourceInventorySchema = Type.Object(
     profileId: Type.String(),
     languageId: Type.String(),
     metricVersion: Type.String(),
+    // Optional for inventories written before the procedure breakdown.
+    procedureLinesVersion: Type.Optional(Type.String()),
     decoderVersion: Type.String(),
     normalizationVersion: Type.String(),
     sqlAccessVersion: Type.String(),

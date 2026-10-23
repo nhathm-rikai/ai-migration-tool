@@ -380,6 +380,28 @@ describe('C01-AC03 inventory compatibility', () => {
     },
   );
 
+  // The fixtures above have no procedure breakdown (written before it).
+  it('accepts the procedure line breakdown with its version', () => {
+    const inventory = structuredClone(fixtures.mappedInventoryFixture) as {
+      procedureLinesVersion?: string;
+      files: { analysis: { procedures?: Record<string, unknown>[] } | null }[];
+    };
+    inventory.procedureLinesVersion = 'vb6-procedure-lines-v1';
+    const procedure = inventory.files[1]?.analysis?.procedures?.[0];
+    if (!procedure) throw new Error('fixture procedure missing');
+    Object.assign(procedure, {
+      physicalLines: 6,
+      commentOnlyLines: 1,
+      blankLines: 0,
+      metadataLines: 0,
+      unclassifiedLines: 0,
+      sqlLines: 2,
+    });
+    expectValid(SourceInventorySchema, inventory);
+    procedure.sqlLines = -1;
+    expect(Check(SourceInventorySchema, inventory)).toBe(false);
+  });
+
   it('keeps the raw and mapped views apart', () => {
     const analysis = fixtures.mappedInventoryFixture.programs[0].analysis;
     expect(analysis.crud.map((entry) => entry.table)).toEqual([

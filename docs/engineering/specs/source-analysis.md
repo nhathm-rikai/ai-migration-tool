@@ -61,6 +61,23 @@ Quy tắc lexical:
 
 Tài liệu cú pháp tham khảo: [Microsoft Rem](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/rem-statement). Đây là tham khảo họ Visual Basic; parser VB6 vẫn phải chứng minh trên fixture/corpus, không giả định parser VBA bất kỳ hỗ trợ toàn bộ VB6.
 
+### 4.1. Breakdown theo procedure (`vb6-procedure-lines-v1`)
+
+Áp cho mỗi `Sub`/`Function`/`Property Get/Let/Set`, phạm vi dòng `startLine..endLine` (gồm chữ ký và `End`). Comment/blank đứng trước chữ ký hoặc giữa hai procedure thuộc file-level, không thuộc procedure nào.
+
+| Trường | Định nghĩa |
+|---|---|
+| Physical (`physicalLines`) | `endLine - startLine + 1`. |
+| Executable (`codeLines`) | Dòng code theo `vb6-physical-code-v1` trong phạm vi: gồm chữ ký, `Dim/Const`, statement và `End ...`. Không tách declaration khỏi statement. |
+| Comment (`commentOnlyLines`) | Dòng chỉ có comment `'`/`Rem` (kể cả sau label/số dòng). Comment cuối dòng code không tính riêng. |
+| Blank (`blankLines`) | Dòng trống trong phạm vi. |
+| Metadata (`metadataLines`), Unclassified (`unclassifiedLines`) | `Attribute` trong procedure; dòng chưa phân loại chắc chắn. |
+| SQL (`sqlLines`) | Dòng Executable có viết ít nhất một literal thuộc một chuỗi SQL mà detector `sqlAccessVersion` nhận ra statement (`SELECT ... FROM`, `INSERT INTO`, `UPDATE ... SET`, `DELETE`, `JOIN`, DDL `TABLE`). |
+
+Quy tắc chồng lấp: Executable, Comment, Blank, Metadata, Unclassified loại trừ nhau và có tổng bằng Physical. SQL **không** phải nhóm riêng: mỗi dòng SQL đồng thời là một dòng Executable, nên `sqlLines ≤ codeLines` và không cộng SQL vào tổng. Một dòng tính SQL một lần dù góp vào nhiều chuỗi SQL. Chuỗi dựng qua nhiều dòng (` _`, `s = s & ...`, biến phụ) tính mọi dòng có literal của chuỗi; dòng chỉ chứa biến/giá trị runtime (`Call Exec(s)`) không tính. Từ khóa SQL trong comment hoặc chuỗi không có statement (`MsgBox "SELECT one"`) không tính. Tổng Executable các procedure + `fileLevelCodeLines` = `codeLines` của file.
+
+Inventory ghi `procedureLinesVersion`. Đổi định nghĩa trên (kể cả đổi detector làm thay đổi `sqlLines`) phải tăng version. Fixture có nhãn tay: `tests/fixtures/vb6-procedure-lines/`, **TL chưa duyệt**.
+
 ## 5. Baseline và ngưỡng lệch ≤ 5%
 
 - TL/người review gán nhãn dòng trên fixture sạch theo đúng metric này, QC/Dev khác đối chiếu; expected không sinh bằng chính counter đang test hoặc AI chưa duyệt.

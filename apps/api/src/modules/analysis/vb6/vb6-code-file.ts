@@ -191,13 +191,25 @@ function scanVb6CodeFile(
     metadataContinues = isMetadata && lexed.continuation === 'code';
     incoming = lexed.continuation;
 
+    // Non-code lines belong to the procedure open around them.
+    const lineOwner: OpenProcedure | null = open;
     if (isMetadata) {
       counters.metadataLines += 1;
+      if (lineOwner) lineOwner.metadataLines += 1;
       continue;
     }
-    if (lexed.kind === 'blank') counters.blankLines += 1;
-    else if (lexed.kind === 'comment') counters.commentOnlyLines += 1;
-    else if (lexed.kind === 'unclassified') counters.unclassifiedLines += 1;
+    const nonCode =
+      lexed.kind === 'blank'
+        ? 'blankLines'
+        : lexed.kind === 'comment'
+          ? 'commentOnlyLines'
+          : lexed.kind === 'unclassified'
+            ? 'unclassifiedLines'
+            : null;
+    if (nonCode) {
+      counters[nonCode] += 1;
+      if (lineOwner) lineOwner[nonCode] += 1;
+    }
     if (lexed.label) labels.push({ name: lexed.label, line: lineNumber });
     if (lexed.kind !== 'code') {
       finishStatement();
@@ -240,7 +252,13 @@ function scanVb6CodeFile(
               : 'global',
           startLine: lineNumber,
           endLine: lineNumber,
+          physicalLines: 0,
           codeLines: 0,
+          commentOnlyLines: 0,
+          blankLines: 0,
+          metadataLines: 0,
+          unclassifiedLines: 0,
+          sqlLines: 0,
           decisionPoints: 0,
           block: kind.split('-')[0] ?? kind,
         };
@@ -279,9 +297,13 @@ function scanVb6CodeFile(
   // emitted on its own; the same fact is kept once.
   const seen = new Set<string>();
   const once = (key: string) => !seen.has(key) && Boolean(seen.add(key));
+  const sqlLinesByOwner = new Map<string | null, Set<number>>();
   for (const [procedureId, units] of sqlByOwner)
     for (const segments of units) {
       const detected = detectSqlAccess(segments);
+      const sqlLines = sqlLinesByOwner.get(procedureId) ?? new Set<number>();
+      for (const line of detected.lines) sqlLines.add(line);
+      sqlLinesByOwner.set(procedureId, sqlLines);
       for (const t of detected.tables)
         if (once(`${procedureId}|${t.table}|${t.operation}|${t.line}`))
           sqlTables.push({ ...t, procedureId });
@@ -296,7 +318,17 @@ function scanVb6CodeFile(
     visibility: procedure.visibility,
     startLine: procedure.startLine,
     endLine: procedure.endLine,
+    physicalLines: procedure.endLine - procedure.startLine + 1,
     codeLines: procedure.codeLines,
+    commentOnlyLines: procedure.commentOnlyLines,
+    blankLines: procedure.blankLines,
+    metadataLines: procedure.metadataLines,
+    unclassifiedLines: procedure.unclassifiedLines,
+    // A line counts once however many SQL texts it writes into; a piece
+    // inlined from another variable counts where that literal is written.
+    sqlLines: [...(sqlLinesByOwner.get(procedure.id) ?? [])].filter(
+      (line) => line >= procedure.startLine && line <= procedure.endLine,
+    ).length,
     decisionPoints: procedure.decisionPoints,
   }));
   const procedureCodeLines = procedures.reduce(

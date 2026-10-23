@@ -27,7 +27,12 @@ describe('detectSqlAccess', () => {
     expect(at('DELETE FROM ', null, ' WHERE A = 1')).toEqual({
       tables: [],
       dynamic: [{ operation: 'D', line: 2 }],
+      lines: [1, 3],
     });
+  });
+
+  it('reports no SQL lines for text without a statement', () => {
+    expect(at('SELECT one', 'DELETE').lines).toEqual([]);
   });
 
   it('ignores the word UPDATE outside an UPDATE statement', () => {

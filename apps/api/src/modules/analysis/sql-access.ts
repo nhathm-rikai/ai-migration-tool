@@ -109,9 +109,12 @@ function maskLiteralsAndComments(text: string): string {
   return masked;
 }
 
+// `lines`: when the text holds at least one statement this detector reads,
+// every line that wrote a literal piece of it; otherwise empty.
 export function detectSqlAccess(segments: readonly SqlSegment[]): {
   tables: SqlTableAccess[];
   dynamic: DynamicSqlUse[];
+  lines: number[];
 } {
   const stream = buildStream(segments);
   const text = maskLiteralsAndComments(stream.text);
@@ -183,14 +186,28 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
         list: false,
       },
     ];
+  let statement = false;
   for (const { regex, operation, list } of patterns)
-    for (const match of text.matchAll(regex))
+    for (const match of text.matchAll(regex)) {
+      statement = true;
       readTables(match.index + match[0].length, operation, list);
+    }
 
   // SELECT ... FROM: the FROM that follows each SELECT keyword.
   for (const select of text.matchAll(/\bselect\b/gi)) {
     const from = /\bfrom\s+/i.exec(text.slice(select.index));
-    if (from) readTables(select.index + from.index + from[0].length, 'R', true);
+    if (!from) continue;
+    statement = true;
+    readTables(select.index + from.index + from[0].length, 'R', true);
   }
-  return { tables, dynamic };
+  const lines = statement
+    ? [
+        ...new Set(
+          segments
+            .filter((segment) => segment.text !== null)
+            .map((segment) => segment.line),
+        ),
+      ]
+    : [];
+  return { tables, dynamic, lines };
 }

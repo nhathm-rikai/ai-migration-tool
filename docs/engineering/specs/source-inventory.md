@@ -8,6 +8,7 @@
 |---|---|---|
 | `schemaVersion` | `source-inventory-v1` | Hình dạng JSON. Thêm trường optional giữ version; đổi tên, bỏ hoặc đổi nghĩa trường phải tăng version. |
 | `metricVersion` | `vb6-physical-code-v1` | Cách đếm dòng, theo [source-analysis](source-analysis.md) §4. |
+| `procedureLinesVersion` | `vb6-procedure-lines-v1` | Breakdown Physical/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có. |
 | `sqlAccessVersion` | `sql-access-v4` | Cách dựng chuỗi SQL (theo biến, nhánh, property) và trích bảng/CRUD. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
 | `complexityVersion` | `complexity-v0-draft` | Công thức điểm complexity, bản nháp chờ TL chốt. |
@@ -18,7 +19,7 @@ Số liệu khác version không được trộn trong cùng report.
 ## 2. Theo file (`files[]`)
 
 - `manifest`: path, vai trò, hash, encoding, số dòng theo [source-analysis](source-analysis.md) §2–3.
-- `analysis` (file code): `counters`, `procedures[]` (ID `<path>#<kind>:<name>`, `visibility`, dòng bắt đầu/kết thúc, `codeLines`, `decisionPoints`), `fileLevelCodeLines`.
+- `analysis` (file code): `counters`, `procedures[]` (ID `<path>#<kind>:<name>`, `visibility`, dòng bắt đầu/kết thúc, `codeLines`, `decisionPoints`, breakdown `physicalLines`/`commentOnlyLines`/`blankLines`/`metadataLines`/`unclassifiedLines`/`sqlLines` khi có `procedureLinesVersion`), `fileLevelCodeLines`.
 - `sqlTables[]`: bảng, thao tác `C|R|U|D|X`, dòng, procedure. `X` là DDL trên bảng (CREATE/DROP/TRUNCATE/ALTER TABLE), thường gặp với bảng tạm.
 - `dynamicSql[]`: tên bảng là giá trị runtime, hoặc dính liền với giá trị runtime (`"FROM ORD_" & tenant`, `"UPDATE HAN01." & t`). Parser gắn cờ, không đoán tên bảng.
 - `externalDeclarations[]`: procedure khai báo từ thư viện native (VB6 `Declare ... Lib`, ví dụ Win32 API).

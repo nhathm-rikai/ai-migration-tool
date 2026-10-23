@@ -111,14 +111,16 @@ const ProcedureSchema = Type.Object(
     ]),
     startLine: Line,
     endLine: Line,
-    // Executable lines (code lines of `metricVersion`).
+    // Code lines of `metricVersion` (source size, declarations included).
     codeLines: Count,
     decisionPoints: Count,
     // Breakdown of startLine..endLine, `procedureLinesVersion`; optional for
     // inventories written before it. physicalLines = codeLines +
-    // commentOnlyLines + blankLines + metadataLines + unclassifiedLines;
-    // sqlLines are code lines writing SQL text, a subset of codeLines.
+    // commentOnlyLines + blankLines + metadataLines + unclassifiedLines.
+    // executableLines (processing statements) and sqlLines (code lines
+    // writing SQL text) are both subsets of codeLines and may overlap.
     physicalLines: Type.Optional(Count),
+    executableLines: Type.Optional(Count),
     commentOnlyLines: Type.Optional(Count),
     blankLines: Type.Optional(Count),
     metadataLines: Type.Optional(Count),

@@ -109,8 +109,8 @@ function maskLiteralsAndComments(text: string): string {
   return masked;
 }
 
-// `lines`: when the text holds at least one statement this detector reads,
-// every line that wrote a literal piece of it; otherwise empty.
+// `lines`: when the text holds at least one statement whose table part this
+// detector read, every line that wrote a literal piece of it; else empty.
 export function detectSqlAccess(segments: readonly SqlSegment[]): {
   tables: SqlTableAccess[];
   dynamic: DynamicSqlUse[];
@@ -121,6 +121,9 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
   const { lineAt } = stream;
   const tables: SqlTableAccess[] = [];
   const dynamic: DynamicSqlUse[] = [];
+  // Set once a statement keyword is followed by a table, a pseudo table or
+  // a runtime value; a keyword alone (`"DELETE "`) is not SQL.
+  let statement = false;
 
   // Reads the table (or table list for FROM) starting at `index`.
   function readTables(
@@ -134,12 +137,15 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
     for (;;) {
       rest = rest.replace(/^\s+/, '');
       if (rest.startsWith(DYNAMIC) || rest.startsWith(GAP)) {
+        statement = true;
         dynamic.push({ operation, line: line() });
         return;
       }
       const match = new RegExp(`^(${IDENT})`).exec(rest);
       const name = match?.[1];
       if (!match || !name || STOP_WORDS.has(name.toLowerCase())) return;
+      // A keyword followed by a table (pseudo tables included) is SQL.
+      statement = true;
       // `ORD_` & tenant: the real name is only known at runtime. A gap may
       // also be empty, so a word right after it could join the name.
       const next = rest.slice(match[0].length, match[0].length + 2);
@@ -186,19 +192,14 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
         list: false,
       },
     ];
-  let statement = false;
   for (const { regex, operation, list } of patterns)
-    for (const match of text.matchAll(regex)) {
-      statement = true;
+    for (const match of text.matchAll(regex))
       readTables(match.index + match[0].length, operation, list);
-    }
 
   // SELECT ... FROM: the FROM that follows each SELECT keyword.
   for (const select of text.matchAll(/\bselect\b/gi)) {
     const from = /\bfrom\s+/i.exec(text.slice(select.index));
-    if (!from) continue;
-    statement = true;
-    readTables(select.index + from.index + from[0].length, 'R', true);
+    if (from) readTables(select.index + from.index + from[0].length, 'R', true);
   }
   const lines = statement
     ? [

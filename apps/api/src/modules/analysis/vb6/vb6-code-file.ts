@@ -32,6 +32,21 @@ const PROCEDURE_START =
   /^((?:(?:public|private|friend|static)\s+)*)(sub|function|property\s+(?:get|let|set))\s+([A-Za-z][A-Za-z0-9_]*)/i;
 const PROCEDURE_END = /^end\s+(sub|function|property)\b/i;
 const DECISION = /^(?:if|elseif|case(?!\s+else\b)|for|do|while)\b/i;
+// Statements that only declare (no processing): Dim/Static/Const, module
+// variables, Declare/Type/Enum/Event, Option/Implements/Def<type> and #
+// directives. ReDim allocates at runtime and stays executable.
+const DECLARATION =
+  /^(?:#|(?:dim|static|const|option|implements|declare|type|enum|event|def(?:bool|byte|int|lng|lnglng|longptr|cur|sng|dbl|dec|date|str|obj|var))\b|(?:public|private|global|friend)\s+(?!sub\b|function\b|property\b))/i;
+
+// Executable: a statement that processes, i.e. neither a declaration nor
+// the signature or End line of a procedure.
+function isExecutable(statement: string): boolean {
+  return (
+    !DECLARATION.test(statement) &&
+    !PROCEDURE_START.test(statement) &&
+    !PROCEDURE_END.test(statement)
+  );
+}
 const DECLARE =
   /^(?:(public|private|global)\s+)?declare\s+(?:sub|function)\s+([A-Za-z][A-Za-z0-9_]*)\s+lib\s+"([^"]*)"/i;
 
@@ -181,6 +196,7 @@ function scanVb6CodeFile(
   let open: OpenProcedure | null = null;
   let incoming: Vb6Continuation = 'none';
   let metadataContinues = false;
+  let continuesExecutable = false;
 
   for (let index = codeStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
@@ -189,6 +205,7 @@ function scanVb6CodeFile(
       (metadataContinues && incoming === 'code') ||
       (lexed.kind === 'code' && ATTRIBUTE.test(lexed.firstStatement ?? ''));
     metadataContinues = isMetadata && lexed.continuation === 'code';
+    const continued = incoming === 'code';
     incoming = lexed.continuation;
 
     // Non-code lines belong to the procedure open around them.
@@ -254,6 +271,7 @@ function scanVb6CodeFile(
           endLine: lineNumber,
           physicalLines: 0,
           codeLines: 0,
+          executableLines: 0,
           commentOnlyLines: 0,
           blankLines: 0,
           metadataLines: 0,
@@ -272,8 +290,16 @@ function scanVb6CodeFile(
         open = null;
       }
     }
+    // A continued line takes the kind of the statement it continues; the
+    // line is executable if any statement on it is.
+    const kinds = lexed.statementStarts.map(isExecutable);
+    const executable =
+      (continued && continuesExecutable) || kinds.includes(true);
+    if (lexed.continuation === 'code')
+      continuesExecutable = kinds.at(-1) ?? (continued && continuesExecutable);
     if (owner) {
       owner.codeLines += 1;
+      if (executable) owner.executableLines += 1;
       owner.decisionPoints += decisions;
     }
     pending ??= { pieces: [], owner };
@@ -320,6 +346,7 @@ function scanVb6CodeFile(
     endLine: procedure.endLine,
     physicalLines: procedure.endLine - procedure.startLine + 1,
     codeLines: procedure.codeLines,
+    executableLines: procedure.executableLines,
     commentOnlyLines: procedure.commentOnlyLines,
     blankLines: procedure.blankLines,
     metadataLines: procedure.metadataLines,

@@ -391,6 +391,7 @@ describe('C01-AC03 inventory compatibility', () => {
     if (!procedure) throw new Error('fixture procedure missing');
     Object.assign(procedure, {
       physicalLines: 6,
+      executableLines: 3,
       commentOnlyLines: 1,
       blankLines: 0,
       metadataLines: 0,

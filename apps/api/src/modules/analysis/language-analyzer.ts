@@ -32,11 +32,13 @@ export type ProcedureMetrics = {
   startLine: number;
   endLine: number;
   // Line breakdown of startLine..endLine (procedureLinesVersion, see
-  // specs/source-analysis.md §4). physicalLines = codeLines (executable) +
+  // specs/source-analysis.md §4.1). physicalLines = codeLines +
   // commentOnlyLines + blankLines + metadataLines + unclassifiedLines.
-  // sqlLines is not a class of its own: a subset of codeLines.
+  // executableLines and sqlLines are not classes of their own: both are
+  // subsets of codeLines and may overlap.
   physicalLines: number;
   codeLines: number;
+  executableLines: number;
   commentOnlyLines: number;
   blankLines: number;
   metadataLines: number;

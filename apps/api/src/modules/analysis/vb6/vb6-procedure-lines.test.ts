@@ -10,15 +10,16 @@ const FIXTURE = new URL(
 );
 
 // Hand-written labels for ORDERS.BAS, one letter per physical line (not
-// produced by the counter): M metadata, B blank, K comment-only, C code,
-// S code that writes SQL text. Digits group the lines by owner: 0 file
+// produced by the counter): M metadata, B blank, K comment-only; code lines
+// are C (declaration, signature or End only), E (executable) or S
+// (executable and writes SQL text). Digits group the lines by owner: 0 file
 // level, 1..3 the procedures in order.
 const LABELS = [
   ['0', 'MCCBK'],
-  ['1', 'CMCBKSSSSCCKCC'],
+  ['1', 'CMCBKSSSSEEKEC'],
   ['0', 'B'],
-  ['2', 'CCSCSC'],
-  ['3', 'C'],
+  ['2', 'CCSESC'],
+  ['3', 'E'],
 ] as const;
 
 function expectedFor(owner: string) {
@@ -29,7 +30,8 @@ function expectedFor(owner: string) {
     [...labels].filter((l) => letters.includes(l)).length;
   return {
     physicalLines: labels.length,
-    codeLines: count('C', 'S'),
+    codeLines: count('C', 'E', 'S'),
+    executableLines: count('E', 'S'),
     commentOnlyLines: count('K'),
     blankLines: count('B'),
     metadataLines: count('M'),
@@ -59,6 +61,7 @@ it('breaks each procedure down to match the hand labels exactly', () => {
       endLine,
       physicalLines: lines.physicalLines,
       codeLines: lines.codeLines,
+      executableLines: lines.executableLines,
       commentOnlyLines: lines.commentOnlyLines,
       blankLines: lines.blankLines,
       metadataLines: lines.metadataLines,
@@ -75,7 +78,7 @@ it('breaks each procedure down to match the hand labels exactly', () => {
 it('keeps file-level lines out of every procedure and sums to the file', () => {
   const file = expectedFor('0');
   expect(result.fileLevelCodeLines).toBe(file.codeLines);
-  const sum = (key: keyof typeof file) =>
+  const sum = (key: Exclude<keyof typeof file, 'executableLines'>) =>
     file[key] + result.procedures.reduce((s, p) => s + p[key], 0);
   expect(result.counters).toEqual({
     physicalLines: sum('physicalLines'),
@@ -88,9 +91,10 @@ it('keeps file-level lines out of every procedure and sums to the file', () => {
   });
 });
 
-it('counts SQL lines as a subset of code lines, never as a class of its own', () => {
+it('counts SQL and executable lines as subsets of code lines, not classes', () => {
   for (const procedure of result.procedures) {
     expect(procedure.sqlLines).toBeLessThanOrEqual(procedure.codeLines);
+    expect(procedure.executableLines).toBeLessThanOrEqual(procedure.codeLines);
     expect(
       procedure.codeLines +
         procedure.commentOnlyLines +
@@ -108,6 +112,19 @@ it.each([
     2,
   ],
   ['a SELECT without FROM is not SQL', ['MsgBox "SELECT one"'], 0],
+  ['a DELETE keyword alone is not SQL', ['MsgBox "DELETE "'], 0],
+  ['SELECT FROM without a table is not SQL', ['MsgBox "SELECT FROM "'], 0],
+  [
+    'a FROM followed by a clause word is not SQL',
+    ['MsgBox "SELECT FROM WHERE"'],
+    0,
+  ],
+  ['a pseudo table is still SQL', ['s = "SELECT 1 FROM DUAL"'], 1],
+  [
+    'a constant holding SQL is SQL though not executable',
+    ['Const Q = "DELETE FROM T1"'],
+    1,
+  ],
   [
     'a runtime table still makes the line SQL',
     ['s = "UPDATE " & t & " SET A = 1"'],
@@ -127,4 +144,47 @@ it.each([
     },
   );
   expect(analysis).toMatchObject({ procedures: [{ sqlLines }] });
+});
+
+it.each([
+  ['declarations only', ['Sub P()', '    Dim x As Long', 'End Sub'], 0],
+  [
+    'Static/Const/ReDim',
+    [
+      'Sub P()',
+      '    Static n As Long',
+      '    Const K = 1',
+      '    ReDim a(9)',
+      'End Sub',
+    ],
+    1,
+  ],
+  [
+    'a declaration and a statement on one line',
+    ['Sub P()', '    Dim t As Long: t = 1', 'End Sub'],
+    1,
+  ],
+  [
+    'a signature and End continued over lines, a label, a directive',
+    [
+      'Function F(a, _',
+      '    b) As Long',
+      'Retry:',
+      '#If DEBUG Then',
+      '    F = a',
+      '#End If',
+      'End Function',
+    ],
+    1,
+  ],
+  [
+    'an executable statement continued over lines',
+    ['Sub P()', '    x = 1 + _', '        2', 'End Sub'],
+    2,
+  ],
+  ['a one-line procedure with a statement', ['Sub P(): Beep: End Sub'], 1],
+])('counts executable lines: %s', (_label, lines, executableLines) => {
+  expect(
+    analyzeVb6CodeFile('M.BAS', lines, { module: 'standard' }),
+  ).toMatchObject({ procedures: [{ executableLines }] });
 });

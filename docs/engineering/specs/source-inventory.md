@@ -11,7 +11,7 @@
 | `procedureLinesVersion` | `vb6-procedure-lines-v1` | Breakdown Physical/Code/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có. |
 | `sqlAccessVersion` | `sql-access-v4` | Cách dựng chuỗi SQL (theo biến, nhánh, property) và trích bảng/CRUD. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
-| `complexityVersion` | `complexity-v0-draft` | Công thức điểm complexity, bản nháp chờ TL chốt. |
+| `complexityVersion` | `complexity-v0` | Công thức điểm complexity, duyệt có giới hạn ngày 23/10/2026: chỉ là phân loại tham khảo (mục 5). Inventory cũ ghi `complexity-v0-draft`, cùng công thức. |
 | `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
 
 Số liệu khác version không được trộn trong cùng report.
@@ -77,7 +77,11 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 | components | số OCX | 10 | 8 |
 | externalApis | số API native gọi tới | 10 | 10 |
 
-Mức: `low` < 40 ≤ `medium` < 55 ≤ `high`. Ngưỡng được chọn để khớp danh sách Low/Medium/High của 15 program pilot (15/15 khớp trên source thật ngày 15/10/2026). Đây là điểm xuất phát, không phải mô hình đã kiểm chứng: TL chốt trọng số/ngưỡng trước khi dùng cho estimate. Đổi công thức phải tăng `complexityVersion`.
+Mức: `low` < 40 ≤ `medium` < 55 ≤ `high`, so trên điểm đã làm tròn. Ngưỡng được chọn để khớp danh sách Low/Medium/High của 15 program pilot (15/15 khớp trên source thật ngày 15/10/2026), nên đó là calibration, không phải độ chính xác. Đối chiếu 10 program holdout có nhãn: 7/10 khớp, High 1/3, mọi ca lệch thấp hơn nhãn một bậc. Đổi công thức phải tăng `complexityVersion`.
+
+**Phạm vi dùng của `complexity-v0` (quyết định 23/10/2026, approved-limited):** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback; các yếu tố này phải được review bổ sung.
+
+`reviewFlags` trên mỗi điểm complexity: `high` (mức High, model kém tin cậy nhất ở mức này) và `near-threshold` (điểm chưa làm tròn cách 40 hoặc 55 không quá 3 điểm). Program có cờ phải được người xem trước khi dùng mức. Danh sách ca lệch đã biết là dữ liệu của corpus, đưa vào báo cáo qua `--complexity-review` ([inventory-report](inventory-report.md)), không ghi trong code. Cải tiến model (v1) là task riêng, cần tập nhãn mới chưa từng xem.
 
 ## 6. Chạy
 

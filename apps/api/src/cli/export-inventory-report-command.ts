@@ -2,10 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { SourceInventorySchema } from '@portal/contracts';
+import { Type } from 'typebox';
 import { Check, Errors } from 'typebox/value';
 import {
   buildInventoryReport,
   ReportSelectionError,
+  type ComplexityKnownMismatch,
 } from '../modules/inventory-report/inventory-report.js';
 import { inventoryReportSheets } from '../modules/inventory-report/inventory-report-workbook.js';
 import { writeXlsx } from '../modules/inventory-report/xlsx-writer.js';
@@ -20,7 +22,7 @@ import {
 // without the process entry point.
 
 const USAGE =
-  'Usage: export-inventory-report --inventory <file.json> --source-root <dir> --programs <ID,ID,...> --out-json <report.json> --out-xlsx <report.xlsx>';
+  'Usage: export-inventory-report --inventory <file.json> --source-root <dir> --programs <ID,ID,...> --out-json <report.json> --out-xlsx <report.xlsx> [--complexity-review <review.json>]';
 
 // The inventory and both outputs must be three different files. Paths are
 // compared without case on purpose: refusing two names that differ only in
@@ -45,15 +47,28 @@ async function distinctFiles(paths: readonly string[]): Promise<boolean> {
 // analyzed source (aliases and junctions resolved) and be distinct files.
 async function refuseOutputs(
   sourceRoot: string,
-  inventory: string,
+  inputs: readonly string[],
   outputs: readonly string[],
 ): Promise<string | null> {
   const refused = await checkOutputs(sourceRoot, outputs);
   if (refused) return refused;
-  return (await distinctFiles([inventory, ...outputs]))
+  return (await distinctFiles([...inputs, ...outputs]))
     ? null
-    : 'The inventory and the two outputs must be different files';
+    : 'Inputs and the two outputs must be different files';
 }
+
+// Reviewed misclassifications, e.g. from a complexity holdout comparison.
+const ComplexityReviewSchema = Type.Object({
+  knownMismatches: Type.Array(
+    Type.Object(
+      {
+        program: Type.String({ minLength: 1 }),
+        note: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+});
 
 export async function main(argv: string[]): Promise<number> {
   const { values } = parseArgs({
@@ -64,6 +79,7 @@ export async function main(argv: string[]): Promise<number> {
       programs: { type: 'string' },
       'out-json': { type: 'string' },
       'out-xlsx': { type: 'string' },
+      'complexity-review': { type: 'string' },
     },
   });
   if (
@@ -81,10 +97,25 @@ export async function main(argv: string[]): Promise<number> {
   const outputs = [resolve(values['out-json']), resolve(values['out-xlsx'])];
   const [outJson, outXlsx] = outputs;
   if (!outJson || !outXlsx) return 2;
-  const refused = await refuseOutputs(sourceRoot, inventoryPath, outputs);
+  const reviewPath = values['complexity-review']
+    ? resolve(values['complexity-review'])
+    : null;
+  const inputs = reviewPath ? [inventoryPath, reviewPath] : [inventoryPath];
+  const refused = await refuseOutputs(sourceRoot, inputs, outputs);
   if (refused) {
     console.error(refused);
     return 2;
+  }
+  let knownMismatches: ComplexityKnownMismatch[] = [];
+  if (reviewPath) {
+    const review: unknown = JSON.parse(await readFile(reviewPath, 'utf8'));
+    if (!Check(ComplexityReviewSchema, review)) {
+      console.error(
+        'Complexity review must be {"knownMismatches":[{"program":"ID","note":"..."}]}',
+      );
+      return 2;
+    }
+    knownMismatches = review.knownMismatches;
   }
   const parsed: unknown = JSON.parse(await readFile(inventoryPath, 'utf8'));
   if (!Check(SourceInventorySchema, parsed)) {
@@ -96,7 +127,11 @@ export async function main(argv: string[]): Promise<number> {
   }
   let report;
   try {
-    report = buildInventoryReport(parsed, values.programs.split(','));
+    report = buildInventoryReport(
+      parsed,
+      values.programs.split(','),
+      knownMismatches,
+    );
   } catch (error) {
     if (error instanceof ReportSelectionError) {
       console.error(error.message);
@@ -106,7 +141,7 @@ export async function main(argv: string[]): Promise<number> {
   }
   const workbook = writeXlsx(inventoryReportSheets(report));
   // Checked again right before writing: links may change meanwhile.
-  const changed = await refuseOutputs(sourceRoot, inventoryPath, outputs);
+  const changed = await refuseOutputs(sourceRoot, inputs, outputs);
   if (changed) {
     console.error(changed);
     return 2;

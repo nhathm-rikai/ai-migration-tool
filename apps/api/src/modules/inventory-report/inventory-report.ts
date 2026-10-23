@@ -61,6 +61,8 @@ export type InventoryReport = {
     requested: string[];
     programs: { id: string; projectPath: string }[];
   };
+  // As given to the report, including programs outside the selection.
+  complexityKnownMismatches: ComplexityKnownMismatch[];
   programs: {
     id: string;
     projectPath: string;
@@ -78,6 +80,9 @@ export type InventoryReport = {
     complexity: NonNullable<InventoryProgram['analysis']>['complexity'] | null;
     normalizedComplexity:
       NonNullable<InventoryProgram['analysis']>['complexity'] | null;
+    // Model flags (high, near-threshold) plus `known-mismatch` from the
+    // complexity review given to the report; empty when none applies.
+    complexityReviewFlags: string[];
   }[];
   members: {
     programId: string;
@@ -274,11 +279,18 @@ function addBreakdown(
 const fileOf = (procedureId: string) =>
   procedureId.slice(0, procedureId.lastIndexOf('#'));
 
+// Programs a reviewed comparison found misclassified (program ID + note).
+// Kept outside the inventory and the code: it is data about one corpus.
+export type ComplexityKnownMismatch = { program: string; note: string };
+
 export function buildInventoryReport(
   inventory: Inventory,
   requested: readonly string[],
+  knownMismatches: readonly ComplexityKnownMismatch[] = [],
 ): InventoryReport {
   const selected = selectPrograms(inventory, requested);
+  const mismatchOf = (id: string) =>
+    knownMismatches.find((m) => m.program.toUpperCase() === id.toUpperCase());
   const filesByPath = new Map(
     inventory.files.map((file) => [file.manifest.relativePath, file]),
   );
@@ -336,6 +348,10 @@ export function buildInventoryReport(
       metrics: program.analysis?.metrics ?? null,
       complexity: program.analysis?.complexity ?? null,
       normalizedComplexity: program.analysis?.normalizedComplexity ?? null,
+      complexityReviewFlags: [
+        ...(program.analysis?.complexity.reviewFlags ?? []),
+        ...(mismatchOf(id) ? ['known-mismatch'] : []),
+      ],
     };
   });
 
@@ -494,13 +510,22 @@ export function buildInventoryReport(
         ? `Normalized CRUD uses ${tableNames.defaultSchema ?? 'no schema'} (${tableNames.status})`
         : 'Inventory has no table name mapping',
     );
-  warn(
-    'COMPLEXITY_DRAFT',
-    null,
-    null,
-    null,
-    `Complexity ${inventory.complexityVersion} is a draft model`,
-  );
+  if (inventory.complexityVersion.endsWith('-draft'))
+    warn(
+      'COMPLEXITY_DRAFT',
+      null,
+      null,
+      null,
+      `Complexity ${inventory.complexityVersion} is a draft model`,
+    );
+  else
+    warn(
+      'COMPLEXITY_REFERENCE_ONLY',
+      null,
+      null,
+      null,
+      `Complexity ${inventory.complexityVersion} is a reference classification: do not derive effort or quotes from it; review file processing, DB writes and transactions separately`,
+    );
   if (!inventory.procedureLinesVersion)
     warn(
       'PROCEDURE_LINES_MISSING',
@@ -518,6 +543,24 @@ export function buildInventoryReport(
       `${inventory.skipped.length} corpus files were not read (symlink/too-large)`,
     );
   for (const { id, program } of selected) {
+    const complexity = program.analysis?.complexity;
+    for (const flag of complexity?.reviewFlags ?? [])
+      warn(
+        flag === 'high' ? 'COMPLEXITY_HIGH' : 'COMPLEXITY_NEAR_THRESHOLD',
+        id,
+        program.projectPath,
+        null,
+        `${complexity?.level ?? ''} (${complexity?.score ?? ''}): review before use`,
+      );
+    const mismatch = mismatchOf(id);
+    if (mismatch)
+      warn(
+        'COMPLEXITY_KNOWN_MISMATCH',
+        id,
+        program.projectPath,
+        null,
+        mismatch.note,
+      );
     if (program.status !== 'parsed')
       warn(
         'PROGRAM_UNSUPPORTED',
@@ -602,6 +645,7 @@ export function buildInventoryReport(
         projectPath: program.projectPath,
       })),
     },
+    complexityKnownMismatches: [...knownMismatches],
     programs,
     members,
     files,

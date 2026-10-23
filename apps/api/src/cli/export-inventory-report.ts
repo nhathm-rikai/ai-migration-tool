@@ -6,7 +6,11 @@
 //
 //   node apps/api/dist/cli/export-inventory-report.js --inventory <file.json>
 //     --source-root <dir> --programs <ID,ID,...> --out-json <report.json>
-//     --out-xlsx <report.xlsx>
+//     --out-xlsx <report.xlsx> [--complexity-review <review.json>]
+//
+// --complexity-review: {"knownMismatches":[{"program":"ID","note":"..."}]},
+// reviewed misclassifications flagged in the report (corpus data, kept
+// outside the repo).
 import { main } from './export-inventory-report-command.js';
 
 process.exitCode = await main(process.argv.slice(2));

@@ -231,6 +231,13 @@ const ComplexitySchema = Type.Object(
       Type.Literal('medium'),
       Type.Literal('high'),
     ]),
+    // Levels a person must look at before use (complexity-v0); optional for
+    // inventories written before the flags.
+    reviewFlags: Type.Optional(
+      Type.Array(
+        Type.Union([Type.Literal('high'), Type.Literal('near-threshold')]),
+      ),
+    ),
     parts: Type.Object(
       {
         size: Type.Number(),

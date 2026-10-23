@@ -64,6 +64,16 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
       'note',
       'Per-program totals count a shared file in every program that lists it; unique totals count each file once. Do not add them together.',
     ],
+    [
+      'complexityUse',
+      'Reference classification only: do not derive effort or quotes from the score. Review file processing, DB writes and transactions separately; see complexityReviewFlags in Programs.',
+    ],
+    [
+      'complexityKnownMismatches',
+      list(
+        report.complexityKnownMismatches.map((m) => `${m.program}: ${m.note}`),
+      ),
+    ],
     ['warnings', report.warnings.length],
     ...[...warningCounts].map(([code, count]): [string, CellValue] => [
       `warnings.${code}`,
@@ -120,6 +130,7 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ['externalApis', 11, (p) => p.metrics?.externalApis ?? null],
         ['complexityScore', 12, (p) => p.complexity?.score ?? null],
         ['complexityLevel', 12, (p) => p.complexity?.level ?? null],
+        ['complexityReviewFlags', 26, (p) => list(p.complexityReviewFlags)],
         [
           'normalizedComplexityScore',
           14,

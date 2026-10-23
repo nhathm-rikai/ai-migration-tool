@@ -38,6 +38,9 @@ const DECLARE =
 const FORM_VERSION = /^version\s+\d/i;
 const CLASS_VERSION = /^version\s+\d+\.\d+\s+class$/i;
 const CLASS_BEGIN = /^begin$/i;
+const CLASS_END = /^end$/i;
+// Class header properties are numeric, e.g. `MultiUse = -1  'True`.
+const CLASS_PROPERTY = /^[A-Za-z][A-Za-z0-9_]*\s*=\s*-?\d+\s*(?:'.*)?$/;
 const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
 const DESIGNER_END = /^(?:end|endproperty)$/i;
 const FORM_NAME_ATTRIBUTE = /^attribute\s+vb_name\s*=/i;
@@ -57,8 +60,9 @@ function emptyCounters(physicalLines: number): LineCounters {
 }
 
 // The header of an exported class is exactly `VERSION x.y CLASS`, one bare
-// BEGIN ... END block of class properties, then `Attribute VB_Name`. Any
-// other line outside the block (e.g. code before VB_Name) makes it unknown.
+// BEGIN ... END block of numeric class properties, then `Attribute VB_Name`.
+// Any other line (e.g. code inside the block or before VB_Name) makes it
+// unknown.
 function findClassHeaderEnd(lines: string[]): number | null {
   const expected = [CLASS_VERSION, CLASS_BEGIN];
   let inBlock = false;
@@ -70,8 +74,8 @@ function findClassHeaderEnd(lines: string[]): number | null {
       if (!next.test(text)) return null;
       inBlock = next === CLASS_BEGIN;
     } else if (inBlock) {
-      if (DESIGNER_BEGIN.test(text) || CLASS_BEGIN.test(text)) return null;
-      if (DESIGNER_END.test(text)) inBlock = false;
+      if (CLASS_END.test(text)) inBlock = false;
+      else if (!CLASS_PROPERTY.test(text) && !text.startsWith("'")) return null;
     } else return FORM_NAME_ATTRIBUTE.test(text) ? index : null;
   }
   return null;

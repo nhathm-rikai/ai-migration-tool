@@ -230,6 +230,39 @@ describe('structure errors are unsupported, never zero LoC', () => {
       ],
       'nested block',
     ],
+    [
+      [
+        'VERSION 1.0 CLASS',
+        'BEGIN',
+        '  MultiUse = -1',
+        'ENDPROPERTY',
+        'Attribute VB_Name = "c"',
+      ],
+      'ENDPROPERTY terminator',
+    ],
+    [
+      [
+        'VERSION 1.0 CLASS',
+        'BEGIN',
+        '  MultiUse = -1',
+        'Public Sub Hidden()',
+        '    s = "DELETE FROM T1"',
+        'End Sub',
+        'END',
+        'Attribute VB_Name = "c"',
+      ],
+      'procedure inside BEGIN',
+    ],
+    [
+      [
+        'VERSION 1.0 CLASS',
+        'BEGIN',
+        '  s = "DELETE FROM T1"',
+        'END',
+        'Attribute VB_Name = "c"',
+      ],
+      'statement inside BEGIN',
+    ],
   ])('class %j (%s)', (lines) => {
     expect(analyzeVb6CodeFile('C.CLS', lines, { module: 'class' })).toEqual({
       status: 'unsupported',

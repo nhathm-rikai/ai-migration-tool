@@ -20,12 +20,18 @@ export type LocalSessionClient = CredentialSource & {
   retry: () => void;
 };
 
+// Callers rethrow the signal's own reason via signal.throwIfAborted().
+function abortReason(signal: AbortSignal): DOMException {
+  return signal.reason instanceof DOMException
+    ? signal.reason
+    : new DOMException('The operation was aborted.', 'AbortError');
+}
+
+// `promise` gets its handlers before the caller can abort, so a rejection
+// after the abort is never unhandled.
 function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
   return new Promise<T>((resolve, reject) => {
-    // Callers rethrow the signal's own reason via signal.throwIfAborted().
-    const abort = () =>
-      reject(new DOMException('The operation was aborted.', 'AbortError'));
+    const abort = () => reject(abortReason(signal));
     signal.addEventListener('abort', abort, { once: true });
     promise.then(resolve, reject).finally(() => {
       signal.removeEventListener('abort', abort);
@@ -85,6 +91,8 @@ export function createLocalSession(
     current: () => token,
     credential(signal) {
       if (token !== undefined) return Promise.resolve(token);
+      // An aborted caller must not start a bootstrap nobody waits for.
+      if (signal.aborted) return Promise.reject(abortReason(signal));
       return untilAborted(bootstrap(), signal);
     },
     invalidate(rejected) {

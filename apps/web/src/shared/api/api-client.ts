@@ -132,7 +132,14 @@ export function createApiClient(
       if (!isCredentialRejected(error)) throw error;
       credentials.invalidate(token);
       if (method !== 'GET') throw error;
-      return send(await authorize(signal, method));
+    }
+    // One GET retry only; a credential it also has rejected is dropped too.
+    const retryToken = await authorize(signal, method);
+    try {
+      return await send(retryToken);
+    } catch (error) {
+      if (isCredentialRejected(error)) credentials.invalidate(retryToken);
+      throw error;
     }
   };
 }

@@ -190,4 +190,52 @@ describe('local credential transport (F00)', () => {
     );
     expect(sent).toEqual([`Bearer ${token}`, `Bearer ${freshToken}`]);
   });
+
+  // Review 03a6945: the retried GET's credential was kept as valid.
+  it('drops a credential the GET retry also had rejected, so the next POST bootstraps again', async () => {
+    const thirdToken = 'D'.repeat(43);
+    const tokens = [token, freshToken, thirdToken];
+    const fetcher = backend(
+      () => Promise.resolve(json({ token: tokens.shift() ?? thirdToken })),
+      (_url, init) =>
+        Promise.resolve(
+          new Headers(init?.headers).get('Authorization') ===
+            `Bearer ${thirdToken}`
+            ? json(project, 201)
+            : rejected('CREDENTIAL_INVALID', 401),
+        ),
+    );
+    const session = createLocalSession(fetcher);
+    const api = createProjectsApi(fetcher, session);
+    await expect(api.get(project.id, signal())).rejects.toMatchObject({
+      code: 'CREDENTIAL_INVALID',
+    });
+    expect(session.getStatus()).toBe('expired');
+    expect(session.current()).toBeUndefined();
+    await expect(api.create(input, signal())).resolves.toEqual(project);
+    expect(sessionCalls(fetcher)).toHaveLength(3);
+    expect(apiCalls(fetcher, 'POST')).toHaveLength(1);
+  });
+
+  // Review 03a6945: an aborted caller started a bootstrap that rejected unhandled.
+  // Vitest fails the run on an unhandled rejection, so reaching the end of
+  // this test with the fake backend offline proves none was raised.
+  it('does not bootstrap for a caller that already aborted', async () => {
+    const fetcher = backend(
+      () => Promise.reject(new TypeError('offline')),
+      () => Promise.resolve(json(project)),
+    );
+    const session = createLocalSession(fetcher);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(session.credential(controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    await expect(
+      createProjectsApi(fetcher, session).get(project.id, controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(session.getStatus()).toBe('idle');
+  });
 });

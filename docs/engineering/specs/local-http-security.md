@@ -26,7 +26,7 @@ Kiểm tra chạy ở hook `onRequest`, trước parse body và handler, nên re
 
 **Thiếu Origin không được coi là tin cậy**: không lấy được credential khi thiếu Origin, và thiếu Origin thì chỉ credential quyết định. Browser luôn gửi Origin cho POST, nên trang lạ không thể bootstrap.
 
-Origin/Host tin cậy: port API (`PORTAL_PORT`) và port UI. `PORTAL_WEB_PORT` (cùng biến Vite dùng) chỉ định một port UI; khi không đặt, tin cậy port mặc định 5173 (dev) và 4173 (preview). Vite proxy giữ nguyên Host/Origin của browser, nên Host của UI port được chấp nhận. Không có wildcard; origin LAN/khác port bị từ chối.
+Origin/Host tin cậy: port API (`PORTAL_PORT`) và port UI. `PORTAL_WEB_PORT` (cùng biến Vite dùng) chỉ định một port UI; khi không đặt, tin cậy port mặc định 5173 (dev) và 4173 (preview). Vite proxy giữ nguyên Host/Origin của browser, nên Host của UI port được chấp nhận. Port 80 được so khớp theo dạng browser gửi: Origin `http://127.0.0.1` (không `:80`), Host `127.0.0.1` hoặc `127.0.0.1:80`; Origin có `:80` bị từ chối vì browser không gửi dạng đó. Không có wildcard; origin LAN/khác port bị từ chối.
 
 ## Không lộ credential
 
@@ -38,7 +38,8 @@ Origin/Host tin cậy: port API (`PORTAL_PORT`) và port UI. `PORTAL_WEB_PORT` (
 
 - `createLocalSession` giữ trạng thái `idle → pending → ready | failed`, `ready → expired` khi API trả 401 `CREDENTIAL_INVALID`. Nhiều request đồng thời dùng chung một bootstrap; caller abort không hủy bootstrap của caller khác; re-render/StrictMode/đổi locale không bootstrap lại.
 - Không có credential thì không gửi request: lỗi `ApiError` kind `credential`, `outcomeUnknown = false` (mutation chưa gửi).
-- 401 `CREDENTIAL_INVALID`: bỏ credential; GET retry đúng một lần với credential mới; POST **không** tự retry, người dùng gửi lại (request bị chặn trước side effect nên kết quả đã biết).
+- 401 `CREDENTIAL_INVALID`: bỏ credential; GET retry đúng một lần với credential mới, nếu lần retry cũng 401 thì bỏ cả credential đó rồi dừng; POST **không** tự retry, người dùng gửi lại (request bị chặn trước side effect nên kết quả đã biết).
+- Caller đã abort không khởi tạo bootstrap; bootstrap đang chạy luôn có handler nên lỗi sau khi caller abort không thành unhandled rejection.
 - `SessionStatus` ở header hiển thị pending/failed/expired; nút "Thử kết nối lại" gọi bootstrap lại, không phát lại mutation đã fail.
 
 ## Chưa đến mốc

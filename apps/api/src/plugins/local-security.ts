@@ -24,21 +24,29 @@ export function createLocalCredential(): string {
   return randomBytes(32).toString('base64url');
 }
 
+const LOOPBACK_NAMES = ['127.0.0.1', 'localhost'] as const;
+const HTTP_DEFAULT_PORT = 80;
+
 // Only loopback names on the API port and the configured UI ports. The Vite
 // proxy forwards the browser's Host, so the UI ports are allowed hosts too.
+// Browsers omit the default port 80 from Host and Origin (URL serialization),
+// so port 80 is trusted in that form; an explicit `:80` Host stays allowed for
+// non-browser clients, but an Origin with `:80` is never sent by a browser.
 export function createLocalSecurityPolicy(
   config: Pick<AppConfig, 'port' | 'webPorts'>,
   credential: string,
 ): LocalSecurityPolicy {
-  const hosts = [config.port, ...config.webPorts].flatMap((port) => [
-    `127.0.0.1:${port}`,
-    `localhost:${port}`,
-  ]);
-  return {
-    allowedHosts: new Set(hosts),
-    trustedOrigins: new Set(hosts.map((host) => `http://${host}`)),
-    credential,
-  };
+  const allowedHosts = new Set<string>();
+  const trustedOrigins = new Set<string>();
+  for (const port of [config.port, ...config.webPorts]) {
+    for (const name of LOOPBACK_NAMES) {
+      const authority = port === HTTP_DEFAULT_PORT ? name : `${name}:${port}`;
+      allowedHosts.add(authority);
+      allowedHosts.add(`${name}:${port}`);
+      trustedOrigins.add(`http://${authority}`);
+    }
+  }
+  return { allowedHosts, trustedOrigins, credential };
 }
 
 function hasCredential(request: FastifyRequest, expected: string): boolean {

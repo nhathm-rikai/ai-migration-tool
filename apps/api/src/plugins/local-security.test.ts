@@ -276,6 +276,46 @@ describe('local HTTP security (B01)', () => {
     }
   });
 
+  // Review 03a6945: browsers omit the default port 80 from Host and Origin.
+  it('accepts the browser form of a UI on port 80, and only that form', async () => {
+    const onPort80 = createTestApp({ PORTAL_WEB_PORT: '80' });
+    try {
+      const bootstrap = (headers: Record<string, string>) =>
+        onPort80.app.inject({
+          method: 'POST',
+          url: LOCAL_SESSION_PATH,
+          headers,
+        });
+      for (const host of ['127.0.0.1', 'localhost']) {
+        const session = await bootstrap({ host, origin: `http://${host}` });
+        expect(session.statusCode).toBe(200);
+      }
+      const explicit = await bootstrap({
+        host: '127.0.0.1:80',
+        origin: 'http://127.0.0.1',
+      });
+      expect(explicit.statusCode).toBe(200);
+      for (const headers of [
+        { host: '127.0.0.1', origin: 'http://127.0.0.1:80' },
+        { host: '127.0.0.1', origin: 'https://127.0.0.1' },
+        { host: '127.0.0.1', origin: 'http://127.0.0.1:5173' },
+      ]) {
+        expect((await bootstrap(headers)).statusCode).toBe(403);
+      }
+    } finally {
+      await onPort80.cleanup();
+    }
+  });
+
+  it('does not accept a port-less Host when no trusted port is 80', async () => {
+    const response = await context.app.inject({
+      method: 'POST',
+      url: LOCAL_SESSION_PATH,
+      headers: { host: '127.0.0.1', origin: 'http://127.0.0.1' },
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
   it('issues a new credential per process, so a restart expires the old one', async () => {
     const created = await context.inject({
       method: 'POST',

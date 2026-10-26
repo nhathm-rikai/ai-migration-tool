@@ -68,7 +68,18 @@ Endpoint đang có:
 - `GET /api/v1/projects/:projectId`: 200 hoặc 404; ID sai định dạng trả 400.
 - `GET /api/v1/projects?limit=20&cursor=<nextCursor>`: `{ items, nextCursor }`; limit 1–100, mặc định 20. Dùng nguyên cursor từ response; thứ tự theo UUID tăng dần, **không phải ngày tạo**. Đây không phải snapshot pagination khi có request tạo project đồng thời.
 
-Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 500 lỗi nội bộ. Chưa có update/delete/job endpoint; không có conflict nghiệp vụ cần 409 trong slice này.
+Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 500 lỗi nội bộ. Chưa có update/delete project.
+
+### Analyze run (PF03: B04 + B05, fixture)
+
+Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-contract.md) §3–5. Mọi project hiện là demo trên source `sample-vb6` (revision 1), nên `expectedSourceRevision` phải là 1 cho tới khi có source registration (B03).
+
+- `POST /api/v1/projects/:projectId/runs` + header `Idempotency-Key`: lưu run `queued` rồi trả **202** + `Location` ngay; không chờ chạy. Cùng key + cùng body (không phụ thuộc thứ tự field) trả lại đúng run đó; cùng key khác body 409 `IDEMPOTENCY_KEY_CONFLICT`; project còn run active 409 `RUN_ACTIVE_CONFLICT`; retry (`retryOfRunId`) luôn là run mới; `reuse-snapshot` cần run cũ có snapshot (409 `SNAPSHOT_UNAVAILABLE`); runtime cần recovery 503 `RUNTIME_RECOVERY_REQUIRED`.
+- `GET .../runs?limit&cursor` (mới nhất trước, cursor opaque), `GET .../runs/current`, `GET .../runs/:runId`: chỉ đọc, run của project khác trả 404 `RUN_NOT_FOUND`.
+- `POST .../runs/:runId/cancel` `{ expectedStateVersion }`: queued → `cancelled` (200), running → `cancelling` (202) rồi dispatcher ghi `cancelled`; lặp lại idempotent; version lệch hoặc terminal 409 `RUN_STATE_CONFLICT`.
+- `GET /api/v1/runtime/status`: `ready` hoặc `recovery_required`.
+
+Ràng buộc nằm ở DB ([0002-runs.sql](migrations/0002-runs.sql)): unique run active mỗi project, unique một run đang chạy toàn runtime, unique `(project, idempotency key)`; mọi chuyển trạng thái là compare-and-set theo status + `stateVersion` ([run.repository.ts](src/modules/jobs/run.repository.ts), quyết định đích ở [job-state.ts](src/modules/jobs/job-state.ts)). [job-dispatcher.ts](src/modules/jobs/job-dispatcher.ts) claim nguyên tử và chạy một execution ngoài request/transaction: timeout → `failed/TIMEOUT`; executor không dừng trong hạn → `failed/STOP_UNCONFIRMED` và runtime `recovery_required` (chặn Start tới khi restart); khởi động đánh dấu run running/cancelling cũ `interrupted`, không tự chạy lại; shutdown dừng dispatch và ghi `interrupted`. Executor hiện là [fixture-run.executor.ts](src/adapters/fake/fixture-run.executor.ts): đi qua các stage, không đọc source, không process/network, không tạo artifact. Limits trong config run là số giữ chỗ (JOB-07).
 
 ## Đọc source theo một request
 

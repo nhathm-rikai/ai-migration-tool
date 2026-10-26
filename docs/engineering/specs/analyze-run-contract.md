@@ -1,6 +1,6 @@
 # Hợp đồng Analyze: source, run, artifact (C01)
 
-**Gate:** FEATURE:jobs/storage/analysis, dữ liệu fixture. Đây là hợp đồng đã chốt cho checkpoint **analyze-only**; endpoint/route/bảng DB chưa tồn tại và được implement ở B03/B04/B07/B09. Schema máy đọc được nằm trong `packages/contracts/src`:
+**Gate:** FEATURE:jobs/storage/analysis, dữ liệu fixture. Đây là hợp đồng đã chốt cho checkpoint **analyze-only**. Start/list/current/detail/cancel và runtime status đã implement ở PF03 (B04/B05, executor fixture, xem [README backend](../../../apps/api/README.md#analyze-run-pf03-b04--b05-fixture)); source registration (B03), artifact (B07) và SSE (B09) chưa có. Schema máy đọc được nằm trong `packages/contracts/src`:
 
 | File | Nội dung |
 |---|---|

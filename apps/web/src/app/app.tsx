@@ -6,14 +6,23 @@ import { useLocale } from '../shared/i18n/locale-context';
 import { isLocale, LOCALES } from '../shared/i18n/locale';
 import { projectsApi, type ProjectsApi } from '../shared/api/projects-api';
 import {
+  runsApi as defaultRunsApi,
+  type RunsApi,
+} from '../shared/api/runs-api';
+import {
   localSession,
   type LocalSessionClient,
 } from '../shared/api/local-session';
 import { SessionStatus } from './session-status';
 
-type AppProps = { api?: ProjectsApi; session?: LocalSessionClient };
+type AppProps = {
+  api?: ProjectsApi;
+  runsApi?: RunsApi;
+  session?: LocalSessionClient;
+};
 
-// `api` must use `session` as its credential source; tests inject both.
+// `api` and `runsApi` must use `session` as their credential source; tests
+// inject them together.
 export function App(props: AppProps) {
   return (
     <LocaleProvider>
@@ -22,7 +31,11 @@ export function App(props: AppProps) {
   );
 }
 
-function AppShell({ api = projectsApi, session = localSession }: AppProps) {
+function AppShell({
+  api = projectsApi,
+  runsApi = defaultRunsApi,
+  session = localSession,
+}: AppProps) {
   const { locale, setLocale, messages } = useLocale();
   useEffect(() => {
     const original = document.title;
@@ -69,7 +82,7 @@ function AppShell({ api = projectsApi, session = localSession }: AppProps) {
         </div>
       </header>
       <SessionStatus session={session} />
-      <ProjectsPage api={api} />
+      <ProjectsPage api={api} runsApi={runsApi} />
     </>
   );
 }

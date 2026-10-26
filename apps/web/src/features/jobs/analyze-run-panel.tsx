@@ -1,0 +1,292 @@
+import { useState } from 'react';
+import type { Run } from '@portal/contracts';
+import type { RunsApi } from '../../shared/api/runs-api';
+import { ApiError } from '../../shared/api/api-error';
+import { useLocale } from '../../shared/i18n/locale-context';
+import { runRequestErrorMessage } from './run-messages';
+import {
+  isActiveRun,
+  useAnalyzeRuns,
+  visibleHistory,
+  type RunAction,
+} from './use-analyze-runs';
+
+// Start/cancel/history of the selected project's analyze runs. Opening the
+// panel, reloading or switching locale only reads; nothing starts by itself.
+export function AnalyzeRunPanel({
+  api,
+  projectId,
+}: {
+  api: RunsApi;
+  projectId: string;
+}) {
+  const { messages, formatDateTime } = useLocale();
+  const copy = messages.runs;
+  const runs = useAnalyzeRuns(api, projectId);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { state, action } = runs;
+  const pending = action.status === 'pending';
+
+  if (state.status === 'loading')
+    return (
+      <section className="panel run-panel" aria-labelledby="runs-title">
+        <h2 id="runs-title">{copy.title}</h2>
+        <p role="status">{copy.loading}</p>
+      </section>
+    );
+  if (state.status === 'error')
+    return (
+      <section className="panel run-panel" aria-labelledby="runs-title">
+        <h2 id="runs-title">{copy.title}</h2>
+        <p role="alert" className="error">
+          {runRequestErrorMessage(state.error, messages)}
+        </p>
+        <button className="button" onClick={runs.refresh}>
+          {copy.reload}
+        </button>
+      </section>
+    );
+
+  const history = visibleHistory(state.current, state.history);
+  const shown =
+    history.find((run) => run.id === selectedId) ?? state.current ?? null;
+  const active = state.current && isActiveRun(state.current.status);
+
+  return (
+    <section className="panel run-panel" aria-labelledby="runs-title">
+      <div className="section-heading">
+        <h2 id="runs-title">
+          {copy.title}{' '}
+          <span className="badge">{messages.projects.demoBadge}</span>
+        </h2>
+        <button
+          className="button small"
+          onClick={runs.refresh}
+          disabled={pending}
+        >
+          {copy.reload}
+        </button>
+      </div>
+      <p className="muted">{copy.demoNotice}</p>
+      {runs.connectionLost && (
+        <p role="status" className="notice">
+          {copy.connectionLost}
+        </p>
+      )}
+      <ActionMessage
+        action={action}
+        uncertainStart={runs.uncertainStart}
+        onResend={() => void runs.start()}
+      />
+      <div className="form-actions">
+        {!active && (
+          <button
+            className="button primary"
+            disabled={pending}
+            onClick={() => void runs.start()}
+          >
+            {pending && action.kind === 'start' ? copy.starting : copy.start}
+          </button>
+        )}
+        {state.current && active && state.current.status !== 'cancelling' && (
+          <CancelButton
+            run={state.current}
+            pending={pending}
+            sending={pending && action.kind === 'cancel'}
+            onCancel={(run) => void runs.cancel(run)}
+          />
+        )}
+      </div>
+      {shown ? (
+        <RunDetail
+          run={shown}
+          canRetry={!active && !pending}
+          onRetry={(runId) => {
+            setSelectedId(null);
+            void runs.retry(runId);
+          }}
+          formatDateTime={formatDateTime}
+        />
+      ) : (
+        <p className="empty-state">{copy.noRun}</p>
+      )}
+      {history.length > 0 && (
+        <>
+          <h3>{copy.history}</h3>
+          <ul className="run-history">
+            {history.map((run) => (
+              <li key={run.id}>
+                <button
+                  className={
+                    'run-history-item' +
+                    (run.id === shown?.id ? ' selected' : '')
+                  }
+                  aria-current={run.id === shown?.id ? 'true' : undefined}
+                  onClick={() => setSelectedId(run.id)}
+                >
+                  <span className={`run-status status-${run.status}`}>
+                    {copy.status[run.status]}
+                  </span>
+                  <span>{formatDateTime(run.createdAt)}</span>
+                  <span className="mono">{run.id.slice(0, 8)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {state.nextCursor && (
+            <button
+              className="button small"
+              disabled={pending}
+              onClick={() => void runs.loadMore()}
+            >
+              {copy.loadMore}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function CancelButton({
+  run,
+  pending,
+  sending,
+  onCancel,
+}: {
+  run: Run;
+  pending: boolean;
+  sending: boolean;
+  onCancel: (run: Run) => void;
+}) {
+  const { messages } = useLocale();
+  return (
+    <button className="button" disabled={pending} onClick={() => onCancel(run)}>
+      {sending ? messages.runs.cancelSending : messages.runs.cancel}
+    </button>
+  );
+}
+
+function ActionMessage({
+  action,
+  uncertainStart,
+  onResend,
+}: {
+  action: RunAction;
+  uncertainStart: boolean;
+  onResend: () => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.runs;
+  if (action.status !== 'error') return null;
+  if (action.kind === 'start' && uncertainStart)
+    return (
+      <div className="notice" role="alert">
+        <p>{copy.startUncertain}</p>
+        <button className="button small" onClick={onResend}>
+          {copy.resend}
+        </button>
+      </div>
+    );
+  if (
+    action.kind === 'cancel' &&
+    action.error instanceof ApiError &&
+    action.error.outcomeUnknown
+  )
+    return (
+      <p role="alert" className="error">
+        {copy.cancelUncertain}
+      </p>
+    );
+  return (
+    <p role="alert" className="error">
+      {runRequestErrorMessage(action.error, messages)}
+    </p>
+  );
+}
+
+function RunDetail({
+  run,
+  canRetry,
+  onRetry,
+  formatDateTime,
+}: {
+  run: Run;
+  canRetry: boolean;
+  onRetry: (runId: string) => void;
+  formatDateTime: (date: string) => string;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.runs;
+  const retryable =
+    run.status === 'failed' ||
+    run.status === 'cancelled' ||
+    run.status === 'interrupted';
+  return (
+    <div className="run-detail" aria-label={copy.current}>
+      <dl className="project-metadata">
+        <div>
+          <dt>{copy.fields.status}</dt>
+          <dd>
+            <span className={`run-status status-${run.status}`} role="status">
+              {copy.status[run.status]}
+            </span>
+          </dd>
+        </div>
+        {run.stage && (
+          <div>
+            <dt>{copy.fields.stage}</dt>
+            <dd>{copy.stage[run.stage]}</dd>
+          </div>
+        )}
+        <div>
+          <dt>{copy.fields.id}</dt>
+          <dd className="mono">{run.id}</dd>
+        </div>
+        <div>
+          <dt>{copy.fields.createdAt}</dt>
+          <dd>{formatDateTime(run.createdAt)}</dd>
+        </div>
+        {run.startedAt && (
+          <div>
+            <dt>{copy.fields.startedAt}</dt>
+            <dd>{formatDateTime(run.startedAt)}</dd>
+          </div>
+        )}
+        {run.finishedAt && (
+          <div>
+            <dt>{copy.fields.finishedAt}</dt>
+            <dd>{formatDateTime(run.finishedAt)}</dd>
+          </div>
+        )}
+        {run.errorCode && (
+          <div>
+            <dt>{copy.fields.error}</dt>
+            <dd>
+              {copy.runError[run.errorCode]}{' '}
+              <span className="mono">{run.errorCode}</span>
+            </dd>
+          </div>
+        )}
+        {run.retryOfRunId && (
+          <div>
+            <dt>{copy.fields.retryOf}</dt>
+            <dd className="mono">{run.retryOfRunId}</dd>
+          </div>
+        )}
+      </dl>
+      {run.status === 'interrupted' && (
+        <p className="muted">{copy.interruptedHelp}</p>
+      )}
+      {retryable && (
+        <button
+          className="button"
+          disabled={!canRetry}
+          onClick={() => onRetry(run.id)}
+        >
+          {copy.retry}
+        </button>
+      )}
+    </div>
+  );
+}

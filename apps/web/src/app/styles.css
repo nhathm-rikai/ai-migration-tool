@@ -770,3 +770,53 @@ dd {
     scroll-behavior: auto !important;
   }
 }
+
+/* Analyze runs (demo) */
+.run-panel {
+  margin-top: 16px;
+}
+.run-panel h3 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+}
+.run-history {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.run-history-item {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.run-history-item.selected {
+  border-color: var(--brand);
+}
+.run-status {
+  font-weight: 600;
+}
+.status-failed,
+.status-interrupted {
+  color: var(--high);
+}
+.status-succeeded {
+  color: var(--low);
+}
+@media (max-width: 560px) {
+  .run-history-item {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Project } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
+import type { RunsApi } from '../../shared/api/runs-api';
+import { AnalyzeRunPanel } from '../jobs/analyze-run-panel';
 import { projectErrorMessage } from './project-messages';
 import { useLocale } from '../../shared/i18n/locale-context';
 
@@ -11,10 +13,13 @@ type DetailState =
 export function ProjectDetail({
   id,
   api,
+  runsApi,
   onClose,
 }: {
   id: string;
   api: ProjectsApi;
+  // Without it the analyze runs panel is not shown (Projects-only tests).
+  runsApi?: RunsApi | undefined;
   onClose: () => void;
 }) {
   const { messages, formatDateTime } = useLocale();
@@ -88,6 +93,9 @@ export function ProjectDetail({
             <strong>{copy.ready}</strong>
             <p>{copy.unavailable}</p>
           </div>
+          {runsApi && (
+            <AnalyzeRunPanel api={runsApi} projectId={state.project.id} />
+          )}
         </>
       )}
     </section>

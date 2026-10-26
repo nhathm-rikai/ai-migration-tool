@@ -116,14 +116,21 @@ export function createApiClient(
     path: string,
     schema: T,
     signal: AbortSignal,
-    options: { method?: ApiMethod; body?: unknown } = {},
+    options: {
+      method?: ApiMethod;
+      body?: unknown;
+      headers?: Record<string, string>;
+    } = {},
   ): Promise<Static<T>> {
     const method = options.method ?? 'GET';
     const send = (token: string) =>
       sendRequest(fetcher, API_BASE_PATH + path, schema, signal, {
         method,
         body: options.body,
-        headers: { Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}` },
+        headers: {
+          ...options.headers,
+          Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}`,
+        },
       });
     const token = credentials.current() ?? (await authorize(signal, method));
     try {

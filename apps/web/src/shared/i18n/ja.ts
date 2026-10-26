@@ -77,7 +77,89 @@ export const jaMessages = {
       createdAt: '作成日時',
       ready: 'プロジェクトを管理できます',
       unavailable:
-        'このバージョンでは、ソース解析、レビュー、レポート作成は未対応です。',
+        'このバージョンでは、実際のソース解析、レビュー、レポート作成は未対応です。下の解析実行はデモです。',
+    },
+  },
+  runs: {
+    title: '解析（デモ）',
+    demoNotice:
+      'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、解析結果も作成しません。',
+    loading: '実行を読み込み中…',
+    reload: '実行を再読み込み',
+    start: '解析を開始',
+    starting: 'リクエストを送信中…',
+    resend: 'リクエストを再送信',
+    cancel: '実行をキャンセル',
+    cancelSending: 'キャンセルを送信中…',
+    retry: '再実行',
+    noRun: 'このプロジェクトの実行はまだありません。',
+    current: '表示中の実行',
+    history: '実行履歴',
+    loadMore: 'さらに読み込む',
+    view: '表示',
+    viewing: '表示中',
+    connectionLost:
+      'バックエンドとの接続が切れました。再試行しています… 実行状態は最後に受信したものです。',
+    startUncertain:
+      'バックエンドが実行リクエストを受け付けたか確認できませんでした。「リクエストを再送信」は同じリクエストを使うため、2つ目の実行は作成されません。',
+    cancelUncertain:
+      'キャンセルリクエストを確認できませんでした。バックエンドから状態を再読み込みしています。',
+    fields: {
+      id: '実行ID',
+      status: '状態',
+      stage: '現在のステップ',
+      createdAt: '作成日時',
+      startedAt: '開始',
+      finishedAt: '終了',
+      error: 'エラー理由',
+      retryOf: '再実行元',
+    },
+    status: {
+      queued: '待機中',
+      running: '実行中',
+      cancelling: 'キャンセル中…',
+      succeeded: '完了（デモ）',
+      failed: '失敗',
+      cancelled: 'キャンセル済み',
+      interrupted: '中断',
+    },
+    stage: {
+      snapshot: 'ソースのスナップショット',
+      inventory: 'インベントリ',
+      publish: '公開',
+    },
+    interruptedHelp:
+      '実行中にバックエンドが停止しました。自動では再実行しません。必要な場合は「再実行」を使ってください。',
+    runError: {
+      SOURCE_UNREADABLE: 'ソースコードを読み込めませんでした。',
+      SOURCE_FORBIDDEN: 'ソースコードを読み込む権限がありません。',
+      SOURCE_CHANGED: '実行中にソースコードが変更されました。',
+      SOURCE_LIMIT_EXCEEDED: 'ソースコードが上限を超えています。',
+      SOURCE_PROFILE_UNSUPPORTED: 'ソースプロファイルに対応していません。',
+      ANALYSIS_OUTPUT_INVALID: '解析結果が正しくありません。',
+      ARTIFACT_WRITE_FAILED: '結果を保存できませんでした。',
+      TIMEOUT: '実行が制限時間を超えました。',
+      STOP_UNCONFIRMED:
+        '処理の停止を確認できませんでした。続行する前にバックエンドを再起動してください。',
+      INTERNAL_ERROR: '実行中にバックエンドでエラーが発生しました。',
+    },
+    errors: {
+      RUN_NOT_FOUND: 'このプロジェクトに該当する実行が見つかりません。',
+      RUN_ACTIVE_CONFLICT:
+        'このプロジェクトでは別の実行が進行中です。進行中の実行を表示しました。',
+      RUN_STATE_CONFLICT:
+        '実行の状態が変わりました。最新の状態を再読み込みしました。',
+      IDEMPOTENCY_KEY_CONFLICT:
+        '実行リクエストが以前のリクエストと一致しません。再読み込みしてから再試行してください。',
+      SOURCE_REVISION_CONFLICT:
+        'プロジェクトのソースが変更されました。再読み込みしてから再試行してください。',
+      SNAPSHOT_UNAVAILABLE:
+        '元の実行には再利用できるソーススナップショットがありません。',
+      SOURCE_PROFILE_UNSUPPORTED:
+        'このバージョンはソースプロファイルに対応していません。',
+      SOURCE_NOT_REGISTERED: 'プロジェクトのソースが登録されていません。',
+      RUNTIME_RECOVERY_REQUIRED:
+        '停止を確認できなかった実行があるため、バックエンドの再起動が必要です。新しい実行は作成されていません。',
     },
   },
   errors: {
@@ -118,6 +200,7 @@ export const jaMessages = {
         'プロジェクトの作成情報が正しくありません。データとアプリのバージョンを確認して再試行してください。',
       get: 'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',
       list: '一覧の取得条件が正しくありません。一覧を再読み込みして再試行してください。',
+      runs: '実行リクエストが正しくありません。実行を再読み込みしてから再試行してください。',
     },
   },
 } satisfies Messages;

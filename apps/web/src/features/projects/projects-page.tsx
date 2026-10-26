@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { projectsApi, type ProjectsApi } from '../../shared/api/projects-api';
+import type { RunsApi } from '../../shared/api/runs-api';
 import { Icon } from '../../shared/ui/icon';
 import { useProjectList } from './use-project-list';
 import { CreateProjectForm } from './create-project-form';
@@ -7,7 +8,13 @@ import { ProjectDetail } from './project-detail';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { projectErrorMessage } from './project-messages';
 
-export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
+export function ProjectsPage({
+  api = projectsApi,
+  runsApi,
+}: {
+  api?: ProjectsApi;
+  runsApi?: RunsApi | undefined;
+}) {
   const { messages } = useLocale();
   const copy = messages.projects;
   const stages = Object.entries(copy.stages);
@@ -204,6 +211,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
             key={selectedId}
             id={selectedId}
             api={api}
+            runsApi={runsApi}
             onClose={() => setSelectedId(null)}
           />
         ) : (

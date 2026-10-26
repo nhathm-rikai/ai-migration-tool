@@ -8,8 +8,8 @@ Kiểm tra read-only ngày 13/10/2026 trên bộ source khách hàng ngoài repo
 
 Profile `bsn-vb6-cp932-v1`:
 
-- Text source v1: `.bas`, `.frm`, `.vbp`. `.cls` chưa có trong corpus kiểm tra; báo unsupported nếu gặp, chỉ mở hỗ trợ sau khi có fixture/parser test.
-- `.bas`, `.frm`: parse code và tính LoC. `.vbp`: parse tham chiếu project/dependency, không cộng vào LoC code VB6.
+- Text source v1: `.bas`, `.frm`, `.cls`, `.vbp`. Corpus BSN kiểm ngày 23/10/2026 không có `.cls` (0 file, không `.vbp` nào khai báo `Class=`); hỗ trợ `.cls` theo phạm vi WBS, chỉ được kiểm trên fixture tự tạo. Loại VB6 khác (`.ctl`, `.dsr`, `.pag`, `.dob`, `.vbg`...) báo unsupported.
+- `.bas`, `.frm`, `.cls`: parse code và tính LoC. `.vbp`: parse tham chiếu project/dependency, không cộng vào LoC code VB6.
 - `.frx`: inventory resource binary theo tên/hash nếu cần; không decode thành text, không gửi thẳng cho AI.
 - `.log`, `.scc`, `.txt`, build output và config agent không nằm trong text source allowlist mặc định. Tài liệu nghiệp vụ cần nhập theo luồng riêng khi được yêu cầu.
 - Root ngoài workspace đã đăng ký, symlink/junction thoát root, secret và file quá giới hạn: báo loại trừ/lỗi, không đọc bừa. Manifest ghi lý do và counts; coverage không giả định bằng 100%.
@@ -55,10 +55,29 @@ Quy tắc lexical:
 - Nhiều statement cách `:` trên cùng dòng vẫn tính 1. Dòng continuation `_` được tính theo từng dòng vật lý có code, không gộp thành một.
 - Dòng chỉ có label/line number và comment tính commentOnly; label đứng riêng không có comment là code line theo metric v1. Phải có fixture cho hai tình huống.
 - `.frm`: vùng designer từ đầu file đến ngay trước dòng top-level `Attribute VB_Name`; Attribute đó thuộc metadata. Parser phải xác định ranh giới theo cấu trúc export, không tìm substring mù; thiếu/không xác định ranh giới → unsupported, không cộng designer thành code.
+- `.cls`: header export (`VERSION x.y CLASS`, khối `BEGIN ... END` property của class) tính `designerLines`, header phải đúng thứ tự VERSION, một khối `BEGIN ... END` (chỉ đóng bằng `END`, bên trong chỉ có property số dạng `MultiUse = -1 'comment`, comment hoặc dòng trống), rồi `Attribute VB_Name`; thiếu khối, khối lồng, code/statement trong khối hoặc dòng khác trước `Attribute VB_Name` → unsupported `CLASS_HEADER_BOUNDARY_NOT_FOUND`. Phần sau như `.bas`. Member không `Private` của class/form chỉ gọi qua object (visibility `public`), `Declare` trong class/form là private.
 - `.bas`: toàn file là vùng code ngoại trừ export Attribute. Attribute ẩn trong procedure vẫn là metadata; số dòng evidence không bị dồn lại.
 - Theo function/procedure: tính codeLines từ chữ ký tới End tương ứng, gồm declaration/body/end, bỏ comment/blank/Attribute. `Sub`, `Function`, `Property Get/Let/Set` có ID riêng; code ngoài procedure tính `fileLevelCodeLines`. Tổng procedure codeLines + fileLevelCodeLines bằng codeLines của file khi coverage đầy đủ.
 
 Tài liệu cú pháp tham khảo: [Microsoft Rem](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/rem-statement). Đây là tham khảo họ Visual Basic; parser VB6 vẫn phải chứng minh trên fixture/corpus, không giả định parser VBA bất kỳ hỗ trợ toàn bộ VB6.
+
+### 4.1. Breakdown theo procedure (`vb6-procedure-lines-v1`)
+
+Áp cho mỗi `Sub`/`Function`/`Property Get/Let/Set`, phạm vi dòng `startLine..endLine` (gồm chữ ký và `End`). Comment/blank đứng trước chữ ký hoặc giữa hai procedure thuộc file-level, không thuộc procedure nào.
+
+| Trường | Định nghĩa |
+|---|---|
+| Physical (`physicalLines`) | `endLine - startLine + 1`. |
+| Code (`codeLines`) | Dòng code theo `vb6-physical-code-v1` trong phạm vi: gồm chữ ký, `Dim/Const`, label, directive, statement và `End ...`. Đo quy mô source, giữ nguyên số liệu cũ. |
+| Executable (`executableLines`) | Dòng Code có ít nhất một statement xử lý. Không tính dòng chỉ có: chữ ký/`End Sub|Function|Property`, khai báo (`Dim`, `Static`, `Const`, `Declare`, `Type`, `Enum`, `Event`, `Implements`, `Option`, `Def<type>`, biến `Public/Private`), directive `#...`, label/số dòng đứng riêng. `ReDim` là statement xử lý. Dòng có cả khai báo và xử lý (`Dim t: t = 1`) tính 1. Dòng continuation mang loại của statement nó nối tiếp (chữ ký nhiều dòng không tính, statement nhiều dòng tính từng dòng). |
+| Comment (`commentOnlyLines`) | Dòng chỉ có comment `'`/`Rem` (kể cả sau label/số dòng). Comment cuối dòng code không tính riêng. |
+| Blank (`blankLines`) | Dòng trống trong phạm vi. |
+| Metadata (`metadataLines`), Unclassified (`unclassifiedLines`) | `Attribute` trong procedure; dòng chưa phân loại chắc chắn. |
+| SQL (`sqlLines`) | Dòng Code có viết ít nhất một literal thuộc một chuỗi SQL mà detector `sqlAccessVersion` xác nhận statement: keyword (`FROM` sau `SELECT`, `INSERT INTO`, `UPDATE ... SET`, `DELETE [FROM]`, `JOIN`, DDL `TABLE`) phải có tên bảng, pseudo table (`DUAL`) hoặc giá trị runtime ngay sau. Keyword đứng một mình (`"DELETE "`, `"SELECT FROM "`) không tính. |
+
+Quy tắc chồng lấp: Code, Comment, Blank, Metadata, Unclassified loại trừ nhau và có tổng bằng Physical; tổng Code các procedure + `fileLevelCodeLines` = `codeLines` của file. Executable và SQL **không** phải nhóm riêng: cả hai là tập con của Code (`executableLines ≤ codeLines`, `sqlLines ≤ codeLines`), không cộng vào tổng và có thể chồng lấp nhau. Một khai báo hằng chứa SQL (`Const Q = "DELETE FROM T1"`) là dòng SQL nhưng không Executable. Một dòng tính SQL một lần dù góp vào nhiều chuỗi SQL. Chuỗi dựng qua nhiều dòng (` _`, `s = s & ...`, biến phụ) tính mọi dòng có literal của chuỗi; dòng chỉ chứa biến/giá trị runtime (`Call Exec(s)`) không tính. Từ khóa SQL trong comment hoặc chuỗi không đủ statement (`MsgBox "SELECT one"`) không tính. Executable không cần cộng khớp tổng file; năng suất theo Executable kLoC phải ghi rõ dùng `executableLines`, không dùng `codeLines`.
+
+Inventory ghi `procedureLinesVersion`. Đổi định nghĩa trên (kể cả đổi detector làm thay đổi `sqlLines`) phải tăng version. Fixture có nhãn tay: `tests/fixtures/vb6-procedure-lines/`, **TL chưa duyệt**.
 
 ## 5. Baseline và ngưỡng lệch ≤ 5%
 

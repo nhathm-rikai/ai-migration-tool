@@ -31,7 +31,19 @@ export type ProcedureMetrics = {
   visibility: 'global' | 'public' | 'private';
   startLine: number;
   endLine: number;
+  // Line breakdown of startLine..endLine (procedureLinesVersion, see
+  // specs/source-analysis.md §4.1). physicalLines = codeLines +
+  // commentOnlyLines + blankLines + metadataLines + unclassifiedLines.
+  // executableLines and sqlLines are not classes of their own: both are
+  // subsets of codeLines and may overlap.
+  physicalLines: number;
   codeLines: number;
+  executableLines: number;
+  commentOnlyLines: number;
+  blankLines: number;
+  metadataLines: number;
+  unclassifiedLines: number;
+  sqlLines: number;
   // Branch statements (If/ElseIf/Case/For/Do/While...), a size-independent
   // input for complexity.
   decisionPoints: number;
@@ -96,6 +108,8 @@ export type ProjectFileAnalysis =
 export interface LanguageAnalyzer {
   readonly languageId: string;
   readonly metricVersion: string;
+  // Per-procedure line breakdown, including which lines write SQL.
+  readonly procedureLinesVersion: string;
   fileRole(relativePath: string): SourceFileRole;
   analyzeCodeFile(relativePath: string, lines: string[]): CodeFileAnalysis;
   // Identifier uses of `names` (lower case) per procedure, for call graphs.

@@ -109,15 +109,21 @@ function maskLiteralsAndComments(text: string): string {
   return masked;
 }
 
+// `lines`: when the text holds at least one statement whose table part this
+// detector read, every line that wrote a literal piece of it; else empty.
 export function detectSqlAccess(segments: readonly SqlSegment[]): {
   tables: SqlTableAccess[];
   dynamic: DynamicSqlUse[];
+  lines: number[];
 } {
   const stream = buildStream(segments);
   const text = maskLiteralsAndComments(stream.text);
   const { lineAt } = stream;
   const tables: SqlTableAccess[] = [];
   const dynamic: DynamicSqlUse[] = [];
+  // Set once a statement keyword is followed by a table, a pseudo table or
+  // a runtime value; a keyword alone (`"DELETE "`) is not SQL.
+  let statement = false;
 
   // Reads the table (or table list for FROM) starting at `index`.
   function readTables(
@@ -131,12 +137,15 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
     for (;;) {
       rest = rest.replace(/^\s+/, '');
       if (rest.startsWith(DYNAMIC) || rest.startsWith(GAP)) {
+        statement = true;
         dynamic.push({ operation, line: line() });
         return;
       }
       const match = new RegExp(`^(${IDENT})`).exec(rest);
       const name = match?.[1];
       if (!match || !name || STOP_WORDS.has(name.toLowerCase())) return;
+      // A keyword followed by a table (pseudo tables included) is SQL.
+      statement = true;
       // `ORD_` & tenant: the real name is only known at runtime. A gap may
       // also be empty, so a word right after it could join the name.
       const next = rest.slice(match[0].length, match[0].length + 2);
@@ -192,5 +201,14 @@ export function detectSqlAccess(segments: readonly SqlSegment[]): {
     const from = /\bfrom\s+/i.exec(text.slice(select.index));
     if (from) readTables(select.index + from.index + from[0].length, 'R', true);
   }
-  return { tables, dynamic };
+  const lines = statement
+    ? [
+        ...new Set(
+          segments
+            .filter((segment) => segment.text !== null)
+            .map((segment) => segment.line),
+        ),
+      ]
+    : [];
+  return { tables, dynamic, lines };
 }

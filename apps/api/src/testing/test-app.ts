@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { LOCAL_SESSION_PATH, type LocalSession } from '@portal/contracts';
 import { buildApp } from '../app.js';
+import type { JobOptions } from '../composition.js';
 import { loadConfig, type AppConfig } from '../config.js';
 
 type App = ReturnType<typeof buildApp>;
@@ -46,14 +47,17 @@ export function createTrustedInject(app: App, config: AppConfig) {
   };
 }
 
-export function createTestApp(env: NodeJS.ProcessEnv = {}) {
+export function createTestApp(
+  env: NodeJS.ProcessEnv = {},
+  options: { jobs?: JobOptions } = {},
+) {
   const dataDir = mkdtempSync(join(tmpdir(), 'portal-api-test-'));
   const config = loadConfig({
     PORTAL_DATA_DIR: dataDir,
     PORTAL_LOG_LEVEL: 'silent',
     ...env,
   });
-  const app = buildApp(config);
+  const app = buildApp(config, options);
   return {
     app,
     config,

@@ -1,4 +1,8 @@
-import type { ApiErrorCode } from '@portal/contracts';
+import {
+  ANALYZE_API_ERROR_HTTP_STATUS,
+  type AnalyzeApiErrorCode,
+  type ApiErrorCode,
+} from '@portal/contracts';
 
 const ERROR_DEFINITIONS = {
   INVALID_INPUT: { status: 400, message: 'Invalid request input.' },
@@ -18,14 +22,55 @@ const ERROR_DEFINITIONS = {
   },
 } as const satisfies Record<ApiErrorCode, { status: number; message: string }>;
 
-export type AppErrorCode = ApiErrorCode;
+// Analyze codes produced by the run routes (B04), with the HTTP status of the
+// contract. Codes of routes that do not exist yet (source registration,
+// artifacts) join when those routes do.
+const S = ANALYZE_API_ERROR_HTTP_STATUS;
+const RUN_ERROR_DEFINITIONS = {
+  SOURCE_REVISION_CONFLICT: {
+    status: S.SOURCE_REVISION_CONFLICT,
+    message: 'The source revision has changed.',
+  },
+  SOURCE_PROFILE_UNSUPPORTED: {
+    status: S.SOURCE_PROFILE_UNSUPPORTED,
+    message: 'The source profile is not supported by this build.',
+  },
+  RUN_NOT_FOUND: { status: S.RUN_NOT_FOUND, message: 'Run not found.' },
+  RUN_ACTIVE_CONFLICT: {
+    status: S.RUN_ACTIVE_CONFLICT,
+    message: 'The project already has an active run.',
+  },
+  RUN_STATE_CONFLICT: {
+    status: S.RUN_STATE_CONFLICT,
+    message: 'The run state has changed.',
+  },
+  IDEMPOTENCY_KEY_CONFLICT: {
+    status: S.IDEMPOTENCY_KEY_CONFLICT,
+    message: 'The idempotency key was already used for a different request.',
+  },
+  SNAPSHOT_UNAVAILABLE: {
+    status: S.SNAPSHOT_UNAVAILABLE,
+    message: 'The run has no source snapshot to reuse.',
+  },
+  RUNTIME_RECOVERY_REQUIRED: {
+    status: S.RUNTIME_RECOVERY_REQUIRED,
+    message: 'The runtime needs recovery before it can start runs.',
+  },
+} as const satisfies Partial<
+  Record<AnalyzeApiErrorCode, { status: number; message: string }>
+>;
+
+const DEFINITIONS = { ...ERROR_DEFINITIONS, ...RUN_ERROR_DEFINITIONS };
+
+export type RunAppErrorCode = keyof typeof RUN_ERROR_DEFINITIONS;
+export type AppErrorCode = ApiErrorCode | RunAppErrorCode;
 
 export class AppError extends Error {
   readonly statusCode: number;
 
   constructor(readonly code: AppErrorCode) {
-    super(ERROR_DEFINITIONS[code].message);
+    super(DEFINITIONS[code].message);
     this.name = 'AppError';
-    this.statusCode = ERROR_DEFINITIONS[code].status;
+    this.statusCode = DEFINITIONS[code].status;
   }
 }

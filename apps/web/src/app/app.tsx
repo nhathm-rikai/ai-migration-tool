@@ -4,16 +4,25 @@ import { ProjectsPage } from '../features/projects/projects-page';
 import { LocaleProvider } from '../shared/i18n/locale-provider';
 import { useLocale } from '../shared/i18n/locale-context';
 import { isLocale, LOCALES } from '../shared/i18n/locale';
+import { projectsApi, type ProjectsApi } from '../shared/api/projects-api';
+import {
+  localSession,
+  type LocalSessionClient,
+} from '../shared/api/local-session';
+import { SessionStatus } from './session-status';
 
-export function App() {
+type AppProps = { api?: ProjectsApi; session?: LocalSessionClient };
+
+// `api` must use `session` as its credential source; tests inject both.
+export function App(props: AppProps) {
   return (
     <LocaleProvider>
-      <AppShell />
+      <AppShell {...props} />
     </LocaleProvider>
   );
 }
 
-function AppShell() {
+function AppShell({ api = projectsApi, session = localSession }: AppProps) {
   const { locale, setLocale, messages } = useLocale();
   useEffect(() => {
     const original = document.title;
@@ -59,7 +68,8 @@ function AppShell() {
           </label>
         </div>
       </header>
-      <ProjectsPage />
+      <SessionStatus session={session} />
+      <ProjectsPage api={api} />
     </>
   );
 }

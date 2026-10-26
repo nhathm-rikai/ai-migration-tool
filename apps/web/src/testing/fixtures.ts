@@ -1,3 +1,4 @@
+import type { LocalSessionClient } from '../shared/api/local-session';
 import type { Project } from '@portal/contracts';
 
 export const project: Project = {
@@ -12,4 +13,21 @@ export function json(value: unknown, status = 200): Response {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// A ready local credential without network, for tests about other behavior.
+// Session/bootstrap behavior is tested with createLocalSession.
+export const testToken = 'T'.repeat(43);
+export const testCredentials: LocalSessionClient = {
+  current: () => testToken,
+  credential: () => Promise.resolve(testToken),
+  invalidate: () => undefined,
+  getStatus: () => 'ready',
+  subscribe: () => () => undefined,
+  retry: () => undefined,
+};
+
+export function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
 }

@@ -62,6 +62,17 @@ async function start() {
   }
   throw new Error('Server startup timed out.');
 }
+// Trusted local client: bootstrap from the API origin; the token travels only
+// in the Authorization header.
+async function bootstrap(base) {
+  const session = await fetch(`${base}/session`, {
+    method: 'POST',
+    headers: { origin: new URL(base).origin },
+  });
+  assert.equal(session.status, 200);
+  const { token } = await session.json();
+  return `Bearer ${token}`;
+}
 try {
   for (const path of [
     repository,
@@ -90,9 +101,16 @@ try {
     realpathSync.native(parent),
   );
   let base = await start();
+  let authorization = await bootstrap(base);
+  const unauthorized = await fetch(`${base}/projects`);
+  assert.equal(unauthorized.status, 401);
   const create = await fetch(`${base}/projects`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      origin: new URL(base).origin,
+      authorization,
+      'content-type': 'application/json',
+    },
     body: JSON.stringify({
       name: 'Relocation fixture',
       fixtureId: 'sample-vb6',
@@ -103,11 +121,19 @@ try {
   assert.ok(existsSync(join(dataDir, 'portal.db')));
   await stop();
   base = await start();
-  const response = await fetch(`${base}/projects/${project.id}`);
+  // A restarted backend issues a new credential; the old one is rejected.
+  const stale = await fetch(`${base}/projects/${project.id}`, {
+    headers: { authorization },
+  });
+  assert.equal(stale.status, 401);
+  authorization = await bootstrap(base);
+  const response = await fetch(`${base}/projects/${project.id}`, {
+    headers: { authorization },
+  });
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), project);
   console.log(
-    `PASS: compiled startup from external cwd, migration, create/reopen, 4 protected paths; parent workspace accepted. ${process.platform}/${process.arch} ${process.version}`,
+    `PASS: compiled startup from external cwd, migration, create/reopen with local credential, 4 protected paths; parent workspace accepted. ${process.platform}/${process.arch} ${process.version}`,
   );
 } finally {
   await stop();

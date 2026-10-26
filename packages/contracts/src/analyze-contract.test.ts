@@ -354,6 +354,9 @@ describe('C01-AC02 Projects API stays compatible', () => {
       'PAYLOAD_TOO_LARGE',
       'UNSUPPORTED_MEDIA_TYPE',
       'INTERNAL_ERROR',
+      'HOST_NOT_ALLOWED',
+      'ORIGIN_NOT_ALLOWED',
+      'CREDENTIAL_INVALID',
     ]) {
       expect(Check(ApiErrorCodeSchema, code)).toBe(true);
     }

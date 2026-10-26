@@ -5,8 +5,16 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 ## Phạm vi hiện tại
 
 - Gate init FE + BE; Projects/UI/API/storage, fixture + fake runner. Fastify → service → repository, SQLite thật, TypeBox contracts.
-- Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
+- Đã có [FE Projects](../../apps/web/README.md) gọi API thật, bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md). Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
+
+## 26/10/2026 — PF02 (B01 + F00) bảo vệ HTTP local và bootstrap credential UI
+
+- Dùng `portal-implement`; gate FEATURE:api,ui + phần local security của LIVE (BE-06/07, FE-08), dữ liệu fixture + fake runner. Nhánh `feat/pf02-local-http-security` từ `master` `fabde36` (đã gồm P1-CLOSE qua PR #4 và contract C01). Không thêm màn hình Analyze.
+- Policy tại [local-http-security](specs/local-http-security.md): Host/Origin allowlist loopback (port API + `PORTAL_WEB_PORT`, mặc định 5173/4173), credential 32 byte mỗi process lấy qua `POST /api/v1/session` (cần Origin tin cậy), gửi bằng `Authorization: Bearer`. Không cookie nên không cần CSRF token riêng; không header CORS. Kiểm ở `onRequest` trước parse body/handler. Thiếu Origin: bootstrap bị từ chối, route protected chỉ cho qua khi có credential. Mã lỗi mới trong contracts: 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`, 401 `CREDENTIAL_INVALID`; health vẫn public nhưng kiểm Host/Origin.
+- FE: `local-session.ts` (bootstrap dùng chung, idle/pending/ready/failed/expired, token chỉ trong memory), `api-client.ts` gửi header, không có credential thì không gửi request (`ApiError` kind `credential`, `outcomeUnknown=false`), 401 → GET retry một lần, POST không retry. `SessionStatus` ở header với nút thử kết nối lại; copy vi/ja. SSE sau này dùng `fetch` streaming với header, không `EventSource` + token query (ghi vào analyze-run-contract).
+- Test: API 336 (19 test security: Host/Origin giả, `null`, https, thiếu/sai/prefix credential, scheme khác, body xấu vẫn 401, preflight lạ, thiếu Origin theo policy, proxy port, restart làm token hết hạn, socket thật + log không chứa token; mutation bỏ đăng ký plugin làm 17/19 fail). Web 50 (F00-AC01 bootstrap lỗi không POST + retry, AC02 header/không URL/storage, AC03 đổi locale khi pending không bootstrap lại, StrictMode). Contracts 42. Smoke backend compiled (bootstrap, 401 khi thiếu credential, token cũ 401 sau restart), E2E Playwright qua Vite preview proxy (kiểm mọi request projects có Bearer, URL không chứa token) và `e2e:self-check` pass. Windows x64, Node 24.16.0, Chromium Playwright.
+- Chưa đến mốc: instance lock (B02), source/CLI thật và release Fastify phục vụ UI cùng origin; chưa kiểm macOS/Linux. Tracker Excel chưa cập nhật trong lượt này.
 
 ## 23/10/2026 — P1-CLOSE-05 complexity-v0 (approved-limited)
 

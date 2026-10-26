@@ -42,7 +42,7 @@ Naming hiện tại độc lập công ty: env `PORTAL_*`, package `@portal/*`, 
 
 Override tới DB cũ cũng phải nằm ngoài repo/source. Nếu DB cũ nằm trong repo, cấu hình đó sẽ bị từ chối; cần xử lý di chuyển dữ liệu nhất quán khi backend đã dừng trước khi dùng lại. App không tự move/xóa DB.
 
-Chỉ dùng dữ liệu demo sạch. Chưa có local credential/Host/Origin protection, instance lock hay tính năng đọc source thật. Không expose backend này ra LAN. LIVE phải đạt gate trước khi bổ sung đường đọc source/CLI; đổi env không bật được các tính năng đó.
+Chỉ dùng dữ liệu demo sạch. Đã có bảo vệ Host/Origin và credential local theo [local-http-security](../../docs/engineering/specs/local-http-security.md); chưa có instance lock hay tính năng đọc source thật. Không expose backend này ra LAN. LIVE phải đạt gate trước khi bổ sung đường đọc source/CLI; đổi env không bật được các tính năng đó.
 
 ## Gọi thử một luồng
 
@@ -51,15 +51,19 @@ Mở PowerShell thứ hai khi server đang chạy:
 ```powershell
 $base = 'http://127.0.0.1:4310/api/v1'
 Invoke-RestMethod "$base/health"
+# Bootstrap credential như UI tin cậy; token chỉ đi trong header Authorization.
+$session = Invoke-RestMethod "$base/session" -Method Post -Headers @{ Origin = 'http://127.0.0.1:4310' }
+$auth = @{ Authorization = "Bearer $($session.token)" }
 $body = @{ name = 'Project demo'; fixtureId = 'sample-vb6' } | ConvertTo-Json
-$project = Invoke-RestMethod "$base/projects" -Method Post -ContentType 'application/json' -Body $body
-Invoke-RestMethod "$base/projects/$($project.id)"
-Invoke-RestMethod "$base/projects?limit=20"
+$project = Invoke-RestMethod "$base/projects" -Method Post -Headers $auth -ContentType 'application/json' -Body $body
+Invoke-RestMethod "$base/projects/$($project.id)" -Headers $auth
+Invoke-RestMethod "$base/projects?limit=20" -Headers $auth
 ```
 
 Endpoint đang có:
 
-- `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI.
+- `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI. Public nhưng vẫn kiểm Host/Origin.
+- `POST /api/v1/session`: bootstrap credential, cần `Origin` tin cậy; trả `{ token }`. Mọi endpoint khác cần `Authorization: Bearer <token>`; 401 `CREDENTIAL_INVALID`, 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`. Policy đầy đủ, gồm request thiếu Origin và `PORTAL_WEB_PORT`: [local-http-security](../../docs/engineering/specs/local-http-security.md).
 - `POST /api/v1/projects`: 201 và `Location`. Body gồm `name` (1–120 ký tự, có nội dung sau trim), `fixtureId` đúng `sample-vb6`. Không nhận `sourcePath` hay field lạ.
 - `GET /api/v1/projects/:projectId`: 200 hoặc 404; ID sai định dạng trả 400.
 - `GET /api/v1/projects?limit=20&cursor=<nextCursor>`: `{ items, nextCursor }`; limit 1–100, mặc định 20. Dùng nguyên cursor từ response; thứ tự theo UUID tăng dần, **không phải ngày tạo**. Đây không phải snapshot pagination khi có request tạo project đồng thời.
@@ -112,6 +116,6 @@ Tests kiểm API success/input/not-found/pagination (cả limit mặc định), 
 
 Rule trọng tâm: CORE-01..10, BE-01..05/07, DATA-01/02/09, QA-01/02/06/07/09 và AI-01/05 cho fake port. Phạm vi reviewer cần xem: schema/validation trước side effect, ranh giới service/repo, DB lifecycle, containment và nhãn demo.
 
-Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export, local HTTP security và instance/recovery là các task tiếp theo. Không có VB6 → C# conversion trong source này.
+Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export và instance/recovery là các task tiếp theo. Local HTTP security (PF02) đã có. Không có VB6 → C# conversion trong source này.
 
 Tham khảo API gốc khi mở rộng: [Fastify type provider](https://github.com/fastify/fastify-type-provider-typebox), [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [better-sqlite3](https://github.com/WiseLibs/better-sqlite3). Phiên bản thực tế được khóa trong package/lockfile, không copy API từ major khác.

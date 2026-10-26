@@ -189,6 +189,8 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
         env: {
           ...process.env,
           PORTAL_PORT: String(apiPort),
+          // The API trusts the preview origin only on this port.
+          PORTAL_WEB_PORT: String(webPort),
           PORTAL_DATA_DIR: join(directory, 'data'),
           PORTAL_MODE: 'fixture',
           PORTAL_RUNNER: 'fake',
@@ -201,9 +203,23 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
     await waitFor(`${apiBase}/health`, api, 'API');
 
     const seedName = 'E2E seed project';
+    // Seed as a trusted local client: bootstrap the credential from the API
+    // origin, then send it in the Authorization header only.
+    const origin = `http://127.0.0.1:${apiPort}`;
+    const session = await fetch(`${apiBase}/session`, {
+      method: 'POST',
+      headers: { origin },
+    });
+    if (session.status !== 200)
+      throw new Error(`Bootstrap failed: ${session.status}`);
+    const { token } = await session.json();
     const seed = await fetch(`${apiBase}/projects`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        origin,
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ name: seedName, fixtureId: 'sample-vb6' }),
     });
     if (seed.status !== 201) throw new Error(`Seed failed: ${seed.status}`);

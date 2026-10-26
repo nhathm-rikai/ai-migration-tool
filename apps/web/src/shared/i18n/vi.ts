@@ -11,6 +11,14 @@ export const viMessages = {
     subtitle: 'Đánh giá hệ thống cũ',
     demo: 'DEMO · dữ liệu mẫu',
     language: 'Ngôn ngữ',
+    session: {
+      pending: 'Đang kết nối backend cục bộ…',
+      failed:
+        'Không khởi tạo được phiên làm việc với backend cục bộ. Chưa có dữ liệu nào được gửi.',
+      expired:
+        'Phiên làm việc đã hết hạn (backend có thể vừa khởi động lại). Thao tác tiếp theo sẽ kết nối lại.',
+      retry: 'Thử kết nối lại',
+    },
   },
   projects: {
     workspace: 'Không gian làm việc',
@@ -90,6 +98,12 @@ export const viMessages = {
         'Định dạng gửi dữ liệu không được hỗ trợ. Kiểm tra phiên bản frontend và backend.',
       INTERNAL_ERROR:
         'Backend gặp lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.',
+      HOST_NOT_ALLOWED:
+        'Backend từ chối địa chỉ truy cập. Mở ứng dụng bằng địa chỉ loopback đã cấu hình.',
+      ORIGIN_NOT_ALLOWED:
+        'Backend từ chối trang gửi yêu cầu. Mở ứng dụng bằng địa chỉ đã cấu hình.',
+      CREDENTIAL_INVALID:
+        'Phiên làm việc đã hết hạn nên yêu cầu chưa được xử lý. Vui lòng thử lại.',
     } satisfies Record<ApiErrorCode, string>,
     failure: {
       http: 'Không thể hoàn tất yêu cầu. Kiểm tra backend rồi thử lại.',
@@ -97,6 +111,8 @@ export const viMessages = {
       timeout: 'Yêu cầu quá hạn. Kiểm tra backend rồi thử lại.',
       'invalid-response':
         'Phản hồi không đúng định dạng. Kiểm tra phiên bản frontend và backend.',
+      credential:
+        'Chưa kết nối được phiên làm việc với backend nên yêu cầu chưa được gửi. Thử kết nối lại.',
     } satisfies Record<ApiFailureKind, string>,
     invalidInput: {
       create:

@@ -645,6 +645,19 @@ dd {
   font-size: 12px;
   margin-bottom: 12px;
 }
+.session-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 1280px;
+  margin: 12px auto 0;
+  padding: 0 24px;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.session-status .error {
+  margin-bottom: 0;
+}
 .success {
   color: var(--low);
   background: var(--low-bg);

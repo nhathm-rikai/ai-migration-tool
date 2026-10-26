@@ -76,7 +76,7 @@ Run DTO theo từng status (schema là union, field mâu thuẫn status bị t�
 
 - `POST .../runs/:runId/cancel` body `{ expectedStateVersion }`, trả Run kèm status theo kết quả (BE-03): **202** khi việc hủy còn đang xử lý (run trả về là `cancelling`), **200** khi đã hủy xong (`cancelled`). queued → `cancelled` (200); running → `cancelling` (202); đang `cancelling`/`cancelled` → trả run hiện tại với 202/200 tương ứng (idempotent, bỏ qua version). BE chọn status bằng `cancelRunSuccessStatus(run)`; `successStatuses` trong bảng operation liệt kê mọi 2xx. Terminal khác hoặc version lệch khi run còn active → `409 RUN_STATE_CONFLICT`; client GET lại rồi quyết định.
 - `GET /runtime/status`: `{ status: 'ready', reasonCode: null }` hoặc `{ status: 'recovery_required', reasonCode: 'PROCESS_CLEANUP_UNCONFIRMED' }`. Không trả PID, path, command hay credential.
-- `GET .../runs/:runId/events`: `text/event-stream`, event name `run`, `id` = `sequence`, `data` = `RunEvent { runId, sequence, stateVersion, status, stage, occurredAt }`. State commit trước event. Không raw stdout/log, không token trên query (transport credential theo B01/F00). Reconnect: GET run là nguồn chính thức, bỏ event có `stateVersion` cũ hơn.
+- `GET .../runs/:runId/events`: `text/event-stream`, event name `run`, `id` = `sequence`, `data` = `RunEvent { runId, sequence, stateVersion, status, stage, occurredAt }`. State commit trước event. Không raw stdout/log, không token trên query; client dùng `fetch` streaming với header `Authorization` theo [local-http-security](local-http-security.md), không dùng `EventSource` kèm token. Reconnect: GET run là nguồn chính thức, bỏ event có `stateVersion` cũ hơn.
 
 ## 6. Artifact (API 7)
 
@@ -94,7 +94,7 @@ Run DTO theo từng status (schema là union, field mâu thuẫn status bị t�
 | `SOURCE_FORBIDDEN`, `SOURCE_UNREADABLE`, `SOURCE_PROFILE_UNSUPPORTED` | 422 |
 | `RUNTIME_RECOVERY_REQUIRED` | 503 |
 
-Danh sách mã từng operation trả được nằm trong `ANALYZE_API_OPERATIONS[op].errorCodes` (gồm `INVALID_INPUT`, `PROJECT_NOT_FOUND`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE` của catalog Projects). `SOURCE_FORBIDDEN` dùng 422 để dành 403 cho bảo vệ request local (B01). Auth/CSRF status do B01 chốt.
+Danh sách mã từng operation trả được nằm trong `ANALYZE_API_OPERATIONS[op].errorCodes` (gồm `INVALID_INPUT`, `PROJECT_NOT_FOUND`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE` của catalog Projects). `SOURCE_FORBIDDEN` dùng 422 để dành 403 cho bảo vệ request local (B01). B01 đã chốt: 401 `CREDENTIAL_INVALID`, 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`, chặn trước route ([local-http-security](local-http-security.md)).
 
 Các mã analyze nằm riêng trong `AnalyzeApiErrorCodeSchema`: BE thêm vào catalog `app-error.ts` (dùng `ANALYZE_API_ERROR_HTTP_STATUS`) và FE thêm message VI/JA khi route/màn hình tương ứng được làm (B03/B04/B07, F01/F02/F03), không thêm sớm vào catalog Projects.
 

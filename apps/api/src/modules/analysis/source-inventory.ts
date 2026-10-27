@@ -85,6 +85,7 @@ export type SourceInventory = {
   profileId: string;
   languageId: string;
   metricVersion: string;
+  procedureLinesVersion: string;
   decoderVersion: string;
   normalizationVersion: string;
   sqlAccessVersion: string;
@@ -348,6 +349,7 @@ export function buildSourceInventory(input: {
     profileId: input.profile.id,
     languageId: analyzer.languageId,
     metricVersion: analyzer.metricVersion,
+    procedureLinesVersion: analyzer.procedureLinesVersion,
     decoderVersion: SOURCE_DECODER_VERSION,
     normalizationVersion: SOURCE_NORMALIZATION_VERSION,
     sqlAccessVersion: SQL_ACCESS_VERSION,

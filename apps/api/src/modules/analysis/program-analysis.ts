@@ -16,7 +16,14 @@ import {
 // of being guessed.
 
 export const CALL_GRAPH_VERSION = 'call-graph-v2';
-export const COMPLEXITY_VERSION = 'complexity-v0-draft';
+// Approved for reference classification only (decision 23/10/2026): same
+// formula, weights, thresholds and rounding as complexity-v0-draft.
+export const COMPLEXITY_VERSION = 'complexity-v0';
+
+// Points around a level threshold (unrounded score) that call for a person
+// to look at the program before the level is used.
+export const NEAR_THRESHOLD_POINTS = 3;
+const THRESHOLDS = [40, 55] as const;
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
 
@@ -63,10 +70,15 @@ export type ProgramMetrics = {
   externalApis: number;
 };
 
+// high: the model is least reliable for High (holdout 1/3);
+// near-threshold: a small change of the source or count changes the level.
+export type ComplexityReviewFlag = 'high' | 'near-threshold';
+
 export type ComplexityScore = {
   version: typeof COMPLEXITY_VERSION;
   score: number;
   level: 'low' | 'medium' | 'high';
+  reviewFlags: ComplexityReviewFlag[];
   parts: Record<
     | 'size'
     | 'decisions'
@@ -282,13 +294,19 @@ export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
       Math.round(value * 10) / 10,
     ]),
   ) as ComplexityScore['parts'];
-  const score = Math.round(
-    Object.values(parts).reduce((sum, value) => sum + value, 0),
-  );
+  const exact = Object.values(parts).reduce((sum, value) => sum + value, 0);
+  const score = Math.round(exact);
+  const [medium, high] = THRESHOLDS;
+  const level = score < medium ? 'low' : score < high ? 'medium' : 'high';
+  const reviewFlags: ComplexityReviewFlag[] = [];
+  if (level === 'high') reviewFlags.push('high');
+  if (THRESHOLDS.some((t) => Math.abs(exact - t) <= NEAR_THRESHOLD_POINTS))
+    reviewFlags.push('near-threshold');
   return {
     version: COMPLEXITY_VERSION,
     score,
-    level: score < 40 ? 'low' : score < 55 ? 'medium' : 'high',
+    level,
+    reviewFlags,
     parts: rounded,
   };
 }

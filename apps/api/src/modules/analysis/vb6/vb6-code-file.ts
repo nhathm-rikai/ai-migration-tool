@@ -18,19 +18,44 @@ import {
 } from './vb6-statement.js';
 import { lexVb6Line, type Vb6Continuation } from './vb6-line-lexer.js';
 
-// Counts metric vb6-physical-code-v1 for one .bas/.frm, splits procedures
-// (specs/source-analysis.md §4) and collects static facts: SQL table
-// access, Declare (Win32 API), labels, decision points, identifier uses.
+// Counts metric vb6-physical-code-v1 for one .bas/.frm/.cls, splits
+// procedures (specs/source-analysis.md §4) and collects static facts: SQL
+// table access, Declare (Win32 API), labels, decision points, identifier uses.
+
+// standard: .bas; form: .frm; class: .cls. Forms and classes are object
+// modules: they start with an exported header and their members are reached
+// through an object.
+export type Vb6ModuleKind = 'standard' | 'form' | 'class';
 
 const ATTRIBUTE = /^attribute\s/i;
 const PROCEDURE_START =
   /^((?:(?:public|private|friend|static)\s+)*)(sub|function|property\s+(?:get|let|set))\s+([A-Za-z][A-Za-z0-9_]*)/i;
 const PROCEDURE_END = /^end\s+(sub|function|property)\b/i;
 const DECISION = /^(?:if|elseif|case(?!\s+else\b)|for|do|while)\b/i;
+// Statements that only declare (no processing): Dim/Static/Const, module
+// variables, Declare/Type/Enum/Event, Option/Implements/Def<type> and #
+// directives. ReDim allocates at runtime and stays executable.
+const DECLARATION =
+  /^(?:#|(?:dim|static|const|option|implements|declare|type|enum|event|def(?:bool|byte|int|lng|lnglng|longptr|cur|sng|dbl|dec|date|str|obj|var))\b|(?:public|private|global|friend)\s+(?!sub\b|function\b|property\b))/i;
+
+// Executable: a statement that processes, i.e. neither a declaration nor
+// the signature or End line of a procedure.
+function isExecutable(statement: string): boolean {
+  return (
+    !DECLARATION.test(statement) &&
+    !PROCEDURE_START.test(statement) &&
+    !PROCEDURE_END.test(statement)
+  );
+}
 const DECLARE =
   /^(?:(public|private|global)\s+)?declare\s+(?:sub|function)\s+([A-Za-z][A-Za-z0-9_]*)\s+lib\s+"([^"]*)"/i;
 
 const FORM_VERSION = /^version\s+\d/i;
+const CLASS_VERSION = /^version\s+\d+\.\d+\s+class$/i;
+const CLASS_BEGIN = /^begin$/i;
+const CLASS_END = /^end$/i;
+// Class header properties are numeric, e.g. `MultiUse = -1  'True`.
+const CLASS_PROPERTY = /^[A-Za-z][A-Za-z0-9_]*\s*=\s*-?\d+\s*(?:'.*)?$/;
 const DESIGNER_BEGIN = /^(?:begin|beginproperty)\s/i;
 const DESIGNER_END = /^(?:end|endproperty)$/i;
 const FORM_NAME_ATTRIBUTE = /^attribute\s+vb_name\s*=/i;
@@ -47,6 +72,28 @@ function emptyCounters(physicalLines: number): LineCounters {
     codeLines: 0,
     unclassifiedLines: 0,
   };
+}
+
+// The header of an exported class is exactly `VERSION x.y CLASS`, one bare
+// BEGIN ... END block of numeric class properties, then `Attribute VB_Name`.
+// Any other line (e.g. code inside the block or before VB_Name) makes it
+// unknown.
+function findClassHeaderEnd(lines: string[]): number | null {
+  const expected = [CLASS_VERSION, CLASS_BEGIN];
+  let inBlock = false;
+  for (const [index, line] of lines.entries()) {
+    const text = line.trim();
+    if (text === '') continue;
+    const next = expected.shift();
+    if (next) {
+      if (!next.test(text)) return null;
+      inBlock = next === CLASS_BEGIN;
+    } else if (inBlock) {
+      if (CLASS_END.test(text)) inBlock = false;
+      else if (!CLASS_PROPERTY.test(text) && !text.startsWith("'")) return null;
+    } else return FORM_NAME_ATTRIBUTE.test(text) ? index : null;
+  }
+  return null;
 }
 
 // The designer of an exported form runs from VERSION to the line before the
@@ -73,7 +120,7 @@ function procedureKind(keyword: string): string {
 export function analyzeVb6CodeFile(
   relativePath: string,
   lines: string[],
-  options: { form: boolean },
+  options: { module: Vb6ModuleKind },
 ): CodeFileAnalysis {
   return scanVb6CodeFile(relativePath, lines, options).analysis;
 }
@@ -81,7 +128,7 @@ export function analyzeVb6CodeFile(
 export function findVb6References(
   relativePath: string,
   lines: string[],
-  options: { form: boolean; names: ReadonlySet<string> },
+  options: { module: Vb6ModuleKind; names: ReadonlySet<string> },
 ): CodeReference[] {
   return scanVb6CodeFile(relativePath, lines, options).references;
 }
@@ -89,20 +136,27 @@ export function findVb6References(
 function scanVb6CodeFile(
   relativePath: string,
   lines: string[],
-  options: { form: boolean; names?: ReadonlySet<string> },
+  options: { module: Vb6ModuleKind; names?: ReadonlySet<string> },
 ): { analysis: CodeFileAnalysis; references: CodeReference[] } {
   const unsupported = (reason: string, line: number | null) => ({
     analysis: { status: 'unsupported' as const, reason, line },
     references: [],
   });
   const counters = emptyCounters(lines.length);
+  const objectModule = options.module !== 'standard';
   let codeStart = 0;
-  if (options.form) {
+  if (options.module === 'form') {
     const designerEnd = findDesignerEnd(lines);
     if (designerEnd === null)
       return unsupported('FORM_DESIGNER_BOUNDARY_NOT_FOUND', null);
     counters.designerLines = designerEnd;
     codeStart = designerEnd;
+  } else if (options.module === 'class') {
+    const headerEnd = findClassHeaderEnd(lines);
+    if (headerEnd === null)
+      return unsupported('CLASS_HEADER_BOUNDARY_NOT_FOUND', null);
+    counters.designerLines = headerEnd;
+    codeStart = headerEnd;
   }
 
   const closed: OpenProcedure[] = [];
@@ -142,6 +196,7 @@ function scanVb6CodeFile(
   let open: OpenProcedure | null = null;
   let incoming: Vb6Continuation = 'none';
   let metadataContinues = false;
+  let continuesExecutable = false;
 
   for (let index = codeStart; index < lines.length; index += 1) {
     const lineNumber = index + 1;
@@ -150,15 +205,28 @@ function scanVb6CodeFile(
       (metadataContinues && incoming === 'code') ||
       (lexed.kind === 'code' && ATTRIBUTE.test(lexed.firstStatement ?? ''));
     metadataContinues = isMetadata && lexed.continuation === 'code';
+    const continued = incoming === 'code';
     incoming = lexed.continuation;
 
+    // Non-code lines belong to the procedure open around them.
+    const lineOwner: OpenProcedure | null = open;
     if (isMetadata) {
       counters.metadataLines += 1;
+      if (lineOwner) lineOwner.metadataLines += 1;
       continue;
     }
-    if (lexed.kind === 'blank') counters.blankLines += 1;
-    else if (lexed.kind === 'comment') counters.commentOnlyLines += 1;
-    else if (lexed.kind === 'unclassified') counters.unclassifiedLines += 1;
+    const nonCode =
+      lexed.kind === 'blank'
+        ? 'blankLines'
+        : lexed.kind === 'comment'
+          ? 'commentOnlyLines'
+          : lexed.kind === 'unclassified'
+            ? 'unclassifiedLines'
+            : null;
+    if (nonCode) {
+      counters[nonCode] += 1;
+      if (lineOwner) lineOwner[nonCode] += 1;
+    }
     if (lexed.label) labels.push({ name: lexed.label, line: lineNumber });
     if (lexed.kind !== 'code') {
       finishStatement();
@@ -181,7 +249,7 @@ function scanVb6CodeFile(
           name: declare[2] ?? '',
           library: declare[3] ?? '',
           visibility:
-            declare[1]?.toLowerCase() === 'private' || options.form
+            declare[1]?.toLowerCase() === 'private' || objectModule
               ? 'private'
               : 'global',
           line: lineNumber,
@@ -196,12 +264,19 @@ function scanVb6CodeFile(
           name,
           visibility: /\bprivate\b/i.test(start[1] ?? '')
             ? 'private'
-            : options.form
+            : objectModule
               ? 'public'
               : 'global',
           startLine: lineNumber,
           endLine: lineNumber,
+          physicalLines: 0,
           codeLines: 0,
+          executableLines: 0,
+          commentOnlyLines: 0,
+          blankLines: 0,
+          metadataLines: 0,
+          unclassifiedLines: 0,
+          sqlLines: 0,
           decisionPoints: 0,
           block: kind.split('-')[0] ?? kind,
         };
@@ -215,8 +290,16 @@ function scanVb6CodeFile(
         open = null;
       }
     }
+    // A continued line takes the kind of the statement it continues; the
+    // line is executable if any statement on it is.
+    const kinds = lexed.statementStarts.map(isExecutable);
+    const executable =
+      (continued && continuesExecutable) || kinds.includes(true);
+    if (lexed.continuation === 'code')
+      continuesExecutable = kinds.at(-1) ?? (continued && continuesExecutable);
     if (owner) {
       owner.codeLines += 1;
+      if (executable) owner.executableLines += 1;
       owner.decisionPoints += decisions;
     }
     pending ??= { pieces: [], owner };
@@ -240,9 +323,13 @@ function scanVb6CodeFile(
   // emitted on its own; the same fact is kept once.
   const seen = new Set<string>();
   const once = (key: string) => !seen.has(key) && Boolean(seen.add(key));
+  const sqlLinesByOwner = new Map<string | null, Set<number>>();
   for (const [procedureId, units] of sqlByOwner)
     for (const segments of units) {
       const detected = detectSqlAccess(segments);
+      const sqlLines = sqlLinesByOwner.get(procedureId) ?? new Set<number>();
+      for (const line of detected.lines) sqlLines.add(line);
+      sqlLinesByOwner.set(procedureId, sqlLines);
       for (const t of detected.tables)
         if (once(`${procedureId}|${t.table}|${t.operation}|${t.line}`))
           sqlTables.push({ ...t, procedureId });
@@ -257,7 +344,18 @@ function scanVb6CodeFile(
     visibility: procedure.visibility,
     startLine: procedure.startLine,
     endLine: procedure.endLine,
+    physicalLines: procedure.endLine - procedure.startLine + 1,
     codeLines: procedure.codeLines,
+    executableLines: procedure.executableLines,
+    commentOnlyLines: procedure.commentOnlyLines,
+    blankLines: procedure.blankLines,
+    metadataLines: procedure.metadataLines,
+    unclassifiedLines: procedure.unclassifiedLines,
+    // A line counts once however many SQL texts it writes into; a piece
+    // inlined from another variable counts where that literal is written.
+    sqlLines: [...(sqlLinesByOwner.get(procedure.id) ?? [])].filter(
+      (line) => line >= procedure.startLine && line <= procedure.endLine,
+    ).length,
     decisionPoints: procedure.decisionPoints,
   }));
   const procedureCodeLines = procedures.reduce(

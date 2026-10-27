@@ -23,7 +23,7 @@ Một project có nhiều run. Mỗi run khóa một snapshot source, cấu hìn
 
 ## 3. Cấu trúc source đích
 
-Ngày 14/10/2026 đã tạo `apps/api` và `packages/contracts`: Projects API/service/repository, config, DB/migrations, error handler và fake AgentRunner dùng trong test. [README backend](../../apps/api/README.md) chỉ rõ file thật và lệnh chạy. Cây bên dưới gồm cả các module **chưa triển khai**; UI Projects đã được thêm tại `apps/web` ngày 15/10; CLI/jobs/analysis/artifacts/reviews chưa được triển khai. Projects hiện chỉ nhận `fixtureId`, chưa đăng ký source root thật.
+Source hiện có Projects UI/API/service/repository, config, DB/migrations, error handler, fake AgentRunner cho test, thư viện/CLI Analyze VB6 độc lập và harness E2E fixture. Xem [README backend](../../apps/api/README.md) để mở file thật. Cây bên dưới là **cấu trúc đích**, gồm cả module chưa triển khai: jobs, Analysis API/UI, artifacts, reviews và adapter Claude CLI. Projects hiện chỉ nhận `fixtureId`, chưa đăng ký source root thật.
 
 ```text
 apps/
@@ -52,7 +52,7 @@ apps/
     features/                    # projects/, jobs/, artifacts/, reviews/
     shared/api/                  # api-client.ts, SSE client
     shared/ui/                   # component hiển thị dùng chung
-packages/contracts/src/          # project.schema.ts, job.schema.ts, artifact.schema.ts, error.schema.ts
+packages/contracts/src/          # project/source-registration/run/artifact/error schema, analyze-api.ts, fixtures/
 tests/e2e/                       # browser test bằng fixture sạch
 tests/fixtures/                  # source giả lập và expected result nhỏ
 docs/engineering/                # bộ hướng dẫn này
@@ -108,7 +108,7 @@ SSE chứa run ID, số thứ tự và trạng thái/progress; không phải ngu
 - SQLite lưu project/run/manifest index/artifact index/review/event metadata. Filesystem lưu snapshot và nội dung artifact theo ID do server sinh.
 - Review append-only, khóa vào artifact version + source hash. Review cũ vẫn là lịch sử hợp lệ cho version cũ; không được áp dụng cho artifact/source mới.
 - Evidence lưu relative path, dòng 1-based, quote, hash và trạng thái đã kiểm chứng/cần xác minh. Việc quote tồn tại không tự chứng minh suy luận nghiệp vụ đúng.
-- Snapshot giữ raw bytes và decoded view theo profile CP932/BOM, line/quote không bị lệch do bỏ header/designer. Text allowlist `.bas/.frm/.vbp`; `.frx` là resource binary, không phải text. Không mang theo config agent, hook, plugin, MCP hoặc secrets từ source khách hàng.
+- Snapshot giữ raw bytes và decoded view theo profile CP932/BOM, line/quote không bị lệch do bỏ header/designer. Text allowlist `.bas/.frm/.cls/.vbp`; `.frx` là resource binary, không phải text. Không mang theo config agent, hook, plugin, MCP hoặc secrets từ source khách hàng.
 - Runtime Claude CLI dùng cấu hình do app kiểm soát. Source, comment và tài liệu khách hàng là dữ liệu không đáng tin; không được trở thành instruction điều khiển tool. Chỉ đọc snapshot, không cấp shell/write tùy ý. Xác nhận cách giới hạn tool/settings theo phiên bản CLI trong spike trước khi nhận source thực.
 
 ## 8. Local runtime và hướng mở rộng

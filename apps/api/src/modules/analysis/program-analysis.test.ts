@@ -45,7 +45,9 @@ const SOURCES: Record<string, { shared: boolean; lines: string[] }> = {
 
 function programFiles(): ProgramFile[] {
   const analyses = Object.entries(SOURCES).map(([path, source]) => {
-    const analysis = analyzeVb6CodeFile(path, source.lines, { form: false });
+    const analysis = analyzeVb6CodeFile(path, source.lines, {
+      module: 'standard',
+    });
     if (analysis.status !== 'analyzed') throw new Error(path);
     return { path, source, analysis };
   });
@@ -55,7 +57,7 @@ function programFiles(): ProgramFile[] {
     shared: source.shared,
     analysis,
     references: findVb6References(path, source.lines, {
-      form: false,
+      module: 'standard',
       names,
     }),
   }));
@@ -130,7 +132,7 @@ describe('analyzeProgram', () => {
   });
 });
 
-describe('scoreComplexity (draft v0)', () => {
+describe('scoreComplexity (v0)', () => {
   const zero: ProgramMetrics = {
     ownFiles: 0,
     ownCodeLines: 0,
@@ -163,5 +165,46 @@ describe('scoreComplexity (draft v0)', () => {
     const small = scoreComplexity({ ...zero, ownCodeLines: 400 }).score;
     const large = scoreComplexity({ ...zero, ownCodeLines: 8000 }).score;
     expect(large).toBeGreaterThan(small);
+  });
+
+  // Unrounded scores in comments; levels still use the rounded score.
+  it.each([
+    // 34.45: far from both thresholds.
+    [{ ownCodeLines: 393, decisionPoints: 47, tables: 2 }, 34, 'low', []],
+    // 38.09: Low, within 3 points of 40.
+    [
+      { ownCodeLines: 577, decisionPoints: 73, tables: 3 },
+      38,
+      'low',
+      ['near-threshold'],
+    ],
+    // 39.71: Medium only through rounding, so it is flagged.
+    [
+      { ownCodeLines: 580, decisionPoints: 65, tables: 2, components: 1 },
+      40,
+      'medium',
+      ['near-threshold'],
+    ],
+    // 65.92: High is always flagged.
+    [
+      { ownCodeLines: 9206, decisionPoints: 1408, tables: 15, components: 2 },
+      66,
+      'high',
+      ['high'],
+    ],
+    // 57.11: High and within 3 points of 55.
+    [
+      { ownCodeLines: 5175, decisionPoints: 804, tables: 6, components: 1 },
+      57,
+      'high',
+      ['high', 'near-threshold'],
+    ],
+  ])('flags %j for review', (metrics, score, level, reviewFlags) => {
+    expect(scoreComplexity({ ...zero, ...metrics })).toMatchObject({
+      version: 'complexity-v0',
+      score,
+      level,
+      reviewFlags,
+    });
   });
 });

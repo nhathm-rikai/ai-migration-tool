@@ -54,7 +54,7 @@ describe('buildSourceInventory on the vb6-sample fixture', () => {
     ).toEqual({
       'cmn/COMMON.BAS': ['code', 'text', 'analyzed'],
       'programs/SAMPLE/BUILD.LOG': ['excluded', 'excluded', null],
-      'programs/SAMPLE/LEGACY.CLS': ['unsupported', 'excluded', null],
+      'programs/SAMPLE/LEGACY.CLS': ['code', 'text', 'analyzed'],
       'programs/SAMPLE/SAMPLE.BAS': ['code', 'text', 'analyzed'],
       'programs/SAMPLE/SAMPLE.VBP': ['project', 'text', null],
       'programs/SAMPLE/SAMPLEFORM.FRM': ['code', 'text', 'analyzed'],
@@ -62,13 +62,14 @@ describe('buildSourceInventory on the vb6-sample fixture', () => {
     });
     expect(inventory.totals).toMatchObject({
       files: 7,
-      codeFiles: 3,
-      analyzedCodeFiles: 3,
-      unsupportedFiles: 1,
+      codeFiles: 4,
+      analyzedCodeFiles: 4,
+      unsupportedFiles: 0,
       errorFiles: 0,
     });
-    // 24 (SAMPLE.BAS) + 7 (SAMPLEFORM.FRM) + 4 (COMMON.BAS), hand-labelled.
-    expect(inventory.totals.uniqueCounters.codeLines).toBe(35);
+    // 24 (SAMPLE.BAS) + 7 (SAMPLEFORM.FRM) + 4 (COMMON.BAS) + 17
+    // (LEGACY.CLS), hand-labelled.
+    expect(inventory.totals.uniqueCounters.codeLines).toBe(52);
   });
 
   it('resolves project members and keeps unresolved ones visible', () => {
@@ -97,10 +98,11 @@ describe('buildSourceInventory on the vb6-sample fixture', () => {
         'analyzed',
       ],
       ['MISSING.BAS', null, 'missing', null],
-      ['LEGACY.CLS', 'programs/SAMPLE/LEGACY.CLS', 'resolved', 'unsupported'],
+      ['LEGACY.CLS', 'programs/SAMPLE/LEGACY.CLS', 'resolved', 'analyzed'],
     ]);
+    // Still incomplete: MISSING.BAS is declared but absent.
     expect(program?.complete).toBe(false);
-    expect(program?.counters.codeLines).toBe(35);
+    expect(program?.counters.codeLines).toBe(52);
     expect(program?.externalReferences.map((ref) => ref.fileName)).toEqual([
       'stdole2.tlb',
       'SPIN32.OCX',

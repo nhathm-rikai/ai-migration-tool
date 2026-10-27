@@ -5,6 +5,8 @@ coverage/
 .env.*
 !.env.example
 *.log
+# Byte-exact analyzer fixtures include a .log file that tests expect.
+!/tests/fixtures/**/*.log
 *.db
 *.db-*
 *.sqlite

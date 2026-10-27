@@ -2,7 +2,7 @@
 
 Mẫu cho Dev khi mở rộng Projects/API/UI: [policy và lỗi API](../../docs/engineering/patterns/api-errors-policy.md). Policy tên/default pagination/fixture dùng chung từ contracts; public error code có type chung, status/message an toàn nằm tại BE. Handler chỉ ánh xạ AppError và lỗi Fastify đã nhận diện; dependency error chưa biết dùng INTERNAL_ERROR, không biến mọi status 4xx thành INVALID_INPUT. Schema/HTTP response và DB hiện có giữ tương thích, migration cũ không sửa.
 
-Đây là mẫu chạy được cho gate **init**, feature **Projects/API/storage**. Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật và fake AgentRunner. Chỉ quản lý metadata project demo; `fixtureId: sample-vb6` là nhãn dữ liệu mẫu, chưa có bộ phân tích VB6. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID.
+API hiện chạy ở gate **init**, feature **Projects/API/storage**. Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật và fake AgentRunner dùng trong test. API chỉ quản lý metadata project demo; `fixtureId: sample-vb6` là nhãn dữ liệu mẫu. Thư viện/CLI Analyze VB6 đã có riêng, chưa nối vào Projects/API/job. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID.
 
 ## Chạy và cấu hình
 
@@ -82,7 +82,7 @@ Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name kh�
 
 `src/modules/analysis/` đọc bytes đã có sẵn trong bộ nhớ và trả inventory; không tự đọc filesystem, không gọi AI. Thứ tự đọc: `source-decoder.ts` → `source-text.ts` → `source-manifest.ts` → `vb6/vb6-line-lexer.ts` → `vb6/vb6-code-file.ts` → `source-inventory.ts`. Thêm ngôn ngữ: tạo analyzer theo `language-analyzer.ts`, đăng ký profile trong `source-profiles.ts`, thêm fixture/test; core không đổi. Metric và encoding theo [source-analysis](../../docs/engineering/specs/source-analysis.md); fixture ở `tests/fixtures/vb6-sample/`.
 
-Sau `source-inventory.ts`, `sql-access.ts` trích bảng/CRUD và `program-analysis.ts` dựng call graph, CRUD, metrics và complexity v0 theo program. Hình dạng JSON và giới hạn theo [source-inventory](../../docs/engineering/specs/source-inventory.md); schema ở `@portal/contracts`. Lệnh dev/TL: `node apps/api/dist/cli/analyze-source.js --root <source> --out <inventory.json> [--summary <programs.csv>]` (chỉ đọc source, chưa nối API/job).
+`buildSourceInventory` trong `source-inventory.ts` điều phối toàn bộ: parse project/member → scan từng file (gồm dựng chuỗi và trích SQL bằng `sql-access.ts`) → tìm reference → `program-analysis.ts` dựng call graph, CRUD, metrics và complexity v0 theo program. Mapping schema thêm góc nhìn normalized, giữ số liệu gốc. Hình dạng JSON/giới hạn theo [source-inventory](../../docs/engineering/specs/source-inventory.md), schema ở `@portal/contracts`. Lệnh dev/TL: `node apps/api/dist/cli/analyze-source.js --root <source> --out <inventory.json> [--summary <programs.csv>] [--default-schema <schema> [--schema-confirmed]]` (chỉ đọc source, chưa nối API/job).
 
 ## Sửa file nào khi có task mới?
 

@@ -2,7 +2,9 @@
 
 **Bản 1.1 — 13/10/2026.** Dành cho Dev, người review và AI coding assistant.
 
-**Trạng thái source 14/10/2026:** đã init backend fixture trong [apps/api](../../apps/api/README.md), shared contracts trong `packages/contracts`. Có Projects API → service → SQLite và fake runner dùng trong test. Ngày 15/10 đã có [UI Projects](../../apps/web/README.md) nối API thật bằng fixture; chưa engine CLI/Analyze. Phần mô tả pipeline bên dưới là kiến trúc đích.
+Thư mục engineering giữ convention, đặc tả, workflow và quyết định kỹ thuật cho cả người lẫn AI.
+
+**Trạng thái source 22/10/2026:** có Projects UI/API → service → SQLite, shared contracts, fake runner cho test, thư viện/CLI Analyze VB6 và harness E2E fixture. Analyze chưa nối API/job/UI; chưa Understand/Claude CLI hoặc artifact/review/export workflow. Pipeline sản phẩm đầy đủ bên dưới vẫn là kiến trúc đích.
 
 RIKAI là portal chạy local để chọn thư mục source legacy, phân tích, đọc kết quả có dẫn chứng, review và xuất báo cáo. Backend gọi Claude Code CLI đã đăng nhập. Source gốc chỉ đọc; dữ liệu làm việc được lưu riêng trên máy. UI local không có nghĩa là AI chạy offline.
 
@@ -43,12 +45,14 @@ RIKAI là portal chạy local để chọn thư mục source legacy, phân tích
 
 - [Đọc source, encoding, evidence và LoC](specs/source-analysis.md): CP932 cho profile BSN; binary không decode; metric `vb6-physical-code-v1` và cách đối chiếu baseline.
 - [Source inventory](specs/source-inventory.md): JSON `source-inventory-v1` cho agent/report: SQL/CRUD, call graph, complexity v0 và CLI.
+- [Báo cáo inventory theo program](specs/inventory-report.md): JSON/XLSX `inventory-report-v1` từ inventory, LoC theo function, dependency/CRUD, totals per-program và unique, cảnh báo.
+- [Hợp đồng Analyze: source/run/artifact](specs/analyze-run-contract.md): API đăng ký source, start/list/cancel run, SSE, artifact inventory, mã lỗi và fixture `@portal/contracts/fixtures` (C01, chưa có route).
 - [Hợp đồng BR/Design](specs/understanding-contract.md): payload AI, metadata do backend tạo, semantic validation và review.
 - [JSON Schema](contracts/understanding-payload.schema.json) và [sample sạch](contracts/understanding-example.json): dùng để implement/test contract khi init, không phải code engine đã chạy.
 
 Những đặc tả này thuộc Portal Analyze/Understand. Quy tắc convert VB6 → C# vẫn nằm ở bộ agent migration riêng, chưa được tạo trong bộ này.
 
-Các file hiện có được dẫn trong [README backend](../../apps/api/README.md) và [examples](examples.md). `apps/web` hiện có shell và Projects; jobs/analysis/artifacts/reviews và CLI adapter vẫn là cấu trúc dự kiến. Rule áp dụng cho code mới và code bị thay đổi trong phạm vi task; không tự sửa hàng loạt tài liệu, demo hoặc source khách hàng cũ để đạt convention.
+Các file hiện có được dẫn trong [README backend](../../apps/api/README.md) và [examples](examples.md). `apps/web` hiện có shell và Projects; thư viện/CLI analysis đã chạy độc lập, còn jobs, Analysis API/UI, artifacts, reviews và adapter Claude CLI là cấu trúc dự kiến. Rule áp dụng cho code mới và code bị thay đổi trong phạm vi task; không tự sửa hàng loạt tài liệu, demo hoặc source khách hàng cũ để đạt convention.
 
 ## Cách hiểu mức bắt buộc
 

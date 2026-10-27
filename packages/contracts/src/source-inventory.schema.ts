@@ -111,8 +111,21 @@ const ProcedureSchema = Type.Object(
     ]),
     startLine: Line,
     endLine: Line,
+    // Code lines of `metricVersion` (source size, declarations included).
     codeLines: Count,
     decisionPoints: Count,
+    // Breakdown of startLine..endLine, `procedureLinesVersion`; optional for
+    // inventories written before it. physicalLines = codeLines +
+    // commentOnlyLines + blankLines + metadataLines + unclassifiedLines.
+    // executableLines (processing statements) and sqlLines (code lines
+    // writing SQL text) are both subsets of codeLines and may overlap.
+    physicalLines: Type.Optional(Count),
+    executableLines: Type.Optional(Count),
+    commentOnlyLines: Type.Optional(Count),
+    blankLines: Type.Optional(Count),
+    metadataLines: Type.Optional(Count),
+    unclassifiedLines: Type.Optional(Count),
+    sqlLines: Type.Optional(Count),
   },
   Strict,
 );
@@ -218,6 +231,13 @@ const ComplexitySchema = Type.Object(
       Type.Literal('medium'),
       Type.Literal('high'),
     ]),
+    // Levels a person must look at before use (complexity-v0); optional for
+    // inventories written before the flags.
+    reviewFlags: Type.Optional(
+      Type.Array(
+        Type.Union([Type.Literal('high'), Type.Literal('near-threshold')]),
+      ),
+    ),
     parts: Type.Object(
       {
         size: Type.Number(),
@@ -330,6 +350,8 @@ export const SourceInventorySchema = Type.Object(
     profileId: Type.String(),
     languageId: Type.String(),
     metricVersion: Type.String(),
+    // Optional for inventories written before the procedure breakdown.
+    procedureLinesVersion: Type.Optional(Type.String()),
     decoderVersion: Type.String(),
     normalizationVersion: Type.String(),
     sqlAccessVersion: Type.String(),

@@ -70,7 +70,7 @@ for (const name of ['portal-implement', 'portal-techlead-review']) {
   assert.ok(codex.metadata.description.length > 20);
   assert.deepEqual(claude.metadata, {
     ...codex.metadata,
-    'disable-model-invocation': 'true',
+    'disable-model-invocation': name === 'portal-implement' ? 'false' : 'true',
   });
   const normalizeInvocation = (body) =>
     body.replaceAll(`Dùng ${name}. `, `/${name} `);

@@ -13,7 +13,7 @@ Mở tool từ root repo sản phẩm chứa `package.json` và AGENTS.md. Bộ 
 - Entrypoint: [CLAUDE.md](../../CLAUDE.md), có mục engineering ở đầu.
 - Skills: [implement](../../.claude/skills/portal-implement/SKILL.md), [review](../../.claude/skills/portal-techlead-review/SKILL.md).
 - Gọi `/portal-implement <task>` hoặc `/portal-techlead-review <phạm vi>`.
-- Hai wrapper có `disable-model-invocation: true` để chọn workflow tường minh. Khi tool không hiện skill, mở lại session từ project root và kiểm tra chế độ project skills có được bật.
+- Wrapper `portal-implement` có `disable-model-invocation: false`: Claude có thể tự chọn khi được giao implement/sửa bug; vẫn gọi được `/portal-implement <task>`. Wrapper `portal-techlead-review` giữ `disable-model-invocation: true`, gọi tường minh để chọn lượt review-only. Khi tool không hiện skill, mở lại session từ project root và kiểm tra chế độ project skills có được bật.
 
 Vị trí project skill và cơ chế explicit invocation theo [Claude Code Skills](https://code.claude.com/docs/en/skills). Project instruction theo [Claude Code Memory](https://code.claude.com/docs/en/memory).
 

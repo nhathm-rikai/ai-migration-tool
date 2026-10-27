@@ -97,9 +97,15 @@ test(
     await expect(
       runPanel.getByRole('status').filter({ hasText: 'Hoàn tất' }),
     ).toBeVisible({ timeout: 20_000 });
+    await runPanel
+      .getByRole('button', { name: 'Xem kết quả phân tích' })
+      .click();
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
-    await expect(assessment.getByText('Danh sách program')).toBeVisible();
+    await expect(
+      assessment.getByRole('tab', { name: 'Danh sách program' }),
+    ).toBeVisible();
+    await assessment.getByText('Thông tin kỹ thuật').click();
     await expect(
       assessment.getByText('Kiểm kê từ bản chụp mã nguồn trên máy này'),
     ).toBeVisible();
@@ -111,22 +117,27 @@ test(
     await expect(assessment.getByTestId('coverage')).toHaveText('4 / 4');
     await expect(assessment.getByText('MEMBER_UNRESOLVED')).toBeVisible();
 
-    await assessment.getByRole('button', { name: 'SampleProject' }).click();
+    await assessment.getByRole('tab', { name: 'Danh sách program' }).click();
+    await assessment.getByRole('button', { name: 'SAMPLE' }).click();
     const detail = assessment.getByRole('region', {
-      name: 'Chi tiết program SampleProject',
+      name: 'Chi tiết program SAMPLE',
     });
-    await expect(detail.getByText('File của SampleProject')).toBeVisible();
+    await detail.getByRole('tab', { name: /^File/ }).click();
+    await expect(detail.getByText('File của SAMPLE')).toBeVisible();
     await expect(
       detail.getByRole('row').filter({ hasText: 'MISSING.BAS' }),
     ).toContainText('Không tìm thấy');
     await expect(
       detail.getByRole('row').filter({ hasText: 'MISSING.BAS' }),
     ).toContainText('Chưa phân tích');
+    await detail.getByRole('tab', { name: /^Procedure/ }).click();
     await expect(
       detail.getByRole('row').filter({ hasText: 'CalcTotal' }),
     ).toContainText('programs/SAMPLE/SAMPLE.BAS');
     await expect(detail.getByText('Procedure và LoC')).toBeVisible();
+    await detail.getByRole('tab', { name: /^Lời gọi/ }).click();
     await expect(detail.getByText('Lời gọi', { exact: true })).toBeVisible();
+    await detail.getByRole('tab', { name: /^CRUD/ }).click();
     await detail.getByLabel('Sau ánh xạ tên bảng').check();
     await expect(
       detail.getByText('Không phát hiện truy cập bảng.'),
@@ -155,9 +166,7 @@ test(
     expect(await readdir(join(dataDir, 'artifacts', '.staging'))).toEqual([]);
 
     await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
-    await expect(
-      page.getByText('プログラム SampleProject の詳細'),
-    ).toBeVisible();
+    await expect(page.getByText('プログラム SAMPLE の詳細')).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(
       await page.evaluate(
@@ -173,6 +182,7 @@ test(
     // Reload: same version and bytes, nothing started again.
     await page.reload();
     await openProject(page, projectName);
+    await page.getByRole('button', { name: '解析結果を表示' }).click();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('52');
     const again: unknown = await (

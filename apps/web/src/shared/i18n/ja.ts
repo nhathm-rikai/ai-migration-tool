@@ -8,7 +8,7 @@ export const jaMessages = {
   app: {
     skipToContent: 'メインコンテンツへ移動',
     subtitle: 'レガシーシステムのアセスメント',
-    demo: 'DEMO · サンプルデータ',
+    demo: '試験版',
     language: '言語',
     session: {
       pending: 'ローカルバックエンドに接続しています…',
@@ -31,8 +31,9 @@ export const jaMessages = {
     empty: 'プロジェクトはまだありません',
     emptyHelp: 'プロジェクトを作成して、作業を開始してください。',
     overview: 'プロジェクト概要',
-    unavailable: '未対応',
-    notAvailableYet: '未対応',
+    unavailable: '今後対応',
+    notAvailableYet: '今後対応',
+    results: '解析結果',
     pageCount: (count: number) => `このページのプロジェクト数：${count}件`,
     firstPage: '最初のページ',
     nextPage: '次のページ',
@@ -41,17 +42,33 @@ export const jaMessages = {
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
-    localData: '登録済みのソースフォルダー',
+    localData: 'このPC上のソースコード',
     assessmentSteps: 'アセスメントの手順',
     stages: {
-      analysis: { title: 'AI解析', description: 'パーサー + AIエージェント' },
-      report: { title: '評価レポート', description: '解析結果' },
-      review: { title: 'レビュー', description: 'SA/PMによる承認' },
-      proposal: { title: '提案書', description: '提案書のドラフト' },
+      analysis: {
+        title: '解析',
+        description: '静的解析 + AIエージェント',
+        status: '静的解析は対応済み · AIは今後対応',
+      },
+      report: {
+        title: '評価レポート',
+        description: '解析結果',
+        status: '今後対応',
+      },
+      review: {
+        title: 'レビュー',
+        description: 'SA/PMによる承認',
+        status: '今後対応',
+      },
+      proposal: {
+        title: '提案書',
+        description: '提案書のドラフト',
+        status: '今後対応',
+      },
     },
     created: 'プロジェクトを作成しました。',
     footer:
-      'デモモード · ローカルAPIでプロジェクトを管理します。解析、レビュー、レポート出力は未対応です。',
+      'プロジェクトと結果はこのPCに保存されます。対応済み：ソース登録と静的解析。今後対応：AIによる業務理解、レビュー、レポート出力。',
     create: {
       eyebrow: 'ワークスペース',
       description:
@@ -59,7 +76,7 @@ export const jaMessages = {
       name: 'プロジェクト名',
       placeholder: '例：販売管理システム',
       nameInvalid: `プロジェクト名は${PROJECT_NAME_MIN_LENGTH}～${PROJECT_NAME_MAX_LENGTH}文字で入力してください。空白のみの名前は使用できません。`,
-      nameHelp: `最大${PROJECT_NAME_MAX_LENGTH}文字。サンプル用の名前とデータのみを使用してください。`,
+      nameHelp: `最大${PROJECT_NAME_MAX_LENGTH}文字。`,
       sample: 'VB6サンプルデータ',
       sampleDescription:
         'プロジェクト情報のみを保存します。ソースコードは読み込みません。',
@@ -83,12 +100,14 @@ export const jaMessages = {
       data: 'データ',
       createdAt: '作成日時',
       ready: 'プロジェクトを管理できます',
+      technical: '技術情報',
       unavailable:
         'このバージョンでは、実際のソース解析、レビュー、レポート作成は未対応です。下の解析実行はデモです。',
     },
   },
   source: {
     title: 'ソースコード',
+    technical: '技術情報',
     loading: 'ソース情報を読み込み中…',
     reload: 'ソースを再読み込み',
     unregistered:
@@ -172,6 +191,8 @@ export const jaMessages = {
     retry: '再実行',
     noRun: 'このプロジェクトの実行はまだありません。',
     current: '表示中の実行',
+    openResults: '解析結果を表示',
+    technical: '技術情報',
     history: '実行履歴',
     loadMore: 'さらに読み込む',
     view: '表示',
@@ -242,6 +263,18 @@ export const jaMessages = {
   },
   assessment: {
     title: 'アセスメント概要',
+    back: '← プロジェクト概要',
+    tabsLabel: '解析結果の項目',
+    tabs: {
+      overview: '概要',
+      programs: 'プログラム一覧',
+      detail: 'プログラム詳細',
+    },
+    technical: '技術情報',
+    distributionTitle: '複雑度の分布（参考）',
+    stateTitle: 'プログラムの解析状況',
+    programCount: (count: string) => `${count} プログラム`,
+    showPrograms: '一覧を表示',
     loading: 'インベントリ結果を読み込み中…',
     retry: '結果を再読み込み',
     empty:
@@ -319,6 +352,13 @@ export const jaMessages = {
       mappedTables: (count: string) => `（マッピング後: ${count}）`,
       draft: 'ドラフト',
       needsReview: '要確認',
+      declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
+      sortBy: (column: string) => `${column}で並べ替え`,
+      pageSize: '1ページの行数',
+      page: (page: number, pages: number) => `${page} / ${pages} ページ`,
+      previous: '前のページ',
+      next: '次のページ',
+      pagination: 'プログラム一覧のページ',
       columns: {
         program: 'プログラム',
         state: '状態',
@@ -355,6 +395,18 @@ export const jaMessages = {
     },
     detail: {
       title: (program: string) => `プログラム ${program} の詳細`,
+      back: '← 一覧に戻る',
+      tabsLabel: 'プログラム詳細の項目',
+      tabs: {
+        summary: '概要',
+        files: 'ファイル',
+        procedures: 'プロシージャ',
+        crud: 'CRUD',
+        calls: '呼び出し',
+      },
+      showingFirst: (shown: string, total: string) =>
+        `${total} 行中 ${shown} 行を表示しています。`,
+      showAll: 'すべて表示',
       issue: '解析できない理由:',
       incomplete:
         'このプログラムは不完全です（ファイル不足、未対応、または未分類の行があります）。数値は解析できた部分のみです。',

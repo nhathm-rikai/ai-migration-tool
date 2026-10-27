@@ -43,11 +43,12 @@ describe('Program detail (F04)', () => {
     render(
       <ProgramDetail inventory={mappedInventoryFixture} projectPath={PATH} />,
     );
+    fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
     const raw = screen.getByTestId('crud-raw');
     expect(within(raw).getByText('APP.ORDERS')).toBeTruthy();
     expect(within(raw).getByText('ORDERS')).toBeTruthy();
     expect(screen.getByTestId('detail-raw-complexity').textContent).toContain(
-      'Thấp (12)',
+      'Thấp · 12',
     );
     expect(screen.getByRole('note').textContent).toContain(
       'Giả định, cần người quản lý DB xác nhận (APP)',
@@ -61,7 +62,7 @@ describe('Program detail (F04)', () => {
     expect(screen.queryByTestId('crud-raw')).toBeNull();
     // The raw score is the analyzer's and does not follow the toggle.
     expect(screen.getByTestId('detail-raw-complexity').textContent).toContain(
-      'Thấp (12)',
+      'Thấp · 12',
     );
     expect(screen.getByText('Độ phức tạp sau ánh xạ')).toBeTruthy();
     expect(screen.getByTestId('detail-own-code-lines').textContent).toBe('6');
@@ -74,6 +75,7 @@ describe('Program detail (F04)', () => {
     render(
       <ProgramDetail inventory={unmappedInventoryFixture} projectPath={PATH} />,
     );
+    fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
     fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
     expect(screen.queryByTestId('crud-mapped')).toBeNull();
@@ -271,6 +273,11 @@ describe('Program detail (F04)', () => {
       <ProgramDetail inventory={mappedInventoryFixture} projectPath={PATH} />,
     );
     expect(screen.getByText('プログラム Order の詳細')).toBeTruthy();
+    const crudTab = screen.getByRole('tab', { name: /^CRUD/ });
+    crudTab.focus();
+    expect(document.activeElement).toBe(crudTab);
+    fireEvent.click(crudTab);
+    expect(crudTab.getAttribute('aria-selected')).toBe('true');
     const mapped = screen.getByRole('radio', {
       name: 'テーブル名マッピング後',
     });
@@ -279,5 +286,30 @@ describe('Program detail (F04)', () => {
     fireEvent.click(mapped);
     expect(screen.getByTestId('crud-mapped')).toBeTruthy();
     expect(screen.getByText('プロシージャとLoC')).toBeTruthy();
+  });
+
+  it('shows the first rows of a long table and the rest on request', () => {
+    const inventory = clone(mappedInventoryFixture);
+    const analysis = firstProgram(inventory).analysis;
+    if (!analysis) throw new Error('fixture is analyzed');
+    analysis.calls = Array.from({ length: 60 }, (_, index) => ({
+      from: `cmn/OrderRules.bas#Function:Caller${index}`,
+      name: `Callee${index}`,
+      resolution: 'local' as const,
+      targets: [`cmn/OrderRules.bas#Sub:Callee${index}`],
+      line: index + 1,
+      count: 1,
+    }));
+    render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
+    fireEvent.click(screen.getByRole('tab', { name: /^Lời gọi/ }));
+    expect(screen.getByText('Đang hiện 50 / 60 dòng.')).toBeTruthy();
+    expect(screen.queryByText('Callee55')).toBeNull();
+    // The caller shows its procedure and file; the full ID stays as title.
+    const caller = screen.getByText('Caller0').closest('th');
+    expect(caller?.getAttribute('title')).toBe(
+      'cmn/OrderRules.bas#Function:Caller0',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
+    expect(screen.getByText('Callee55')).toBeTruthy();
   });
 });

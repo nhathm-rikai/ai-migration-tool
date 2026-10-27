@@ -270,6 +270,8 @@ test(
     await expect(
       page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();
+    // The run ID is technical information, folded by default.
+    await page.locator('.run-detail details.technical > summary').click();
     await expect(page.getByText(run.id, { exact: true }).first()).toBeVisible();
     expect(starts).toBe(1);
     expect(page.url()).not.toContain(sourceRoot);

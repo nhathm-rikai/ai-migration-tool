@@ -97,44 +97,53 @@ function SourceSummary({
   const copy = messages.source;
   const { tableNameMapping: mapping } = source;
   return (
-    <dl className="project-metadata">
-      <div>
-        <dt>{copy.fields.folder}</dt>
-        <dd>{source.displayName}</dd>
-      </div>
-      <div>
-        <dt>{copy.fields.status}</dt>
-        <dd>
-          <span
-            className={`source-status status-${source.status}`}
-            role="status"
-          >
-            {copy.status[source.status]}
-          </span>
-        </dd>
-      </div>
-      <div>
-        <dt>{copy.fields.profile}</dt>
-        <dd>{profileLabel(source.profileId, copy.profiles)}</dd>
-      </div>
-      <div>
-        <dt>{copy.fields.defaultSchema}</dt>
-        <dd>
-          {mapping.defaultSchema !== null && (
-            <span className="mono">{mapping.defaultSchema} </span>
-          )}
-          <span className="badge">{copy.mappingStatus[mapping.status]}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>{copy.fields.revision}</dt>
-        <dd>{source.revision}</dd>
-      </div>
-      <div>
-        <dt>{copy.fields.checkedAt}</dt>
-        <dd>{formatDateTime(source.checkedAt)}</dd>
-      </div>
-    </dl>
+    <>
+      <dl className="project-metadata">
+        <div>
+          <dt>{copy.fields.folder}</dt>
+          <dd>{source.displayName}</dd>
+        </div>
+        <div>
+          <dt>{copy.fields.status}</dt>
+          <dd>
+            <span
+              className={`source-status status-${source.status}`}
+              role="status"
+            >
+              {copy.status[source.status]}
+            </span>
+          </dd>
+        </div>
+      </dl>
+      <details className="technical">
+        <summary>{copy.technical}</summary>
+        <dl className="project-metadata">
+          <div>
+            <dt>{copy.fields.profile}</dt>
+            <dd>{profileLabel(source.profileId, copy.profiles)}</dd>
+          </div>
+          <div>
+            <dt>{copy.fields.defaultSchema}</dt>
+            <dd>
+              {mapping.defaultSchema !== null && (
+                <span className="mono">{mapping.defaultSchema} </span>
+              )}
+              <span className="badge">
+                {copy.mappingStatus[mapping.status]}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt>{copy.fields.revision}</dt>
+            <dd>{source.revision}</dd>
+          </div>
+          <div>
+            <dt>{copy.fields.checkedAt}</dt>
+            <dd>{formatDateTime(source.checkedAt)}</dd>
+          </div>
+        </dl>
+      </details>
+    </>
   );
 }
 

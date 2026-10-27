@@ -23,10 +23,13 @@ export function ProjectDetail({
   runsApi,
   sourcesApi,
   artifactsApi,
+  onOpenResults,
   onClose,
 }: {
   id: string;
   api: ProjectsApi;
+  // Opens a succeeded run's results page; without it they show inline.
+  onOpenResults?: ((runId: string) => void) | undefined;
   // Without it the analyze runs panel is not shown (Projects-only tests).
   runsApi?: RunsApi | undefined;
   // Without it a local project shows no source and cannot start runs.
@@ -87,10 +90,6 @@ export function ProjectDetail({
           </div>
           <dl className="project-metadata">
             <div>
-              <dt>{copy.id}</dt>
-              <dd className="mono">{state.project.id}</dd>
-            </div>
-            <div>
               <dt>{copy.data}</dt>
               <dd>
                 {state.project.mode === 'demo' ? (
@@ -113,19 +112,27 @@ export function ProjectDetail({
               <dd>{formatDateTime(state.project.createdAt)}</dd>
             </div>
           </dl>
-          <div className="notice">
-            <strong>{copy.ready}</strong>
-            <p>
-              {state.project.mode === 'demo'
-                ? copy.unavailable
-                : messages.runs.localNotice}
-            </p>
-          </div>
+          <details className="technical">
+            <summary>{copy.technical}</summary>
+            <dl className="project-metadata">
+              <div>
+                <dt>{copy.id}</dt>
+                <dd className="mono">{state.project.id}</dd>
+              </div>
+            </dl>
+          </details>
+          {state.project.mode === 'demo' && (
+            <div className="notice">
+              <strong>{copy.ready}</strong>
+              <p>{copy.unavailable}</p>
+            </div>
+          )}
           {state.project.mode === 'demo' ? (
             runsApi && (
               <AnalyzeRunPanel
                 api={runsApi}
                 artifactsApi={artifactsApi}
+                onOpenResults={onOpenResults}
                 projectId={state.project.id}
                 demo
                 sourceRevision={FIXTURE_SOURCE_REVISION}
@@ -137,12 +144,14 @@ export function ProjectDetail({
               runsApi={runsApi}
               sourcesApi={sourcesApi}
               artifactsApi={artifactsApi}
+              onOpenResults={onOpenResults}
             />
           ) : (
             runsApi && (
               <AnalyzeRunPanel
                 api={runsApi}
                 artifactsApi={artifactsApi}
+                onOpenResults={onOpenResults}
                 projectId={state.project.id}
                 demo={false}
                 sourceRevision={null}
@@ -162,11 +171,13 @@ function SourceAndRuns({
   runsApi,
   sourcesApi,
   artifactsApi,
+  onOpenResults,
 }: {
   projectId: string;
   runsApi?: RunsApi | undefined;
   sourcesApi: SourcesApi;
   artifactsApi?: ArtifactsApi | undefined;
+  onOpenResults?: ((runId: string) => void) | undefined;
 }) {
   const source = useProjectSource(sourcesApi, projectId);
   return (
@@ -176,6 +187,7 @@ function SourceAndRuns({
         <AnalyzeRunPanel
           api={runsApi}
           artifactsApi={artifactsApi}
+          onOpenResults={onOpenResults}
           projectId={projectId}
           demo={false}
           sourceRevision={startableRevision(source.state)}

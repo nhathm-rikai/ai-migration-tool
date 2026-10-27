@@ -1,6 +1,8 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
+import { programLabel } from './assessment-summary';
+import { ComplexityTag } from './tags';
 import {
   crudRows,
   programDetail,
@@ -12,9 +14,9 @@ import {
 
 // Program detail (F04): member files, procedures with LoC, CRUD as written
 // or after table name mapping, calls and external dependencies of the
-// program selected in the overview. Lists and tables only; every value is
-// rendered as text (React escapes it), never as HTML or a link guessed from
-// a name.
+// program selected in the overview, one tab each. Lists and tables only;
+// every value is rendered as text (React escapes it), never as HTML or a
+// link guessed from a name.
 
 function useNumber() {
   const { locale } = useLocale();
@@ -38,8 +40,22 @@ export function ProgramDetail({
     [inventory, projectPath],
   );
   const titleId = useId();
+  const [tab, setTab] = useState<DetailTab>('summary');
   if (!detail) return null;
-  const label = detail.name ?? detail.projectPath;
+  const label = programLabel(detail.projectPath);
+  const analysis = detail.analysis;
+  const tabs: DetailTab[] = analysis
+    ? ['summary', 'files', 'procedures', 'crud', 'calls']
+    : ['summary', 'files'];
+  const panel = (value: DetailTab) => `${titleId}-${value}`;
+  const count = (value: DetailTab): number | null => {
+    if (value === 'files') return detail.members.length;
+    if (!analysis) return null;
+    if (value === 'procedures') return analysis.procedures.length;
+    if (value === 'crud') return analysis.rawCrud.length;
+    if (value === 'calls') return analysis.calls.length;
+    return null;
+  };
   return (
     <section className="program-detail" aria-labelledby={titleId}>
       <h5 id={titleId}>{copy.title(label)}</h5>
@@ -53,22 +69,106 @@ export function ProgramDetail({
         </p>
       )}
       {!detail.complete && <p className="notice">{copy.incomplete}</p>}
-      {detail.analysis ? (
-        <Summary analysis={detail.analysis} />
-      ) : (
-        <p className="empty-state">{copy.unavailable}</p>
-      )}
-      <Members rows={detail.members} label={label} />
-      {detail.analysis && (
+      <div className="tabs" role="tablist" aria-label={copy.tabsLabel}>
+        {tabs.map((value) => {
+          const total = count(value);
+          return (
+            <button
+              key={value}
+              id={`${panel(value)}-tab`}
+              role="tab"
+              className="tab"
+              aria-selected={tab === value}
+              aria-controls={panel(value)}
+              onClick={() => setTab(value)}
+            >
+              {copy.tabs[value]}
+              {total !== null && <span className="tab-count">{total}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <TabPanel id={panel('summary')} active={tab === 'summary'}>
+        {analysis ? (
+          <Summary analysis={analysis} />
+        ) : (
+          <p className="empty-state">{copy.unavailable}</p>
+        )}
+        <External detail={detail} />
+      </TabPanel>
+      <TabPanel id={panel('files')} active={tab === 'files'}>
+        <Members rows={detail.members} label={label} />
+      </TabPanel>
+      {analysis && (
         <>
-          <Procedures analysis={detail.analysis} />
-          <Crud detail={detail} analysis={detail.analysis} />
-          <Calls rows={detail.analysis.calls} />
+          <TabPanel id={panel('procedures')} active={tab === 'procedures'}>
+            <Procedures analysis={analysis} />
+          </TabPanel>
+          <TabPanel id={panel('crud')} active={tab === 'crud'}>
+            <Crud detail={detail} analysis={analysis} />
+          </TabPanel>
+          <TabPanel id={panel('calls')} active={tab === 'calls'}>
+            <Calls rows={analysis.calls} />
+          </TabPanel>
         </>
       )}
-      <External detail={detail} />
     </section>
   );
+}
+
+type DetailTab = 'summary' | 'files' | 'procedures' | 'crud' | 'calls';
+
+function TabPanel({
+  id,
+  active,
+  children,
+}: {
+  id: string;
+  active: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="tabpanel"
+      id={id}
+      aria-labelledby={`${id}-tab`}
+      hidden={!active}
+      className="detail-panel-body"
+    >
+      {children}
+    </div>
+  );
+}
+
+// Long tables show their first rows; the rest stays one click away.
+const ROW_LIMIT = 50;
+function useRowLimit<T>(rows: readonly T[]) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.detail;
+  const [all, setAll] = useState(false);
+  const number = useNumber();
+  const shown = all ? rows : rows.slice(0, ROW_LIMIT);
+  const more =
+    shown.length < rows.length ? (
+      <p className="muted row-limit">
+        {copy.showingFirst(number(shown.length), number(rows.length))}{' '}
+        <button className="link-button" onClick={() => setAll(true)}>
+          {copy.showAll}
+        </button>
+      </p>
+    ) : null;
+  return { shown, more };
+}
+
+// "path/File.frm#sub:Name" → "Name" and "File.frm"; the full ID stays in
+// the tooltip as evidence.
+function shortProcedure(id: string): { name: string; file: string } {
+  const [path = id, procedure = ''] = id.split('#');
+  const file = path.split('/').pop() ?? path;
+  const name = procedure.includes(':')
+    ? procedure.slice(procedure.indexOf(':') + 1)
+    : procedure;
+  return { name: name || file, file };
 }
 
 type Analysis = NonNullable<Detail['analysis']>;
@@ -76,7 +176,6 @@ type Analysis = NonNullable<Detail['analysis']>;
 function Summary({ analysis }: { analysis: Analysis }) {
   const { messages } = useLocale();
   const copy = messages.assessment.detail;
-  const levels = messages.assessment.programs.level;
   const number = useNumber();
   return (
     <dl className="stat-grid">
@@ -97,16 +196,23 @@ function Summary({ analysis }: { analysis: Analysis }) {
       <div>
         <dt>{copy.rawComplexity}</dt>
         <dd data-testid="detail-raw-complexity">
-          {levels[analysis.complexity.level]} ({analysis.complexity.score}){' '}
-          <span className="mono muted">{analysis.complexity.version}</span>
+          <ComplexityTag
+            level={analysis.complexity.level}
+            score={analysis.complexity.score}
+          />{' '}
+          <span className="mono muted version">
+            {analysis.complexity.version}
+          </span>
         </dd>
       </div>
       {analysis.mappedComplexity && (
         <div>
           <dt>{copy.mappedComplexity}</dt>
           <dd>
-            {levels[analysis.mappedComplexity.level]} (
-            {analysis.mappedComplexity.score})
+            <ComplexityTag
+              level={analysis.mappedComplexity.level}
+              score={analysis.mappedComplexity.score}
+            />
           </dd>
         </div>
       )}
@@ -120,6 +226,7 @@ function Members({ rows, label }: { rows: MemberRow[]; label: string }) {
   const members = messages.assessment.members;
   const number = useNumber();
   const id = useId();
+  const { shown, more } = useRowLimit(rows);
   const metric = (value: number | null) =>
     value === null ? copy.notAnalyzed : number(value);
   return (
@@ -139,7 +246,7 @@ function Members({ rows, label }: { rows: MemberRow[]; label: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {shown.map((row) => (
                 <tr key={row.key}>
                   <th scope="row">
                     <span className="mono">
@@ -174,6 +281,7 @@ function Members({ rows, label }: { rows: MemberRow[]; label: string }) {
           </table>
         </div>
       )}
+      {more}
     </section>
   );
 }
@@ -183,6 +291,7 @@ function Procedures({ analysis }: { analysis: Analysis }) {
   const copy = messages.assessment.detail;
   const number = useNumber();
   const id = useId();
+  const { shown, more } = useRowLimit(analysis.procedures);
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.proceduresTitle}</h6>
@@ -202,7 +311,7 @@ function Procedures({ analysis }: { analysis: Analysis }) {
               </tr>
             </thead>
             <tbody>
-              {analysis.procedures.map((row) => (
+              {shown.map((row) => (
                 <tr key={row.id}>
                   <th scope="row">
                     <span className="mono">{row.name}</span>{' '}
@@ -229,6 +338,7 @@ function Procedures({ analysis }: { analysis: Analysis }) {
           </table>
         </div>
       )}
+      {more}
     </section>
   );
 }
@@ -239,6 +349,7 @@ function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
   const [view, setView] = useState<CrudView>('raw');
   const id = useId();
   const { rows, shown, fallback } = crudRows(analysis, view);
+  const limited = useRowLimit(rows);
   const mapping = detail.tableNames;
   return (
     <section aria-labelledby={id}>
@@ -289,7 +400,7 @@ function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {limited.shown.map((row) => (
                 <tr key={row.table}>
                   <th scope="row">
                     <span className="mono">{row.table}</span>{' '}
@@ -310,6 +421,7 @@ function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
           </table>
         </div>
       )}
+      {limited.more}
     </section>
   );
 }
@@ -327,7 +439,16 @@ function CallTargets({ row }: { row: CallRow }) {
         </span>
       </>
     );
-  return <span className="mono">{row.targets.join(', ')}</span>;
+  return (
+    <span className="mono" title={row.targets.join(', ')}>
+      {row.targets
+        .map((target) => {
+          const { name, file } = shortProcedure(target);
+          return name === file ? file : `${name} (${file})`;
+        })
+        .join(', ')}
+    </span>
+  );
 }
 
 function Calls({ rows }: { rows: CallRow[] }) {
@@ -335,6 +456,7 @@ function Calls({ rows }: { rows: CallRow[] }) {
   const copy = messages.assessment.detail;
   const number = useNumber();
   const id = useId();
+  const { shown, more } = useRowLimit(rows);
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.callsTitle}</h6>
@@ -354,29 +476,34 @@ function Calls({ rows }: { rows: CallRow[] }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.key}>
-                  <th scope="row" className="mono">
-                    {row.from}
-                  </th>
-                  <td className="mono">
-                    {row.name} <span className="muted">L{row.line}</span>
-                  </td>
-                  <td>
-                    <span className="badge">
-                      {copy.resolution[row.resolution]}
-                    </span>
-                  </td>
-                  <td>
-                    <CallTargets row={row} />
-                  </td>
-                  <td>{number(row.count)}</td>
-                </tr>
-              ))}
+              {shown.map((row) => {
+                const caller = shortProcedure(row.from);
+                return (
+                  <tr key={row.key}>
+                    <th scope="row" title={row.from}>
+                      <span className="mono">{caller.name}</span>{' '}
+                      <span className="muted">{caller.file}</span>
+                    </th>
+                    <td className="mono">
+                      {row.name} <span className="muted">L{row.line}</span>
+                    </td>
+                    <td>
+                      <span className="badge">
+                        {copy.resolution[row.resolution]}
+                      </span>
+                    </td>
+                    <td>
+                      <CallTargets row={row} />
+                    </td>
+                    <td>{number(row.count)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+      {more}
     </section>
   );
 }

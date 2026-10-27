@@ -28,7 +28,7 @@ export const viMessages = {
   app: {
     skipToContent: 'Đến nội dung chính',
     subtitle: 'Đánh giá hệ thống cũ',
-    demo: 'DEMO · dữ liệu mẫu',
+    demo: 'Bản thử nghiệm',
     language: 'Ngôn ngữ',
     session: {
       pending: 'Đang kết nối backend cục bộ…',
@@ -51,8 +51,9 @@ export const viMessages = {
     empty: 'Chưa có dự án',
     emptyHelp: 'Tạo dự án để bắt đầu không gian làm việc.',
     overview: 'Tổng quan dự án',
-    unavailable: 'Chưa khả dụng',
-    notAvailableYet: 'Chưa có',
+    unavailable: 'Sắp có',
+    notAvailableYet: 'Sắp có',
+    results: 'Kết quả phân tích',
     pageCount: (count: number) => `${count} dự án trong trang`,
     firstPage: 'Về trang đầu',
     nextPage: 'Trang tiếp',
@@ -61,20 +62,33 @@ export const viMessages = {
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
-    localData: 'Thư mục mã nguồn đăng ký',
+    localData: 'Mã nguồn trên máy này',
     assessmentSteps: 'Các bước đánh giá',
     stages: {
       analysis: {
-        title: 'Phân tích AI',
-        description: 'Bộ phân tích + tác nhân AI',
+        title: 'Phân tích',
+        description: 'Phân tích tĩnh + tác nhân AI',
+        status: 'Phân tích tĩnh đã có · AI sắp có',
       },
-      report: { title: 'Báo cáo đánh giá', description: 'Kết quả phân tích' },
-      review: { title: 'Rà soát', description: 'SA/PM phê duyệt' },
-      proposal: { title: 'Đề xuất', description: 'Bản nháp đề xuất' },
+      report: {
+        title: 'Báo cáo đánh giá',
+        description: 'Kết quả phân tích',
+        status: 'Sắp có',
+      },
+      review: {
+        title: 'Rà soát',
+        description: 'SA/PM phê duyệt',
+        status: 'Sắp có',
+      },
+      proposal: {
+        title: 'Đề xuất',
+        description: 'Bản nháp đề xuất',
+        status: 'Sắp có',
+      },
     },
     created: 'Đã tạo dự án.',
     footer:
-      'Chế độ demo · Quản lý dự án trên máy này. Phân tích, rà soát và xuất báo cáo chưa khả dụng.',
+      'Dự án và kết quả được lưu trên máy này. Đã có: đăng ký mã nguồn và phân tích tĩnh. Sắp có: hiểu nghiệp vụ bằng AI, rà soát và xuất báo cáo.',
     create: {
       eyebrow: 'Không gian làm việc',
       description:
@@ -82,7 +96,7 @@ export const viMessages = {
       name: 'Tên dự án',
       placeholder: 'Ví dụ: Hệ thống quản lý bán hàng',
       nameInvalid: `Nhập tên dự án từ ${PROJECT_NAME_MIN_LENGTH} đến ${PROJECT_NAME_MAX_LENGTH} ký tự, không chỉ chứa khoảng trắng.`,
-      nameHelp: `Tối đa ${PROJECT_NAME_MAX_LENGTH} ký tự. Chỉ dùng tên và dữ liệu mẫu.`,
+      nameHelp: `Tối đa ${PROJECT_NAME_MAX_LENGTH} ký tự.`,
       sample: 'Dữ liệu mẫu VB6',
       sampleDescription: 'Chỉ lưu thông tin dự án, chưa đọc mã nguồn.',
       kind: 'Loại dự án',
@@ -105,12 +119,14 @@ export const viMessages = {
       data: 'Dữ liệu',
       createdAt: 'Ngày tạo',
       ready: 'Sẵn sàng quản lý dự án',
+      technical: 'Thông tin kỹ thuật',
       unavailable:
         'Phân tích mã nguồn thật, rà soát và tạo báo cáo chưa khả dụng trong bản này; lượt chạy phân tích bên dưới là demo.',
     },
   },
   source: {
     title: 'Mã nguồn',
+    technical: 'Thông tin kỹ thuật',
     loading: 'Đang tải thông tin mã nguồn…',
     reload: 'Tải lại mã nguồn',
     unregistered:
@@ -193,6 +209,8 @@ export const viMessages = {
     retry: 'Chạy lại',
     noRun: 'Chưa có lượt chạy nào cho dự án này.',
     current: 'Lượt chạy đang xem',
+    openResults: 'Xem kết quả phân tích',
+    technical: 'Thông tin kỹ thuật',
     history: 'Lịch sử lượt chạy',
     loadMore: 'Tải thêm',
     view: 'Xem',
@@ -261,6 +279,18 @@ export const viMessages = {
   },
   assessment: {
     title: 'Đánh giá tổng quan',
+    back: '← Tổng quan dự án',
+    tabsLabel: 'Các phần của kết quả phân tích',
+    tabs: {
+      overview: 'Tổng quan',
+      programs: 'Danh sách program',
+      detail: 'Chi tiết program',
+    },
+    technical: 'Thông tin kỹ thuật',
+    distributionTitle: 'Phân bố độ phức tạp (tham khảo)',
+    stateTitle: 'Tình trạng phân tích program',
+    programCount: (count: string) => `${count} program`,
+    showPrograms: 'Xem danh sách',
     loading: 'Đang tải kết quả kiểm kê…',
     retry: 'Tải lại kết quả',
     empty:
@@ -336,6 +366,13 @@ export const viMessages = {
       mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
       draft: 'Nháp',
       needsReview: 'Cần xem lại',
+      declaredName: (name: string) => `Tên trong project: ${name}`,
+      sortBy: (column: string) => `Sắp xếp theo ${column}`,
+      pageSize: 'Số dòng mỗi trang',
+      page: (page: number, pages: number) => `Trang ${page} / ${pages}`,
+      previous: 'Trang trước',
+      next: 'Trang sau',
+      pagination: 'Phân trang danh sách program',
       columns: {
         program: 'Program',
         state: 'Trạng thái',
@@ -376,6 +413,18 @@ export const viMessages = {
     },
     detail: {
       title: (program: string) => `Chi tiết program ${program}`,
+      back: '← Quay lại danh sách',
+      tabsLabel: 'Các phần của chi tiết program',
+      tabs: {
+        summary: 'Tóm tắt',
+        files: 'File',
+        procedures: 'Procedure',
+        crud: 'CRUD',
+        calls: 'Lời gọi',
+      },
+      showingFirst: (shown: string, total: string) =>
+        `Đang hiện ${shown} / ${total} dòng.`,
+      showAll: 'Xem tất cả',
       issue: 'Lý do không phân tích được:',
       incomplete:
         'Program chưa đầy đủ: có file thiếu, không hỗ trợ hoặc dòng chưa phân loại. Số liệu chỉ gồm phần đã phân tích.',

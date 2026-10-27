@@ -1,26 +1,35 @@
-import { useMemo, useState } from 'react';
-import type {
-  ArtifactEnvelope,
-  SourceInventoryDocument,
-} from '@portal/contracts';
+import { useId, useMemo, useState, type ReactNode } from 'react';
+import type { ArtifactEnvelope } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
 import type { Messages } from '../../shared/i18n/vi';
 import { projectErrorMessage } from '../projects/project-messages';
 import {
+  countBy,
   filterPrograms,
+  pageOf,
+  programLabel,
+  sortPrograms,
   summarizeInventory,
   type AssessmentSummary,
+  type AssessmentWarning,
+  type ComplexityLevel,
   type ProgramFilter,
   type ProgramRow,
+  type ProgramSort,
+  type ProgramSortKey,
+  type ProgramState,
 } from './assessment-summary';
 import { ProgramDetail } from './program-detail';
+import { ComplexityCell, ProgramStateTag } from './tags';
 import { useRunAssessment } from './use-run-assessment';
 
-// Assessment overview of one succeeded run (F03): header of the exact
-// artifact version, unique corpus totals apart from per-program totals,
-// coverage/warnings and the program list. Parent keys it by run.
+// Assessment of one succeeded run (F03/F04): an overview tab (unique corpus
+// totals apart from per-program totals, distributions, warnings), the
+// program list (filter, sort, pages) and the detail of the program picked
+// from it. Version/snapshot metadata stays available under "technical
+// information". Parent keys it by run.
 
 function assessmentErrorMessage(error: unknown, messages: Messages): string {
   if (
@@ -66,84 +75,11 @@ export function AssessmentOverview({
   );
 }
 
-function ArtifactView({ artifact }: { artifact: ArtifactEnvelope }) {
-  const { messages, formatDateTime } = useLocale();
-  const copy = messages.assessment;
-  const summary = useMemo(
-    () => summarizeInventory(artifact.payload),
-    [artifact.payload],
-  );
-  const mapping = summary.tableMapping;
-  return (
-    <>
-      <dl className="project-metadata assessment-header">
-        <div>
-          <dt>{copy.fields.mode}</dt>
-          <dd>
-            <span className="badge">
-              {artifact.mode === 'demo'
-                ? messages.projects.demoBadge
-                : messages.projects.localBadge}
-            </span>{' '}
-            {artifact.mode === 'demo' ? copy.demoData : copy.localData}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.fields.artifact}</dt>
-          <dd className="mono">
-            {artifact.id.slice(0, 8)} · v{artifact.version}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.fields.snapshot}</dt>
-          <dd className="mono" title={artifact.sourceSnapshotHash}>
-            {artifact.sourceSnapshotId.slice(0, 8)} ·{' '}
-            {artifact.sourceSnapshotHash.slice(0, 12)}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.fields.createdAt}</dt>
-          <dd>{formatDateTime(artifact.createdAt)}</dd>
-        </div>
-        <div>
-          <dt>{copy.fields.versions}</dt>
-          <dd className="mono">
-            {artifact.schemaVersion} · {artifact.payload.metricVersion}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.fields.tableMapping}</dt>
-          <dd>
-            {mapping ? copy.mapping[mapping.status] : copy.mapping.absent}
-            {mapping?.defaultSchema && (
-              <span className="mono"> ({mapping.defaultSchema})</span>
-            )}
-          </dd>
-        </div>
-      </dl>
-      <p className="muted">{copy.draftNotice}</p>
-      {summary.partial && (
-        <p className="notice" role="note">
-          <strong>{copy.partialTitle}</strong> {copy.partialHelp}
-        </p>
-      )}
-      <Totals summary={summary} />
-      {summary.warnings.length > 0 && (
-        <>
-          <h4>{copy.warningsTitle}</h4>
-          <ul className="assessment-warnings">
-            {summary.warnings.map((code) => (
-              <li key={code}>
-                {copy.warnings[code]} <span className="mono">{code}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      <ProgramList rows={summary.programs} inventory={artifact.payload} />
-    </>
-  );
-}
+type Tab = 'overview' | 'programs' | 'detail';
+
+const EMPTY_FILTER: ProgramFilter = { query: '', state: 'all', level: 'all' };
+const DEFAULT_SORT: ProgramSort = { key: 'complexity', direction: 'desc' };
+const PAGE_SIZES = [25, 50, 100] as const;
 
 function useNumber() {
   const { locale } = useLocale();
@@ -151,6 +87,232 @@ function useNumber() {
     const format = new Intl.NumberFormat(locale);
     return (value: number) => format.format(value);
   }, [locale]);
+}
+
+function ArtifactView({ artifact }: { artifact: ArtifactEnvelope }) {
+  const { messages } = useLocale();
+  const copy = messages.assessment;
+  const summary = useMemo(
+    () => summarizeInventory(artifact.payload),
+    [artifact.payload],
+  );
+  const [tab, setTab] = useState<Tab>('overview');
+  const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const baseId = useId();
+  const tabs: Tab[] = selectedKey
+    ? ['overview', 'programs', 'detail']
+    : ['overview', 'programs'];
+  const panelId = (value: Tab) => `${baseId}-${value}`;
+  const showPrograms = (next: Partial<ProgramFilter>) => {
+    setFilter({ ...EMPTY_FILTER, ...next });
+    setTab('programs');
+  };
+  return (
+    <>
+      <div className="tabs" role="tablist" aria-label={copy.tabsLabel}>
+        {tabs.map((value) => (
+          <button
+            key={value}
+            id={`${panelId(value)}-tab`}
+            role="tab"
+            className="tab"
+            aria-selected={tab === value}
+            aria-controls={panelId(value)}
+            onClick={() => setTab(value)}
+          >
+            {copy.tabs[value]}
+          </button>
+        ))}
+      </div>
+      <div
+        role="tabpanel"
+        id={panelId('overview')}
+        aria-labelledby={`${panelId('overview')}-tab`}
+        hidden={tab !== 'overview'}
+      >
+        <Overview
+          artifact={artifact}
+          summary={summary}
+          onShowPrograms={showPrograms}
+        />
+      </div>
+      <div
+        role="tabpanel"
+        id={panelId('programs')}
+        aria-labelledby={`${panelId('programs')}-tab`}
+        hidden={tab !== 'programs'}
+      >
+        <ProgramList
+          rows={summary.programs}
+          filter={filter}
+          onFilter={setFilter}
+          selectedKey={selectedKey}
+          onSelect={(key) => {
+            setSelectedKey(key);
+            setTab('detail');
+          }}
+        />
+      </div>
+      {selectedKey && (
+        <div
+          role="tabpanel"
+          id={panelId('detail')}
+          aria-labelledby={`${panelId('detail')}-tab`}
+          hidden={tab !== 'detail'}
+        >
+          <button
+            className="button small back-button"
+            onClick={() => setTab('programs')}
+          >
+            {copy.detail.back}
+          </button>
+          <ProgramDetail
+            key={selectedKey}
+            inventory={artifact.payload}
+            projectPath={selectedKey}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function Overview({
+  artifact,
+  summary,
+  onShowPrograms,
+}: {
+  artifact: ArtifactEnvelope;
+  summary: AssessmentSummary;
+  onShowPrograms: (filter: Partial<ProgramFilter>) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment;
+  return (
+    <>
+      <p className="muted">{copy.draftNotice}</p>
+      {summary.partial && (
+        <p className="notice" role="note">
+          <strong>{copy.partialTitle}</strong> {copy.partialHelp}
+        </p>
+      )}
+      <div className="assessment-charts">
+        <Distribution summary={summary} onShowPrograms={onShowPrograms} />
+      </div>
+      <Totals summary={summary} />
+      <Warnings summary={summary} onShowPrograms={onShowPrograms} />
+      <TechnicalInfo artifact={artifact} summary={summary} />
+    </>
+  );
+}
+
+const LEVELS: ComplexityLevel[] = ['low', 'medium', 'high'];
+const STATES: ProgramState[] = ['complete', 'partial', 'unsupported'];
+const STATE_TONE: Record<ProgramState, ComplexityLevel> = {
+  complete: 'low',
+  partial: 'medium',
+  unsupported: 'high',
+};
+
+function Distribution({
+  summary,
+  onShowPrograms,
+}: {
+  summary: AssessmentSummary;
+  onShowPrograms: (filter: Partial<ProgramFilter>) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment;
+  const number = useNumber();
+  const levels = countBy(
+    summary.programs,
+    (row) => row.complexity?.level ?? null,
+  );
+  const states = countBy(summary.programs, (row) => row.state);
+  const total = summary.programs.length;
+  return (
+    <>
+      <Bar
+        title={copy.distributionTitle}
+        total={total}
+        parts={LEVELS.map((level) => ({
+          key: level,
+          tone: level,
+          label: copy.programs.level[level],
+          count: levels[level] ?? 0,
+          onClick: () => onShowPrograms({ level }),
+        }))}
+        number={number}
+      />
+      <Bar
+        title={copy.stateTitle}
+        total={total}
+        parts={STATES.map((state) => ({
+          key: state,
+          tone: STATE_TONE[state],
+          label: copy.programs.state[state],
+          count: states[state] ?? 0,
+          onClick: () => onShowPrograms({ state }),
+        }))}
+        number={number}
+      />
+    </>
+  );
+}
+
+function Bar({
+  title,
+  total,
+  parts,
+  number,
+}: {
+  title: string;
+  total: number;
+  parts: {
+    key: string;
+    tone: ComplexityLevel;
+    label: string;
+    count: number;
+    onClick: () => void;
+  }[];
+  number: (value: number) => string;
+}) {
+  const shown = parts.filter((part) => part.count > 0);
+  return (
+    <section className="distribution">
+      <h4>{title}</h4>
+      <div className="stack" aria-hidden="true">
+        {shown.map((part) => (
+          <i
+            key={part.key}
+            className={`tone-${part.tone}`}
+            style={{ width: `${total ? (part.count / total) * 100 : 0}%` }}
+          />
+        ))}
+      </div>
+      <ul className="legend">
+        {parts.map((part) => (
+          <li key={part.key}>
+            <button
+              className="link-button"
+              disabled={part.count === 0}
+              onClick={part.onClick}
+            >
+              <span className={`tag tag-${part.tone}`}>{part.label}</span>{' '}
+              {number(part.count)}
+              {total > 0 && (
+                <span className="muted">
+                  {' '}
+                  ({Math.round((part.count / total) * 100)}%)
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function Totals({ summary }: { summary: AssessmentSummary }) {
@@ -223,27 +385,214 @@ function Totals({ summary }: { summary: AssessmentSummary }) {
   );
 }
 
-const EMPTY_FILTER: ProgramFilter = { query: '', state: 'all', level: 'all' };
+// Warnings that concern programs carry their count and open the list
+// filtered on them; the others are corpus-wide notes.
+function warningTarget(code: AssessmentWarning): Partial<ProgramFilter> | null {
+  if (code === 'PROGRAM_INCOMPLETE') return { state: 'partial' };
+  if (code === 'PROGRAM_UNSUPPORTED') return { state: 'unsupported' };
+  return null;
+}
+
+function Warnings({
+  summary,
+  onShowPrograms,
+}: {
+  summary: AssessmentSummary;
+  onShowPrograms: (filter: Partial<ProgramFilter>) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment;
+  const number = useNumber();
+  if (summary.warnings.length === 0) return null;
+  const affected = (code: AssessmentWarning) => {
+    const programs = summary.programs;
+    switch (code) {
+      case 'PROGRAM_INCOMPLETE':
+        return programs.filter((row) => row.state === 'partial').length;
+      case 'PROGRAM_UNSUPPORTED':
+        return programs.filter((row) => row.state === 'unsupported').length;
+      case 'MEMBER_UNRESOLVED':
+        return programs.filter((row) => row.unresolvedMembers > 0).length;
+      case 'COMPLEXITY_REVIEW':
+        return programs.filter((row) => row.complexity?.needsReview).length;
+      default:
+        return null;
+    }
+  };
+  return (
+    <>
+      <h4>{copy.warningsTitle}</h4>
+      <ul className="assessment-warnings">
+        {summary.warnings.map((code) => {
+          const count = affected(code);
+          const target = warningTarget(code);
+          return (
+            <li key={code}>
+              {copy.warnings[code]}
+              {count !== null && (
+                <strong> {copy.programCount(number(count))}</strong>
+              )}
+              {target && (
+                <>
+                  {' '}
+                  <button
+                    className="link-button"
+                    onClick={() => onShowPrograms(target)}
+                  >
+                    {copy.showPrograms}
+                  </button>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
+function TechnicalInfo({
+  artifact,
+  summary,
+}: {
+  artifact: ArtifactEnvelope;
+  summary: AssessmentSummary;
+}) {
+  const { messages, formatDateTime } = useLocale();
+  const copy = messages.assessment;
+  const mapping = summary.tableMapping;
+  return (
+    <details className="technical">
+      <summary>{copy.technical}</summary>
+      <dl className="project-metadata assessment-header">
+        <div>
+          <dt>{copy.fields.mode}</dt>
+          <dd>
+            <span className="badge">
+              {artifact.mode === 'demo'
+                ? messages.projects.demoBadge
+                : messages.projects.localBadge}
+            </span>{' '}
+            {artifact.mode === 'demo' ? copy.demoData : copy.localData}
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.fields.artifact}</dt>
+          <dd className="mono">
+            {artifact.id.slice(0, 8)} · v{artifact.version}
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.fields.snapshot}</dt>
+          <dd className="mono" title={artifact.sourceSnapshotHash}>
+            {artifact.sourceSnapshotId.slice(0, 8)} ·{' '}
+            {artifact.sourceSnapshotHash.slice(0, 12)}
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.fields.createdAt}</dt>
+          <dd>{formatDateTime(artifact.createdAt)}</dd>
+        </div>
+        <div>
+          <dt>{copy.fields.versions}</dt>
+          <dd className="mono">
+            {artifact.schemaVersion} · {artifact.payload.metricVersion}
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.fields.tableMapping}</dt>
+          <dd>
+            {mapping ? copy.mapping[mapping.status] : copy.mapping.absent}
+            {mapping?.defaultSchema && (
+              <span className="mono"> ({mapping.defaultSchema})</span>
+            )}
+          </dd>
+        </div>
+        {summary.warnings.length > 0 && (
+          <div>
+            <dt>{copy.warningsTitle}</dt>
+            <dd className="mono">
+              {summary.warnings.map((code) => (
+                <span key={code} className="warning-code">
+                  {code}
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </details>
+  );
+}
 
 function ProgramList({
   rows,
-  inventory,
+  filter,
+  onFilter,
+  selectedKey,
+  onSelect,
 }: {
   rows: ProgramRow[];
-  inventory: SourceInventoryDocument;
+  filter: ProgramFilter;
+  onFilter: (filter: ProgramFilter) => void;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   const { messages } = useLocale();
   const copy = messages.assessment.programs;
-  const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const visible = filterPrograms(rows, filter);
-  const selected = rows.find((row) => row.key === selectedKey) ?? null;
+  const [sort, setSort] = useState<ProgramSort>(DEFAULT_SORT);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const visible = useMemo(
+    () => sortPrograms(filterPrograms(rows, filter), sort),
+    [rows, filter, sort],
+  );
+  const current = pageOf(visible, page, pageSize);
   const number = useNumber();
   const metric = (value: number | null) =>
     value === null ? copy.notAnalyzed : number(value);
+  const changeFilter = (next: ProgramFilter) => {
+    onFilter(next);
+    setPage(1);
+  };
+  const header = (key: ProgramSortKey, label: string): ReactNode => {
+    const active = sort.key === key;
+    return (
+      <th
+        scope="col"
+        aria-sort={
+          active
+            ? sort.direction === 'asc'
+              ? 'ascending'
+              : 'descending'
+            : undefined
+        }
+      >
+        <button
+          className="sort-button"
+          aria-label={copy.sortBy(label)}
+          onClick={() => {
+            setSort(
+              active
+                ? {
+                    key,
+                    direction: sort.direction === 'asc' ? 'desc' : 'asc',
+                  }
+                : { key, direction: key === 'program' ? 'asc' : 'desc' },
+            );
+            setPage(1);
+          }}
+        >
+          {label}
+          <span aria-hidden="true" className="sort-mark">
+            {active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+      </th>
+    );
+  };
   return (
-    <section aria-labelledby="program-list-title">
-      <h4 id="program-list-title">{copy.title}</h4>
+    <section aria-label={copy.title}>
       <div className="program-filters">
         <label>
           <span>{copy.search}</span>
@@ -251,7 +600,7 @@ function ProgramList({
             type="search"
             value={filter.query}
             onChange={(event) =>
-              setFilter({ ...filter, query: event.currentTarget.value })
+              changeFilter({ ...filter, query: event.currentTarget.value })
             }
           />
         </label>
@@ -267,7 +616,7 @@ function ProgramList({
                 value === 'partial' ||
                 value === 'unsupported'
               )
-                setFilter({ ...filter, state: value });
+                changeFilter({ ...filter, state: value });
             }}
           >
             <option value="all">{copy.all}</option>
@@ -288,7 +637,7 @@ function ProgramList({
                 value === 'medium' ||
                 value === 'high'
               )
-                setFilter({ ...filter, level: value });
+                changeFilter({ ...filter, level: value });
             }}
           >
             <option value="all">{copy.all}</option>
@@ -304,81 +653,104 @@ function ProgramList({
       {visible.length === 0 ? (
         <p className="empty-state">{rows.length ? copy.noMatch : copy.none}</p>
       ) : (
-        <div className="table-scroll">
-          <table className="program-table">
-            <thead>
-              <tr>
-                <th scope="col">{copy.columns.program}</th>
-                <th scope="col">{copy.columns.state}</th>
-                <th scope="col">{copy.columns.ownCodeLines}</th>
-                <th scope="col">{copy.columns.codeLines}</th>
-                <th scope="col">{copy.columns.procedures}</th>
-                <th scope="col">{copy.columns.tables}</th>
-                <th scope="col">{copy.columns.complexity}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((row) => (
-                <tr
-                  key={row.key}
-                  className={row.key === selectedKey ? 'selected' : undefined}
-                >
-                  <th scope="row">
-                    <button
-                      className="link-button"
-                      aria-pressed={row.key === selectedKey}
-                      onClick={() =>
-                        setSelectedKey(row.key === selectedKey ? null : row.key)
+        <>
+          <div className="table-scroll">
+            <table className="program-table">
+              <thead>
+                <tr>
+                  {header('program', copy.columns.program)}
+                  {header('state', copy.columns.state)}
+                  {header('ownCodeLines', copy.columns.ownCodeLines)}
+                  {header('codeLines', copy.columns.codeLines)}
+                  {header('procedures', copy.columns.procedures)}
+                  {header('tables', copy.columns.tables)}
+                  {header('complexity', copy.columns.complexity)}
+                </tr>
+              </thead>
+              <tbody>
+                {current.items.map((row) => {
+                  const label = programLabel(row.projectPath);
+                  return (
+                    <tr
+                      key={row.key}
+                      className={
+                        row.key === selectedKey ? 'selected' : undefined
                       }
                     >
-                      {row.name ?? row.projectPath}
-                    </button>
-                    <span className="mono muted">{row.projectPath}</span>
-                  </th>
-                  <td>
-                    <span className={`run-status program-${row.state}`}>
-                      {copy.state[row.state]}
-                    </span>
-                  </td>
-                  <td>{metric(row.ownCodeLines)}</td>
-                  <td>{metric(row.codeLines)}</td>
-                  <td>{metric(row.procedures)}</td>
-                  <td>
-                    {metric(row.tables)}
-                    {row.mappedTables !== null && (
-                      <span className="muted">
-                        {' '}
-                        {copy.mappedTables(number(row.mappedTables))}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {row.complexity ? (
-                      <>
-                        {copy.level[row.complexity.level]} (
-                        {row.complexity.score})
-                        {row.complexity.draft && (
-                          <span className="badge">{copy.draft}</span>
+                      <th scope="row">
+                        <button
+                          className="link-button"
+                          aria-pressed={row.key === selectedKey}
+                          onClick={() => onSelect(row.key)}
+                        >
+                          {label}
+                        </button>
+                        {row.name && row.name !== label && (
+                          <span className="muted declared-name">
+                            {copy.declaredName(row.name)}
+                          </span>
                         )}
-                        {row.complexity.needsReview && (
-                          <span className="badge">{copy.needsReview}</span>
-                        )}
-                      </>
-                    ) : (
-                      copy.notAnalyzed
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {selected && (
-        <ProgramDetail
-          inventory={inventory}
-          projectPath={selected.projectPath}
-        />
+                        <span className="mono muted">{row.projectPath}</span>
+                      </th>
+                      <td>
+                        <ProgramStateTag state={row.state} />
+                      </td>
+                      <td>{metric(row.ownCodeLines)}</td>
+                      <td>{metric(row.codeLines)}</td>
+                      <td>{metric(row.procedures)}</td>
+                      <td>
+                        {metric(row.tables)}
+                        {row.mappedTables !== null &&
+                          row.mappedTables !== row.tables && (
+                            <span className="muted">
+                              {' '}
+                              {copy.mappedTables(number(row.mappedTables))}
+                            </span>
+                          )}
+                      </td>
+                      <td>
+                        <ComplexityCell complexity={row.complexity} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <nav className="pagination" aria-label={copy.pagination}>
+            <button
+              className="button small"
+              disabled={current.page <= 1}
+              onClick={() => setPage(current.page - 1)}
+            >
+              {copy.previous}
+            </button>
+            <span>{copy.page(current.page, current.pages)}</span>
+            <button
+              className="button small"
+              disabled={current.page >= current.pages}
+              onClick={() => setPage(current.page + 1)}
+            >
+              {copy.next}
+            </button>
+            <label>
+              <span>{copy.pageSize}</span>
+              <select
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.currentTarget.value));
+                  setPage(1);
+                }}
+              >
+                {PAGE_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </nav>
+        </>
       )}
     </section>
   );

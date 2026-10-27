@@ -533,6 +533,13 @@ input {
   background: var(--surface);
   min-width: 0;
 }
+input[type='radio'],
+input[type='checkbox'] {
+  width: auto;
+  flex: none;
+  padding: 0;
+  margin: 0;
+}
 input[aria-invalid='true'] {
   border-color: var(--high);
 }
@@ -1061,8 +1068,234 @@ dd {
 .detail-list li {
   overflow-wrap: anywhere;
 }
+
+/* Results page: tabs, tags, distributions, pagination, technical info */
+.results-panel .assessment {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: 12px 0 16px;
+}
+.tab {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-3);
+  margin-bottom: -1px;
+}
+.tab[aria-selected='true'] {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.tab-count {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.tag-low {
+  color: var(--low);
+  background: var(--low-bg);
+  border-color: #b9dfc7;
+}
+.tag-medium {
+  color: #8a5a0b;
+  background: #fdf3cf;
+  border-color: #f0d98a;
+}
+.tag-high {
+  color: #b44d00;
+  background: #fde9d7;
+  border-color: #f6c49a;
+}
+.tag-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.program-table .tag-group .badge {
+  margin-left: 0;
+}
+.badge.review {
+  background: var(--surface);
+  border: 1px dashed var(--line-2);
+  color: var(--fg-2);
+}
+.declared-name {
+  display: block;
+  font-size: 11px;
+}
+.sort-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  font-weight: 600;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+.sort-mark {
+  font-size: 10px;
+  color: var(--fg-3);
+}
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.pagination label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--fg-3);
+}
+.pagination select {
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.assessment-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 12px 0 4px;
+}
+.distribution {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+.assessment .distribution h4 {
+  margin: 0 0 10px;
+}
+.stack {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+}
+.stack i {
+  display: block;
+  height: 100%;
+}
+.tone-low {
+  background: var(--low);
+}
+.tone-medium {
+  background: #e3b341;
+}
+.tone-high {
+  background: #e8823a;
+}
+.legend {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+}
+.legend .link-button {
+  font-weight: 500;
+  color: var(--fg);
+}
+.legend .link-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.assessment-warnings .link-button {
+  font-size: 12px;
+}
+details.technical {
+  margin: 14px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+}
+details.technical > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-3);
+}
+details.technical[open] > summary {
+  margin-bottom: 8px;
+}
+.warning-code {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 11px;
+}
+.back-button {
+  margin-bottom: 4px;
+}
+.program-detail .tabs {
+  margin: 4px 0 0;
+}
+.detail-panel-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.row-limit {
+  font-size: 12px;
+}
+.program-detail .version {
+  font-size: 11px;
+}
+.results-link {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+.project-node .chip {
+  margin-left: auto;
+  font-size: 10px;
+}
 @media (max-width: 760px) {
-  .assessment-totals {
+  .assessment-totals,
+  .assessment-charts {
     grid-template-columns: 1fr;
   }
 }

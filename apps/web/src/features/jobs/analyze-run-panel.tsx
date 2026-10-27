@@ -21,10 +21,14 @@ export function AnalyzeRunPanel({
   projectId,
   demo,
   sourceRevision,
+  onOpenResults,
 }: {
   api: RunsApi;
   // Without it a succeeded run shows no assessment (run-only tests).
   artifactsApi?: ArtifactsApi | undefined;
+  // Given: a succeeded run links to its own results page instead of showing
+  // the assessment inline.
+  onOpenResults?: ((runId: string) => void) | undefined;
   projectId: string;
   // Demo projects run the fixture executor and say so.
   demo: boolean;
@@ -136,14 +140,25 @@ export function AnalyzeRunPanel({
       ) : (
         <p className="empty-state">{copy.noRun}</p>
       )}
-      {shown?.status === 'succeeded' && artifactsApi && (
-        <AssessmentOverview
-          key={shown.id}
-          api={artifactsApi}
-          projectId={projectId}
-          runId={shown.id}
-        />
-      )}
+      {shown?.status === 'succeeded' &&
+        artifactsApi &&
+        (onOpenResults ? (
+          <div className="form-actions results-link">
+            <button
+              className="button primary"
+              onClick={() => onOpenResults(shown.id)}
+            >
+              {copy.openResults}
+            </button>
+          </div>
+        ) : (
+          <AssessmentOverview
+            key={shown.id}
+            api={artifactsApi}
+            projectId={projectId}
+            runId={shown.id}
+          />
+        ))}
       {history.length > 0 && (
         <>
           <h3>{copy.history}</h3>
@@ -275,14 +290,6 @@ function RunDetail({
             <dd>{copy.stage[run.stage]}</dd>
           </div>
         )}
-        <div>
-          <dt>{copy.fields.id}</dt>
-          <dd className="mono">{run.id}</dd>
-        </div>
-        <div>
-          <dt>{copy.fields.createdAt}</dt>
-          <dd>{formatDateTime(run.createdAt)}</dd>
-        </div>
         {run.startedAt && (
           <div>
             <dt>{copy.fields.startedAt}</dt>
@@ -304,13 +311,26 @@ function RunDetail({
             </dd>
           </div>
         )}
-        {run.retryOfRunId && (
-          <div>
-            <dt>{copy.fields.retryOf}</dt>
-            <dd className="mono">{run.retryOfRunId}</dd>
-          </div>
-        )}
       </dl>
+      <details className="technical">
+        <summary>{copy.technical}</summary>
+        <dl className="project-metadata">
+          <div>
+            <dt>{copy.fields.id}</dt>
+            <dd className="mono">{run.id}</dd>
+          </div>
+          <div>
+            <dt>{copy.fields.createdAt}</dt>
+            <dd>{formatDateTime(run.createdAt)}</dd>
+          </div>
+          {run.retryOfRunId && (
+            <div>
+              <dt>{copy.fields.retryOf}</dt>
+              <dd className="mono">{run.retryOfRunId}</dd>
+            </div>
+          )}
+        </dl>
+      </details>
       {run.status === 'interrupted' && (
         <p className="muted">{copy.interruptedHelp}</p>
       )}

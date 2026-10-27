@@ -47,15 +47,20 @@ test(
     const projectName = `PF06 demo ${Date.now()}`;
     await page.goto('/');
     await page.getByLabel('Tên dự án').fill(projectName);
+    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
     await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
     await expect(
       panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
     ).toBeVisible();
+    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
-    await expect(assessment.getByText('Danh sách program')).toBeVisible();
+    await expect(
+      assessment.getByRole('tab', { name: 'Danh sách program' }),
+    ).toBeVisible();
+    await assessment.getByText('Thông tin kỹ thuật').click();
     expect(listed).toBeDefined();
     const ref = listed;
     if (!ref) throw new Error('no artifact listed');
@@ -83,15 +88,21 @@ test(
       assessment.getByText('TABLE_NAMES_NOT_CONFIRMED'),
     ).toBeVisible();
 
+    const programsTab = assessment.getByRole('tab', {
+      name: 'Danh sách program',
+    });
+    await programsTab.click();
     await assessment.getByLabel('Tìm program').fill('rep');
     await expect(
       assessment.getByText('Đang hiển thị 1 / 3 program'),
     ).toBeVisible();
     await assessment.getByRole('button', { name: 'REPORT' }).click();
+    await assessment.getByRole('tab', { name: /^File/ }).click();
     await expect(assessment.getByText('File của REPORT')).toBeVisible();
     await expect(
       assessment.getByText('Không tìm thấy', { exact: true }),
     ).toBeVisible();
+    await programsTab.click();
     await assessment.getByLabel('Tìm program').fill('');
 
     // Nothing half-written is left in the store.
@@ -120,6 +131,7 @@ test(
     // Reload reads the same version back and starts nothing.
     await page.reload();
     await openProject(page, projectName);
+    await page.getByRole('button', { name: '解析結果を表示' }).click();
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('655');
     expect(new Set(artifactReads)).toEqual(

@@ -22,7 +22,7 @@ export function CreateProjectForm({
   const { messages } = useLocale();
   const copy = messages.projects.create;
   const [name, setName] = useState('');
-  const [kind, setKind] = useState<'demo' | 'local'>('demo');
+  const [kind, setKind] = useState<'demo' | 'local'>('local');
   const [fieldInvalid, setFieldInvalid] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<{ error: unknown } | null>(
     null,
@@ -99,6 +99,22 @@ export function CreateProjectForm({
             <input
               type="radio"
               name="project-kind"
+              value="local"
+              checked={kind === 'local'}
+              onChange={() => setKind('local')}
+            />
+            <span className="fixture-icon">
+              <Icon name="folder" />
+            </span>
+            <span>
+              <strong>{copy.kindLocal}</strong>
+              <span className="field-help">{copy.kindLocalDescription}</span>
+            </span>
+          </label>
+          <label className="fixture-card">
+            <input
+              type="radio"
+              name="project-kind"
               value="demo"
               checked={kind === 'demo'}
               onChange={() => setKind('demo')}
@@ -111,22 +127,6 @@ export function CreateProjectForm({
               <span className="field-help">
                 {PROJECT_FIXTURE_ID} · {copy.sampleDescription}
               </span>
-            </span>
-          </label>
-          <label className="fixture-card">
-            <input
-              type="radio"
-              name="project-kind"
-              value="local"
-              checked={kind === 'local'}
-              onChange={() => setKind('local')}
-            />
-            <span className="fixture-icon">
-              <Icon name="folder" />
-            </span>
-            <span>
-              <strong>{copy.kindLocal}</strong>
-              <span className="field-help">{copy.kindLocalDescription}</span>
             </span>
           </label>
         </fieldset>

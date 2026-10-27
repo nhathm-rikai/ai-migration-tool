@@ -213,3 +213,87 @@ export function filterPrograms(
         row.projectPath.toLowerCase().includes(query)),
   );
 }
+
+// The project file name without folder or extension. VB project files often
+// keep the IDE default name ("Project1"), so the file name is what tells
+// programs apart; the declared name is shown beside it when it differs.
+export function programLabel(projectPath: string): string {
+  const file = projectPath.split(/[\\/]/).pop() ?? projectPath;
+  const dot = file.lastIndexOf('.');
+  return dot > 0 ? file.slice(0, dot) : file;
+}
+
+export type ProgramSortKey =
+  | 'program'
+  | 'state'
+  | 'ownCodeLines'
+  | 'codeLines'
+  | 'procedures'
+  | 'tables'
+  | 'complexity';
+export type ProgramSort = { key: ProgramSortKey; direction: 'asc' | 'desc' };
+
+const STATE_ORDER: Record<ProgramState, number> = {
+  complete: 0,
+  partial: 1,
+  unsupported: 2,
+};
+
+function sortValue(row: ProgramRow, key: ProgramSortKey): number | string {
+  switch (key) {
+    case 'program':
+      return programLabel(row.projectPath).toLowerCase();
+    case 'state':
+      return STATE_ORDER[row.state];
+    case 'complexity':
+      return row.complexity?.score ?? Number.NaN;
+    default:
+      return row[key] ?? Number.NaN;
+  }
+}
+
+// Stable sort; programs without a value (not analyzed) always come last so
+// sorting never presents them as 0.
+export function sortPrograms(
+  rows: readonly ProgramRow[],
+  sort: ProgramSort,
+): ProgramRow[] {
+  const sign = sort.direction === 'asc' ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index, value: sortValue(row, sort.key) }))
+    .sort((a, b) => {
+      const aMissing = typeof a.value === 'number' && Number.isNaN(a.value);
+      const bMissing = typeof b.value === 'number' && Number.isNaN(b.value);
+      if (aMissing !== bMissing) return aMissing ? 1 : -1;
+      if (a.value < b.value) return -sign;
+      if (a.value > b.value) return sign;
+      return a.index - b.index;
+    })
+    .map(({ row }) => row);
+}
+
+export function countBy<K extends string>(
+  rows: readonly ProgramRow[],
+  key: (row: ProgramRow) => K | null,
+): Partial<Record<K, number>> {
+  const counts: Partial<Record<K, number>> = {};
+  for (const row of rows) {
+    const value = key(row);
+    if (value !== null) counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return counts;
+}
+
+export function pageOf<T>(
+  rows: readonly T[],
+  page: number,
+  size: number,
+): { items: T[]; page: number; pages: number } {
+  const pages = Math.max(1, Math.ceil(rows.length / size));
+  const current = Math.min(Math.max(1, page), pages);
+  return {
+    items: rows.slice((current - 1) * size, current * size),
+    page: current,
+    pages,
+  };
+}

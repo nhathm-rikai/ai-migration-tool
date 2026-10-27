@@ -84,6 +84,9 @@ function sharedInventory(): Inventory {
   };
 }
 
+const openPrograms = () =>
+  fireEvent.click(screen.getByRole('tab', { name: 'Danh sách program' }));
+
 afterEach(() => {
   window.localStorage.clear();
 });
@@ -151,6 +154,7 @@ describe('Assessment overview (F03)', () => {
     expect(screen.getByTestId('per-program-code-lines').textContent).toContain(
       '12',
     );
+    openPrograms();
     fireEvent.click(screen.getByRole('button', { name: 'Order' }));
     expect(screen.getAllByText('Dùng chung').length).toBeGreaterThan(0);
   });
@@ -204,6 +208,7 @@ describe('Assessment overview (F03)', () => {
     expect(within(row).getAllByText('Chưa phân tích')).toHaveLength(5);
     expect(within(row).queryByText('0')).toBeNull();
     // Members of the partial program show why it is incomplete.
+    openPrograms();
     fireEvent.click(screen.getByRole('button', { name: 'Order' }));
     expect(screen.getByText('Không tìm thấy')).toBeTruthy();
   });
@@ -238,6 +243,7 @@ describe('Assessment overview (F03)', () => {
       />,
     );
     await screen.findByText('Đang hiển thị 2 / 2 program');
+    openPrograms();
     fireEvent.change(screen.getByLabelText('Tìm program'), {
       target: { value: 'invo' },
     });
@@ -369,5 +375,78 @@ describe('Assessment overview (F03)', () => {
     expect(screen.getByText('プログラム一覧')).toBeTruthy();
     expect(screen.getByText('ソース全体の合計（重複なし）')).toBeTruthy();
     expect(server.calls).toHaveLength(2);
+  });
+
+  it('pages and sorts a long program list, names programs by file', async () => {
+    const base: Inventory = structuredClone(
+      mappedInventoryArtifactFixture.payload,
+    );
+    const [program] = base.programs;
+    const analysis = program?.analysis;
+    if (!program || !analysis)
+      throw new Error('fixture has an analyzed program');
+    // 60 programs that all keep the IDE default name "Project1".
+    const payload: Inventory = {
+      ...base,
+      programs: Array.from({ length: 60 }, (_, index) => ({
+        ...structuredClone(program),
+        projectPath: `programs/P${String(index).padStart(2, '0')}.vbp`,
+        name: 'Project1',
+        analysis: {
+          ...structuredClone(analysis),
+          complexity: { ...analysis.complexity, score: index },
+        },
+      })),
+    };
+    const server = serve({ ...mappedInventoryArtifactFixture, payload });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Đang hiển thị 60 / 60 program');
+    openPrograms();
+    const names = () =>
+      screen
+        .getAllByRole('button', { pressed: false })
+        .map((button) => button.textContent)
+        .filter((text) => text?.startsWith('P'));
+    // Default: highest complexity first, 50 rows per page.
+    expect(names()).toHaveLength(50);
+    expect(names()[0]).toBe('P59');
+    expect(screen.getAllByText('Tên trong project: Project1').length).toBe(50);
+    expect(screen.getByText('Trang 1 / 2')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+    expect(names()).toHaveLength(10);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Sắp xếp theo Program' }),
+    );
+    expect(screen.getByText('Trang 1 / 2')).toBeTruthy();
+    expect(names()[0]).toBe('P00');
+  });
+
+  it('opens the list filtered from a warning of the overview', async () => {
+    const server = serve(partialInventoryArtifactFixture);
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Kiểm kê chưa đầy đủ.');
+    const [show] = screen.getAllByRole('button', { name: 'Xem danh sách' });
+    if (!show) throw new Error('warning links to the list');
+    fireEvent.click(show);
+    expect(
+      screen
+        .getByRole('tab', { name: 'Danh sách program' })
+        .getAttribute('aria-selected'),
+    ).toBe('true');
+    const state = screen.getByLabelText('Trạng thái');
+    if (!(state instanceof HTMLSelectElement)) throw new Error('select');
+    expect(state.value).not.toBe('all');
   });
 });

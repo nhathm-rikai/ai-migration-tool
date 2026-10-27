@@ -81,6 +81,21 @@ Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-c
 
 Ràng buộc nằm ở DB ([0002-runs.sql](migrations/0002-runs.sql)): unique run active mỗi project, unique một run đang chạy toàn runtime, unique `(project, idempotency key)`; mọi chuyển trạng thái là compare-and-set theo status + `stateVersion` ([run.repository.ts](src/modules/jobs/run.repository.ts), quyết định đích ở [job-state.ts](src/modules/jobs/job-state.ts)). [job-dispatcher.ts](src/modules/jobs/job-dispatcher.ts) claim nguyên tử và chạy một execution ngoài request/transaction: timeout → `failed/TIMEOUT`; executor không dừng trong hạn → `failed/STOP_UNCONFIRMED` và runtime `recovery_required` (chặn Start tới khi restart); không ghi được trạng thái kết thúc vào DB cũng chuyển runtime `recovery_required` (run còn `running` giữ slot, restart đánh dấu `interrupted`), cancel run đó vẫn kết thúc `cancelled` vì execution đã dừng; khởi động đánh dấu run running/cancelling cũ `interrupted`, không tự chạy lại; shutdown dừng dispatch và ghi `interrupted`. Executor hiện là [fixture-run.executor.ts](src/adapters/fake/fixture-run.executor.ts): đi qua các stage, không đọc source, không process/network, không tạo artifact. Limits trong config run là số giữ chỗ (JOB-07).
 
+### Instance lock và recovery (PF04: B02)
+
+Mỗi data directory chỉ một backend. [server.ts](src/server.ts) khóa trước khi mở `portal.db` hoặc listen bằng [instance-lock.ts](src/platform/instance-lock.ts): file `instance.lock` cạnh `portal.db`, giữ lock EXCLUSIVE của SQLite, tức file lock của OS (Windows `LockFileEx`, POSIX `fcntl`). Process thứ hai cùng data directory thoát với `STARTUP_FAILED`/`DATA_DIR_LOCKED`, không mở DB; data directory khác độc lập. Shutdown đóng dispatcher và DB rồi mới nhả lock, ghi `released_at` vào owner record. Process crash/bị kill thì OS tự nhả lock, không có lock file cũ phải xóa tay; lần khởi động sau log `INSTANCE_PREVIOUS_UNRELEASED` và đánh dấu run running/cancelling cũ `interrupted` (không tự chạy lại).
+
+Owner record (owner id, pid, thời điểm start/release) chỉ để chẩn đoán: không bao giờ kill hoặc xóa gì theo pid trong đó. Record không đọc được (format khác, cột thiếu/sai kiểu, bảng lạ) nghĩa là không xác định được process cũ và những gì nó đã chạy: backend vẫn khởi động, đánh dấu run cũ `interrupted`, nhưng runtime `recovery_required` (`PROCESS_CLEANUP_UNCONFIRMED`, Start 503, queue không dispatch), log `INSTANCE_OWNER_UNKNOWN`. Record giữ nguyên qua các lần restart tới khi người vận hành xác nhận. File `instance.lock` không phải SQLite: startup fail `INSTANCE_LOCK_INVALID` vì không thể bảo đảm loại trừ.
+
+**Runbook xử lý thủ công**
+
+1. `DATA_DIR_LOCKED` khi khởi động: một backend khác đang dùng data directory. Dùng backend đó hoặc dừng nó bằng cách bình thường (Ctrl+C trong terminal của nó). Không xóa `instance.lock`; lock tự nhả khi process kết thúc.
+2. Runtime `recovery_required` sau khởi động (log `INSTANCE_OWNER_UNKNOWN`), hoặc trong lúc chạy (log `RUN_STOP_UNCONFIRMED`/`RUN_STATE_WRITE_FAILED`): dừng backend. Kiểm bằng Task Manager (Windows), Activity Monitor hoặc `ps` (macOS/Linux) rằng không còn process backend/job nào của data directory này; tự xác định process bằng command line, không dựa vào pid trong owner record. Nếu còn, dừng nó theo cách bình thường của công cụ đó.
+3. Với `INSTANCE_OWNER_UNKNOWN`, sau bước 2 chạy `PORTAL_DATA_DIR=<dir> node apps/api/dist/cli/confirm-recovery.js --confirm` (cần `npm run build`; PowerShell đặt `$env:PORTAL_DATA_DIR` trước). Lệnh lấy lock nên từ chối (`DATA_DIR_LOCKED`) nếu backend còn chạy; chỉ reset owner record, không đụng process, run hoặc `portal.db`. Khởi động lại backend: runtime `ready`, queue tiếp tục. Với lỗi trong lúc chạy, khởi động lại là đủ.
+4. `INSTANCE_LOCK_INVALID`: dừng mọi backend của data directory, đổi tên `instance.lock` sang tên khác để giữ lại phân tích rồi khởi động lại.
+
+Process ownership của job CLI (A03/A04) chưa có: executor fixture chạy trong process backend nên chết cùng nó. Khi có process con, record sẽ phải ghi các process con để restart chặn dispatch khi chúng có thể còn sống.
+
 ## Đọc source theo một request
 
 1. [project.schema.ts](../../packages/contracts/src/project.schema.ts): JSON Schema + DTO suy ra. Shared contracts không phụ thuộc Fastify/Node/database.
@@ -127,6 +142,6 @@ Tests kiểm API success/input/not-found/pagination (cả limit mặc định), 
 
 Rule trọng tâm: CORE-01..10, BE-01..05/07, DATA-01/02/09, QA-01/02/06/07/09 và AI-01/05 cho fake port. Phạm vi reviewer cần xem: schema/validation trước side effect, ranh giới service/repo, DB lifecycle, containment và nhãn demo.
 
-Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export và instance/recovery là các task tiếp theo. Local HTTP security (PF02) đã có. Không có VB6 → C# conversion trong source này.
+Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export là các task tiếp theo; instance lock/recovery tối thiểu (PF04) đã có, process ownership của CLI chưa. Local HTTP security (PF02) đã có. Không có VB6 → C# conversion trong source này.
 
 Tham khảo API gốc khi mở rộng: [Fastify type provider](https://github.com/fastify/fastify-type-provider-typebox), [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [better-sqlite3](https://github.com/WiseLibs/better-sqlite3). Phiên bản thực tế được khóa trong package/lockfile, không copy API từ major khác.

@@ -1,6 +1,6 @@
 # Quy trình phân tích source đa ngôn ngữ
 
-**DRAFT — spec-design-rules-0.7.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
+**DRAFT — spec-design-rules-0.8.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
 
 ## 1. Nguyên tắc: không dùng profile theo ngôn ngữ
 
@@ -93,7 +93,7 @@ Nguyên tắc **sửa quy trình, không vá output**: finding TL ghi cho từng
 | ----- | -------- | ------ | ------------------- |
 | 0. Feasibility | Program có đủ điều kiện phân tích không: source legacy, output P1 (1.1 bắt buộc), program thuộc Source Inventory, quyền, CLI | Go/no-go trước khi gọi agent | Go; no-go ghi lý do, không gọi model |
 | 1. Map và chuẩn hóa | Agent đọc thứ tự/phụ thuộc từ output P1 1.3 (chung trước riêng), ghi cycle nếu P1 báo; lập bảng điểm ngầm định | Mục "Điểm ngầm định" và boundary trong [coverage](templates/coverage.md) | Mọi file allowlist có vai trò; câu hỏi diễn giải chưa rõ đã có Q-ID |
-| 2. Sinh | Agent sinh các tài liệu TL đã chọn kèm coverage/open-questions, ghi dần từng đơn vị và chạy tiếp được khi bị dừng ([SD-CT-08](rules/artifacts.md)), tự kiểm theo [checklist](review-checklist.md) | Markdown trong output program | Đủ tài liệu được chọn; coverage `hoàn tất`; self-check không phải approval |
+| 2. Sinh | Agent sinh các tài liệu ở mục 3 phiếu input (TL chọn + sinh kèm theo [SD-CT-07](rules/artifacts.md)) kèm coverage/open-questions, ghi dần từng đơn vị và chạy tiếp được khi bị dừng ([SD-CT-08](rules/artifacts.md)), tự kiểm theo [checklist](review-checklist.md) | Markdown trong output program | Đủ tài liệu ở mục 3; coverage `hoàn tất`; self-check không phải approval |
 | 3. TL review | Output trả về Portal; TL review 3 lớp theo [checklist](review-checklist.md) | Quyết định approve/reject và finding của TL | TL duyệt; reject thì chạy lại program hoặc sửa pack |
 
 Không áp dụng từ kit: rulebook, stress-test, reviewer/fixer agent, run manifest, dịch/compile/build survey, smoke test, parity harness chạy source cũ (cấm chạy source khách hàng), script dependency map (thứ tự lấy từ P1 1.3).

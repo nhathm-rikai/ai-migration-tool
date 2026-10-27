@@ -1,11 +1,11 @@
 # Specification design — validation và human review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.7.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.8.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm thực tế; chưa đánh dấu nghĩa là chưa kiểm. Findings ghi item/section, bằng chứng, tác động, hướng xử lý. Không AI ghi danh tính hay quyết định thay reviewer.
 
 - [ ] Trạng thái sinh: coverage ghi `hoàn tất`, không còn đơn vị "chưa phân tích" trong phạm vi; nếu số phiên > 1 thì soát chỗ nối giữa các phiên, không có đoạn bị viết lại hoặc ID trùng/đặt lại ([SD-CT-08](rules/artifacts.md)).
-- [ ] Cấu trúc: đúng mode/schema/version, đủ các tài liệu TL đã chọn kèm coverage/open-questions hoặc JSON đúng mode; ID unique, refs tồn tại, đủ section, không placeholder/truncation âm thầm.
+- [ ] Cấu trúc: đúng mode/schema/version, đủ các tài liệu ở mục 3 phiếu input (TL chọn + sinh kèm theo SD-CT-07) kèm coverage/open-questions hoặc JSON đúng mode; ID unique, refs tồn tại, đủ section, không placeholder/truncation âm thầm.
 - [ ] Nhận diện ngôn ngữ: bảng bước 0 trong coverage phủ mọi file allowlist; language/dialect/runtime/framework/build config có căn cứ manifest hoặc nội dung, không chỉ từ đuôi file; mâu thuẫn với input có Q-ID; boundary liên ngôn ngữ, binary/generated/unsupported/unmeasured rõ. Semantics ghi theo ngôn ngữ thực, không mượn từ ngôn ngữ khác ([quy trình](analysis-method.md)).
 - [ ] Context: đúng program/snapshot, manifest included/excluded/missing/unsupported/unread, chunk hợp nhất, scope allowlist.
 - [ ] Evidence: validator độc lập kiểm path/range/quote/hash trên snapshot; không thêm symbol/hash vào evidence JSON.
@@ -15,7 +15,7 @@ Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm t
 - [ ] Detail Design theo mẫu tham khảo: có danh sách xử lý → trigger/I-O → trình tự/component → validation/SQL → transaction/lỗi → message/state; report có output mapping khi áp dụng; common có mapping caller. Inventory vẫn đủ đơn vị logic/file-level code. Không đưa kiến trúc, SQL, rounding hoặc nghiệp vụ của dự án tham khảo thành sự thật của source đang xét; tham chiếu Basic/DB/BR chuẩn thay vì tạo bản sao.
 - [ ] Report/export: áp dụng [review bổ sung](report-templates.md) cho đủ mode, layout/block/helper, query-field mapping, formula owner, CSV contract, config đích, consumer/RPA, file lock/no-data/cancel/partial output/cleanup. Thiếu source/layout là Q-ID; không lấy mẫu hoặc screenshot làm chứng cứ hành vi hệ thống đang xét.
 - [ ] DB: as-written/mapping/provenance riêng; unknown không thành DDL; dynamic SQL/stored procedure/X không mất.
-- [ ] Nhất quán: BR ↔ design ↔ function ↔ DB ↔ question giữa các tài liệu được sinh; tham chiếu tới tài liệu không được chọn chỉ trỏ bản đã duyệt cùng snapshot, còn lại ghi "chưa sinh" + Q-ID theo SD-CT-07, không có ID bịa; evidence đa đoạn đủ chứng minh claim; bản dịch ngôn ngữ gốc tách riêng.
+- [ ] Nhất quán: BR ↔ design ↔ function ↔ DB ↔ question giữa các tài liệu được sinh; tài liệu liên quan được sinh cùng lần theo SD-CT-07 hoặc trỏ bản đã duyệt cùng snapshot ở mục 4, không có ID bịa; evidence đa đoạn đủ chứng minh claim; bản dịch ngôn ngữ gốc tách riêng.
 - [ ] Nghiệp vụ: TL kiểm ý nghĩa claim, nhánh thiếu, precision/Null/error; quote đúng không tự chứng minh hiểu đúng.
 - [ ] Review: version/source đúng, evidence lỗi và blocking questions được xử lý theo contract; append-only, stale review không tái dùng.
 - [ ] Export/KB: đúng version/state, BR xlsx còn là nghĩa vụ nếu chỉ có Markdown; text chống formula injection; không secret/path tuyệt đối/log; chỉ index bản được duyệt.

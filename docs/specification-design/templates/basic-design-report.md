@@ -1,6 +1,6 @@
 # Basic Design Report/Export — <PROGRAM> / <REPORT-ID> / <MODE>
 
-**DRAFT TEMPLATE — spec-design-templates-0.6.0-draft.** Phần mở rộng của [Basic Design](basic-design.md), không thay toàn bộ tài liệu program. Áp dụng [cách ghép và nguồn tham khảo](../report-templates.md), [rule đầu ra](../rules/deliverables.md), [phần đầu chung](../README.md).
+**DRAFT TEMPLATE — spec-design-templates-0.7.0-draft.** Phần mở rộng của [Basic Design](basic-design.md), không thay toàn bộ tài liệu program. Áp dụng [cách ghép và nguồn tham khảo](../report-templates.md), [rule đầu ra](../rules/deliverables.md), [phần đầu chung](../README.md).
 
 Điền một khối cho từng report và mode có đầu ra khác nhau. REPORT-ID/MODE/field ID là định danh trình bày, không thêm vào JSON v1. Mỗi mục có nội dung hoặc không áp dụng + lý do/phạm vi đã kiểm hoặc chưa xác định + Q-ID. Evidence nguồn và provenance layout phân biệt rõ; ảnh/tài liệu mẫu không chứng minh hành vi source hiện tại.
 

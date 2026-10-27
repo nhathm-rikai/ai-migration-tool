@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — specification-design: tài liệu liên quan sinh cùng lúc
+
+- Scope docs-only theo yêu cầu người dùng; pack `spec-design-rules-0.8.0-draft`, template set `spec-design-templates-0.7.0-draft`, vẫn Draft/unapproved.
+- Viết lại SD-CT-07 trong [artifacts](../specification-design/rules/artifacts.md): tài liệu tham chiếu ID của tài liệu khác được sinh cùng lần (Basic kèm BR; Detail kèm BR, Basic, DB), trừ tài liệu đã có bản approved cùng snapshot ở mục 4; thứ tự sinh BR → DB → Basic → Detail; "chưa sinh" + Q-ID chỉ còn là trường hợp ngoại lệ.
+- Phiếu input tách "Tài liệu TL chọn" và "Tài liệu sinh kèm"; coverage ghi trạng thái được chọn/sinh kèm/tham chiếu/chưa sinh; README, runbook 2.2/2.3, checklist, analysis-method, SD-CT-04 cập nhật. Bối cảnh: test Codex KUNO0020 cho thấy chọn riêng lẻ dẫn tới tham chiếu "chưa sinh" và sửa lại BR khi chạy thêm Detail/DB.
+
 ## 27/10/2026 — specification-design: ghi dần và chạy tiếp khi bị dừng
 
 - Scope docs-only theo yêu cầu người dùng (cách 2: trạng thái trên đĩa); pack `spec-design-rules-0.7.0-draft`, template set `spec-design-templates-0.6.0-draft`, vẫn Draft/unapproved.

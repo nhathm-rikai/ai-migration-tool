@@ -1,6 +1,6 @@
 # Cách dùng template Report/Export
 
-**DRAFT — spec-design-templates-0.6.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
+**DRAFT — spec-design-templates-0.7.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
 
 ## Ghép vào bộ specification-design
 

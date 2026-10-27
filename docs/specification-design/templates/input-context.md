@@ -1,6 +1,6 @@
 # Phiếu đầu vào một run specification-design
 
-**DRAFT INPUT — spec-design-templates-0.6.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
+**DRAFT INPUT — spec-design-templates-0.7.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
 
 Input chỉ gồm hai nhóm: **source legacy** và **output của P1**. Lựa chọn program và tài liệu cần tạo là phạm vi run do TL chọn trên Portal (mục 3); tài liệu đã duyệt từ run trước do Portal đưa kèm nếu có (mục 4). Snapshot/hash, decode, quyền đọc/ghi và phiên bản CLI do Portal/công cụ quản lý, không do người điền. Ngôn ngữ/runtime do agent tự nhận diện theo [quy trình phân tích](../analysis-method.md).
 
@@ -26,7 +26,8 @@ Thiếu mục P1 nào thì ghi "chưa được cung cấp" và phần liên quan
 | Lựa chọn         | Giá trị                                                                                                              |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Program          | Tất cả / một / một số program trong Source Inventory (1.1): <điền>                                                   |
-| Tài liệu cần tạo | Một hoặc nhiều: business-rules, basic-design, detail-design, db-design. `coverage` và `open-questions` luôn sinh kèm |
+| Tài liệu TL chọn | Một hoặc nhiều: business-rules, basic-design, detail-design, db-design |
+| Tài liệu sinh kèm | Theo [SD-CT-07](../rules/artifacts.md): basic-design kèm business-rules; detail-design kèm business-rules, basic-design, db-design; trừ tài liệu đã có bản approved ở mục 4. `coverage` và `open-questions` luôn sinh kèm |
 
 ## 4. Tài liệu đã duyệt từ run trước (Portal cung cấp, nếu có)
 
@@ -34,6 +35,6 @@ Thiếu mục P1 nào thì ghi "chưa được cung cấp" và phần liên quan
 | -------------- | ------- | -------- | ----------------- | --------- |
 | <điền hoặc không có> |  |          | approved          |           |
 
-Chỉ liệt kê bản **approved** của cùng program. Agent dùng bản này để tham chiếu ID khi tài liệu đó không được chọn, theo [SD-CT-07](../rules/artifacts.md); không sửa bản này.
+Chỉ liệt kê bản **approved** của cùng program. Có bản approved thì tài liệu đó không sinh kèm; agent dẫn ID của bản này, theo [SD-CT-07](../rules/artifacts.md); không sửa bản này.
 
 Không đưa credential/raw log/config agent từ corpus. Phiếu này không thay hash/manifest công cụ hay cơ chế kiểm soát quyền.

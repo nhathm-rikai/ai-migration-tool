@@ -1,6 +1,6 @@
 # Bộ tài liệu specification-design từ source đa ngôn ngữ
 
-**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.7.0-draft`, ngày 22/10/2026; template set `spec-design-templates-0.6.0-draft` cho cả tám template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
+**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.8.0-draft`, ngày 22/10/2026; template set `spec-design-templates-0.7.0-draft` cho cả tám template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
 
 ## Thứ tự đọc
 
@@ -9,7 +9,7 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 1. [Nguồn và truy vết yêu cầu](requirements-map.md), [gate](../engineering/delivery-gates.md), [CORE](../engineering/rules/core.md).
 2. [Phạm vi/pilot](rules/scope.md), [context/evidence](rules/context-evidence.md), [quy trình phân tích đa ngôn ngữ](analysis-method.md).
 3. [Yêu cầu đầu ra](rules/deliverables.md), [artifact](rules/artifacts.md), [mapping contract](contract-mapping.md).
-4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [questions](templates/open-questions.md), [coverage](templates/coverage.md). Khi chạy, agent chỉ đọc template của tài liệu được chọn, cộng questions và coverage ([SD-CT-07](rules/artifacts.md)).
+4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [questions](templates/open-questions.md), [coverage](templates/coverage.md). Khi chạy, agent chỉ đọc template của tài liệu ở mục 3 phiếu input (được chọn + sinh kèm), cộng questions và coverage ([SD-CT-07](rules/artifacts.md)).
 5. [Phiếu input](templates/input-context.md) và cách kết hợp bên dưới.
 6. [Luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase).
 7. [Checklist review](review-checklist.md), [KB](knowledge-base.md), [quyết định chờ duyệt](decisions.md), [runbook](runbook.md).
@@ -24,9 +24,9 @@ Giữ tám file template output, thứ tự section và packaging tối đa sáu
 
 1. TL mở Portal và chọn thư mục source legacy.
 2. TL chọn program cần phân tích: tất cả, một hoặc một số program trong Source Inventory (output P1 1.1).
-3. TL chọn tài liệu cần tạo: một, nhiều hoặc tất cả trong `business-rules`, `basic-design`, `detail-design`, `db-design`. `coverage` và `open-questions` luôn sinh kèm vì là bằng chứng phạm vi đã đọc và chỗ còn thiếu.
-4. Portal lập [phiếu input](templates/input-context.md) (source legacy + output P1 1.1–1.3 + lựa chọn của TL) và gọi agent CLI cho từng program. Nếu tài liệu được chọn cần tham chiếu tài liệu không được chọn, Portal đưa kèm bản đã duyệt từ run trước (nếu có); không có thì agent ghi "chưa sinh" + Q-ID ([SD-CT-07](rules/artifacts.md)).
-5. Agent CLI phân tích theo phiếu input và bộ tài liệu chuẩn này, chỉ sinh các tài liệu được chọn, ghi dần tiến độ vào coverage, rồi trả output về Portal. Nếu phiên bị dừng giữa chừng (vd. usage limit), Portal chạy tiếp bằng phiên mới từ trạng thái trên đĩa ([SD-CT-08](rules/artifacts.md)); chỉ output có coverage `hoàn tất` mới sang bước review.
+3. TL chọn tài liệu cần tạo: một, nhiều hoặc tất cả trong `business-rules`, `basic-design`, `detail-design`, `db-design`. Tài liệu được tham chiếu tự sinh kèm theo [SD-CT-07](rules/artifacts.md): chọn Basic thì kèm BR; chọn Detail thì kèm BR, Basic, DB — trừ tài liệu đã có bản duyệt. `coverage` và `open-questions` luôn sinh kèm vì là bằng chứng phạm vi đã đọc và chỗ còn thiếu.
+4. Portal lập [phiếu input](templates/input-context.md) (source legacy + output P1 1.1–1.3 + lựa chọn của TL) và gọi agent CLI cho từng program. Phiếu ghi cả tài liệu sinh kèm; tài liệu đã có bản duyệt từ run trước thì Portal đưa bản đó vào mục 4 thay vì sinh lại ([SD-CT-07](rules/artifacts.md)).
+5. Agent CLI phân tích theo phiếu input và bộ tài liệu chuẩn này, sinh các tài liệu ở mục 3 phiếu input (được chọn + sinh kèm), ghi dần tiến độ vào coverage, rồi trả output về Portal. Nếu phiên bị dừng giữa chừng (vd. usage limit), Portal chạy tiếp bằng phiên mới từ trạng thái trên đĩa ([SD-CT-08](rules/artifacts.md)); chỉ output có coverage `hoàn tất` mới sang bước review.
 6. TL review output trên Portal theo [checklist](review-checklist.md).
 
 Bước 4–6 thuộc tự động hóa Portal, chưa triển khai (xem bên dưới); hiện chạy thủ công theo [runbook](runbook.md).

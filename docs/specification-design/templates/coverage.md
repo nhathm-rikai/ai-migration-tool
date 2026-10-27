@@ -1,6 +1,6 @@
 # Coverage — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.4.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
+**DRAFT TEMPLATE — spec-design-templates-0.5.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
 
 ## Ngôn ngữ và thành phần phát hiện
 
@@ -27,6 +27,17 @@ Phase 1 theo [luồng phase](../analysis-method.md#8-luồng-vận-hành-theo-ph
 | ----------------------------------------- | -------------------- | ----------- | ----------------- | ------------- | ---- |
 
 Gồm excluded/missing/unsupported/unread, phần chồng lặp chunk. Đã đọc không đồng nghĩa được TL duyệt.
+
+## Tài liệu được chọn và tham chiếu
+
+Theo [SD-CT-07](../rules/artifacts.md).
+
+| Tài liệu       | Trạng thái: được sinh / tham chiếu bản đã duyệt / chưa sinh | Version/snapshot bản tham chiếu | Q-ID |
+| -------------- | ----------------------------------------------------------- | ------------------------------- | ---- |
+| business-rules |                                                             |                                 |      |
+| basic-design   |                                                             |                                 |      |
+| detail-design  |                                                             |                                 |      |
+| db-design      |                                                             |                                 |      |
 
 ## Hợp nhất
 

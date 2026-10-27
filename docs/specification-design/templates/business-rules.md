@@ -1,6 +1,6 @@
 # Business Rules — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.4.0-draft.** Điền [phần đầu chung](../README.md); áp dụng [yêu cầu BR](../rules/deliverables.md).
+**DRAFT TEMPLATE — spec-design-templates-0.5.0-draft.** Điền [phần đầu chung](../README.md); áp dụng [yêu cầu BR](../rules/deliverables.md).
 
 | BR ID   | Tiêu đề/phát biểu | Basis | Trigger/điều kiện/ngoại lệ | Input/output | Công thức/precision/rounding/Null/Empty/giới hạn | Dependency | Evidence refs | Q-IDs |
 | ------- | ----------------- | ----- | -------------------------- | ------------ | ------------------------------------------------ | ---------- | ------------- | ----- |

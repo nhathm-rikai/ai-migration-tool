@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — specification-design: chọn tài liệu riêng lẻ
+
+- Scope docs-only theo yêu cầu người dùng (hướng 3); pack `spec-design-rules-0.6.0-draft`, template set `spec-design-templates-0.5.0-draft`, vẫn Draft/unapproved.
+- Thêm SD-CT-07 trong [artifacts](../specification-design/rules/artifacts.md): chỉ sinh tài liệu được chọn; tham chiếu tới tài liệu không được chọn dùng bản đã duyệt cùng program/snapshot do Portal cung cấp, không có thì ghi "chưa sinh" + Q-ID, không bịa ID.
+- Phiếu input thêm mục tài liệu đã duyệt từ run trước; coverage thêm bảng tài liệu được chọn/tham chiếu; checklist và README cập nhật tương ứng. Portal lưu/cung cấp bản đã duyệt vẫn chưa triển khai.
+
 ## 27/10/2026 — specification-design: tinh gọn input, bỏ rulebook, flow Portal
 
 - Scope docs-only theo yêu cầu người dùng; pack `spec-design-rules-0.5.0-draft`, template set `spec-design-templates-0.4.0-draft`, vẫn Draft/unapproved.

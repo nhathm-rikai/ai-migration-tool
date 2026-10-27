@@ -1,6 +1,6 @@
 # Specification design — chạy mẫu sau khi được duyệt
 
-**DRAFT — chờ duyệt.** Pack: `spec-design-rules-0.5.0-draft`. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: `spec-design-rules-0.6.0-draft`. [Thứ tự đọc và nguồn quy định](README.md).
 
 Runbook này tách calibration trực tiếp bằng CLI khỏi tự động hóa Portal. Calibration trực tiếp không chờ Portal runner, nhưng vẫn phải khóa quyền đọc/ghi và xác minh phiên bản CLI. Portal chỉ được chạy source thật khi hoàn tất gate LIVE tương ứng.
 

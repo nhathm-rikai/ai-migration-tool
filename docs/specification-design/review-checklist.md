@@ -1,6 +1,6 @@
 # Specification design — validation và human review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.5.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.6.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm thực tế; chưa đánh dấu nghĩa là chưa kiểm. Findings ghi item/section, bằng chứng, tác động, hướng xử lý. Không AI ghi danh tính hay quyết định thay reviewer.
 
@@ -14,7 +14,7 @@ Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm t
 - [ ] Detail Design theo mẫu tham khảo: có danh sách xử lý → trigger/I-O → trình tự/component → validation/SQL → transaction/lỗi → message/state; report có output mapping khi áp dụng; common có mapping caller. Inventory vẫn đủ đơn vị logic/file-level code. Không đưa kiến trúc, SQL, rounding hoặc nghiệp vụ của dự án tham khảo thành sự thật của source đang xét; tham chiếu Basic/DB/BR chuẩn thay vì tạo bản sao.
 - [ ] Report/export: áp dụng [review bổ sung](report-templates.md) cho đủ mode, layout/block/helper, query-field mapping, formula owner, CSV contract, config đích, consumer/RPA, file lock/no-data/cancel/partial output/cleanup. Thiếu source/layout là Q-ID; không lấy mẫu hoặc screenshot làm chứng cứ hành vi hệ thống đang xét.
 - [ ] DB: as-written/mapping/provenance riêng; unknown không thành DDL; dynamic SQL/stored procedure/X không mất.
-- [ ] Nhất quán: BR ↔ design ↔ function ↔ DB ↔ question; evidence đa đoạn đủ chứng minh claim; bản dịch ngôn ngữ gốc tách riêng.
+- [ ] Nhất quán: BR ↔ design ↔ function ↔ DB ↔ question giữa các tài liệu được sinh; tham chiếu tới tài liệu không được chọn chỉ trỏ bản đã duyệt cùng snapshot, còn lại ghi "chưa sinh" + Q-ID theo SD-CT-07, không có ID bịa; evidence đa đoạn đủ chứng minh claim; bản dịch ngôn ngữ gốc tách riêng.
 - [ ] Nghiệp vụ: TL kiểm ý nghĩa claim, nhánh thiếu, precision/Null/error; quote đúng không tự chứng minh hiểu đúng.
 - [ ] Review: version/source đúng, evidence lỗi và blocking questions được xử lý theo contract; append-only, stale review không tái dùng.
 - [ ] Export/KB: đúng version/state, BR xlsx còn là nghĩa vụ nếu chỉ có Markdown; text chống formula injection; không secret/path tuyệt đối/log; chỉ index bản được duyệt.

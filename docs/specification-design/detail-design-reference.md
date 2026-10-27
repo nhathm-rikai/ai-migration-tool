@@ -19,4 +19,4 @@ Mẫu có ASP.NET MVC/.NET/PostgreSQL và hành vi riêng. Chỉ tiếp thu các
 
 Basic Design giữ item chuẩn, DB Design giữ schema/usage, BR list giữ BR canonical. Detail Design ghi trình tự/mapping theo caller và dẫn các nguồn đó. Giữ nghĩa vụ inventory, file-level code, unresolved, evidence, coverage/questions; không đổi schema hoặc số artifact mặc định.
 
-Revision p2-detail-design-0.1.1-draft nay được gộp vào template set spec-design-templates-0.4.0-draft (thuật ngữ trung lập). Đây là cập nhật Draft theo yêu cầu tham khảo, không phải approval rule pack/tài liệu nghiệp vụ.
+Revision p2-detail-design-0.1.1-draft nay được gộp vào template set spec-design-templates-0.5.0-draft (thuật ngữ trung lập). Đây là cập nhật Draft theo yêu cầu tham khảo, không phải approval rule pack/tài liệu nghiệp vụ.

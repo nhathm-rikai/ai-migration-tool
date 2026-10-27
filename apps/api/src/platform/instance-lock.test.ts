@@ -1,11 +1,22 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { openDatabase } from '../db/database.js';
 import {
   acquireInstanceLock,
   confirmInstanceRecovery,
@@ -201,5 +212,84 @@ describe('instance lock', () => {
       acquireInstanceLock(join(repository, 'lock-data'), owner()),
     ).toThrow(expect.objectContaining({ code: 'DATA_DIR_FORBIDDEN' }));
     expect(existsSync(join(repository, 'lock-data'))).toBe(false);
+  });
+});
+
+describe('lock file identity', () => {
+  // portal.db with a project, closed: what an alias would destroy.
+  function seedDatabase(): { path: string; hash: () => string } {
+    const db = openDatabase(dataDir);
+    db.prepare(
+      `INSERT INTO projects (id, name, fixture_id, created_at)
+       VALUES ('p1', 'Kept', 'sample-vb6', '2026-10-27')`,
+    ).run();
+    db.close();
+    const path = join(dataDir, 'portal.db');
+    return {
+      path,
+      hash: () => createHash('sha256').update(readFileSync(path)).digest('hex'),
+    };
+  }
+
+  it('refuses a lock file hard-linked to portal.db in acquire and recovery, leaving the DB unchanged', () => {
+    const database = seedDatabase();
+    const before = database.hash();
+    linkSync(database.path, join(dataDir, INSTANCE_LOCK_FILE));
+    expect(() => confirmInstanceRecovery(dataDir)).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+    expect(() => acquireInstanceLock(dataDir, owner())).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+    expect(database.hash()).toBe(before);
+    const db = new Database(database.path, { readonly: true });
+    try {
+      expect(db.prepare('SELECT name FROM projects').pluck().all()).toEqual([
+        'Kept',
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('refuses a lock file that is a symbolic link, leaving the target unchanged', (context) => {
+    const database = seedDatabase();
+    const before = database.hash();
+    try {
+      symlinkSync(database.path, join(dataDir, INSTANCE_LOCK_FILE), 'file');
+    } catch (error) {
+      // Windows without symlink privilege: the hard-link case still runs.
+      if ((error as NodeJS.ErrnoException).code === 'EPERM') context.skip();
+      throw error;
+    }
+    expect(() => confirmInstanceRecovery(dataDir)).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+    expect(() => acquireInstanceLock(dataDir, owner())).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+    expect(database.hash()).toBe(before);
+  });
+
+  it('refuses a lock path that is a directory', () => {
+    mkdirSync(join(dataDir, INSTANCE_LOCK_FILE), { recursive: true });
+    expect(() => acquireInstanceLock(dataDir, owner())).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+  });
+
+  it('recovery refuses a lock file holding anything but the owner record, without changing it', () => {
+    acquireInstanceLock(dataDir, owner()).release();
+    const path = join(dataDir, INSTANCE_LOCK_FILE);
+    const db = new Database(path);
+    db.exec(
+      "CREATE TABLE projects (id TEXT); INSERT INTO projects VALUES ('p1')",
+    );
+    db.close();
+    const before = readFileSync(path);
+    expect(() => confirmInstanceRecovery(dataDir)).toThrow(
+      expect.objectContaining({ code: 'INSTANCE_LOCK_INVALID' }),
+    );
+    expect(readFileSync(path).equals(before)).toBe(true);
   });
 });

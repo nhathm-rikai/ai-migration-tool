@@ -1,6 +1,6 @@
-# Phiếu đầu vào một run P2
+# Phiếu đầu vào một run specification-design
 
-**DRAFT INPUT — p2-templates-0.2.0-draft.** [Cách dùng](../README.md). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
+**DRAFT INPUT — spec-design-templates-0.3.0-draft.** [Cách dùng](../README.md). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
 
 Không cần khai báo ngôn ngữ/runtime: agent tự nhận diện theo [quy trình phân tích](../analysis-method.md) và ghi vào coverage. Người vận hành chỉ cung cấp phần công cụ hoặc kế hoạch dự án phải xác định.
 
@@ -19,6 +19,7 @@ Không cần khai báo ngôn ngữ/runtime: agent tự nhận diện theo [quy t
 | Report/export: report/mode IDs, layout/resource/config được phép đọc     | <provenance hoặc không áp dụng> |
 | Context/output limits, thứ tự chunk                                      | <điền>                          |
 | Calibration được giao / run sau duyệt, quyền dùng dữ liệu                | <điền>                          |
+| Phase 0 feasibility: go/no-go, lý do, người xác nhận; rulebook revision   | <điền>                          |
 
 Report/export ghi provenance file/version/sheet/range hoặc vùng ảnh; thiếu resource hoặc chưa xác minh ghi rõ theo [hướng dẫn report](../report-templates.md). Không đưa giá trị config chứa credential/path nhạy cảm vào tài liệu xuất.
 

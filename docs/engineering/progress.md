@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — P2 luồng phase theo code-migration-kit
+
+- Scope docs-only, không gồm migration code; pack `p2-rules-0.4.0-draft`, template set `p2-templates-0.3.0-draft`, vẫn Draft/unapproved. Chỉ áp phương pháp vận hành của code-migration-kit-with-claude-code (Apache-2.0, viết lại).
+- [Quy trình phân tích](../specification-design/analysis-method.md) thêm mục 8: phase 0–4 (feasibility, map + điểm ngầm định, stress-test, generator + 2 reviewer + fixer, sign-off), nguyên tắc "sửa quy trình, không vá output".
+- Thêm [rulebook](../specification-design/rulebook.md) và [run manifest](../specification-design/templates/run-manifest.md) là hồ sơ quy trình, không phải artifact thứ bảy. Coverage thêm bảng điểm ngầm định; phiếu input thêm verdict phase 0; checklist, runbook (2.2a), artifacts (P2-CT-06), decisions cập nhật tương ứng.
+- Đổi tên "P2" thành specification-design trong `docs/specification-design`, README root và engineering README: pack `spec-design-rules-0.4.0-draft`, template `spec-design-templates-0.3.0-draft`, mã rule `P2-xx-NN` → `SD-xx-NN` (giữ số). Giữ nguyên ID yêu cầu ngoài `OUT-P2-*`, tên file nguồn `P2-Rules-v0.1-Draft.md`, tên revision lịch sử `p2-*` và mức severity P2 trong REV-02; các mục progress cũ không sửa.
+- Kiểm chứng: `node scripts/verify-repository.mjs` pass trên Windows/Node local. Chưa calibration thật; deferred: script dependency map (context builder), cú pháp settings Claude CLI cụ thể theo version.
+
 ## 22/10/2026 — P2 phân tích theo ngôn ngữ phát hiện, bỏ profile
 
 - Scope docs-only theo yêu cầu người dùng; pack `p2-rules-0.3.0-draft`, template set `p2-templates-0.2.0-draft`, vẫn Draft/unapproved. Không dùng profile theo ngôn ngữ: source ngôn ngữ nào trong allowlist thì phân tích ngôn ngữ đó.

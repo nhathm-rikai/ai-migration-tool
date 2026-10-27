@@ -1,6 +1,6 @@
-# Bộ tài liệu P2 từ source đa ngôn ngữ
+# Bộ tài liệu specification-design từ source đa ngôn ngữ
 
-**DRAFT — CHỜ DUYỆT**, pack `p2-rules-0.3.0-draft`, ngày 22/10/2026; template set `p2-templates-0.2.0-draft` cho cả tám template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
+**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.4.0-draft`, ngày 22/10/2026; template set `spec-design-templates-0.3.0-draft` cho cả tám template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
 
 ## Thứ tự đọc
 
@@ -11,7 +11,8 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 3. [Yêu cầu đầu ra](rules/deliverables.md), [artifact](rules/artifacts.md), [mapping contract](contract-mapping.md).
 4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [questions](templates/open-questions.md), [coverage](templates/coverage.md).
 5. [Phiếu input](templates/input-context.md) và cách kết hợp bên dưới.
-6. [Checklist review](review-checklist.md), [KB](knowledge-base.md), [quyết định chờ duyệt](decisions.md), [runbook](runbook.md).
+6. [Rulebook diễn giải](rulebook.md), [run manifest](templates/run-manifest.md) và [luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase).
+7. [Checklist review](review-checklist.md), [KB](knowledge-base.md), [quyết định chờ duyệt](decisions.md), [runbook](runbook.md).
 
 ## Phạm vi đa ngôn ngữ
 
@@ -23,7 +24,7 @@ Giữ tám file template output, thứ tự section và packaging sáu Markdown,
 
 Program có report/export dùng thêm [Basic report](templates/basic-design-report.md) và [Detail report](templates/detail-design-report.md) theo [hướng dẫn ghép và nguồn tham khảo](report-templates.md). Đây là section bổ sung vào hai tài liệu Basic/Detail trong gói sáu Markdown; không tự tạo artifact thứ bảy hoặc mở rộng pilot.
 
-Ghép quy định engineering liên quan → rule P2 → quy trình phân tích → template/contract đã chọn → phiếu input đã điền → context source được đánh dấu là dữ liệu không đáng tin. Không gửi placeholder vào run thật. Cùng bộ file dùng cho Codex CLI và Claude CLI; không cần file prompt riêng hoặc bản sao rule trong AGENTS/CLAUDE.
+Ghép quy định engineering liên quan → rule specification-design → quy trình phân tích → template/contract đã chọn → phiếu input đã điền → context source được đánh dấu là dữ liệu không đáng tin. Không gửi placeholder vào run thật. Cùng bộ file dùng cho Codex CLI và Claude CLI; không cần file prompt riêng hoặc bản sao rule trong AGENTS/CLAUDE.
 
 Trước khi sinh, xác nhận program/snapshot và quyền đọc; nếu chưa rõ thì dừng và báo khoảng trống blocking. Trước khi rule được duyệt, chỉ calibration được giao tường minh và gắn nhãn dùng Draft; chưa chạy batch chính thức. Việc lưu phiên bản chỉ dẫn thực tế của mỗi run vẫn theo contract hiện hành, không dùng một version prompt cố định từ pack này.
 
@@ -37,7 +38,7 @@ Có hai đường sử dụng tách biệt:
 Chọn tường minh một chế độ:
 
 - `document-draft`: sáu Markdown theo template; chưa phải payload backend hoặc deliverable BR xlsx.
-- `understanding-v1`: chỉ JSON theo [schema hiện hữu](../engineering/contracts/understanding-payload.schema.json); không nhúng sáu file/metadata vào JSON, không tuyên bố đủ bảng P2.
+- `understanding-v1`: chỉ JSON theo [schema hiện hữu](../engineering/contracts/understanding-payload.schema.json); không nhúng sáu file/metadata vào JSON, không tuyên bố đủ bảng specification-design.
 
 Phần đầu chung cho mỗi template: unit/program, project/entrypoint path và alias, snapshot và version đã được cung cấp, phạm vi đã đọc, giới hạn, nhãn Draft. AI chỉ chép định danh đã cung cấp; không cấp artifact/run ID, hash, thời điểm, reviewer hoặc review state. Thiếu metadata ghi “chưa được cung cấp”. Nhãn Draft không phải quyền ghi envelope.
 
@@ -52,6 +53,6 @@ Phần đầu chung cho mỗi template: unit/program, project/entrypoint path v�
 | Snapshot, evidence, review, export             | [DATA](../engineering/rules/data-evidence.md)                                             |
 | Kiểm chứng theo phạm vi                        | [QA/REV](../engineering/rules/testing-review.md)                                          |
 
-Rule P2 áp dụng các nguồn này cho tài liệu hiện trạng, không định nghĩa lại thuật toán hay thay contract. Nếu mâu thuẫn ảnh hưởng hành vi, ghi blocking decision, không tự nới gate. Các đoạn nguyên tắc được giữ từ Draft là diễn giải áp dụng; nguồn engineering vẫn quyết định chi tiết kỹ thuật.
+Rule specification-design áp dụng các nguồn này cho tài liệu hiện trạng, không định nghĩa lại thuật toán hay thay contract. Nếu mâu thuẫn ảnh hưởng hành vi, ghi blocking decision, không tự nới gate. Các đoạn nguyên tắc được giữ từ Draft là diễn giải áp dụng; nguồn engineering vẫn quyết định chi tiết kỹ thuật.
 
 Bộ pack chỉ định nghĩa tài liệu: không context builder, runner, backend, UI, exporter hoặc KB index. Gói chuẩn bị calibration có thể được lập từ P1 nhưng không phải tài liệu nghiệp vụ; chỉ chạy CLI AI sau khi có quyết định và preflight theo runbook. Không chạy legacy, SQL hay executable từ corpus.

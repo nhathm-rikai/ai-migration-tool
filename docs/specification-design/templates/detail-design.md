@@ -1,6 +1,6 @@
 # Detail Design — <PROGRAM> — <Tên chức năng>
 
-**DRAFT TEMPLATE — p2-templates-0.2.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
+**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
 
 Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ procedure. Một xử lý có thể gồm nhiều procedure, một procedure có thể phục vụ nhiều xử lý. ID xử lý là tham chiếu Markdown, không thêm field vào understanding-v1. Mọi mục có nội dung hoặc “không áp dụng” kèm lý do/phạm vi đã kiểm hoặc “chưa xác định” kèm Q-ID. E-ref trỏ evidence registry mục 7.
 
@@ -123,7 +123,7 @@ Không có report thì ghi không áp dụng + phạm vi kiểm; thiếu source/
 | Canonical shared ID/symbol | Input từ caller | Output sử dụng | Điều kiện gọi | Tác động kết quả/lỗi | Mục chuẩn + version | BR/E-ref |
 | -------------------------- | --------------- | -------------- | ------------- | -------------------- | ------------------- | -------- |
 
-Mô tả xử lý chung một lần bằng khối mục 3: tổng quan → input/output → bảng dùng → logic/SQL → điều kiện gọi/lỗi. Caller chỉ ghi mapping và điều kiện riêng. Trong gói hiện tại, tham chiếu mục trong detail-design đã xác định; tách thêm file common cần quyết định đóng gói, chưa mặc định artifact thứ bảy. Không copy tài liệu common của dự án tham khảo vào output P2.
+Mô tả xử lý chung một lần bằng khối mục 3: tổng quan → input/output → bảng dùng → logic/SQL → điều kiện gọi/lỗi. Caller chỉ ghi mapping và điều kiện riêng. Trong gói hiện tại, tham chiếu mục trong detail-design đã xác định; tách thêm file common cần quyết định đóng gói, chưa mặc định artifact thứ bảy. Không copy tài liệu common của dự án tham khảo vào output specification-design.
 
 Reference Markdown phải tồn tại, rõ version/snapshot. JSON v1 theo [mapping contract](../contract-mapping.md), chỉ references cùng payload. Không nhân bản BR chung để tăng KPI.
 

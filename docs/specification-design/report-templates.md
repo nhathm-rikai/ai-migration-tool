@@ -1,8 +1,8 @@
 # Cách dùng template Report/Export
 
-**DRAFT — p2-templates-0.2.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
+**DRAFT — spec-design-templates-0.3.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
 
-## Ghép vào bộ P2
+## Ghép vào bộ specification-design
 
 1. Basic Design mục 6 liệt kê report + mode. Với mỗi đầu ra khác biệt, điền [Basic report](templates/basic-design-report.md) thành phần con của mục 6 trong basic-design.md.
 2. Detail Design mục 4.1 dẫn cùng Report ID/mode tới [Detail report](templates/detail-design-report.md), điền thành phần con tại mục đó trong detail-design.md. Tái sử dụng inventory/common/evidence của program; khối report sở hữu logic export, không lặp lại cả khối xử lý chung.

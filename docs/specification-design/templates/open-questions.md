@@ -1,6 +1,8 @@
 # Open questions — <PROGRAM>
 
-**DRAFT TEMPLATE — p2-templates-0.2.0-draft.** [Phần đầu chung](../README.md), [mapping](../contract-mapping.md).
+**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** [Phần đầu chung](../README.md), [mapping](../contract-mapping.md).
+
+Q-ID về cách diễn giải dùng chung (không riêng program này) ghi thêm đề xuất [rulebook](../rulebook.md) ở cột cuối.
 
 | Q-ID   | Câu hỏi/thiếu gì | Related BR/DS/section | Blocking đề xuất | Phần ảnh hưởng | Evidence/context cần thêm |
 | ------ | ---------------- | --------------------- | ---------------- | -------------- | ------------------------- |

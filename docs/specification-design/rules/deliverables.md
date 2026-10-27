@@ -1,6 +1,6 @@
-# P2 — yêu cầu nội dung đầu ra
+# Specification design — yêu cầu nội dung đầu ra
 
-**DRAFT — chờ duyệt.** Pack: p2-rules-0.3.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.4.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -20,13 +20,13 @@ Một BR mô tả một hành vi nghiệp vụ có thể kiểm chứng. Không 
 | Evidence            | Một hoặc nhiều path + range + quote                                               |
 | Open questions      | ID câu hỏi chưa giải quyết                                                        |
 
-P2-BR-01: kiểm tra validation, quyền/trạng thái, tính toán, CRUD, transaction, điều kiện in/xuất, cập nhật tồn kho và lỗi nghiệp vụ khi source có chúng. Mỗi nhóm có ghi nhận tìm thấy hoặc chưa xác định, không áp đặt nhóm nào cũng phải có BR.
+SD-BR-01: kiểm tra validation, quyền/trạng thái, tính toán, CRUD, transaction, điều kiện in/xuất, cập nhật tồn kho và lỗi nghiệp vụ khi source có chúng. Mỗi nhóm có ghi nhận tìm thấy hoặc chưa xác định, không áp đặt nhóm nào cũng phải có BR.
 
-P2-BR-02: giữ khác biệt giữa path bình thường và path lỗi; ghi rõ side effect xảy ra trước/sau lỗi. Không suy ra transaction chỉ từ nhiều câu SQL liên tiếp.
+SD-BR-02: giữ khác biệt giữa path bình thường và path lỗi; ghi rõ side effect xảy ra trước/sau lỗi. Không suy ra transaction chỉ từ nhiều câu SQL liên tiếp.
 
-P2-BR-03: BR thuộc common module dùng ID riêng và dẫn tham chiếu từ program; không sao chép thành nhiều rule để tăng mẫu số accuracy. Giữ điều kiện gọi khác nhau ở từng program.
+SD-BR-03: BR thuộc common module dùng ID riêng và dẫn tham chiếu từ program; không sao chép thành nhiều rule để tăng mẫu số accuracy. Giữ điều kiện gọi khác nhau ở từng program.
 
-P2-BR-04: file review xlsx là deliverable cuối theo OUT-P2-01. Giai đoạn chạy mẫu có thể dùng Markdown/JSON; không coi đó là đã bàn giao xlsx. Spreadsheet export phải ghi chuỗi như văn bản, không thực thi nội dung bắt đầu bằng ký tự công thức.
+SD-BR-04: file review xlsx là deliverable cuối theo OUT-P2-01. Giai đoạn chạy mẫu có thể dùng Markdown/JSON; không coi đó là đã bàn giao xlsx. Spreadsheet export phải ghi chuỗi như văn bản, không thực thi nội dung bắt đầu bằng ký tự công thức.
 
 ## 7. Basic Design — template mỗi program
 
@@ -41,7 +41,7 @@ Report/export áp dụng thêm [Basic report template](../templates/basic-design
 7. **Thông báo và điều hướng:** nguyên văn, điều kiện hiển thị, tác động, evidence.
 8. **Câu hỏi và thiếu dữ liệu:** blocking/nonblocking, phần bị ảnh hưởng.
 
-P2-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm lý do/phạm vi đã kiểm, hoặc "chưa xác định" kèm câu hỏi. Không dựng ảnh UI hoặc hành vi tương tác chỉ từ tên control.
+SD-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm lý do/phạm vi đã kiểm, hoặc "chưa xác định" kèm câu hỏi. Không dựng ảnh UI hoặc hành vi tương tác chỉ từ tên control.
 
 ## 8. Detail Design — template mỗi program
 
@@ -53,9 +53,9 @@ P2-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm l
 6. Rủi ro hiểu sai: type conversion, null/missing values, precision/overflow, locale/date, state/lifecycle, error propagation, concurrency/async và conditional compilation theo [checklist semantics chung](../analysis-method.md#4-checklist-semantics-chung). Chỉ ghi hiện tượng có bằng chứng; không khẳng định semantics chưa được xác minh.
 7. Coverage đối chiếu inventory symbol của công cụ được chọn và open questions.
 
-P2-DD-01: không chỉ paraphrase source từng dòng. Mô tả nhánh, trạng thái và tác động đủ để người review kiểm tra tính tương đương.
+SD-DD-01: không chỉ paraphrase source từng dòng. Mô tả nhánh, trạng thái và tác động đủ để người review kiểm tra tính tương đương.
 
-P2-DD-02: unresolved call/dynamic dispatch phải hiện rõ; không dựng call graph đầy đủ giả. Không tự chọn nhánh conditional compilation khi chưa biết build configuration.
+SD-DD-02: unresolved call/dynamic dispatch phải hiện rõ; không dựng call graph đầy đủ giả. Không tự chọn nhánh conditional compilation khi chưa biết build configuration.
 
 ## 9. DB Design — template và giới hạn suy luận
 
@@ -66,8 +66,8 @@ P2-DD-02: unresolved call/dynamic dispatch phải hiện rõ; không dựng call
 | CRUD Matrix           | Program/function, table, C/R/U/D xác định được, call site, dynamic/unresolved access, evidence                                        |
 | Transaction/relations | Boundary/locking/relation thấy trong source hoặc DDL, provenance, câu hỏi                                                             |
 
-P2-DB-01: nếu không có DDL/schema, chỉ xuất **column usage suy ra từ source**, giữ type/length/PK/FK là unknown khi thiếu chứng cứ. Dùng JOIN không chứng minh có FK constraint; kiểu biến trong ngôn ngữ nguồn không chứng minh kiểu cột DB.
+SD-DB-01: nếu không có DDL/schema, chỉ xuất **column usage suy ra từ source**, giữ type/length/PK/FK là unknown khi thiếu chứng cứ. Dùng JOIN không chứng minh có FK constraint; kiểu biến trong ngôn ngữ nguồn không chứng minh kiểu cột DB.
 
-P2-DB-02: Default schema/namespace do parser hoặc cấu hình cung cấp không chứng minh mọi bảng thuộc schema đó. Lưu riêng tên as-written và nguồn chuẩn hóa schema.
+SD-DB-02: Default schema/namespace do parser hoặc cấu hình cung cấp không chứng minh mọi bảng thuộc schema đó. Lưu riêng tên as-written và nguồn chuẩn hóa schema.
 
-P2-DB-03: SQL động không giải quyết được phải ghi unresolved; không bỏ khỏi matrix hay gán bảng phỏng đoán thành observed. Stored routine không có body được ghi dependency cần bổ sung; khi routine là đơn vị phân tích chính, logic mô tả ở Detail Design như đơn vị logic khác.
+SD-DB-03: SQL động không giải quyết được phải ghi unresolved; không bỏ khỏi matrix hay gán bảng phỏng đoán thành observed. Stored routine không có body được ghi dependency cần bổ sung; khi routine là đơn vị phân tích chính, logic mô tả ở Detail Design như đơn vị logic khác.

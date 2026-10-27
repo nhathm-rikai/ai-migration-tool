@@ -1,6 +1,6 @@
 # Basic Design — <PROGRAM>
 
-**DRAFT TEMPLATE — p2-templates-0.2.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + Q-ID.
+**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + Q-ID.
 
 ## 1. Thông tin tài liệu
 

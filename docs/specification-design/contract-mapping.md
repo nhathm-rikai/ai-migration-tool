@@ -1,9 +1,9 @@
-# Mapping P2 và khoảng trống contract
+# Mapping specification-design và khoảng trống contract
 
 **DRAFT — đề xuất để review, không phải schema mới.** [README](README.md).
 Nguồn: [contract](../engineering/specs/understanding-contract.md), [schema](../engineering/contracts/understanding-payload.schema.json), [sample sạch](../engineering/contracts/understanding-example.json). `additionalProperties:false`: không thêm trường bằng prompt.
 
-| Nội dung P2                               | Mapping hợp lệ hiện tại                                                                                    | Giới hạn/đề xuất                                                                          |
+| Nội dung specification-design                               | Mapping hợp lệ hiện tại                                                                                    | Giới hạn/đề xuất                                                                          |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | BR                                        | businessRules.id/title/statement/basis/inputs/outputs/conditions/evidence/openQuestionIds                  | Công thức/dependency viết trong statement/conditions đúng giới hạn; chưa có field riêng   |
 | Basic/Detail/DB                           | designs.id/title/kind=current_behavior/summary/constraints/relatedBusinessRuleIds/evidence/openQuestionIds | Văn xuôi tổng quát, chưa có screen/item/procedure/column/CRUD dạng bảng máy đọc           |
@@ -32,7 +32,7 @@ Trước tích hợp cần đối chiếu schema/profile registry và validator 
 
 Report templates hiện chỉ là section Markdown: report/mode/field/region/query IDs, mapping cell/CSV, dynamic block, formula owner, serialization và provenance layout chưa có bảng máy đọc riêng trong v1. Ghi phần tổng quát trong designs đúng schema khi dùng JSON; không thêm các field này. Nếu cần per-report artifact/layout xlsx, review packaging và metadata trước tích hợp; xem [hướng dẫn report](report-templates.md).
 
-1. Chọn review sáu Markdown thủ công hay bổ sung payload P2 có version riêng.
+1. Chọn review sáu Markdown thủ công hay bổ sung payload specification-design có version riêng.
 2. Nếu mở rộng, thiết kế schema screen/item/event, procedure/call site, DB usage, coverage/chunk, external provenance, shared references; review mapping không mất dữ liệu và giới hạn trước tích hợp.
 3. Duyệt bổ sung metadata envelope; tách khỏi AI payload. Không chỉ sửa prompt.
 4. Có reader v1 tương thích, contract parity và fixture success/failure cho references/unknown/metadata giả/quote.

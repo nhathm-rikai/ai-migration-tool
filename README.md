@@ -35,7 +35,7 @@ npm.cmd start
 
 ## Tài liệu
 
-- [Bộ P2 Draft: rules, templates và checklist](docs/specification-design/README.md).
+- [Bộ specification-design Draft: rules, templates và checklist](docs/specification-design/README.md).
 
 - [Cách gọi API, đọc source và mở rộng từng lớp](apps/api/README.md).
 - [Rule và workflow dùng skill](docs/engineering/README.md).

@@ -23,7 +23,7 @@ Template, ID, cách đóng gói, adapter, calibration và bổ sung checklist l�
 | 2 Mục tiêu        | [scope](rules/scope.md)                                                              | Không trộn P3, P1 complete không thay approval                                            |
 | 3 Pilot           | [scope](rules/scope.md), [phiếu input](templates/input-context.md)                   | Danh sách 15 ID và ambiguity KZKO0010 do input pilot VB6 cung cấp                         |
 | 4 Input           | [context](rules/context-evidence.md), [phiếu input](templates/input-context.md)      | Snapshot/allowlist/chunk/provenance                                                       |
-| 5 Evidence        | [context](rules/context-evidence.md)                                                 | P2-EV-01 đến 08, không tự verify                                                          |
+| 5 Evidence        | [context](rules/context-evidence.md)                                                 | SD-EV-01 đến 08, không tự verify                                                          |
 | 6 BR              | [deliverables](rules/deliverables.md), [BR template](templates/business-rules.md)    | Đủ cột, nhóm nghiệp vụ, shared, xlsx                                                      |
 | 7 Basic           | [deliverables](rules/deliverables.md), [Basic template](templates/basic-design.md)   | Đủ 8 section                                                                              |
 | 8 Detail          | [deliverables](rules/deliverables.md), [Detail template](templates/detail-design.md) | Đủ 7 section, file-level code                                                             |
@@ -37,4 +37,4 @@ Template, ID, cách đóng gói, adapter, calibration và bổ sung checklist l�
 | 16 Áp dụng        | [runbook](runbook.md)                                                                | Tách direct CLI calibration khỏi Portal LIVE; cả hai có preflight riêng                   |
 | 17 Quyết định     | [decisions](decisions.md)                                                            | Tất cả chờ duyệt                                                                          |
 
-Mã P2 từ Draft giữ nguyên, mỗi mã có một định nghĩa tại rule sở hữu. Templates là biểu mẫu áp dụng, không tạo bản schema/policy mới. Số mục gốc được giữ trong các file chuyển soạn để truy vết.
+Mã rule từ Draft đổi tiền tố P2- thành SD-, giữ nguyên số, mỗi mã có một định nghĩa tại rule sở hữu. Templates là biểu mẫu áp dụng, không tạo bản schema/policy mới. Số mục gốc được giữ trong các file chuyển soạn để truy vết.

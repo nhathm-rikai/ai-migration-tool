@@ -1,6 +1,6 @@
 # Basic Design Report/Export — <PROGRAM> / <REPORT-ID> / <MODE>
 
-**DRAFT TEMPLATE — p2-templates-0.2.0-draft.** Phần mở rộng của [Basic Design](basic-design.md), không thay toàn bộ tài liệu program. Áp dụng [cách ghép và nguồn tham khảo](../report-templates.md), [rule đầu ra](../rules/deliverables.md), [phần đầu chung](../README.md).
+**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** Phần mở rộng của [Basic Design](basic-design.md), không thay toàn bộ tài liệu program. Áp dụng [cách ghép và nguồn tham khảo](../report-templates.md), [rule đầu ra](../rules/deliverables.md), [phần đầu chung](../README.md).
 
 Điền một khối cho từng report và mode có đầu ra khác nhau. REPORT-ID/MODE/field ID là định danh trình bày, không thêm vào JSON v1. Mỗi mục có nội dung hoặc không áp dụng + lý do/phạm vi đã kiểm hoặc chưa xác định + Q-ID. Evidence nguồn và provenance layout phân biệt rõ; ảnh/tài liệu mẫu không chứng minh hành vi source hiện tại.
 
@@ -76,7 +76,7 @@ Phân biệt màu/chữ chú thích thiết kế với định dạng đầu ra 
 | Số cột / thứ tự / format ngày-số   | <điều kiện thay đổi theo mode>                   |            |
 | Consumer / RPA / import dependency | <định dạng bắt buộc được ghi nhận, provenance>   |            |
 
-Ghi nguyên hành vi legacy, kể cả quoting do API/thư viện ghi file tạo ra nếu có evidence. Không tự thêm/xóa cột hoặc chuẩn hóa format làm thay đổi hợp đồng file. Nội dung bắt đầu bằng ký tự công thức được ghi như văn bản trong tài liệu/export review; không nhầm chính sách xuất tài liệu P2 với hành vi file legacy.
+Ghi nguyên hành vi legacy, kể cả quoting do API/thư viện ghi file tạo ra nếu có evidence. Không tự thêm/xóa cột hoặc chuẩn hóa format làm thay đổi hợp đồng file. Nội dung bắt đầu bằng ký tự công thức được ghi như văn bản trong tài liệu/export review; không nhầm chính sách xuất tài liệu specification-design với hành vi file legacy.
 
 ## 6. Kết quả, giới hạn và liên kết Detail
 

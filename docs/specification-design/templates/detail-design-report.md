@@ -1,6 +1,6 @@
 # Detail Design Report/Export — <PROGRAM> / <REPORT-ID> / <MODE>
 
-**DRAFT TEMPLATE — p2-templates-0.2.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
+**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
 
 REPORT-ID/MODE và query/region/field IDs là tham chiếu Markdown, không thêm schema. Mọi mục có nội dung hoặc lý do không áp dụng hoặc chưa xác định + Q-ID. Không kế thừa session/web/DB/rounding từ mẫu tham khảo.
 
@@ -102,7 +102,7 @@ Chỉ ghi cách áp dụng/ghi đè, không nhân bản đặc tả layout. Help
 | Hoàn tất / ghi dở       | <temp/rename nếu có, file partial và khi báo thành công>                                |                         |
 | Consumer/RPA            | <cột/format/thứ tự phải giữ; provenance xác nhận>                                       |                         |
 
-Comment về tương thích là bằng chứng ý định; đối chiếu code, nếu mâu thuẫn mở Q-ID. Không tự thêm cột/escape/chống formula injection vào hành vi legacy; tài liệu review vẫn lưu trích dẫn như text theo policy P2.
+Comment về tương thích là bằng chứng ý định; đối chiếu code, nếu mâu thuẫn mở Q-ID. Không tự thêm cột/escape/chống formula injection vào hành vi legacy; tài liệu review vẫn lưu trích dẫn như text theo policy specification-design.
 
 ## 10. Transaction và lỗi — トランザクション・例外処理
 

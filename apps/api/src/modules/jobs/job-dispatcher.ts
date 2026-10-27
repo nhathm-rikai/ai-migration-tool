@@ -34,6 +34,9 @@ type Execution = {
   done: Promise<void>;
 };
 
+const CLAIM_RETRY_MIN_MS = 1000;
+const CLAIM_RETRY_MAX_MS = 30_000;
+
 export function createJobDispatcher(deps: {
   repository: RunRepository;
   executor: RunExecutor;
@@ -45,6 +48,10 @@ export function createJobDispatcher(deps: {
   const { repository, log } = deps;
   let active: Execution | null = null;
   let scheduled: NodeJS.Immediate | null = null;
+  // A failed claim changed nothing (one UPDATE); it is retried with backoff
+  // so queued runs do not wait for an unrelated wake.
+  let claimRetry: NodeJS.Timeout | undefined;
+  let claimDelayMs = CLAIM_RETRY_MIN_MS;
   let closed = false;
   // Set once close() returned: the database may be gone.
   let detached = false;
@@ -179,10 +186,18 @@ export function createJobDispatcher(deps: {
     } catch (error) {
       log.error(
         { code: 'RUN_CLAIM_FAILED', reason: getErrorReason(error) },
-        'Could not claim a queued run.',
+        'Could not claim a queued run; retrying.',
       );
+      if (!claimRetry) {
+        claimRetry = setTimeout(() => {
+          claimRetry = undefined;
+          wake();
+        }, claimDelayMs);
+        claimDelayMs = Math.min(claimDelayMs * 2, CLAIM_RETRY_MAX_MS);
+      }
       return;
     }
+    claimDelayMs = CLAIM_RETRY_MIN_MS;
     if (!run) return;
     const execution: Execution = {
       run,
@@ -250,6 +265,8 @@ export function createJobDispatcher(deps: {
       closed = true;
       if (scheduled) clearImmediate(scheduled);
       scheduled = null;
+      clearTimeout(claimRetry);
+      claimRetry = undefined;
       const execution = active;
       if (execution) {
         stop(execution, 'shutdown');

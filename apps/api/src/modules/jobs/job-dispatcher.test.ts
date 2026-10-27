@@ -31,8 +31,16 @@ describe('dispatcher when a state write fails', () => {
   function setup() {
     const real = createRunRepository(db);
     let failTransitions = false;
+    let failClaims = 0;
     const repository: RunRepository = {
       ...real,
+      claimNextQueued(now) {
+        if (failClaims > 0) {
+          failClaims--;
+          throw new Error('database is locked');
+        }
+        return real.claimNextQueued(now);
+      },
       transition(...args) {
         if (failTransitions) throw new Error('disk I/O error at C:/private');
         return real.transition(...args);
@@ -71,6 +79,9 @@ describe('dispatcher when a state write fails', () => {
       project,
       setFailing: (value: boolean) => {
         failTransitions = value;
+      },
+      failNextClaims: (count: number) => {
+        failClaims = count;
       },
     };
   }
@@ -144,5 +155,29 @@ describe('dispatcher when a state write fails', () => {
     expect(restarted.real.findAny(run.id)?.status).toBe('interrupted');
     expect(restarted.jobs.runtimeStatus().status).toBe('ready');
     await restarted.dispatcher.close();
+  });
+
+  it('retries a failed claim by itself, so a queued run does not wait for another wake', async () => {
+    const ctx = setup();
+    const a = ctx.project();
+    ctx.failNextClaims(1);
+    const { run } = ctx.jobs.start(
+      a.id,
+      `key-${randomUUID()}`,
+      startRunFixture,
+    );
+    await vi.waitFor(
+      () =>
+        expect(ctx.controlled.executions.map((e) => e.run.id)).toEqual([
+          run.id,
+        ]),
+      { timeout: 5000 },
+    );
+    expect(ctx.log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'RUN_CLAIM_FAILED' }),
+      expect.any(String),
+    );
+    expect(ctx.jobs.runtimeStatus().status).toBe('ready');
+    await ctx.dispatcher.close();
   });
 });

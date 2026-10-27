@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { Project } from '@portal/contracts';
+import { FIXTURE_SOURCE_REVISION, type Project } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
+import type { SourcesApi } from '../../shared/api/sources-api';
 import { AnalyzeRunPanel } from '../jobs/analyze-run-panel';
+import { SourcePanel } from '../source/source-panel';
+import {
+  startableRevision,
+  useProjectSource,
+} from '../source/use-project-source';
 import { projectErrorMessage } from './project-messages';
 import { useLocale } from '../../shared/i18n/locale-context';
 
@@ -14,12 +20,15 @@ export function ProjectDetail({
   id,
   api,
   runsApi,
+  sourcesApi,
   onClose,
 }: {
   id: string;
   api: ProjectsApi;
   // Without it the analyze runs panel is not shown (Projects-only tests).
   runsApi?: RunsApi | undefined;
+  // Without it a local project shows no source and cannot start runs.
+  sourcesApi?: SourcesApi | undefined;
   onClose: () => void;
 }) {
   const { messages, formatDateTime } = useLocale();
@@ -80,8 +89,19 @@ export function ProjectDetail({
             <div>
               <dt>{copy.data}</dt>
               <dd>
-                {state.project.fixtureId}{' '}
-                <span className="badge">{messages.projects.demoBadge}</span>
+                {state.project.mode === 'demo' ? (
+                  <>
+                    {state.project.fixtureId}{' '}
+                    <span className="badge">{messages.projects.demoBadge}</span>
+                  </>
+                ) : (
+                  <>
+                    {messages.projects.localData}{' '}
+                    <span className="badge">
+                      {messages.projects.localBadge}
+                    </span>
+                  </>
+                )}
               </dd>
             </div>
             <div>
@@ -93,11 +113,60 @@ export function ProjectDetail({
             <strong>{copy.ready}</strong>
             <p>{copy.unavailable}</p>
           </div>
-          {runsApi && (
-            <AnalyzeRunPanel api={runsApi} projectId={state.project.id} />
+          {state.project.mode === 'demo' ? (
+            runsApi && (
+              <AnalyzeRunPanel
+                api={runsApi}
+                projectId={state.project.id}
+                demo
+                sourceRevision={FIXTURE_SOURCE_REVISION}
+              />
+            )
+          ) : sourcesApi ? (
+            <SourceAndRuns
+              projectId={state.project.id}
+              runsApi={runsApi}
+              sourcesApi={sourcesApi}
+            />
+          ) : (
+            runsApi && (
+              <AnalyzeRunPanel
+                api={runsApi}
+                projectId={state.project.id}
+                demo={false}
+                sourceRevision={null}
+              />
+            )
           )}
         </>
       )}
     </section>
+  );
+}
+
+// Source registration and runs of a local project: a run may start only on a
+// registered, readable source and names the revision shown here.
+function SourceAndRuns({
+  projectId,
+  runsApi,
+  sourcesApi,
+}: {
+  projectId: string;
+  runsApi?: RunsApi | undefined;
+  sourcesApi: SourcesApi;
+}) {
+  const source = useProjectSource(sourcesApi, projectId);
+  return (
+    <>
+      <SourcePanel control={source} />
+      {runsApi && (
+        <AnalyzeRunPanel
+          api={runsApi}
+          projectId={projectId}
+          demo={false}
+          sourceRevision={startableRevision(source.state)}
+        />
+      )}
+    </>
   );
 }

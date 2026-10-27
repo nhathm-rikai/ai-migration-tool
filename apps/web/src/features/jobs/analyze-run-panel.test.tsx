@@ -80,7 +80,12 @@ describe('Analyze run panel (F02)', () => {
     const view = render(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel api={server.api} projectId={projectId} />
+        <AnalyzeRunPanel
+          api={server.api}
+          projectId={projectId}
+          demo
+          sourceRevision={1}
+        />
       </StrictMode>,
     );
     expect(await screen.findAllByText('Hoàn tất (demo)')).not.toHaveLength(0);
@@ -89,7 +94,12 @@ describe('Analyze run panel (F02)', () => {
     view.rerender(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel api={server.api} projectId={projectId} />
+        <AnalyzeRunPanel
+          api={server.api}
+          projectId={projectId}
+          demo
+          sourceRevision={1}
+        />
       </StrictMode>,
     );
     expect(server.mutations()).toEqual([]);
@@ -108,7 +118,14 @@ describe('Analyze run panel (F02)', () => {
         return json(queuedRunFixture, 202);
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     const start = await screen.findByRole('button', {
       name: 'Bắt đầu phân tích',
     });
@@ -157,7 +174,14 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
     );
@@ -199,7 +223,14 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
     );
@@ -238,7 +269,14 @@ describe('Analyze run panel (F02)', () => {
         return json(cancelling, 202);
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
@@ -292,7 +330,14 @@ describe('Analyze run panel (F02)', () => {
           : json(cancelling, 202);
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
@@ -315,7 +360,14 @@ describe('Analyze run panel (F02)', () => {
         return json(runningRunFixture);
       },
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     expect(await screen.findAllByText('Đang chạy')).not.toHaveLength(0);
     online = false;
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS + 10));
@@ -355,6 +407,8 @@ describe('Analyze run panel (F02)', () => {
         key={projectId}
         api={server.api}
         projectId={projectId}
+        demo
+        sourceRevision={1}
       />,
     );
     await waitFor(() => expect(releaseA).toBeDefined());
@@ -363,6 +417,8 @@ describe('Analyze run panel (F02)', () => {
         key={otherProjectId}
         api={server.api}
         projectId={otherProjectId}
+        demo
+        sourceRevision={1}
       />,
     );
     expect(await screen.findAllByText('Thất bại')).not.toHaveLength(0);
@@ -390,7 +446,14 @@ describe('Analyze run panel (F02)', () => {
       [`GET ${base}/${retried.id}`]: () => json(retried),
       [`POST ${base}`]: startRoute(retried),
     });
-    render(<AnalyzeRunPanel api={server.api} projectId={projectId} />);
+    render(
+      <AnalyzeRunPanel
+        api={server.api}
+        projectId={projectId}
+        demo
+        sourceRevision={1}
+      />,
+    );
     expect(
       await screen.findByText('Mã nguồn đã thay đổi trong lúc chạy.'),
     ).toBeTruthy();

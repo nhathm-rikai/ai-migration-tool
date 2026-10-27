@@ -820,3 +820,46 @@ dd {
     gap: 2px;
   }
 }
+
+/* Project kind and source registration (F01) */
+.project-kind {
+  border: 0;
+  margin: 20px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.project-kind legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.project-kind .fixture-card {
+  margin: 0;
+  cursor: pointer;
+}
+.project-kind .fixture-card:has(input:checked) {
+  border-color: var(--brand);
+}
+.project-kind .field-help {
+  display: block;
+}
+.source-panel {
+  margin-top: 16px;
+}
+.source-panel h3 {
+  margin: 20px 0 8px;
+  font-size: 15px;
+}
+.source-panel select {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.source-status {
+  font-weight: 600;
+}
+.source-status.status-ready {
+  color: var(--low);
+}
+.source-status.status-unreadable {
+  color: var(--high);
+}

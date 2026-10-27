@@ -9,6 +9,8 @@ const RUNTIME_ERRORS = {
   UNSUPPORTED_PLATFORM:
     'This platform is not a supported configuration target.',
   MIGRATION_MODIFIED: 'An applied migration was modified.',
+  MIGRATION_FOREIGN_KEY_VIOLATION:
+    'A migration left rows that reference missing rows.',
   SCHEMA_TOO_NEW: 'Database schema is newer than this application.',
 } as const;
 

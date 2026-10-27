@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACTIVE_RUN_STATUSES,
-  FIXTURE_SOURCE_REVISION,
   type Run,
   type RunStatus,
   type StartRunInput,
@@ -55,11 +54,14 @@ export type RunAction =
 // One Start intent: the same key and body for every HTTP retry of it.
 type StartIntent = { key: string; input: StartRunInput };
 
-function startInput(retryOfRunId: string | null): StartRunInput {
-  // Every project is a demo project on the bundled source until B03.
+function startInput(
+  sourceRevision: number,
+  retryOfRunId: string | null,
+): StartRunInput {
+  // The source revision the user sees; a newer one answers 409.
   const source = {
     strategy: 'current-source',
-    expectedSourceRevision: FIXTURE_SOURCE_REVISION,
+    expectedSourceRevision: sourceRevision,
   } as const;
   return retryOfRunId === null
     ? { kind: 'analyze', source, retryOfRunId: null }
@@ -69,6 +71,8 @@ function startInput(retryOfRunId: string | null): StartRunInput {
 export function useAnalyzeRuns(
   api: RunsApi,
   projectId: string,
+  // null: no startable source (unregistered or unreadable); Start is refused.
+  sourceRevision: number | null,
   newKey: () => string = () => crypto.randomUUID(),
 ) {
   const [state, setState] = useState<RunsState>({ status: 'loading' });
@@ -219,11 +223,23 @@ export function useAnalyzeRuns(
     uncertainStart,
     refresh,
     // New run, or the same intent again while its outcome is unknown.
-    start: () =>
-      sendStart(intent.current ?? { key: newKey(), input: startInput(null) }),
+    async start() {
+      // An intent whose outcome is unknown is resent exactly as it was.
+      if (intent.current) return sendStart(intent.current);
+      if (sourceRevision === null) return;
+      return sendStart({
+        key: newKey(),
+        input: startInput(sourceRevision, null),
+      });
+    },
     // Business retry: always a new run with a new key.
-    retry: (runId: string) =>
-      sendStart({ key: newKey(), input: startInput(runId) }),
+    async retry(runId: string) {
+      if (sourceRevision === null) return;
+      return sendStart({
+        key: newKey(),
+        input: startInput(sourceRevision, runId),
+      });
+    },
     async cancel(run: Run) {
       const result = await mutate('cancel', async (signal) => {
         try {

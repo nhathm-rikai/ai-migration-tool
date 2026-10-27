@@ -1,8 +1,6 @@
 import {
-  FIXTURE_SOURCE_REVISION,
   SOURCE_INVENTORY_SCHEMA_VERSION,
   type AnalyzeRunConfig,
-  type Project,
   type Run,
   type TableNameMapping,
 } from '@portal/contracts';
@@ -16,9 +14,8 @@ import { SOURCE_NORMALIZATION_VERSION } from '../analysis/source-text.js';
 import { SQL_ACCESS_VERSION } from '../analysis/sql-access.js';
 import { TABLE_NAME_VERSION } from '../analysis/table-names.js';
 
-// What a run locks at admission: the source it reads and the analyzer config
-// of the running build. Until source registration (B03) exists every project
-// is a demo project on the bundled fixture source.
+// What a run locks at admission: the source it reads (from the project's
+// source registration) and the analyzer config of the running build.
 
 export type RunLimits = AnalyzeRunConfig['limits'];
 
@@ -28,21 +25,6 @@ export type ProjectRunSource = {
   profileId: string;
   tableNameMapping: TableNameMapping;
 };
-
-const FIXTURE_PROFILE_ID = 'vb6-cp932-v1';
-
-export function projectRunSource(project: Project): ProjectRunSource {
-  return {
-    source: {
-      kind: 'fixture',
-      fixtureId: project.fixtureId,
-      revision: FIXTURE_SOURCE_REVISION,
-    },
-    revision: FIXTURE_SOURCE_REVISION,
-    profileId: FIXTURE_PROFILE_ID,
-    tableNameMapping: { defaultSchema: null, status: 'unconfigured' },
-  };
-}
 
 // undefined when the profile is not compiled into this build.
 export function analyzeRunConfig(

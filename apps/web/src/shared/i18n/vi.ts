@@ -8,6 +8,8 @@ import type {
   ApiErrorCode,
   RunErrorCode,
   RunStatus,
+  SourceProfileId,
+  TableNameMapping,
 } from '@portal/contracts';
 import type { ApiFailureKind } from '../api/api-error';
 
@@ -47,6 +49,8 @@ export const viMessages = {
     breadcrumb: 'Dự án',
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
+    localBadge: 'LOCAL',
+    localData: 'Thư mục mã nguồn đăng ký',
     assessmentSteps: 'Các bước đánh giá',
     stages: {
       analysis: {
@@ -70,6 +74,11 @@ export const viMessages = {
       nameHelp: `Tối đa ${PROJECT_NAME_MAX_LENGTH} ký tự. Chỉ dùng tên và dữ liệu mẫu.`,
       sample: 'Dữ liệu mẫu VB6',
       sampleDescription: 'Chỉ lưu thông tin dự án, chưa đọc mã nguồn.',
+      kind: 'Loại dự án',
+      kindDemo: 'Demo với dữ liệu mẫu',
+      kindLocal: 'Mã nguồn trên máy này',
+      kindLocalDescription:
+        'Đăng ký thư mục mã nguồn sau khi tạo dự án. Mã nguồn chỉ được đọc khi chạy phân tích.',
       submit: 'Tạo dự án',
       pending: 'Đang tạo…',
       savedLocally:
@@ -89,10 +98,80 @@ export const viMessages = {
         'Phân tích mã nguồn thật, rà soát và tạo báo cáo chưa khả dụng trong bản này; lượt chạy phân tích bên dưới là demo.',
     },
   },
+  source: {
+    title: 'Mã nguồn',
+    loading: 'Đang tải thông tin mã nguồn…',
+    reload: 'Tải lại mã nguồn',
+    unregistered:
+      'Dự án chưa đăng ký thư mục mã nguồn. Đăng ký trước khi chạy phân tích.',
+    fixture: (fixtureId: string) =>
+      `Dự án demo dùng bộ mẫu ${fixtureId} đi kèm ứng dụng; không đăng ký được thư mục khác.`,
+    fields: {
+      folder: 'Thư mục',
+      revision: 'Lần đăng ký',
+      profile: 'Hồ sơ phân tích',
+      defaultSchema: 'Schema mặc định',
+      status: 'Trạng thái',
+      checkedAt: 'Kiểm tra lúc',
+    },
+    status: {
+      ready: 'Đọc được (mới kiểm tra thư mục, chưa đọc nội dung)',
+      unreadable:
+        'Không đọc được thư mục đã đăng ký. Kiểm tra thư mục rồi đăng ký lại.',
+    },
+    mappingStatus: {
+      unconfigured: 'Chưa cấu hình',
+      assumed: 'Giả định, chưa xác nhận',
+      confirmed: 'Đã được người quản lý DB xác nhận',
+    } satisfies Record<TableNameMapping['status'], string>,
+    profiles: {
+      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
+    } satisfies Record<SourceProfileId, string>,
+    form: {
+      titleNew: 'Đăng ký mã nguồn',
+      titleEdit: 'Đổi mã nguồn',
+      rootPath: 'Đường dẫn thư mục (tuyệt đối)',
+      rootPathHelp:
+        'Ví dụ C:\\work\\order-module hoặc /home/dev/order-module. Backend kiểm tra thư mục và quyền đọc; nội dung chỉ được đọc khi chạy phân tích.',
+      rootPathInvalid: 'Nhập đường dẫn thư mục mã nguồn.',
+      profile: 'Hồ sơ phân tích',
+      mappingStatus: 'Schema mặc định của tên bảng',
+      defaultSchema: 'Tên schema',
+      defaultSchemaHelp:
+        'Schema mà tên bảng không có tiền tố trỏ tới (ví dụ user đăng nhập). Chỉ chọn “đã xác nhận” khi người quản lý DB đã xác nhận.',
+      defaultSchemaInvalid:
+        'Nhập tên schema bắt đầu bằng chữ cái hoặc “_”, chỉ gồm chữ, số, _, $, #.',
+      submit: 'Đăng ký',
+      update: 'Lưu thay đổi',
+      pending: 'Đang kiểm tra…',
+      edit: 'Đổi mã nguồn',
+      cancelEdit: 'Hủy',
+      saved: 'Đã lưu mã nguồn.',
+    },
+    errors: {
+      SOURCE_FORBIDDEN:
+        'Không được dùng thư mục này: thư mục mạng, thư mục của ứng dụng hoặc chứa thư mục dữ liệu của ứng dụng.',
+      SOURCE_UNREADABLE:
+        'Thư mục không tồn tại hoặc ứng dụng không có quyền đọc.',
+      SOURCE_REVISION_CONFLICT:
+        'Mã nguồn vừa được cập nhật ở nơi khác. Tải lại mã nguồn rồi lưu lại; dữ liệu bạn nhập vẫn được giữ.',
+      SOURCE_PROFILE_UNSUPPORTED: 'Hồ sơ phân tích không được bản này hỗ trợ.',
+      PROJECT_MODE_CONFLICT:
+        'Dự án demo không đăng ký được thư mục mã nguồn. Tạo dự án mã nguồn trên máy này.',
+    } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,
+    outcomeUnknown:
+      'Chưa xác nhận được backend đã lưu mã nguồn. Tải lại mã nguồn để kiểm tra trước khi gửi lại.',
+    startBlocked:
+      'Cần đăng ký một thư mục mã nguồn đọc được trước khi chạy phân tích.',
+  },
   runs: {
     title: 'Phân tích (demo)',
+    titleLocal: 'Phân tích',
     demoNotice:
       'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: chưa đọc mã nguồn và chưa tạo kết quả phân tích.',
+    localNotice:
+      'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc). Kiểm kê và báo cáo chưa có trong bản này.',
+    snapshotTaken: 'Đã chụp nguồn',
     loading: 'Đang tải lượt chạy…',
     reload: 'Tải lại lượt chạy',
     start: 'Bắt đầu phân tích',
@@ -206,6 +285,8 @@ export const viMessages = {
       get: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',
       list: 'Tham số tải danh sách không hợp lệ. Làm mới danh sách rồi thử lại.',
       runs: 'Yêu cầu lượt chạy không hợp lệ. Tải lại lượt chạy rồi thử lại.',
+      source:
+        'Thông tin mã nguồn không hợp lệ: đường dẫn phải là đường dẫn tuyệt đối trên máy này.',
     },
   },
 };

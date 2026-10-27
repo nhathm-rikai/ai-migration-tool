@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3';
-import { PROJECT_DEMO_MODE, type Project } from '@portal/contracts';
+import {
+  PROJECT_DEMO_MODE,
+  PROJECT_FIXTURE_ID,
+  PROJECT_LOCAL_MODE,
+  type Project,
+} from '@portal/contracts';
 
 export interface ProjectRepository {
   create(project: Project): Project;
@@ -10,38 +15,43 @@ export interface ProjectRepository {
 type ProjectRow = {
   id: string;
   name: string;
-  fixture_id: 'sample-vb6';
+  mode: string;
+  fixture_id: string | null;
   created_at: string;
 };
 
+// The table's CHECKs pair demo with the fixture ID and local with none; a
+// row outside them is corruption, not a project.
 function toProject(row: ProjectRow): Project {
-  return {
-    id: row.id,
-    name: row.name,
-    fixtureId: row.fixture_id,
-    createdAt: row.created_at,
-    mode: PROJECT_DEMO_MODE,
-  };
+  const common = { id: row.id, name: row.name, createdAt: row.created_at };
+  if (row.mode === PROJECT_DEMO_MODE && row.fixture_id === PROJECT_FIXTURE_ID)
+    return { ...common, fixtureId: row.fixture_id, mode: PROJECT_DEMO_MODE };
+  if (row.mode === PROJECT_LOCAL_MODE && row.fixture_id === null)
+    return { ...common, mode: PROJECT_LOCAL_MODE };
+  throw new Error('Stored project row has an unknown mode.');
 }
+
+const COLUMNS = 'id, name, mode, fixture_id, created_at';
 
 export function createProjectRepository(
   db: Database.Database,
 ): ProjectRepository {
-  const insert = db.prepare<[string, string, string, string]>(
-    'INSERT INTO projects (id, name, fixture_id, created_at) VALUES (?, ?, ?, ?)',
+  const insert = db.prepare<[string, string, string, string | null, string]>(
+    `INSERT INTO projects (${COLUMNS}) VALUES (?, ?, ?, ?, ?)`,
   );
   const find = db.prepare<[string], ProjectRow>(
-    'SELECT id, name, fixture_id, created_at FROM projects WHERE id = ?',
+    `SELECT ${COLUMNS} FROM projects WHERE id = ?`,
   );
   const list = db.prepare<[string, number], ProjectRow>(
-    'SELECT id, name, fixture_id, created_at FROM projects WHERE id > ? ORDER BY id ASC LIMIT ?',
+    `SELECT ${COLUMNS} FROM projects WHERE id > ? ORDER BY id ASC LIMIT ?`,
   );
   return {
     create(project) {
       insert.run(
         project.id,
         project.name,
-        project.fixtureId,
+        project.mode,
+        project.mode === PROJECT_DEMO_MODE ? project.fixtureId : null,
         project.createdAt,
       );
       return project;

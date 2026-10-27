@@ -40,6 +40,8 @@ export const jaMessages = {
     breadcrumb: 'プロジェクト',
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
+    localBadge: 'LOCAL',
+    localData: '登録済みのソースフォルダー',
     assessmentSteps: 'アセスメントの手順',
     stages: {
       analysis: { title: 'AI解析', description: 'パーサー + AIエージェント' },
@@ -61,6 +63,11 @@ export const jaMessages = {
       sample: 'VB6サンプルデータ',
       sampleDescription:
         'プロジェクト情報のみを保存します。ソースコードは読み込みません。',
+      kind: 'プロジェクトの種類',
+      kindDemo: 'サンプルデータのデモ',
+      kindLocal: 'この端末のソースコード',
+      kindLocalDescription:
+        '作成後にソースフォルダーを登録します。ソースは解析の実行時にのみ読み込まれます。',
       submit: '作成する',
       pending: '作成中…',
       savedLocally:
@@ -80,10 +87,81 @@ export const jaMessages = {
         'このバージョンでは、実際のソース解析、レビュー、レポート作成は未対応です。下の解析実行はデモです。',
     },
   },
+  source: {
+    title: 'ソースコード',
+    loading: 'ソース情報を読み込み中…',
+    reload: 'ソースを再読み込み',
+    unregistered:
+      'ソースフォルダーが登録されていません。解析の前に登録してください。',
+    fixture: (fixtureId: string) =>
+      `デモプロジェクトはアプリ同梱のサンプル ${fixtureId} を使用します。別のフォルダーは登録できません。`,
+    fields: {
+      folder: 'フォルダー',
+      revision: '登録リビジョン',
+      profile: '解析プロファイル',
+      defaultSchema: 'デフォルトスキーマ',
+      status: '状態',
+      checkedAt: '確認日時',
+    },
+    status: {
+      ready: '読み取り可能（フォルダーのみ確認、内容は未読）',
+      unreadable:
+        '登録したフォルダーを読み取れません。フォルダーを確認して再登録してください。',
+    },
+    mappingStatus: {
+      unconfigured: '未設定',
+      assumed: '仮定（未確認）',
+      confirmed: 'DB管理者が確認済み',
+    },
+    profiles: {
+      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
+    },
+    form: {
+      titleNew: 'ソースを登録',
+      titleEdit: 'ソースを変更',
+      rootPath: 'フォルダーのパス（絶対パス）',
+      rootPathHelp:
+        '例：C:\\work\\order-module、/home/dev/order-module。バックエンドがフォルダーと読み取り権限を確認します。内容は解析の実行時にのみ読み込まれます。',
+      rootPathInvalid: 'ソースフォルダーのパスを入力してください。',
+      profile: '解析プロファイル',
+      mappingStatus: 'テーブル名のデフォルトスキーマ',
+      defaultSchema: 'スキーマ名',
+      defaultSchemaHelp:
+        '修飾なしのテーブル名が指すスキーマ（例：ログインユーザー）。DB管理者が確認した場合のみ「確認済み」を選択してください。',
+      defaultSchemaInvalid:
+        'スキーマ名は英字または「_」で始め、英数字・_・$・# のみで入力してください。',
+      submit: '登録する',
+      update: '変更を保存',
+      pending: '確認中…',
+      edit: 'ソースを変更',
+      cancelEdit: 'キャンセル',
+      saved: 'ソースを保存しました。',
+    },
+    errors: {
+      SOURCE_FORBIDDEN:
+        'このフォルダーは使用できません：ネットワークフォルダー、アプリのフォルダー、またはアプリのデータフォルダーを含むフォルダーです。',
+      SOURCE_UNREADABLE:
+        'フォルダーが存在しないか、アプリに読み取り権限がありません。',
+      SOURCE_REVISION_CONFLICT:
+        'ソースが別の操作で更新されました。ソースを再読み込みしてから保存し直してください。入力内容は保持されています。',
+      SOURCE_PROFILE_UNSUPPORTED:
+        'この解析プロファイルはこのバージョンでは未対応です。',
+      PROJECT_MODE_CONFLICT:
+        'デモプロジェクトにはソースフォルダーを登録できません。ローカルソースのプロジェクトを作成してください。',
+    },
+    outcomeUnknown:
+      'バックエンドがソースを保存したか確認できませんでした。再送信する前にソースを再読み込みして確認してください。',
+    startBlocked:
+      '解析の前に、読み取り可能なソースフォルダーを登録してください。',
+  },
   runs: {
     title: '解析（デモ）',
+    titleLocal: '解析',
     demoNotice:
       'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、解析結果も作成しません。',
+    localNotice:
+      '実行時に登録フォルダーの不変スナップショットを作成します（読み取りのみ）。インベントリとレポートはこのバージョンでは未対応です。',
+    snapshotTaken: 'スナップショット作成済み',
     loading: '実行を読み込み中…',
     reload: '実行を再読み込み',
     start: '解析を開始',
@@ -201,6 +279,8 @@ export const jaMessages = {
       get: 'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',
       list: '一覧の取得条件が正しくありません。一覧を再読み込みして再試行してください。',
       runs: '実行リクエストが正しくありません。実行を再読み込みしてから再試行してください。',
+      source:
+        'ソース情報が正しくありません。パスはこの端末の絶対パスで入力してください。',
     },
   },
 } satisfies Messages;

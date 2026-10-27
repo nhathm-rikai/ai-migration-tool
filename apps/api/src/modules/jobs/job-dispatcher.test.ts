@@ -12,6 +12,8 @@ import { createProjectRepository } from '../projects/project.repository.js';
 import { createProjectService } from '../projects/project.service.js';
 import { createJobDispatcher } from './job-dispatcher.js';
 import { createJobService } from './job.service.js';
+import { createSourceRegistrationRepository } from '../projects/source-registration.repository.js';
+import { createSourceRegistrationService } from '../projects/source-registration.service.js';
 import { createRunRepository, type RunRepository } from './run.repository.js';
 
 // Dispatcher over real SQLite with a repository whose writes can be made to
@@ -63,6 +65,17 @@ describe('dispatcher when a state write fails', () => {
     const jobs = createJobService({
       repository,
       projects,
+      // Demo projects only: no source root is ever checked here.
+      sources: createSourceRegistrationService({
+        repository: createSourceRegistrationRepository(db),
+        roots: {
+          resolve: () => ({ ok: false, code: 'SOURCE_UNREADABLE' }),
+          check: () => 'unreadable',
+        },
+        projects,
+        nextId: randomUUID,
+        now: () => new Date(),
+      }),
       control: dispatcher,
       limits: DEFAULT_RUN_LIMITS,
       nextId: randomUUID,

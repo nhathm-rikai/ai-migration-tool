@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import { openDatabase } from './db/database.js';
 import { createFixtureRunExecutor } from './adapters/fake/fixture-run.executor.js';
+import { createLocalSourceRootPolicy } from './adapters/local/local-source-root.js';
+import { createLocalWorkspaceProvider } from './adapters/local/local-workspace.provider.js';
+import { createSourceRunExecutor } from './adapters/local/source-run.executor.js';
+import { APPLICATION_ROOT } from './platform/data-directory.js';
 import type { RunLimits } from './modules/jobs/analyze-run-config.js';
 import {
   createJobDispatcher,
@@ -10,6 +15,10 @@ import { createJobService } from './modules/jobs/job.service.js';
 import { createRunRepository } from './modules/jobs/run.repository.js';
 import { createProjectRepository } from './modules/projects/project.repository.js';
 import { createProjectService } from './modules/projects/project.service.js';
+import { createSourceRegistrationRepository } from './modules/projects/source-registration.repository.js';
+import { createSourceRegistrationService } from './modules/projects/source-registration.service.js';
+import { createSnapshotRepository } from './modules/snapshots/snapshot.repository.js';
+import { createSnapshotService } from './modules/snapshots/snapshot.service.js';
 import type { RunExecutor } from './ports/run-executor.js';
 
 // Placeholder limits locked into each run's config until the analysis spike
@@ -27,6 +36,8 @@ const FIXTURE_STAGE_DELAY_MS = 700;
 // Tests swap the executor and shorten timeouts.
 export type JobOptions = {
   executor?: RunExecutor;
+  // Replaces only the demo executor; local sources keep the snapshot path.
+  fixtureExecutor?: RunExecutor;
   limits?: Partial<RunLimits>;
   stopTimeoutMs?: number;
 };
@@ -54,14 +65,42 @@ export function createDependencies(
       nextId: randomUUID,
       now,
     });
+    // A source may not overlap the application or the data directory, so
+    // snapshots (written under dataDir) never land in a source.
+    const roots = createLocalSourceRootPolicy({
+      protectedRoots: [APPLICATION_ROOT, dataDir],
+    });
+    const sources = createSourceRegistrationService({
+      repository: createSourceRegistrationRepository(db),
+      roots,
+      projects,
+      nextId: randomUUID,
+      now,
+    });
+    const workspace = createLocalWorkspaceProvider({
+      snapshotsDir: join(dataDir, 'snapshots'),
+    });
+    const snapshots = createSnapshotService({
+      repository: createSnapshotRepository(db),
+      provider: workspace,
+      roots,
+      sources,
+      nextId: randomUUID,
+      now,
+    });
     const runs = createRunRepository(db);
     const dispatcher = createJobDispatcher({
       repository: runs,
       executor:
         options.jobs?.executor ??
-        createFixtureRunExecutor({
-          stageDelayMs: FIXTURE_STAGE_DELAY_MS,
-          nextId: randomUUID,
+        createSourceRunExecutor({
+          fixture:
+            options.jobs?.fixtureExecutor ??
+            createFixtureRunExecutor({
+              stageDelayMs: FIXTURE_STAGE_DELAY_MS,
+              nextId: randomUUID,
+            }),
+          snapshots,
         }),
       stopTimeoutMs: options.jobs?.stopTimeoutMs ?? STOP_TIMEOUT_MS,
       now,
@@ -74,6 +113,7 @@ export function createDependencies(
     const jobs = createJobService({
       repository: runs,
       projects,
+      sources,
       control: dispatcher,
       limits: { ...DEFAULT_RUN_LIMITS, ...options.jobs?.limits },
       nextId: randomUUID,
@@ -81,9 +121,15 @@ export function createDependencies(
     });
     return {
       projects,
+      sources,
       jobs,
-      // Queued runs from a previous process start once the app is ready.
-      start: () => dispatcher.wake(),
+      snapshots,
+      // Staging copies a previous process left are app-owned and never
+      // public; remove them, then start queued runs from a previous process.
+      async start() {
+        await workspace.cleanupStaging();
+        dispatcher.wake();
+      },
       async close() {
         try {
           await dispatcher.close();

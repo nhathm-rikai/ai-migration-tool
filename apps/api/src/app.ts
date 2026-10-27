@@ -15,6 +15,7 @@ import {
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
+import { registerSourceRegistrationRoutes } from './modules/projects/source-registration.routes.js';
 import { createLoggerOptions } from './plugins/logger.js';
 import {
   createLocalCredential,
@@ -46,8 +47,8 @@ export function buildApp(
     ...(options.jobs ? { jobs: options.jobs } : {}),
     ...(options.recovery ? { recovery: options.recovery } : {}),
   });
-  app.addHook('onReady', () => {
-    dependencies.start();
+  app.addHook('onReady', async () => {
+    await dependencies.start();
   });
   app.addHook('onClose', async () => {
     await dependencies.close();
@@ -69,6 +70,7 @@ export function buildApp(
     () => ({ status: 'ok' as const, mode: config.mode, runner: config.runner }),
   );
   registerProjectRoutes(app, dependencies.projects);
+  registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
   return app;
 }

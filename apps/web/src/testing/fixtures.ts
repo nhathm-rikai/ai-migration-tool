@@ -1,7 +1,7 @@
 import type { LocalSessionClient } from '../shared/api/local-session';
-import type { Project } from '@portal/contracts';
+import type { DemoProject, LocalProject } from '@portal/contracts';
 
-export const project: Project = {
+export const project: DemoProject = {
   id: '00000000-0000-4000-8000-000000000001',
   name: 'Dự án mẫu',
   fixtureId: 'sample-vb6',
@@ -31,3 +31,10 @@ export function requestUrl(input: Parameters<typeof fetch>[0]): string {
   if (typeof input === 'string') return input;
   return input instanceof URL ? input.href : input.url;
 }
+
+export const localProject: LocalProject = {
+  id: '00000000-0000-4000-8000-000000000002',
+  name: 'Dự án mã nguồn',
+  mode: 'local',
+  createdAt: '2026-10-27T00:00:00.000Z',
+};

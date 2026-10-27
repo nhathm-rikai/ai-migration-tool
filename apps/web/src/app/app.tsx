@@ -13,15 +13,20 @@ import {
   localSession,
   type LocalSessionClient,
 } from '../shared/api/local-session';
+import {
+  sourcesApi as defaultSourcesApi,
+  type SourcesApi,
+} from '../shared/api/sources-api';
 import { SessionStatus } from './session-status';
 
 type AppProps = {
   api?: ProjectsApi;
   runsApi?: RunsApi;
+  sourcesApi?: SourcesApi;
   session?: LocalSessionClient;
 };
 
-// `api` and `runsApi` must use `session` as their credential source; tests
+// `api`, `runsApi` and `sourcesApi` must use `session` as their credential source; tests
 // inject them together.
 export function App(props: AppProps) {
   return (
@@ -34,6 +39,7 @@ export function App(props: AppProps) {
 function AppShell({
   api = projectsApi,
   runsApi = defaultRunsApi,
+  sourcesApi = defaultSourcesApi,
   session = localSession,
 }: AppProps) {
   const { locale, setLocale, messages } = useLocale();
@@ -82,7 +88,7 @@ function AppShell({
         </div>
       </header>
       <SessionStatus session={session} />
-      <ProjectsPage api={api} runsApi={runsApi} />
+      <ProjectsPage api={api} runsApi={runsApi} sourcesApi={sourcesApi} />
     </>
   );
 }

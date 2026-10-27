@@ -220,8 +220,8 @@ describe('lock file identity', () => {
   function seedDatabase(): { path: string; hash: () => string } {
     const db = openDatabase(dataDir);
     db.prepare(
-      `INSERT INTO projects (id, name, fixture_id, created_at)
-       VALUES ('p1', 'Kept', 'sample-vb6', '2026-10-27')`,
+      `INSERT INTO projects (id, name, mode, fixture_id, created_at)
+       VALUES ('p1', 'Kept', 'demo', 'sample-vb6', '2026-10-27')`,
     ).run();
     db.close();
     const path = join(dataDir, 'portal.db');

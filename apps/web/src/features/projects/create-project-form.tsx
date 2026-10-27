@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   CreateProjectSchema,
   PROJECT_FIXTURE_ID,
+  PROJECT_LOCAL_MODE,
+  type CreateProjectInput,
   type Project,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
@@ -20,6 +22,7 @@ export function CreateProjectForm({
   const { messages } = useLocale();
   const copy = messages.projects.create;
   const [name, setName] = useState('');
+  const [kind, setKind] = useState<'demo' | 'local'>('demo');
   const [fieldInvalid, setFieldInvalid] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<{ error: unknown } | null>(
     null,
@@ -30,7 +33,10 @@ export function CreateProjectForm({
 
   async function submit() {
     if (active.current) return;
-    const input = { name: name.trim(), fixtureId: PROJECT_FIXTURE_ID };
+    const input: CreateProjectInput =
+      kind === 'demo'
+        ? { name: name.trim(), fixtureId: PROJECT_FIXTURE_ID }
+        : { name: name.trim(), mode: PROJECT_LOCAL_MODE };
     setSubmitFailure(null);
     if (!Check(CreateProjectSchema, input)) {
       setFieldInvalid(true);
@@ -87,17 +93,43 @@ export function CreateProjectForm({
         <p className="field-help" id="name-help">
           {copy.nameHelp}
         </p>
-        <div className="fixture-card">
-          <span className="fixture-icon">
-            <Icon name="folder" />
-          </span>
-          <div>
-            <strong>{copy.sample}</strong>
-            <p>
-              {PROJECT_FIXTURE_ID} · {copy.sampleDescription}
-            </p>
-          </div>
-        </div>
+        <fieldset className="project-kind" disabled={pending}>
+          <legend>{copy.kind}</legend>
+          <label className="fixture-card">
+            <input
+              type="radio"
+              name="project-kind"
+              value="demo"
+              checked={kind === 'demo'}
+              onChange={() => setKind('demo')}
+            />
+            <span className="fixture-icon">
+              <Icon name="folder" />
+            </span>
+            <span>
+              <strong>{copy.kindDemo}</strong>
+              <span className="field-help">
+                {PROJECT_FIXTURE_ID} · {copy.sampleDescription}
+              </span>
+            </span>
+          </label>
+          <label className="fixture-card">
+            <input
+              type="radio"
+              name="project-kind"
+              value="local"
+              checked={kind === 'local'}
+              onChange={() => setKind('local')}
+            />
+            <span className="fixture-icon">
+              <Icon name="folder" />
+            </span>
+            <span>
+              <strong>{copy.kindLocal}</strong>
+              <span className="field-help">{copy.kindLocalDescription}</span>
+            </span>
+          </label>
+        </fieldset>
         {fieldInvalid && (
           <p id="create-field-error" role="alert" className="error">
             {copy.nameInvalid}

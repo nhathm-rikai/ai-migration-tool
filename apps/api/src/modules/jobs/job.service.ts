@@ -15,7 +15,7 @@ import { Check } from 'typebox/value';
 import { AppError } from '../../shared/app-error.js';
 import {
   analyzeRunConfig,
-  projectRunSource,
+  type ProjectRunSource,
   type RunLimits,
 } from './analyze-run-config.js';
 import { cancelPatch, isTerminalStatus } from './job-state.js';
@@ -73,6 +73,8 @@ function decodeCursor(cursor: string): RunPosition {
 export function createJobService(deps: {
   repository: RunRepository;
   projects: { get(projectId: string): Project };
+  // Source registration: what a new run of the project locks.
+  sources: { runSource(project: Project): ProjectRunSource };
   control: JobControl;
   limits: RunLimits;
   nextId(): string;
@@ -107,20 +109,21 @@ export function createJobService(deps: {
       }
       if (deps.control.runtimeStatus().status !== 'ready')
         throw new AppError('RUNTIME_RECOVERY_REQUIRED');
-      const current = projectRunSource(project);
       const retried =
         input.retryOfRunId === null
           ? null
           : repository.findById(project.id, input.retryOfRunId);
       if (input.retryOfRunId !== null && !retried)
         throw new AppError('RUN_NOT_FOUND');
-      let profileId = current.profileId;
-      let tableNameMapping = current.tableNameMapping;
+      let profileId: string;
+      let tableNameMapping: ProjectRunSource['tableNameMapping'];
       let sourceSnapshotId: string | null = null;
-      let source = current.source;
+      let source: Run['source'];
       if (input.source.strategy === 'current-source') {
+        const current = deps.sources.runSource(project);
         if (input.source.expectedSourceRevision !== current.revision)
           throw new AppError('SOURCE_REVISION_CONFLICT');
+        ({ source, profileId, tableNameMapping } = current);
       } else {
         // reuse-snapshot is only valid with retryOfRunId (schema).
         if (!retried?.sourceSnapshotId)

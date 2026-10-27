@@ -22,11 +22,27 @@ const ERROR_DEFINITIONS = {
   },
 } as const satisfies Record<ApiErrorCode, { status: number; message: string }>;
 
-// Analyze codes produced by the run routes (B04), with the HTTP status of the
-// contract. Codes of routes that do not exist yet (source registration,
-// artifacts) join when those routes do.
+// Analyze codes produced by the source (B03) and run routes (B04), with the
+// HTTP status of the contract. Codes of routes that do not exist yet
+// (artifacts) join when those routes do.
 const S = ANALYZE_API_ERROR_HTTP_STATUS;
 const RUN_ERROR_DEFINITIONS = {
+  PROJECT_MODE_CONFLICT: {
+    status: S.PROJECT_MODE_CONFLICT,
+    message: 'A demo project cannot register a local source.',
+  },
+  SOURCE_NOT_REGISTERED: {
+    status: S.SOURCE_NOT_REGISTERED,
+    message: 'The project has no registered source.',
+  },
+  SOURCE_FORBIDDEN: {
+    status: S.SOURCE_FORBIDDEN,
+    message: 'This folder cannot be registered as a source.',
+  },
+  SOURCE_UNREADABLE: {
+    status: S.SOURCE_UNREADABLE,
+    message: 'The source folder does not exist or cannot be read.',
+  },
   SOURCE_REVISION_CONFLICT: {
     status: S.SOURCE_REVISION_CONFLICT,
     message: 'The source revision has changed.',

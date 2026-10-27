@@ -98,7 +98,7 @@ function isCredentialRejected(error: unknown): boolean {
 
 // Protected API transport: the credential goes only in the Authorization
 // header, and nothing is sent without one. A rejected credential is
-// invalidated; a GET is retried once with a fresh one, a POST never is.
+// invalidated; a GET is retried once with a fresh one, a mutation never is.
 export function createApiClient(
   credentials: CredentialSource,
   fetcher: typeof fetch = defaultFetcher,

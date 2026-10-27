@@ -16,13 +16,26 @@ import {
 export function AnalyzeRunPanel({
   api,
   projectId,
+  demo,
+  sourceRevision,
 }: {
   api: RunsApi;
   projectId: string;
+  // Demo projects run the fixture executor and say so.
+  demo: boolean;
+  // Revision a new run locks; null blocks Start (no readable source).
+  sourceRevision: number | null;
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.runs;
-  const runs = useAnalyzeRuns(api, projectId);
+  const runs = useAnalyzeRuns(api, projectId, sourceRevision);
+  // A Start whose outcome is unknown can still be resent as it was.
+  const blocked = sourceRevision === null && !runs.uncertainStart;
+  // A local run ends once its snapshot exists; it is not an analysis result.
+  const statusLabel = (run: Run) =>
+    run.status === 'succeeded' && !demo
+      ? copy.snapshotTaken
+      : copy.status[run.status];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { state, action } = runs;
   const pending = action.status === 'pending';
@@ -56,8 +69,8 @@ export function AnalyzeRunPanel({
     <section className="panel run-panel" aria-labelledby="runs-title">
       <div className="section-heading">
         <h2 id="runs-title">
-          {copy.title}{' '}
-          <span className="badge">{messages.projects.demoBadge}</span>
+          {demo ? copy.title : copy.titleLocal}{' '}
+          {demo && <span className="badge">{messages.projects.demoBadge}</span>}
         </h2>
         <button
           className="button small"
@@ -67,7 +80,12 @@ export function AnalyzeRunPanel({
           {copy.reload}
         </button>
       </div>
-      <p className="muted">{copy.demoNotice}</p>
+      <p className="muted">{demo ? copy.demoNotice : copy.localNotice}</p>
+      {blocked && !active && (
+        <p className="notice" id="runs-start-blocked">
+          {messages.source.startBlocked}
+        </p>
+      )}
       {runs.connectionLost && (
         <p role="status" className="notice">
           {copy.connectionLost}
@@ -82,7 +100,8 @@ export function AnalyzeRunPanel({
         {!active && (
           <button
             className="button primary"
-            disabled={pending}
+            disabled={pending || blocked}
+            aria-describedby={blocked ? 'runs-start-blocked' : undefined}
             onClick={() => void runs.start()}
           >
             {pending && action.kind === 'start' ? copy.starting : copy.start}
@@ -100,7 +119,8 @@ export function AnalyzeRunPanel({
       {shown ? (
         <RunDetail
           run={shown}
-          canRetry={!active && !pending}
+          canRetry={!active && !pending && !blocked}
+          statusLabel={statusLabel}
           onRetry={(runId) => {
             setSelectedId(null);
             void runs.retry(runId);
@@ -125,7 +145,7 @@ export function AnalyzeRunPanel({
                   onClick={() => setSelectedId(run.id)}
                 >
                   <span className={`run-status status-${run.status}`}>
-                    {copy.status[run.status]}
+                    {statusLabel(run)}
                   </span>
                   <span>{formatDateTime(run.createdAt)}</span>
                   <span className="mono">{run.id.slice(0, 8)}</span>
@@ -208,11 +228,13 @@ function ActionMessage({
 function RunDetail({
   run,
   canRetry,
+  statusLabel,
   onRetry,
   formatDateTime,
 }: {
   run: Run;
   canRetry: boolean;
+  statusLabel: (run: Run) => string;
   onRetry: (runId: string) => void;
   formatDateTime: (date: string) => string;
 }) {
@@ -229,7 +251,7 @@ function RunDetail({
           <dt>{copy.fields.status}</dt>
           <dd>
             <span className={`run-status status-${run.status}`} role="status">
-              {copy.status[run.status]}
+              {statusLabel(run)}
             </span>
           </dd>
         </div>

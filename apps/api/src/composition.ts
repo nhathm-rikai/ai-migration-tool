@@ -31,9 +31,20 @@ export type JobOptions = {
   stopTimeoutMs?: number;
 };
 
+// From the instance lock taken by server.ts before the DB opens.
+export type StartupRecovery = {
+  // A previous process cannot be accounted for: runs it left executing still
+  // end interrupted, but dispatch stays blocked (recovery_required).
+  recoveryRequired: boolean;
+};
+
 export function createDependencies(
   dataDir: string,
-  options: { log: DispatcherLog; jobs?: JobOptions },
+  options: {
+    log: DispatcherLog;
+    jobs?: JobOptions;
+    recovery?: StartupRecovery;
+  },
 ) {
   const db = openDatabase(dataDir);
   try {
@@ -55,6 +66,7 @@ export function createDependencies(
       stopTimeoutMs: options.jobs?.stopTimeoutMs ?? STOP_TIMEOUT_MS,
       now,
       log: options.log,
+      recoveryRequired: options.recovery?.recoveryRequired ?? false,
     });
     // Before any request: runs a previous process left executing end
     // interrupted and are never resumed.

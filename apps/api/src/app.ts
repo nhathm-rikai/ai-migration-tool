@@ -7,7 +7,11 @@ import {
   HealthSchema,
 } from '@portal/contracts';
 import type { AppConfig } from './config.js';
-import { createDependencies, type JobOptions } from './composition.js';
+import {
+  createDependencies,
+  type JobOptions,
+  type StartupRecovery,
+} from './composition.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
@@ -22,7 +26,11 @@ import { registerLocalSessionRoutes } from './modules/local-session/local-sessio
 // loggerStream lets tests read the structured log; production logs to stdout.
 export function buildApp(
   config: AppConfig,
-  options: { loggerStream?: Writable; jobs?: JobOptions } = {},
+  options: {
+    loggerStream?: Writable;
+    jobs?: JobOptions;
+    recovery?: StartupRecovery;
+  } = {},
 ) {
   const app = Fastify({
     bodyLimit: 16 * 1024,
@@ -36,6 +44,7 @@ export function buildApp(
   const dependencies = createDependencies(config.dataDir, {
     log: app.log,
     ...(options.jobs ? { jobs: options.jobs } : {}),
+    ...(options.recovery ? { recovery: options.recovery } : {}),
   });
   app.addHook('onReady', () => {
     dependencies.start();

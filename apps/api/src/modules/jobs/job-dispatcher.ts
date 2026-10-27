@@ -44,6 +44,9 @@ export function createJobDispatcher(deps: {
   stopTimeoutMs: number;
   now(): Date;
   log: DispatcherLog;
+  // Startup could not account for a previous process (unreadable instance
+  // owner record): nothing is dispatched until an operator confirms cleanup.
+  recoveryRequired?: boolean;
 }) {
   const { repository, log } = deps;
   let active: Execution | null = null;
@@ -55,9 +58,10 @@ export function createJobDispatcher(deps: {
   let closed = false;
   // Set once close() returned: the database may be gone.
   let detached = false;
-  // An execution did not confirm its stop; no new run may start until an
-  // operator restarts the runtime (JOB-04).
-  let recoveryRequired = false;
+  // An execution did not confirm its stop, or a previous process is
+  // unaccounted for; no new run may start until an operator restarts or
+  // confirms recovery (JOB-04/JOB-05).
+  let recoveryRequired = deps.recoveryRequired ?? false;
   const iso = () => deps.now().toISOString();
 
   function commit(run: Run, patch: RunPatch | null): Run | undefined {

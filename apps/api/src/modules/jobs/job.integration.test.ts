@@ -850,6 +850,65 @@ describe(
         }
       });
 
+      it('B02-AC03: a previous process that cannot be accounted for interrupts its runs and blocks dispatch until recovery', async () => {
+        const controlled = createControlledExecutor();
+        const ctx = setup({
+          executor: controlled.executor,
+          stopTimeoutMs: 20,
+        });
+        const project = await createProject(ctx.inject);
+        const queued = (
+          await start(ctx.inject, project.id, newKey())
+        ).json<Run>();
+        await waitForStatus(ctx.inject, queued, 'running');
+        const other = await createProject(ctx.inject, 'Other');
+        const waiting = (
+          await start(ctx.inject, other.id, newKey())
+        ).json<Run>();
+        // The restarted process found an unknown instance owner record.
+        const restarted = createControlledExecutor({ stopOnAbort: true });
+        const blockedApp = buildApp(ctx.config, {
+          jobs: { executor: restarted.executor },
+          recovery: { recoveryRequired: true },
+        });
+        try {
+          const inject = createTrustedInject(blockedApp, ctx.config);
+          await blockedApp.ready();
+          expect(await getRun(inject, queued)).toMatchObject({
+            status: 'interrupted',
+          });
+          expect(
+            (await inject('/api/v1/runtime/status')).json<RuntimeStatus>(),
+          ).toEqual({
+            status: 'recovery_required',
+            reasonCode: 'PROCESS_CLEANUP_UNCONFIRMED',
+          });
+          const blocked = await start(inject, project.id, newKey());
+          expect(blocked.statusCode).toBe(503);
+          expect(blocked.json()).toMatchObject({
+            error: { code: 'RUNTIME_RECOVERY_REQUIRED' },
+          });
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          expect(await getRun(inject, waiting)).toEqual(waiting);
+          expect(restarted.executions).toHaveLength(0);
+        } finally {
+          await blockedApp.close();
+        }
+        // After the operator confirmed recovery the queue continues.
+        const recovered = buildApp(ctx.config, {
+          jobs: { executor: restarted.executor },
+        });
+        try {
+          const inject = createTrustedInject(recovered, ctx.config);
+          await waitForStatus(inject, waiting, 'running');
+          expect(restarted.executions.map((e) => e.run.id)).toEqual([
+            waiting.id,
+          ]);
+        } finally {
+          await recovered.close();
+        }
+      });
+
       it('shutdown stops dispatching and records the executing run interrupted', async () => {
         const controlled = createControlledExecutor({ stopOnAbort: true });
         const ctx = setup({ executor: controlled.executor });

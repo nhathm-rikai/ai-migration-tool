@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
+import { acquireInstanceLock } from './platform/instance-lock.js';
 import {
   createStartupDiagnostic,
   getErrorReason,
@@ -7,12 +9,44 @@ import {
 
 async function start(): Promise<void> {
   const config = loadConfig();
-  const app = buildApp(config);
+  // Before the DB opens or the port listens: a second process on the same
+  // data directory stops here with DATA_DIR_LOCKED.
+  const lock = acquireInstanceLock(config.dataDir, {
+    id: randomUUID(),
+    pid: process.pid,
+    now: () => new Date(),
+  });
+  let app: ReturnType<typeof buildApp>;
+  try {
+    app = buildApp(config, {
+      recovery: { recoveryRequired: lock.previousOwner === 'unknown' },
+    });
+  } catch (error) {
+    lock.release();
+    throw error;
+  }
+  // Released only after the dispatcher stopped and the DB closed. If closing
+  // fails the lock is left to process exit, so the next start sees an
+  // unreleased owner.
+  const close = async () => {
+    await app.close();
+    lock.release();
+  };
+  if (lock.previousOwner === 'unreleased')
+    app.log.warn(
+      { code: 'INSTANCE_PREVIOUS_UNRELEASED' },
+      'The previous backend exited without shutting down; its executing runs are marked interrupted.',
+    );
+  if (lock.previousOwner === 'unknown')
+    app.log.error(
+      { code: 'INSTANCE_OWNER_UNKNOWN' },
+      'The previous backend cannot be accounted for; runs are not dispatched until recovery is confirmed.',
+    );
   let closing = false;
   const shutdown = () => {
     if (closing) return;
     closing = true;
-    void app.close().catch((error: unknown) => {
+    void close().catch((error: unknown) => {
       app.log.error(
         { code: 'SHUTDOWN_FAILED', reason: getErrorReason(error) },
         'Could not close backend cleanly.',
@@ -29,7 +63,7 @@ async function start(): Promise<void> {
   try {
     await app.listen({ host: config.host, port: config.port });
   } catch (error) {
-    await app.close();
+    await close();
     throw error;
   }
 }

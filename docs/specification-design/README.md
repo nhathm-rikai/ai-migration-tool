@@ -9,7 +9,7 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 1. [Nguồn và truy vết yêu cầu](requirements-map.md), [gate](../engineering/delivery-gates.md), [CORE](../engineering/rules/core.md).
 2. [Phạm vi/pilot](rules/scope.md), [context/evidence](rules/context-evidence.md), [quy trình phân tích đa ngôn ngữ](analysis-method.md).
 3. [Yêu cầu đầu ra](rules/deliverables.md), [artifact](rules/artifacts.md), [mapping contract](contract-mapping.md).
-4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [questions](templates/open-questions.md), [coverage](templates/coverage.md).
+4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [questions](templates/open-questions.md), [coverage](templates/coverage.md). Khi chạy, agent chỉ đọc template của tài liệu được chọn, cộng questions và coverage ([SD-CT-07](rules/artifacts.md)).
 5. [Phiếu input](templates/input-context.md) và cách kết hợp bên dưới.
 6. [Luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase).
 7. [Checklist review](review-checklist.md), [KB](knowledge-base.md), [quyết định chờ duyệt](decisions.md), [runbook](runbook.md).

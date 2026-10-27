@@ -1,5 +1,10 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — specification-design: runbook theo tài liệu được chọn
+
+- Scope docs-only theo yêu cầu người dùng; pack/template giữ `spec-design-rules-0.6.0-draft`/`spec-design-templates-0.5.0-draft` vì chỉ làm rõ cách áp SD-CT-07.
+- [Runbook](../specification-design/runbook.md) mục 2.2: chỉ dẫn tác vụ yêu cầu chỉ đọc template và chỉ sinh tài liệu ở mục 3 phiếu input (kèm coverage/open-questions), tham chiếu bản đã duyệt ở mục 4 hoặc ghi "chưa sinh" + Q-ID, và nêu cách dùng output P1 1.1–1.3. README thứ tự đọc bước 4 ghi chú tương ứng.
+
 ## 27/10/2026 — specification-design: chọn tài liệu riêng lẻ
 
 - Scope docs-only theo yêu cầu người dùng (hướng 3); pack `spec-design-rules-0.6.0-draft`, template set `spec-design-templates-0.5.0-draft`, vẫn Draft/unapproved.

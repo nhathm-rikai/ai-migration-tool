@@ -8,6 +8,13 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 27/10/2026 — sửa 2 finding P2 review PF07 (`58166eb`)
+
+- Dùng `portal-implement`, cùng nhánh PF07. Cả hai finding được xác minh đúng bằng regression fail trên code trước sửa.
+- P2 cancel trong pha đọc snapshot: `readSnapshotFiles` và `openSnapshot` (verify toàn bộ bytes, dùng cho reuse-snapshot) nhận `signal`, kiểm trước mỗi file và ném lý do hủy; executor đổi lỗi khi signal đã hủy thành `stopped`. Trước sửa, regression qua API/dispatcher thật (600 file, stop deadline 300 ms, Cancel lúc bắt đầu đọc) kết thúc `failed/STOP_UNCONFIRMED`; sau sửa run `cancelled`, `/runtime/status` vẫn `ready`, Start tiếp hoàn tất. Thêm unit provider: signal đã hủy → cả hai hàm reject `AbortError`.
+- P2 phụ thuộc ngoài của program chưa phân tích: không còn coi `analysis: null` là danh sách rỗng. Chưa phân tích → “chưa xác định được API ngoài”, vẫn liệt kê reference/component đọc từ file project; program chưa đầy đủ → ghi chú danh sách chỉ gồm phần đã phân tích; chỉ báo “Không có…” khi program đầy đủ. Regression: `analysis: null` có/không reference (gồm `PROJECT_NOT_DECODED`), program partial, program đầy đủ. VI/JA.
+- Kiểm chứng (Windows x64, Node 24.16.0): format (file đổi), `lint`, `typecheck`, `npm test` (contracts 43, API 472 pass + 1 skip, web 99), `npm run e2e` 5/5, `smoke-backend`, `verify-repository`, `git diff --check`. Chưa review lại độc lập; CRUD/lời gọi rỗng của program partial vẫn dựa vào notice “chưa đầy đủ” ở đầu chi tiết.
+
 ## 27/10/2026 — PF07 (B08 + F04) nối analyzer vào local run và chi tiết program
 
 - Dùng `portal-implement`; nhánh `feat/pf07-analyze-program-detail` từ PF06 `9e53942` (PF02 → … → PF06 → PF07 chưa merge). Gate FEATURE:jobs/storage/analysis/ui (DATA-05, BE-02/03/04, JOB timeout/cancel, FE-02/04/06/08/09). Dữ liệu: fixture sạch `tests/fixtures/vb6-sample` và corpus VB6 tổng hợp; không đọc source khách hàng, không gọi AI/process ngoài.

@@ -354,6 +354,16 @@ describe('local workspace provider (B06)', () => {
     );
     expect(Buffer.from(main?.bytes ?? [])).toEqual(CP932_BYTES);
 
+    // Cancel/timeout: both full reads stop instead of reading on.
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      provider.readSnapshotFiles(manifest, controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(
+      provider.openSnapshot(input.snapshotId, controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+
     writeFileSync(
       join(snapshotsDir, input.snapshotId, 'raw', 'programs', 'UTF.BAS'),
       'x',

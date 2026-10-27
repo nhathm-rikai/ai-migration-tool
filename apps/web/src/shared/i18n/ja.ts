@@ -398,6 +398,10 @@ export const jaMessages = {
       },
       externalTitle: '外部依存',
       noExternal: '外部参照・外部APIはありません。',
+      externalUnknown:
+        '未解析のため外部APIは特定できていません。プロジェクトファイルから読み取れた参照のみ表示します（ある場合）。',
+      externalPartial:
+        'このプログラムは不完全です。一覧は解析済みの部分のみで、未検出の依存がある可能性があります。',
       externalApi: '外部API',
       referenceKind: {
         reference: '参照',

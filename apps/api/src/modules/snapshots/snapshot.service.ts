@@ -95,10 +95,11 @@ export function createSnapshotService(deps: {
     async open(
       projectId: string,
       snapshotId: string,
+      signal?: AbortSignal,
     ): Promise<SnapshotManifest | undefined> {
       const record = deps.repository.findById(projectId, snapshotId);
       if (!record) return undefined;
-      const manifest = await deps.provider.openSnapshot(snapshotId);
+      const manifest = await deps.provider.openSnapshot(snapshotId, signal);
       if (
         !manifest ||
         manifest.snapshotId !== record.id ||
@@ -113,8 +114,8 @@ export function createSnapshotService(deps: {
 
     // Raw bytes of a snapshot returned by createForRun/open, verified
     // against its manifest; undefined when the stored bytes changed since.
-    readFiles(manifest: SnapshotManifest) {
-      return deps.provider.readSnapshotFiles(manifest);
+    readFiles(manifest: SnapshotManifest, signal?: AbortSignal) {
+      return deps.provider.readSnapshotFiles(manifest, signal);
     },
   };
 }

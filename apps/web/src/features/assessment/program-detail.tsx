@@ -385,13 +385,30 @@ function External({ detail }: { detail: Detail }) {
   const { messages } = useLocale();
   const copy = messages.assessment.detail;
   const id = useId();
+  // External APIs come from the analysis of the code files; references and
+  // components from the project file. "None" is only a finding when the
+  // program was analyzed completely.
   const apis = detail.analysis?.externalApis ?? [];
+  const known = apis.length + detail.externalReferences.length;
+  const note = !detail.analysis
+    ? copy.externalUnknown
+    : !detail.complete
+      ? copy.externalPartial
+      : known === 0
+        ? copy.noExternal
+        : null;
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.externalTitle}</h6>
-      {apis.length === 0 && detail.externalReferences.length === 0 ? (
-        <p className="empty-state">{copy.noExternal}</p>
-      ) : (
+      {note && (
+        <p
+          className={known === 0 ? 'empty-state' : 'muted'}
+          data-testid="external-note"
+        >
+          {note}
+        </p>
+      )}
+      {known > 0 && (
         <ul className="detail-list">
           {apis.map((api) => (
             <li key={`api:${api.library}:${api.name}`}>

@@ -419,6 +419,10 @@ export const viMessages = {
       } satisfies Record<CallResolution, string>,
       externalTitle: 'Phụ thuộc bên ngoài',
       noExternal: 'Không có tham chiếu hoặc API ngoài.',
+      externalUnknown:
+        'Chưa phân tích nên chưa xác định được API ngoài; chỉ liệt kê tham chiếu đã đọc được từ file project (nếu có).',
+      externalPartial:
+        'Program chưa đầy đủ: danh sách chỉ gồm phần đã phân tích, có thể còn phụ thuộc chưa phát hiện.',
       externalApi: 'API ngoài',
       referenceKind: {
         reference: 'Tham chiếu',

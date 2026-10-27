@@ -78,12 +78,17 @@ export type CreateSnapshotResult =
 export interface WorkspaceProvider {
   createSnapshot(request: CreateSnapshotRequest): Promise<CreateSnapshotResult>;
   // Reads a published snapshot back and verifies every hash; undefined when
-  // it is missing or does not match its manifest.
-  openSnapshot(snapshotId: string): Promise<SnapshotManifest | undefined>;
+  // it is missing or does not match its manifest. Both reads check `signal`
+  // before each file and throw its reason once aborted (cancel/timeout).
+  openSnapshot(
+    snapshotId: string,
+    signal?: AbortSignal,
+  ): Promise<SnapshotManifest | undefined>;
   // Raw bytes of every manifest entry, in manifest order, each checked
   // against its recorded hash and size; undefined when any does not match.
   readSnapshotFiles(
     manifest: SnapshotManifest,
+    signal?: AbortSignal,
   ): Promise<SnapshotFile[] | undefined>;
   // Removes a published snapshot the database never recorded.
   discardSnapshot(snapshotId: string): Promise<void>;

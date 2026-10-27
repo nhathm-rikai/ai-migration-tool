@@ -327,8 +327,10 @@ export function createLocalWorkspaceProvider(options: {
   async function verifyStored(
     directory: string,
     manifest: SnapshotManifest,
+    signal?: AbortSignal,
   ): Promise<boolean> {
     for (const entry of manifest.entries) {
+      signal?.throwIfAborted();
       if (!isRelativeSourcePath(entry.relativePath)) return false;
       const raw = await storage.read(
         storagePath(join(directory, RAW), entry.relativePath),
@@ -387,7 +389,7 @@ export function createLocalWorkspaceProvider(options: {
       }
     },
 
-    async openSnapshot(snapshotId) {
+    async openSnapshot(snapshotId, signal) {
       if (!/^[0-9a-f-]{36}$/.test(snapshotId)) return undefined;
       const directory = join(snapshotsDir, snapshotId);
       let manifest: SnapshotManifest;
@@ -398,19 +400,22 @@ export function createLocalWorkspaceProvider(options: {
         if (!isSnapshotManifest(parsed) || parsed.snapshotId !== snapshotId)
           return undefined;
         manifest = parsed;
-        return (await verifyStored(directory, manifest)) ? manifest : undefined;
+        return (await verifyStored(directory, manifest, signal))
+          ? manifest
+          : undefined;
       } catch (error) {
         if (isChange(error) || error instanceof SyntaxError) return undefined;
         throw error;
       }
     },
 
-    async readSnapshotFiles(manifest) {
+    async readSnapshotFiles(manifest, signal) {
       if (!/^[0-9a-f-]{36}$/.test(manifest.snapshotId)) return undefined;
       const directory = join(snapshotsDir, manifest.snapshotId, RAW);
       const files: SnapshotFile[] = [];
       try {
         for (const entry of manifest.entries) {
+          signal?.throwIfAborted();
           if (!isRelativeSourcePath(entry.relativePath)) return undefined;
           const bytes = await storage.read(
             storagePath(directory, entry.relativePath),

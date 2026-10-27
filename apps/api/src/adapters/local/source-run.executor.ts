@@ -18,6 +18,8 @@ import { DEMO_SNAPSHOT_HASH, demoInventory } from '../fake/demo-inventory.js';
 // artifact isolated (its run never ends succeeded).
 
 export type SourceRunHooks = {
+  // Tests: called before the snapshot files are read for the inventory.
+  beforeReadFiles?: () => Promise<void> | void;
   // Tests: called right before the publish of a local inventory.
   beforePublish?: () => Promise<void> | void;
 };
@@ -53,17 +55,23 @@ export function createSourceRunExecutor(deps: {
       }
       if (signal.aborted) return { status: 'stopped' };
       report({ stage: 'snapshot' });
-      const snapshot = await takeSnapshot();
+      const snapshot = await stoppable(takeSnapshot);
       if (snapshot.status !== 'ready') return snapshot;
       const { snapshotId, manifest } = snapshot;
 
       if (signal.aborted) return { status: 'stopped' };
       report({ stage: 'inventory', sourceSnapshotId: snapshotId });
-      const files = await deps.snapshots.readFiles(manifest);
-      // The stored bytes no longer match the snapshot that was just checked.
-      if (!files) return { status: 'failed', errorCode: 'INTERNAL_ERROR' };
+      await deps.hooks?.beforeReadFiles?.();
+      const files = await stoppable(async () => {
+        const read = await deps.snapshots.readFiles(manifest, signal);
+        // The stored bytes no longer match the snapshot just checked.
+        return read
+          ? { status: 'read' as const, files: read }
+          : { status: 'failed' as const, errorCode: 'INTERNAL_ERROR' as const };
+      });
+      if (files.status !== 'read') return files;
       const built = await deps.inventory.build(
-        { run, manifest, files },
+        { run, manifest, files: files.files },
         signal,
       );
       if (built.status !== 'prepared') return built;
@@ -87,6 +95,7 @@ export function createSourceRunExecutor(deps: {
           const manifest = await deps.snapshots.open(
             run.projectId,
             run.sourceSnapshotId,
+            signal,
           );
           return manifest
             ? { status: 'ready', snapshotId: run.sourceSnapshotId, manifest }
@@ -100,6 +109,20 @@ export function createSourceRunExecutor(deps: {
           snapshotId: outcome.snapshotId,
           manifest: outcome.manifest,
         };
+      }
+
+      // Reading/verifying a stored snapshot reads every file: it checks the
+      // signal per file and throws once aborted, which settles `stopped`
+      // within the stop deadline instead of reading on.
+      async function stoppable<T>(
+        step: () => Promise<T>,
+      ): Promise<T | { status: 'stopped' }> {
+        try {
+          return await step();
+        } catch (error) {
+          if (signal.aborted) return { status: 'stopped' };
+          throw error;
+        }
       }
     },
   };

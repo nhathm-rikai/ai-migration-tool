@@ -412,6 +412,45 @@ describe(
       );
     });
 
+    it('B08-AC03 stops reading the snapshot on cancel and keeps the runtime ready', async () => {
+      // Enough files that reading the snapshot back outlasts the stop
+      // deadline unless the read loop honours the cancel.
+      const many = join(source, 'many');
+      mkdirSync(many);
+      for (let i = 0; i < 600; i++)
+        writeFileSync(
+          join(many, `M${i}.BAS`),
+          `Attribute VB_Name = "M${i}"\r\n`,
+        );
+      const hooks: SourceRunHooks = {};
+      const { inject } = await open({
+        stopTimeoutMs: 300,
+        sourceRunHooks: hooks,
+      });
+      const project = await registeredProject(inject);
+      let cancelled: Promise<unknown> | undefined;
+      hooks.beforeReadFiles = () => {
+        delete hooks.beforeReadFiles;
+        // Not awaited: the cancel lands while the files are being read.
+        cancelled = (async () => {
+          const current = await getRun(inject, running);
+          return inject({
+            method: 'POST',
+            url: `/api/v1/projects/${project.id}/runs/${running.id}/cancel`,
+            payload: { expectedStateVersion: current.stateVersion },
+          });
+        })();
+      };
+      const running = (await start(inject, project.id)).json<Run>();
+      const run = await finished(inject, running);
+      await cancelled;
+      expect(run).toMatchObject({ status: 'cancelled', errorCode: null });
+      const runtime = await inject('/api/v1/runtime/status');
+      expect(runtime.json()).toEqual({ status: 'ready', reasonCode: null });
+      const next = await startAndFinish(inject, project.id);
+      expect(next.status).toBe('succeeded');
+    });
+
     it('fails INTERNAL_ERROR without publishing when the stored snapshot bytes changed', async () => {
       const { inject } = await open();
       const project = await registeredProject(inject);

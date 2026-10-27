@@ -147,6 +147,69 @@ describe('Program detail (F04)', () => {
     expect(screen.getByText(/Program chưa đầy đủ/)).toBeTruthy();
   });
 
+  it('F04-AC02 never reports "no dependencies" for an unanalyzed program', () => {
+    // Project file read, code not analyzed: known references stay listed.
+    const inventory = clone(mappedInventoryFixture);
+    const program = firstProgram(inventory);
+    program.analysis = null;
+    program.complete = false;
+    program.externalReferences = [
+      {
+        kind: 'component',
+        identifier: '{00000000-0000-0000-0000-000000000001}#1.0#0',
+        fileName: 'GRID32.OCX',
+        description: null,
+      },
+    ];
+    const { unmount } = render(
+      <ProgramDetail inventory={inventory} projectPath={PATH} />,
+    );
+    expect(screen.getByTestId('external-note').textContent).toContain(
+      'Chưa phân tích nên chưa xác định được API ngoài',
+    );
+    expect(screen.getByText('GRID32.OCX')).toBeTruthy();
+    expect(
+      screen.queryByText('Không có tham chiếu hoặc API ngoài.'),
+    ).toBeNull();
+    unmount();
+
+    // The project file itself was not decoded: nothing is known at all.
+    const undecoded = clone(mappedInventoryFixture);
+    const failed = firstProgram(undecoded);
+    Object.assign(failed, {
+      status: 'unsupported',
+      issue: { reason: 'PROJECT_NOT_DECODED', line: null },
+      name: null,
+      members: [],
+      externalReferences: [],
+      complete: false,
+      analysis: null,
+    });
+    render(<ProgramDetail inventory={undecoded} projectPath={PATH} />);
+    expect(screen.getByTestId('external-note').textContent).toContain(
+      'Chưa phân tích',
+    );
+    expect(
+      screen.queryByText('Không có tham chiếu hoặc API ngoài.'),
+    ).toBeNull();
+  });
+
+  it('qualifies dependencies of a partial program and states none only when complete', () => {
+    const { unmount } = render(
+      <ProgramDetail inventory={partialInventoryFixture} projectPath={PATH} />,
+    );
+    expect(screen.getByTestId('external-note').textContent).toContain(
+      'Program chưa đầy đủ',
+    );
+    unmount();
+    render(
+      <ProgramDetail inventory={mappedInventoryFixture} projectPath={PATH} />,
+    );
+    expect(screen.getByTestId('external-note').textContent).toBe(
+      'Không có tham chiếu hoặc API ngoài.',
+    );
+  });
+
   it('F04-AC03 renders source text with HTML/script as escaped text', () => {
     const inventory = clone(mappedInventoryFixture);
     const program = firstProgram(inventory);

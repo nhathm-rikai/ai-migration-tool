@@ -37,6 +37,7 @@ export interface RunRepository {
   transaction<T>(work: () => T): T;
   insert(record: NewRun): Run;
   findById(projectId: string, runId: string): Run | undefined;
+  findAny(runId: string): Run | undefined;
   findByIdempotencyKey(
     projectId: string,
     key: string,
@@ -132,6 +133,9 @@ export function createRunRepository(db: Database.Database): RunRepository {
   );
   const findById = db.prepare<[string, string], RunRow>(
     `SELECT ${COLUMNS} FROM runs WHERE id = ? AND project_id = ?`,
+  );
+  const findAny = db.prepare<[string], RunRow>(
+    `SELECT ${COLUMNS} FROM runs WHERE id = ?`,
   );
   const findByKey = db.prepare<
     [string, string],
@@ -239,6 +243,10 @@ export function createRunRepository(db: Database.Database): RunRepository {
     },
     findById(projectId, runId) {
       const row = findById.get(runId, projectId);
+      return row ? toRun(row) : undefined;
+    },
+    findAny(runId) {
+      const row = findAny.get(runId);
       return row ? toRun(row) : undefined;
     },
     findByIdempotencyKey(projectId, key) {

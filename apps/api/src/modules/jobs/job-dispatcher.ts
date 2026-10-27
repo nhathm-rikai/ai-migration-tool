@@ -70,25 +70,26 @@ export function createJobDispatcher(deps: {
   }
 
   // Re-reads the run so the decision uses the committed state (a cancel may
-  // have landed while the execution was settling).
+  // have landed while the execution was settling). A failed write leaves the
+  // run executing in the DB, which blocks every claim: the runtime goes to
+  // recovery_required (Start answers 503) instead of reporting ready while
+  // the queue is stuck. Restart marks the run interrupted.
   function settle(
-    execution: Execution,
+    run: { id: string },
     decide: (current: Run, now: string) => RunPatch | null,
   ): void {
     try {
-      const current = repository.findById(
-        execution.run.projectId,
-        execution.run.id,
-      );
+      const current = repository.findAny(run.id);
       if (current) commit(current, decide(current, iso()));
     } catch (error) {
+      recoveryRequired = true;
       log.error(
         {
           code: 'RUN_STATE_WRITE_FAILED',
           reason: getErrorReason(error),
-          runId: execution.run.id,
+          runId: run.id,
         },
-        'Could not record the run state.',
+        'Could not record the run state; runtime needs recovery.',
       );
     }
   }
@@ -132,7 +133,7 @@ export function createJobDispatcher(deps: {
         { code: 'RUN_STOP_UNCONFIRMED', runId: execution.run.id },
         'Run did not confirm its stop; runtime needs recovery.',
       );
-      settle(execution, stopUnconfirmedPatch);
+      settle(execution.run, stopUnconfirmedPatch);
     }, deps.stopTimeoutMs);
   }
 
@@ -165,7 +166,7 @@ export function createJobDispatcher(deps: {
     }
     // Too late: the run already ended STOP_UNCONFIRMED, or the DB is closed.
     if (execution.unconfirmed || detached) return;
-    settle(execution, (current, now) =>
+    settle(execution.run, (current, now) =>
       completionPatch(current, result, execution.stopReason, now),
     );
   }
@@ -210,7 +211,18 @@ export function createJobDispatcher(deps: {
   const control: JobControl = {
     wake,
     requestStop(runId) {
-      if (active?.run.id === runId) stop(active, 'cancel');
+      if (active?.run.id === runId) {
+        stop(active, 'cancel');
+        return;
+      }
+      // Nothing executes this run here (its execution already ended, e.g. a
+      // completion that could not be recorded): the stop is confirmed.
+      if (detached) return;
+      settle({ id: runId }, (current, now) =>
+        current.status === 'cancelling'
+          ? completionPatch(current, { status: 'stopped' }, 'cancel', now)
+          : null,
+      );
     },
     runtimeStatus: (): RuntimeStatus =>
       recoveryRequired
@@ -251,7 +263,7 @@ export function createJobDispatcher(deps: {
         clearTimeout(deadline);
         clearTimeout(execution.stopTimer);
         if (!settled && !execution.unconfirmed)
-          settle(execution, interruptedPatch);
+          settle(execution.run, interruptedPatch);
       }
       detached = true;
     },

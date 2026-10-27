@@ -1,6 +1,6 @@
 # Detail Design — <PROGRAM> — <Tên chức năng>
 
-**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
+**DRAFT TEMPLATE — spec-design-templates-0.4.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
 
 Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ procedure. Một xử lý có thể gồm nhiều procedure, một procedure có thể phục vụ nhiều xử lý. ID xử lý là tham chiếu Markdown, không thêm field vào understanding-v1. Mọi mục có nội dung hoặc “không áp dụng” kèm lý do/phạm vi đã kiểm hoặc “chưa xác định” kèm Q-ID. E-ref trỏ evidence registry mục 7.
 

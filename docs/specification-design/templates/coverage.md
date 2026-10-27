@@ -1,6 +1,6 @@
 # Coverage — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.3.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
+**DRAFT TEMPLATE — spec-design-templates-0.4.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
 
 ## Ngôn ngữ và thành phần phát hiện
 
@@ -18,8 +18,8 @@ Ghi cả file binary/generated/unsupported. Thông tin ngôn ngữ trong phiếu
 
 Phase 1 theo [luồng phase](../analysis-method.md#8-luồng-vận-hành-theo-phase): mọi chỗ source để ngầm mà tài liệu phải nói rõ (state toàn cục/session, side effect DB/file/network, nhánh lỗi/cleanup, default/implicit conversion, wiring qua config, encoding). Mỗi dòng có evidence hoặc Q-ID; không suy diễn để lấp.
 
-| Vị trí (file/symbol/range) | Loại ngầm định | Hành vi quan sát được | Tài liệu/section ghi | R-ID áp dụng | E-ref/Q-ID |
-| -------------------------- | -------------- | --------------------- | -------------------- | ------------ | ---------- |
+| Vị trí (file/symbol/range) | Loại ngầm định | Hành vi quan sát được | Tài liệu/section ghi | E-ref/Q-ID |
+| -------------------------- | -------------- | --------------------- | -------------------- | ---------- |
 
 ## Phạm vi đã đọc
 

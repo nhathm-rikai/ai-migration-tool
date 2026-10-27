@@ -1,34 +1,31 @@
 # Phiếu đầu vào một run specification-design
 
-**DRAFT INPUT — spec-design-templates-0.3.0-draft.** [Cách dùng](../README.md). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
+**DRAFT INPUT — spec-design-templates-0.4.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
 
-Không cần khai báo ngôn ngữ/runtime: agent tự nhận diện theo [quy trình phân tích](../analysis-method.md) và ghi vào coverage. Người vận hành chỉ cung cấp phần công cụ hoặc kế hoạch dự án phải xác định.
+Input chỉ gồm hai nhóm: **source legacy** và **output của P1**. Lựa chọn program và tài liệu cần tạo là phạm vi run do TL chọn trên Portal, ghi ở bảng cuối. Snapshot/hash, decode, quyền đọc/ghi và phiên bản CLI do Portal/công cụ quản lý, không do người điền. Ngôn ngữ/runtime do agent tự nhận diện theo [quy trình phân tích](../analysis-method.md).
 
-| Người vận hành cung cấp                                                  | Giá trị                         |
-| ------------------------------------------------------------------------ | ------------------------------- |
-| Project/unit ID; danh sách pilot, KPI, người quyết định gate nếu có      | <điền>                          |
-| Project/entrypoint relative path/alias, căn cứ mapping/ambiguity         | <điền>                          |
-| Snapshot ID/hash từ công cụ, normalized view, decode profile theo file   | <điền>                          |
-| Inventory công cụ cụ thể, versions/complete/limitations, phần chưa đo    | <điền>                          |
-| Thông tin ngôn ngữ/runtime đã biết (tùy chọn, agent đối chiếu)           | <điền hoặc không cung cấp>      |
-| Rule/template/schema và revision chỉ dẫn tác vụ thực tế                  | <điền>                          |
-| Mode document-draft hoặc understanding-v1                                | <chọn>                          |
-| Read allowlist, output ngoài source/repo, run identity do tool cấp       | <điền>                          |
-| Provider/model/CLI version, permissions/preflight record                 | <điền>                          |
-| Build config, DDL/schema, bản export text của file binary, ảnh/tài liệu  | <provenance hoặc thiếu>         |
-| Report/export: report/mode IDs, layout/resource/config được phép đọc     | <provenance hoặc không áp dụng> |
-| Context/output limits, thứ tự chunk                                      | <điền>                          |
-| Calibration được giao / run sau duyệt, quyền dùng dữ liệu                | <điền>                          |
-| Phase 0 feasibility: go/no-go, lý do, người xác nhận; rulebook revision   | <điền>                          |
+## 1. Source legacy
 
-Report/export ghi provenance file/version/sheet/range hoặc vùng ảnh; thiếu resource hoặc chưa xác minh ghi rõ theo [hướng dẫn report](../report-templates.md). Không đưa giá trị config chứa credential/path nhạy cảm vào tài liệu xuất.
+| Thông tin                                 | Giá trị  |
+| ----------------------------------------- | -------- |
+| Đường dẫn thư mục source legacy (TL chọn) | <điền>   |
+| Snapshot ID do Portal cấp khi chọn source | <Portal> |
 
-| Relative path | Vai trò | included/excluded/missing/unsupported | Lý do | Snapshot entry | Range gốc/chunk | Dependency |
-| ------------- | ------- | ------------------------------------- | ----- | -------------- | --------------- | ---------- |
-| <điền>        |         |                                       |       |                |                 |            |
+## 2. Output P1 — kết quả parser
 
-| Chunk ID               | Program/flow/đơn vị logic | Files/ranges gốc | Đã/chưa đọc | Chồng lặp/thiếu | Hợp nhất |
-| ---------------------- | ------------------------- | ---------------- | ----------- | --------------- | -------- |
-| <điền hoặc không chia> |                           |                  |             |                 |          |
+| Mục P1 | Tài liệu                                                                            | Dùng để                                                                                      | Đường dẫn/version |
+| ------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------- |
+| 1.1    | Source Inventory — parser chạy trên các program (vd. `.vbp`/`.frm`/`.bas`/`.cls`)    | Danh sách program TL được chọn; file thuộc từng program, symbol/procedure để đối chiếu coverage | <điền>            |
+| 1.2    | LoC report — LoC theo function (Physical/Exe/Comment/Blank/SQL)                     | Số đo LoC/coverage trong tài liệu; agent không tự đếm ([SD-EV-08](../rules/context-evidence.md)) | <điền>            |
+| 1.3    | Dependency — dependency graph và DB access                                          | Caller/callee, module dùng chung, bảng/SQL theo call site; thứ tự phân tích                   | <điền>            |
+
+Thiếu mục P1 nào thì ghi "chưa được cung cấp" và phần liên quan ghi "chưa đo"/Q-ID; không để agent tự dựng inventory, LoC hoặc dependency thay parser. Thiếu 1.1 là blocking vì không xác định được program và file thuộc program.
+
+## 3. Phạm vi run (TL chọn trên Portal)
+
+| Lựa chọn         | Giá trị                                                                                                              |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Program          | Tất cả / một / một số program trong Source Inventory (1.1): <điền>                                                   |
+| Tài liệu cần tạo | Một hoặc nhiều: business-rules, basic-design, detail-design, db-design. `coverage` và `open-questions` luôn sinh kèm |
 
 Không đưa credential/raw log/config agent từ corpus. Phiếu này không thay hash/manifest công cụ hay cơ chế kiểm soát quyền.

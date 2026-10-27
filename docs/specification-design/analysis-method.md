@@ -1,6 +1,6 @@
 # Quy trình phân tích source đa ngôn ngữ
 
-**DRAFT — spec-design-rules-0.4.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
+**DRAFT — spec-design-rules-0.5.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
 
 ## 1. Nguyên tắc: không dùng profile theo ngôn ngữ
 
@@ -85,30 +85,15 @@ Calibration theo từng ngôn ngữ/runtime và kiểu ứng dụng có trong sc
 
 ## 8. Luồng vận hành theo phase
 
-Luồng này điều chỉnh phương pháp vận hành của [code-migration-kit-with-claude-code](https://github.com/anthropics/code-migration-kit-with-claude-code) (Apache-2.0) cho việc **sinh tài liệu hiện trạng**. Chỉ lấy cách tổ chức công việc; không có pha dịch, compile, chạy hoặc so parity với source cũ. Nguồn và phần không áp dụng ghi tại [decisions](decisions.md).
+Luồng này lấy một phần cách tổ chức công việc của [code-migration-kit-with-claude-code](https://github.com/anthropics/code-migration-kit-with-claude-code) (Apache-2.0) cho việc **sinh tài liệu hiện trạng**; không có pha dịch, compile, chạy hoặc so parity với source cũ. Mỗi program do **một phiên agent CLI** sinh tài liệu, rồi gửi thẳng TL review trên Portal; không có agent reviewer/fixer trung gian. Phần không áp dụng ghi tại [decisions](decisions.md).
 
-Hai nguyên tắc xuyên suốt:
-
-- **Sửa quy trình, không vá output.** Finding đơn lẻ do fixer xử lý. Finding cùng loại lặp ở từ hai program trở lên nghĩa là rule/template/[rulebook](rulebook.md) thiếu hoặc sai: sửa pack bằng revision mới, không sửa ngầm output đã review.
-- **Mỗi phase chạy hết, trả bằng chứng rồi dừng.** Người có quyền mở phase sau bằng cách cập nhật [run manifest](templates/run-manifest.md). Trạng thái nằm trên đĩa nên dừng/resume không mất việc.
+Nguyên tắc **sửa quy trình, không vá output**: finding TL ghi cho từng output được xử lý bằng run mới; finding cùng loại lặp ở từ hai program trở lên nghĩa là rule/template thiếu hoặc sai, sửa pack bằng revision mới, không sửa ngầm output đã review.
 
 | Phase | Mục tiêu | Đầu ra | Điều kiện qua phase |
 | ----- | -------- | ------ | ------------------- |
-| 0. Feasibility | Program có đủ điều kiện phân tích không: identity, snapshot/hash, decode, allowlist, quyền, CLI | Verdict go/no-go trong [phiếu input](templates/input-context.md) | Go; no-go ghi lý do, không gọi model |
-| 1. Map và chuẩn hóa | Thứ tự phân tích từ inventory công cụ (leaves → root, chung trước riêng); kiểm cycle ở mức file và module; lập bảng điểm ngầm định; tra [rulebook](rulebook.md) | Thứ tự trong run manifest; mục "Điểm ngầm định" và boundary trong [coverage](templates/coverage.md) | Mọi file allowlist có vai trò; cycle được ghi; câu hỏi diễn giải mới đã có rule hoặc Q-ID |
-| 2. Stress-test rule | Chỉ khi calibration: sinh hai lần trên program khó — một theo rulebook, một không — rồi đối chiếu từng khác biệt | Bảng khác biệt → kết luận: thêm/sửa rule hoặc chấp nhận | Chỉ thay đổi rule được giữ; output bakeoff bị bỏ |
-| 3. Sinh, review, sửa | Mỗi program: generator sinh sáu Markdown; hai reviewer độc lập; fixer chỉ sửa theo finding | Sáu Markdown + finding theo [checklist](review-checklist.md) | Không còn finding mức blocking chưa xử lý; run manifest cập nhật |
-| 4. Sign-off | Kiểm coverage/consistency toàn scope, gom Q-ID blocking, gửi TL | Gói gửi TL theo [runbook](runbook.md#23-kiểm-output-trước-khi-gửi-tl) | TL duyệt; self-check của agent không phải approval |
+| 0. Feasibility | Program có đủ điều kiện phân tích không: source legacy, output P1 (1.1 bắt buộc), program thuộc Source Inventory, quyền, CLI | Go/no-go trước khi gọi agent | Go; no-go ghi lý do, không gọi model |
+| 1. Map và chuẩn hóa | Agent đọc thứ tự/phụ thuộc từ output P1 1.3 (chung trước riêng), ghi cycle nếu P1 báo; lập bảng điểm ngầm định | Mục "Điểm ngầm định" và boundary trong [coverage](templates/coverage.md) | Mọi file allowlist có vai trò; câu hỏi diễn giải chưa rõ đã có Q-ID |
+| 2. Sinh | Agent sinh các tài liệu TL đã chọn kèm coverage/open-questions, tự kiểm theo [checklist](review-checklist.md) | Markdown trong output program | Đủ tài liệu được chọn; self-check không phải approval |
+| 3. TL review | Output trả về Portal; TL review 3 lớp theo [checklist](review-checklist.md) | Quyết định approve/reject và finding của TL | TL duyệt; reject thì chạy lại program hoặc sửa pack |
 
-Vai trò ở phase 3 là các phiên agent riêng, mỗi vai trò chỉ đọc đúng đầu vào của mình:
-
-| Vai trò | Đọc | Ghi |
-| ------- | --- | --- |
-| Generator | Phiếu input, pack, rulebook, source allowlist | Sáu Markdown trong output program |
-| Reviewer A — evidence/truy vết | Output, source allowlist | Finding: claim thiếu/sai evidence, quote lệch, hypothesis mất nhãn, ID/reference gãy |
-| Reviewer B — coverage/semantics | Output, source allowlist, coverage | Finding: đơn vị logic/nhánh lỗi/side effect bị bỏ, checklist mục 4 chưa trả lời, mâu thuẫn BR ↔ design ↔ DB |
-| Fixer | Output, danh sách finding | Chỉ sửa đoạn có finding; finding sai thì ghi lý do bác, không tự mở rộng phạm vi |
-
-Reviewer không sửa output; fixer không tự tìm lỗi mới. Finding lặp lại đi vào nguyên tắc "sửa quy trình" ở trên. Không có vai trò nào thay TL review nghiệp vụ.
-
-Không áp dụng từ kit: dịch/compile/build survey, smoke test, parity harness chạy source cũ (cấm chạy source khách hàng), script dependency map của kit (thứ tự lấy từ inventory công cụ; script thật thuộc context builder, deferred).
+Không áp dụng từ kit: rulebook, stress-test, reviewer/fixer agent, run manifest, dịch/compile/build survey, smoke test, parity harness chạy source cũ (cấm chạy source khách hàng), script dependency map (thứ tự lấy từ P1 1.3).

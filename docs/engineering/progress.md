@@ -1,10 +1,18 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — specification-design: tinh gọn input, bỏ rulebook, flow Portal
+
+- Scope docs-only theo yêu cầu người dùng; pack `spec-design-rules-0.5.0-draft`, template set `spec-design-templates-0.4.0-draft`, vẫn Draft/unapproved.
+- [Phiếu input](../specification-design/templates/input-context.md) chỉ còn source legacy, output P1 (1.1 Source Inventory, 1.2 LoC report, 1.3 Dependency graph & DB access) và phạm vi run TL chọn; snapshot/hash/decode/quyền/CLI do công cụ quản lý.
+- Bỏ rulebook và phase stress-test; luồng phase còn 0–3. Gỡ R-ID khỏi coverage, run manifest, checklist, open-questions, SD-CT-06, decisions.
+- README thêm flow nghiệp vụ Portal: chọn source → program (tất cả/một/một số) → tài liệu cần tạo (BR/Basic/Detail/DB tùy chọn, coverage/open-questions luôn kèm) → agent CLI → TL review. Runbook, checklist, SD-CT-04 đổi "đủ sáu Markdown" thành "đủ tài liệu được chọn". Portal automation vẫn chưa triển khai.
+- Bỏ reviewer A/B, fixer và run manifest theo quyết định người dùng: mỗi program một phiên agent CLI sinh tài liệu rồi gửi thẳng TL review trên Portal. Luồng phase còn 0 Feasibility, 1 Map, 2 Sinh, 3 TL review; thứ tự/phụ thuộc lấy từ output P1 1.3. Xóa `templates/run-manifest.md`; cập nhật runbook 2.2a, checklist, SD-CT-06, decisions.
+
 ## 27/10/2026 — specification-design luồng phase theo code-migration-kit
 
 - Scope docs-only, không gồm migration code; pack `spec-design-rules-0.4.0-draft`, template set `spec-design-templates-0.3.0-draft`, vẫn Draft/unapproved. Chỉ áp phương pháp vận hành của code-migration-kit-with-claude-code (Apache-2.0, viết lại).
 - [Quy trình phân tích](../specification-design/analysis-method.md) thêm mục 8: phase 0–4 (feasibility, map + điểm ngầm định, stress-test, generator + 2 reviewer + fixer, sign-off), nguyên tắc "sửa quy trình, không vá output".
-- Thêm [rulebook](../specification-design/rulebook.md) và [run manifest](../specification-design/templates/run-manifest.md) là hồ sơ quy trình, không phải artifact thứ bảy. Coverage thêm bảng điểm ngầm định; phiếu input thêm verdict phase 0; checklist, runbook (2.2a), artifacts (SD-CT-06), decisions cập nhật tương ứng.
+- Thêm rulebook (đã bỏ ở mục sau) và run manifest (đã bỏ ở mục sau) là hồ sơ quy trình, không phải artifact thứ bảy. Coverage thêm bảng điểm ngầm định; phiếu input thêm verdict phase 0; checklist, runbook (2.2a), artifacts (SD-CT-06), decisions cập nhật tương ứng.
 - Đổi tên "P2" thành specification-design trong `docs/specification-design`, README root và engineering README: pack `spec-design-rules-0.4.0-draft`, template `spec-design-templates-0.3.0-draft`, mã rule `P2-xx-NN` → `SD-xx-NN` (giữ số). Giữ nguyên ID yêu cầu ngoài `OUT-P2-*`, tên file nguồn `P2-Rules-v0.1-Draft.md`, tên revision lịch sử `p2-*` và mức severity P2 trong REV-02; các mục progress cũ không sửa.
 - Kiểm chứng: `node scripts/verify-repository.mjs` pass trên Windows/Node local. Chưa calibration thật; deferred: script dependency map (context builder), cú pháp settings Claude CLI cụ thể theo version.
 

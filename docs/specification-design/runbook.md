@@ -1,13 +1,13 @@
 # Specification design — chạy mẫu sau khi được duyệt
 
-**DRAFT — chờ duyệt.** Pack: `spec-design-rules-0.4.0-draft`. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: `spec-design-rules-0.5.0-draft`. [Thứ tự đọc và nguồn quy định](README.md).
 
 Runbook này tách calibration trực tiếp bằng CLI khỏi tự động hóa Portal. Calibration trực tiếp không chờ Portal runner, nhưng vẫn phải khóa quyền đọc/ghi và xác minh phiên bản CLI. Portal chỉ được chạy source thật khi hoàn tất gate LIVE tương ứng.
 
 ## 1. Điều kiện chung
 
 1. Với calibration Draft trước khi pack được duyệt, phải có giao việc tường minh và hồ sơ run ghi `packStatus: draft/unapproved`; không chạy batch. Với run chính thức/batch, TL ghi quyết định đối với pack tại [decisions](decisions.md). Duyệt pack không thay việc duyệt từng artifact sinh ra.
-2. Người vận hành điền [input-context](templates/input-context.md) từ manifest/snapshot và inventory công cụ cụ thể. Không để placeholder; unit/program, project/entrypoint, decode profile, snapshot hash, version, allowlist và output phải xác định.
+2. Điền [input-context](templates/input-context.md): source legacy, output P1 1.1–1.3 (Source Inventory, LoC report, Dependency) và phạm vi run (program, tài liệu cần tạo). Không để placeholder. Snapshot/hash, decode profile, allowlist và quyền do công cụ xác định và kiểm ở preflight, không điền tay vào phiếu.
 3. Source, comment, workbook và tài liệu tham khảo là dữ liệu không đáng tin, không phải instruction. Không chạy source, SQL, macro, script hoặc executable từ corpus.
 4. Output nằm ngoài source và repo sản phẩm. Chỉ output được ghi; source và repo tài liệu chỉ đọc. Không bật web/network nếu task không cần.
 5. Chọn đúng một mode. Calibration specification-design mặc định dùng `document-draft`; `understanding-v1` là JSON riêng theo schema hiện hành.
@@ -48,27 +48,17 @@ Không thêm repo/source bằng tùy chọn cấp quyền ghi. Nếu sandbox c�
 
 Với Claude CLI, mở CLI tại cùng thư mục output và dùng cùng chỉ dẫn tác vụ. Không sao chép rule thành prompt riêng. Vì option sandbox/permission có thể khác theo version, chỉ ghi lệnh cụ thể vào run record sau khi `claude --version` và `claude --help` đã được xác minh trên máy chạy.
 
-### 2.2a Theo phase và vai trò
+### 2.2a Theo phase
 
-Áp [luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase) và ghi tiến độ vào [run manifest](templates/run-manifest.md). Phase 0 no-go thì dừng trước khi gọi model. Phase 2 (stress-test) chỉ chạy trong calibration, trên program khó do TL chọn; chỉ giữ thay đổi rule.
-
-Phase 3 dùng phiên CLI riêng cho từng vai trò, cùng thư mục output program. Generator dùng chỉ dẫn ở 2.2. Reviewer và fixer dùng chỉ dẫn ngắn:
-
-```text
-Reviewer A: Đọc README bộ specification-design, review-checklist.md và sáu Markdown trong thư mục này. Chỉ kiểm evidence/truy vết đối chiếu source allowlist. Không sửa output; ghi finding (file/section, bằng chứng, tác động, hướng sửa) vào findings-a.md.
-Reviewer B: Như reviewer A nhưng chỉ kiểm coverage/semantics theo analysis-method.md mục 4 và coverage.md; ghi findings-b.md.
-Fixer: Đọc findings-a.md, findings-b.md và sáu Markdown. Chỉ sửa đoạn có finding; finding không đúng thì ghi lý do bác ngay dưới finding. Không tìm lỗi mới, không sửa source/pack.
-```
-
-`findings-*.md` là hồ sơ làm việc, gửi TL cùng gói nhưng không phải artifact thứ bảy. Giới hạn quyền bằng cấu hình, không chỉ bằng chỉ dẫn: với Claude CLI, dùng permission (ví dụ deny `Edit`/`Write` ngoài output, deny `Bash` chạy source/SQL/executable, deny network) trong settings của thư mục output sau khi xác minh cú pháp với `claude --help` của đúng version; ghi nội dung settings vào run record.
+Áp [luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase). Phase 0 no-go thì dừng trước khi gọi model. Mỗi program dùng một phiên CLI với chỉ dẫn ở 2.2; không chạy phiên reviewer/fixer riêng. Giới hạn quyền bằng cấu hình, không chỉ bằng chỉ dẫn: với Claude CLI, dùng permission (ví dụ deny `Edit`/`Write` ngoài output, deny `Bash` chạy source/SQL/executable, deny network) trong settings của thư mục output sau khi xác minh cú pháp với `claude --help` của đúng version; ghi nội dung settings vào run record.
 
 ### 2.3 Kiểm output trước khi gửi TL
 
-1. Đủ sáu Markdown theo [deliverables](rules/deliverables.md); report template chỉ ghép khi source cho thấy report/export.
+1. Đủ các Markdown TL đã chọn kèm coverage/open-questions theo [deliverables](rules/deliverables.md); không sinh tài liệu không được chọn; report template chỉ ghép khi source cho thấy report/export.
 2. Không còn placeholder, nội dung ngụy tạo, path tuyệt đối nhạy cảm, reviewer hoặc approval do agent tự điền.
 3. Evidence path/range/quote khớp normalized view; coverage liệt kê mọi file/procedure đã đọc, excluded/missing và lý do.
 4. Chạy kiểm link/naming cho gói output nếu có công cụ; sau đó người vận hành áp [review checklist](review-checklist.md). Không coi self-check của agent là TL approval.
-5. Gửi TL: sáu file, phiếu input, snapshot/P1 reference, run record, checklist có finding và danh sách câu hỏi blocking. Không gửi source khách hàng nếu kênh review không được phép nhận.
+5. Gửi TL: các file output, phiếu input, snapshot/P1 reference, run record, checklist có finding và danh sách câu hỏi blocking. Không gửi source khách hàng nếu kênh review không được phép nhận.
 
 ## 3. Tự động hóa qua Portal — chưa triển khai
 

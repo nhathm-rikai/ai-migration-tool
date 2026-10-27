@@ -1,12 +1,10 @@
 # Specification design — validation và human review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.4.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.5.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm thực tế; chưa đánh dấu nghĩa là chưa kiểm. Findings ghi item/section, bằng chứng, tác động, hướng xử lý. Không AI ghi danh tính hay quyết định thay reviewer.
 
-- [ ] Vai trò review (phase 3, [luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase)): reviewer A ghi finding evidence/truy vết, reviewer B ghi finding coverage/semantics; fixer chỉ xử lý finding đã ghi hoặc bác có lý do. Finding cùng loại ở từ hai program trở lên đã vào mục "Finding lặp lại" của [run manifest](templates/run-manifest.md). Hai reviewer agent không thay TL.
-- [ ] Rulebook: output áp đúng R-ID đã duyệt trong [rulebook](rulebook.md); câu hỏi diễn giải mới có Q-ID, không tự chốt.
-- [ ] Cấu trúc: đúng mode/schema/version, đủ sáu tài liệu hoặc JSON đúng mode; ID unique, refs tồn tại, đủ section, không placeholder/truncation âm thầm.
+- [ ] Cấu trúc: đúng mode/schema/version, đủ các tài liệu TL đã chọn kèm coverage/open-questions hoặc JSON đúng mode; ID unique, refs tồn tại, đủ section, không placeholder/truncation âm thầm.
 - [ ] Nhận diện ngôn ngữ: bảng bước 0 trong coverage phủ mọi file allowlist; language/dialect/runtime/framework/build config có căn cứ manifest hoặc nội dung, không chỉ từ đuôi file; mâu thuẫn với input có Q-ID; boundary liên ngôn ngữ, binary/generated/unsupported/unmeasured rõ. Semantics ghi theo ngôn ngữ thực, không mượn từ ngôn ngữ khác ([quy trình](analysis-method.md)).
 - [ ] Context: đúng program/snapshot, manifest included/excluded/missing/unsupported/unread, chunk hợp nhất, scope allowlist.
 - [ ] Evidence: validator độc lập kiểm path/range/quote/hash trên snapshot; không thêm symbol/hash vào evidence JSON.

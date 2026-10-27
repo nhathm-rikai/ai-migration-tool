@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 27/10/2026 — specification-design: ghi dần và chạy tiếp khi bị dừng
+
+- Scope docs-only theo yêu cầu người dùng (cách 2: trạng thái trên đĩa); pack `spec-design-rules-0.7.0-draft`, template set `spec-design-templates-0.6.0-draft`, vẫn Draft/unapproved.
+- Thêm SD-CT-08 trong [artifacts](../specification-design/rules/artifacts.md): ghi dần từng đơn vị logic, mục "Trạng thái sinh" trong coverage (`đang sinh`/`hoàn tất`, số phiên), chạy tiếp chỉ khi snapshot/P1/pack/lựa chọn không đổi, không viết lại phần đã xong, đánh số ID tiếp; output `đang sinh` không gửi review.
+- Runbook thêm 2.2b "Dừng và chạy tiếp" (resume CLI hoặc phiên mới đọc trạng thái trên đĩa, so bản sao sau khi chạy tiếp); 2.2, 2.3, checklist, analysis-method, README cập nhật. Trạng thái job/paused/resume trên Portal là đề xuất cho implementation sau, chưa triển khai.
+
 ## 27/10/2026 — specification-design: runbook theo tài liệu được chọn
 
 - Scope docs-only theo yêu cầu người dùng; pack/template giữ `spec-design-rules-0.6.0-draft`/`spec-design-templates-0.5.0-draft` vì chỉ làm rõ cách áp SD-CT-07.

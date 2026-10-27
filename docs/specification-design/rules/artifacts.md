@@ -1,6 +1,6 @@
 # Specification design — artifact và contract
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.6.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.7.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -23,6 +23,15 @@ SD-CT-07: chọn tài liệu riêng lẻ. Agent chỉ sinh tài liệu được 
 - Ghi rõ trong coverage tài liệu nào được sinh, được tham chiếu (version) hoặc còn thiếu.
 
 Khi tài liệu còn thiếu được sinh ở run sau, giữ ID của các bản đã duyệt khác; tham chiếu "chưa sinh" trong tài liệu cũ được TL xử lý bằng run mới, không sửa ngầm bản đã duyệt.
+
+SD-CT-08: ghi dần và chạy tiếp. Agent ghi kết quả ngay sau mỗi đơn vị logic (hoặc nhóm nhỏ theo thứ tự P1 1.3) vào tài liệu được chọn và đánh dấu "đã phân tích" trong coverage; không dồn tới cuối mới ghi. Đầu coverage giữ mục "Trạng thái sinh": `đang sinh` kèm đơn vị dừng gần nhất, hoặc `hoàn tất` khi không còn đơn vị "chưa phân tích" trong phạm vi.
+
+Khi phiên bị dừng (usage limit, mất kết nối, người vận hành dừng) và chạy tiếp bằng phiên mới:
+
+- Chỉ chạy tiếp khi snapshot, version output P1, pack/template và lựa chọn tài liệu không đổi so với phiên đầu; đổi bất kỳ mục nào thì chạy lại từ đầu bằng run mới.
+- Đọc lại phiếu input, pack và coverage; kiểm cấu trúc coverage và tài liệu đang dở trước. File hỏng hoặc không nhất quán thì dừng, báo lỗi, không đoán.
+- Chỉ phân tích đơn vị "chưa phân tích"; không viết lại phần đã xong. BR-ID/Q-ID/E-ref đánh số tiếp, không đặt lại.
+- Tăng số phiên trong "Trạng thái sinh". Output còn `đang sinh` không được gửi TL review.
 
 SD-CT-06: run record và finding review của TL là hồ sơ quy trình, không phải artifact nghiệp vụ, không làm thay đổi gói Markdown nghiệp vụ.
 

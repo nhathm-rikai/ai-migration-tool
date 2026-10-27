@@ -1,6 +1,6 @@
 # Phiếu đầu vào một run specification-design
 
-**DRAFT INPUT — spec-design-templates-0.5.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
+**DRAFT INPUT — spec-design-templates-0.6.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
 
 Input chỉ gồm hai nhóm: **source legacy** và **output của P1**. Lựa chọn program và tài liệu cần tạo là phạm vi run do TL chọn trên Portal (mục 3); tài liệu đã duyệt từ run trước do Portal đưa kèm nếu có (mục 4). Snapshot/hash, decode, quyền đọc/ghi và phiên bản CLI do Portal/công cụ quản lý, không do người điền. Ngôn ngữ/runtime do agent tự nhận diện theo [quy trình phân tích](../analysis-method.md).
 

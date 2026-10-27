@@ -1,6 +1,14 @@
 # Coverage — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.5.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
+**DRAFT TEMPLATE — spec-design-templates-0.6.0-draft.** [Phần đầu chung](../README.md), [KPI/checklist](../review-checklist.md).
+
+## Trạng thái sinh
+
+Theo [SD-CT-08](../rules/artifacts.md). Cập nhật sau mỗi lần ghi; Portal/người vận hành chỉ gửi review khi trạng thái là `hoàn tất`.
+
+| Trạng thái              | Đơn vị dừng gần nhất | Đã phân tích / tổng (theo P1 1.1) | Số phiên | Ghi chú phiên chạy tiếp |
+| ----------------------- | -------------------- | --------------------------------- | -------- | ----------------------- |
+| đang sinh / hoàn tất    |                      |                                   | 1        |                         |
 
 ## Ngôn ngữ và thành phần phát hiện
 

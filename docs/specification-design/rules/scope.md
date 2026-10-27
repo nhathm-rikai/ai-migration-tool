@@ -1,6 +1,6 @@
 # Specification design — phạm vi và pilot
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.6.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.7.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 

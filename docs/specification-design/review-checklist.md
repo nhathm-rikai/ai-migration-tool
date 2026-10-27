@@ -1,9 +1,10 @@
 # Specification design — validation và human review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.6.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.7.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm thực tế; chưa đánh dấu nghĩa là chưa kiểm. Findings ghi item/section, bằng chứng, tác động, hướng xử lý. Không AI ghi danh tính hay quyết định thay reviewer.
 
+- [ ] Trạng thái sinh: coverage ghi `hoàn tất`, không còn đơn vị "chưa phân tích" trong phạm vi; nếu số phiên > 1 thì soát chỗ nối giữa các phiên, không có đoạn bị viết lại hoặc ID trùng/đặt lại ([SD-CT-08](rules/artifacts.md)).
 - [ ] Cấu trúc: đúng mode/schema/version, đủ các tài liệu TL đã chọn kèm coverage/open-questions hoặc JSON đúng mode; ID unique, refs tồn tại, đủ section, không placeholder/truncation âm thầm.
 - [ ] Nhận diện ngôn ngữ: bảng bước 0 trong coverage phủ mọi file allowlist; language/dialect/runtime/framework/build config có căn cứ manifest hoặc nội dung, không chỉ từ đuôi file; mâu thuẫn với input có Q-ID; boundary liên ngôn ngữ, binary/generated/unsupported/unmeasured rõ. Semantics ghi theo ngôn ngữ thực, không mượn từ ngôn ngữ khác ([quy trình](analysis-method.md)).
 - [ ] Context: đúng program/snapshot, manifest included/excluded/missing/unsupported/unread, chunk hợp nhất, scope allowlist.

@@ -206,7 +206,14 @@ export function createJobService(deps: {
     // the execution and commits cancelled). Repeating a cancel is idempotent.
     cancel(projectId: string, runId: string, input: CancelRunInput): Run {
       const run = findRun(projectId, runId);
-      if (run.status === 'cancelling' || run.status === 'cancelled') return run;
+      if (run.status === 'cancelled') return run;
+      // A repeated cancel asks the dispatcher to reconcile again: an ended
+      // execution whose `cancelled` write failed is finished now; a live one
+      // keeps waiting for its stop to be confirmed.
+      if (run.status === 'cancelling') {
+        deps.control.requestStop(run.id);
+        return repository.findById(projectId, runId) ?? run;
+      }
       if (
         isTerminalStatus(run.status) ||
         run.stateVersion !== input.expectedStateVersion

@@ -180,4 +180,59 @@ describe('dispatcher when a state write fails', () => {
     expect(ctx.jobs.runtimeStatus().status).toBe('ready');
     await ctx.dispatcher.close();
   });
+
+  it('a repeated cancel finishes a stopped run whose cancelled write failed', async () => {
+    const ctx = setup();
+    const a = ctx.project();
+    const { run } = ctx.jobs.start(
+      a.id,
+      `key-${randomUUID()}`,
+      startRunFixture,
+    );
+    await vi.waitFor(() => expect(ctx.controlled.executions).toHaveLength(1));
+    const running = ctx.jobs.get(a.id, run.id);
+    expect(
+      ctx.jobs.cancel(a.id, run.id, {
+        expectedStateVersion: running.stateVersion,
+      }).status,
+    ).toBe('cancelling');
+    // The executor stops; writing `cancelled` fails.
+    ctx.setFailing(true);
+    ctx.controlled.executions[0]?.finish({ status: 'stopped' });
+    await vi.waitFor(() =>
+      expect(ctx.jobs.runtimeStatus().status).toBe('recovery_required'),
+    );
+    expect(ctx.jobs.get(a.id, run.id).status).toBe('cancelling');
+    ctx.setFailing(false);
+    const repeated = ctx.jobs.cancel(a.id, run.id, { expectedStateVersion: 1 });
+    expect(repeated).toMatchObject({ status: 'cancelled', stateVersion: 4 });
+    // Terminal stays terminal.
+    expect(ctx.jobs.cancel(a.id, run.id, { expectedStateVersion: 1 })).toEqual(
+      repeated,
+    );
+    await ctx.dispatcher.close();
+  });
+
+  it('a repeated cancel of a run still stopping keeps it cancelling', async () => {
+    const ctx = setup();
+    const a = ctx.project();
+    const { run } = ctx.jobs.start(
+      a.id,
+      `key-${randomUUID()}`,
+      startRunFixture,
+    );
+    await vi.waitFor(() => expect(ctx.controlled.executions).toHaveLength(1));
+    const running = ctx.jobs.get(a.id, run.id);
+    ctx.jobs.cancel(a.id, run.id, {
+      expectedStateVersion: running.stateVersion,
+    });
+    // The executor ignores the abort and has not settled yet.
+    const repeated = ctx.jobs.cancel(a.id, run.id, { expectedStateVersion: 1 });
+    expect(repeated.status).toBe('cancelling');
+    ctx.controlled.executions[0]?.finish({ status: 'stopped' });
+    await vi.waitFor(() =>
+      expect(ctx.jobs.get(a.id, run.id).status).toBe('cancelled'),
+    );
+    await ctx.dispatcher.close();
+  });
 });

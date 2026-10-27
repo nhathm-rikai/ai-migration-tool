@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../apps/api/dist/config.js';
@@ -132,8 +142,93 @@ try {
   });
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), project);
+
+  // PF05: a real compiled process publishes a local snapshot. A restarted
+  // process reuses it even when the registered source no longer exists.
+  const sourceRoot = join(owned, 'source');
+  const movedRoot = join(owned, 'moved-source');
+  mkdirSync(sourceRoot);
+  const bytes = Buffer.from('Sub Main()\r\nEnd Sub\r\n');
+  writeFileSync(join(sourceRoot, 'MAIN.BAS'), bytes);
+  const jsonHeaders = { authorization, 'content-type': 'application/json' };
+  const localCreated = await fetch(`${base}/projects`, {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ name: 'Snapshot reopen fixture', mode: 'local' }),
+  });
+  assert.equal(localCreated.status, 201);
+  const local = await localCreated.json();
+  const registered = await fetch(`${base}/projects/${local.id}/source`, {
+    method: 'PUT',
+    headers: jsonHeaders,
+    body: JSON.stringify({
+      rootPath: sourceRoot,
+      profileId: 'vb6-cp932-v1',
+      tableNameMapping: { defaultSchema: null, status: 'unconfigured' },
+      expectedSourceRevision: null,
+    }),
+  });
+  assert.equal(registered.status, 200);
+  const startRun = async (body) => {
+    const accepted = await fetch(`${base}/projects/${local.id}/runs`, {
+      method: 'POST',
+      headers: {
+        authorization,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      body: JSON.stringify(body),
+    });
+    assert.equal(accepted.status, 202);
+    const { id } = await accepted.json();
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const loaded = await fetch(`${base}/projects/${local.id}/runs/${id}`, {
+        headers: { authorization },
+      });
+      assert.equal(loaded.status, 200);
+      const run = await loaded.json();
+      if (!['queued', 'running', 'cancelling'].includes(run.status)) {
+        assert.equal(run.status, 'succeeded');
+        return run;
+      }
+      await delay(100);
+    }
+    throw new Error('Local snapshot run did not finish.');
+  };
+  const first = await startRun({
+    kind: 'analyze',
+    source: { strategy: 'current-source', expectedSourceRevision: 1 },
+    retryOfRunId: null,
+  });
+  const snapshot = join(dataDir, 'snapshots', first.sourceSnapshotId);
+  const manifestBefore = readFileSync(join(snapshot, 'manifest.json'));
+  assert.deepEqual(readFileSync(join(snapshot, 'raw', 'MAIN.BAS')), bytes);
+  assert.deepEqual(readFileSync(join(sourceRoot, 'MAIN.BAS')), bytes);
+  await stop();
+  // Both paths are immediate children of the temp directory this smoke owns.
+  assert.equal(dirname(sourceRoot), owned);
+  assert.equal(dirname(movedRoot), owned);
+  renameSync(sourceRoot, movedRoot);
+  base = await start();
+  authorization = await bootstrap(base);
+  const sourceRead = await fetch(`${base}/projects/${local.id}/source`, {
+    headers: { authorization },
+  });
+  assert.equal(sourceRead.status, 200);
+  assert.equal((await sourceRead.json()).source.status, 'unreadable');
+  const reused = await startRun({
+    kind: 'analyze',
+    source: { strategy: 'reuse-snapshot' },
+    retryOfRunId: first.id,
+  });
+  assert.equal(reused.sourceSnapshotId, first.sourceSnapshotId);
+  assert.deepEqual(
+    readFileSync(join(snapshot, 'manifest.json')),
+    manifestBefore,
+  );
+  assert.deepEqual(readFileSync(join(movedRoot, 'MAIN.BAS')), bytes);
   console.log(
-    `PASS: compiled startup from external cwd, migration, create/reopen with local credential, 4 protected paths; parent workspace accepted. ${process.platform}/${process.arch} ${process.version}`,
+    `PASS: compiled startup, migration, demo reopen/credential rotation, 4 protected paths; local snapshot/restart/reuse without source, original bytes unchanged. ${process.platform}/${process.arch} ${process.version}`,
   );
 } finally {
   await stop();

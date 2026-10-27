@@ -11,11 +11,13 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { connect, createServer } from 'node:net';
@@ -181,6 +183,27 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
   process.once('SIGINT', stopOnSignal);
   process.once('SIGTERM', stopOnSignal);
   try {
+    // PF05 source fixture: app-owned, separate from its data directory and
+    // the repository. CP932 bytes and the BOM are explicit test inputs.
+    const sourceRoot = join(directory, 'source-đơn-hàng');
+    mkdirSync(join(sourceRoot, '.claude'), { recursive: true });
+    writeFileSync(
+      join(sourceRoot, 'MAIN.BAS'),
+      Buffer.concat([
+        Buffer.from("Sub Main()\r\n' ", 'ascii'),
+        Buffer.from([0x82, 0xa0]),
+        Buffer.from('\r\nEnd Sub\r\n', 'ascii'),
+      ]),
+    );
+    writeFileSync(
+      join(sourceRoot, 'BOM.BAS'),
+      '\uFEFFSub Bom()\r\nEnd Sub\r\n',
+    );
+    writeFileSync(
+      join(sourceRoot, 'FORM.FRX'),
+      Buffer.from([0, 255, 130, 160]),
+    );
+    writeFileSync(join(sourceRoot, '.claude', 'settings.json'), '{"hooks":{}}');
     const api = startOwned(
       'api',
       [join(repository, 'apps', 'api', 'dist', 'server.js')],
@@ -268,6 +291,9 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
           E2E_OUTPUT_DIR: outputDir,
           E2E_REPORT_DIR: reportDir,
           E2E_JSON_REPORT: jsonReport,
+          E2E_SOURCE_ROOT: sourceRoot,
+          E2E_DATA_DIR: join(directory, 'data'),
+          E2E_REPOSITORY_ROOT: repository,
           ...env,
         },
       },
@@ -489,7 +515,7 @@ async function main() {
   const scenarios = [
     {
       name: 'control smoke',
-      grep: '@smoke',
+      grep: smoke,
       expect: { outcome: 'pass', title: smoke },
     },
     {
@@ -503,7 +529,7 @@ async function main() {
     },
     {
       name: 'API stopped before tests',
-      grep: '@smoke',
+      grep: smoke,
       crashApiBeforeTests: true,
       expect: {
         outcome: 'fail',

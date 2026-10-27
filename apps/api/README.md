@@ -2,7 +2,7 @@
 
 Mẫu cho Dev khi mở rộng Projects/API/UI: [policy và lỗi API](../../docs/engineering/patterns/api-errors-policy.md). Policy tên/default pagination/fixture dùng chung từ contracts; public error code có type chung, status/message an toàn nằm tại BE. Handler chỉ ánh xạ AppError và lỗi Fastify đã nhận diện; dependency error chưa biết dùng INTERNAL_ERROR, không biến mọi status 4xx thành INVALID_INPUT. Schema/HTTP response và DB hiện có giữ tương thích, migration cũ không sửa.
 
-API hiện chạy ở gate **init**, feature **Projects/API/storage**. Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật và fake AgentRunner dùng trong test. API chỉ quản lý metadata project demo; `fixtureId: sample-vb6` là nhãn dữ liệu mẫu. Thư viện/CLI Analyze VB6 đã có riêng, chưa nối vào Projects/API/job. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID.
+API có Projects demo/local, run lifecycle và source registration/snapshot (PF05). Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật; demo dùng executor fixture, local run đọc source đã đăng ký để tạo snapshot bất biến. Thư viện/CLI Analyze VB6 chưa nối vào job để tạo inventory/artifact (B08/B07); chưa Claude CLI. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID. Phần security/instance của LIVE đã có, chưa nghiệm thu LIVE/MS1 toàn bộ; chỉ dùng fixture sạch khi kiểm thử.
 
 ## Chạy và cấu hình
 
@@ -42,7 +42,7 @@ Naming hiện tại độc lập công ty: env `PORTAL_*`, package `@portal/*`, 
 
 Override tới DB cũ cũng phải nằm ngoài repo/source. Nếu DB cũ nằm trong repo, cấu hình đó sẽ bị từ chối; cần xử lý di chuyển dữ liệu nhất quán khi backend đã dừng trước khi dùng lại. App không tự move/xóa DB.
 
-Chỉ dùng dữ liệu demo sạch. Đã có bảo vệ Host/Origin và credential local theo [local-http-security](../../docs/engineering/specs/local-http-security.md); chưa có instance lock hay tính năng đọc source thật. Không expose backend này ra LAN. LIVE phải đạt gate trước khi bổ sung đường đọc source/CLI; đổi env không bật được các tính năng đó.
+Đã có bảo vệ Host/Origin và credential local theo [local-http-security](../../docs/engineering/specs/local-http-security.md), instance lock/recovery PF04 và đường đọc source local PF05. Không expose backend ra LAN. `mode: fixture`/`runner: fake` trên health không có nghĩa local project không đọc file: local run thực sự tạo snapshot, chỉ chưa gọi analyzer/AI. Chưa nghiệm thu source khách hàng; path/process smoke hiện chỉ có Windows với fixture sạch.
 
 ## Gọi thử một luồng
 
@@ -64,15 +64,26 @@ Endpoint đang có:
 
 - `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI. Public nhưng vẫn kiểm Host/Origin.
 - `POST /api/v1/session`: bootstrap credential, cần `Origin` tin cậy; trả `{ token }`. Mọi endpoint khác cần `Authorization: Bearer <token>`; 401 `CREDENTIAL_INVALID`, 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`. Policy đầy đủ, gồm request thiếu Origin và `PORTAL_WEB_PORT`: [local-http-security](../../docs/engineering/specs/local-http-security.md).
-- `POST /api/v1/projects`: 201 và `Location`. Body gồm `name` (1–120 ký tự, có nội dung sau trim), `fixtureId` đúng `sample-vb6`. Không nhận `sourcePath` hay field lạ.
+- `POST /api/v1/projects`: 201 và `Location`. Demo dùng `{ name, fixtureId: 'sample-vb6' }`; local dùng `{ name, mode: 'local' }` và đăng ký source bằng endpoint riêng. Name 1–120 Unicode code point, có nội dung sau trim; không nhận `sourcePath` hay field lạ.
 - `GET /api/v1/projects/:projectId`: 200 hoặc 404; ID sai định dạng trả 400.
 - `GET /api/v1/projects?limit=20&cursor=<nextCursor>`: `{ items, nextCursor }`; limit 1–100, mặc định 20. Dùng nguyên cursor từ response; thứ tự theo UUID tăng dần, **không phải ngày tạo**. Đây không phải snapshot pagination khi có request tạo project đồng thời.
 
-Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 500 lỗi nội bộ. Chưa có update/delete project.
+Project demo trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC; local trả cùng metadata với `mode: local`, không có `fixtureId`. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 409 revision/state conflict, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 422 source không dùng được, 500 lỗi nội bộ. Chưa có update/delete project.
+
+### Source registration và snapshot (PF05: B03 + B06 + F01)
+
+- [source-registration.routes.ts](src/modules/projects/source-registration.routes.ts): `GET/PUT /api/v1/projects/:projectId/source`, cần credential local. PUT gồm root tuyệt đối, `profileId: vb6-cp932-v1`, mapping `unconfigured|assumed|confirmed`, `expectedSourceRevision: null` lần đầu hoặc revision đã đọc khi sửa. Demo PUT trả 409 `PROJECT_MODE_CONFLICT`.
+- [source-registration.service.ts](src/modules/projects/source-registration.service.ts) + repository: kiểm profile/root trước khi ghi, CAS revision trong transaction; mỗi revision bất biến. GET chỉ trả sourceId/displayName/profile/revision/status, không trả absolute path. Path không được dùng trả lỗi an toàn, không ghi DB.
+- [local-source-root.ts](src/adapters/local/local-source-root.ts): canonicalize, kiểm containment theo segment/physical path, từ chối overlap repo/data và alias, path tương đối/UNC/device. Kiểm đọc/liệt kê root không walk source. Root thay bằng link sang nơi khác bị coi không đọc được. Native mapped drive và các mount mạng khác chưa được kiểm chứng.
+- [snapshot.service.ts](src/modules/snapshots/snapshot.service.ts), [local-workspace.provider.ts](src/adapters/local/local-workspace.provider.ts): khi run chạy mới đọc revision đã khóa; copy vào `snapshots/.staging/<id>`, giữ raw/normalized/manifest, kiểm source đổi rồi atomic rename và ghi DB. Link không đi theo, file loại trừ/quá lớn/không đọc được có `skipped`; file decode lỗi có manifest lỗi. Reopen/reuse kiểm hash raw/normalized/manifest và đối chiếu ID, hash, profile, số file/tổng bytes với record DB; không dùng root hiện tại để thay snapshot cũ.
+- [snapshot-storage.ts](src/adapters/local/snapshot-storage.ts) kiểm `lstat`/đường dẫn vật lý từ data directory trước đọc, ghi, publish và cleanup, kể cả thư mục con và cleanup sau lỗi. Junction/symlink hoặc file hard link trong storage bị từ chối (`SNAPSHOT_STORAGE_INVALID`); startup không cleanup qua link. Data directory phải do app kiểm soát: Node không có API portable để loại trừ hoàn toàn process khác cùng quyền đổi thư mục giữa hai filesystem syscall.
+- [0003-local-sources.sql](migrations/0003-local-sources.sql) giữ demo/run cũ khi nâng DB từ 0001/0002. Migration runner tắt foreign keys chỉ quanh transaction migration và kiểm `foreign_key_check` trước commit; không sửa migration cũ. Hạ phiên bản không tự downgrade DB: dừng backend và dùng backup nhất quán nếu cần rollback.
+
+Chi tiết contract/path/error/giới hạn: [analyze-run-contract §2](../../docs/engineering/specs/analyze-run-contract.md#2-source-registration-api-2). Source chỉ được mở read-only. Không chạy script/hooks/config trong source. Chỉ fixture sạch được dùng trong E2E; đây chưa phải bằng chứng nghiệm thu customer source, analyzer job hoặc CLI.
 
 ### Analyze run (PF03: B04 + B05, fixture)
 
-Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-contract.md) §3–5. Mọi project hiện là demo trên source `sample-vb6` (revision 1), nên `expectedSourceRevision` phải là 1 cho tới khi có source registration (B03).
+Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-contract.md) §3–5. Demo dùng `sample-vb6` revision 1. Local dùng revision hiện tại từ GET source; chưa đăng ký trả `SOURCE_NOT_REGISTERED`, revision cũ trả `SOURCE_REVISION_CONFLICT`. [source-run.executor.ts](src/adapters/local/source-run.executor.ts) chọn executor fixture cho demo hoặc snapshot service cho local. Local `succeeded` chỉ có nghĩa đã chụp nguồn, chưa tạo inventory/artifact.
 
 - `POST /api/v1/projects/:projectId/runs` + header `Idempotency-Key`: lưu run `queued` rồi trả **202** + `Location` ngay; không chờ chạy. Cùng key + cùng body (không phụ thuộc thứ tự field) trả lại đúng run đó; cùng key khác body 409 `IDEMPOTENCY_KEY_CONFLICT`; project còn run active 409 `RUN_ACTIVE_CONFLICT`; retry (`retryOfRunId`) luôn là run mới; `reuse-snapshot` cần run cũ có snapshot (409 `SNAPSHOT_UNAVAILABLE`); runtime cần recovery 503 `RUNTIME_RECOVERY_REQUIRED`.
 - `GET .../runs?limit&cursor` (mới nhất trước, cursor opaque), `GET .../runs/current`, `GET .../runs/:runId`: chỉ đọc, run của project khác trả 404 `RUN_NOT_FOUND`.
@@ -142,6 +153,6 @@ Tests kiểm API success/input/not-found/pagination (cả limit mặc định), 
 
 Rule trọng tâm: CORE-01..10, BE-01..05/07, DATA-01/02/09, QA-01/02/06/07/09 và AI-01/05 cho fake port. Phạm vi reviewer cần xem: schema/validation trước side effect, ranh giới service/repo, DB lifecycle, containment và nhãn demo.
 
-Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export là các task tiếp theo; instance lock/recovery tối thiểu (PF04) đã có, process ownership của CLI chưa. Local HTTP security (PF02) đã có. Không có VB6 → C# conversion trong source này.
+[UI Projects](../web/README.md), local HTTP security PF02, run lifecycle PF03, instance lock/recovery PF04 và source registration/snapshot PF05 đã có. Decoder/LoC/analyzer hiện chạy độc lập; chưa nối inventory/artifact vào job (B08/B07), chưa SSE, Claude process, BR/Design/evidence, review/export hoặc nghiệm thu LIVE/MS1. Process ownership/cleanup của CLI còn ở A03/A04. Không có VB6 → C# conversion trong source này.
 
 Tham khảo API gốc khi mở rộng: [Fastify type provider](https://github.com/fastify/fastify-type-provider-typebox), [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [better-sqlite3](https://github.com/WiseLibs/better-sqlite3). Phiên bản thực tế được khóa trong package/lockfile, không copy API từ major khác.

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -152,6 +153,82 @@ describe(
         { timeout: 8000, interval: 20 },
       );
     }
+
+    it('refuses startup cleanup through a snapshots junction without deleting external data', async () => {
+      const victim = join(sourceA, '.staging', randomUUID());
+      mkdirSync(victim, { recursive: true });
+      const sentinel = join(victim, 'ORDER.BAS');
+      writeFileSync(sentinel, 'external source fixture');
+      linkDirectory(sourceA, join(dataDir, 'snapshots'));
+      const config = loadConfig({
+        PORTAL_DATA_DIR: dataDir,
+        PORTAL_LOG_LEVEL: 'silent',
+      });
+      const app = buildApp(config);
+      apps.push(app);
+      await expect(app.ready()).rejects.toMatchObject({
+        code: 'SNAPSHOT_STORAGE_INVALID',
+      });
+      expect(readFileSync(sentinel, 'utf8')).toBe('external source fixture');
+    });
+
+    it.each(['content', 'fileCount', 'totalBytes'])(
+      'rejects reuse after replacing snapshot %s despite an internally valid manifest',
+      async (changed) => {
+        const { inject } = await open();
+        const project = await createProject(inject);
+        await put(inject, project.id, body(sourceA));
+        const first = await finished(
+          inject,
+          (await start(inject, project.id, 1)).json<Run>(),
+        );
+        await put(inject, project.id, body(sourceB, 1));
+        const second = await finished(
+          inject,
+          (await start(inject, project.id, 2)).json<Run>(),
+        );
+        if (first.status !== 'succeeded' || second.status !== 'succeeded')
+          throw new Error('Snapshots must publish.');
+        const a = join(dataDir, 'snapshots', first.sourceSnapshotId);
+        const b = join(dataDir, 'snapshots', second.sourceSnapshotId);
+        const replacement: unknown = JSON.parse(
+          readFileSync(
+            join(changed === 'content' ? b : a, 'manifest.json'),
+            'utf8',
+          ),
+        );
+        if (typeof replacement !== 'object' || replacement === null)
+          throw new Error('Manifest missing.');
+        if (changed === 'content')
+          cpSync(b, a, { recursive: true, force: true });
+        writeFileSync(
+          join(a, 'manifest.json'),
+          JSON.stringify({
+            ...replacement,
+            snapshotId: first.sourceSnapshotId,
+            ...(changed === 'content' ? {} : { [changed]: 12345 }),
+          }),
+        );
+        // Reopen the backend too: validation must use persisted metadata, not
+        // a cache populated by the original creation.
+        await closeAll();
+        const reopened = await open();
+        const accepted = await reopened.inject({
+          method: 'POST',
+          url: `/api/v1/projects/${project.id}/runs`,
+          headers: { 'idempotency-key': `key-${randomUUID()}` },
+          payload: {
+            kind: 'analyze',
+            source: { strategy: 'reuse-snapshot' },
+            retryOfRunId: first.id,
+          },
+        });
+        expect(accepted.statusCode).toBe(202);
+        expect(
+          await finished(reopened.inject, accepted.json<Run>()),
+        ).toMatchObject({ status: 'failed', errorCode: 'INTERNAL_ERROR' });
+      },
+    );
 
     it('B03-AC01 rejects relative, forbidden, link-escaping and missing roots without writing', async () => {
       const { inject } = await open();

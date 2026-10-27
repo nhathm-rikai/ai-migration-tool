@@ -1,6 +1,6 @@
 # Hợp đồng Analyze: source, run, artifact (C01)
 
-**Gate:** FEATURE:jobs/storage/analysis, dữ liệu fixture. Đây là hợp đồng đã chốt cho checkpoint **analyze-only**. Start/list/current/detail/cancel và runtime status đã implement ở PF03 (B04/B05, executor fixture, xem [README backend](../../../apps/api/README.md#analyze-run-pf03-b04--b05-fixture)); source registration (B03), artifact (B07) và SSE (B09) chưa có. Schema máy đọc được nằm trong `packages/contracts/src`:
+**Gate:** FEATURE:jobs/storage/analysis; demo dùng executor fixture, project local đọc source đã đăng ký qua snapshot provider PF05 (B03/B06/F01). HTTP local và instance lock đã có ở PF02/PF04. Checkpoint hiện tại tạo snapshot bất biến; local run `succeeded` được UI ghi “Đã chụp nguồn”, chưa tạo inventory/artifact (B08/B07) hoặc SSE (B09). Chỉ kiểm với source fixture sạch, chưa nghiệm thu source khách hàng hoặc LIVE/MS1 toàn bộ. Schema máy đọc được nằm trong `packages/contracts/src`:
 
 | File | Nội dung |
 |---|---|
@@ -19,7 +19,7 @@ Route, API client và message catalog dùng `ANALYZE_API_OPERATIONS` và schema/
 - Schema strict: field lạ, ID không phải UUID, status/stage/mã lỗi ngoài union đều bị từ chối. Nullable là giá trị `null` bắt buộc có mặt, không dùng field optional cho DTO mới; optional chỉ còn ở inventory để đọc bản cũ (§6).
 - Thời gian UTC ISO-8601. Query/path số đi dưới dạng string (API tắt coerce).
 - Error dùng envelope `{ error: { code, message, requestId } }` hiện có. Client cũ gặp mã mới dùng fallback.
-- Projects API (create/list/detail) **không đổi**: DTO Project, query và mã lỗi giữ nguyên; test AC02 khóa payload cũ dưới dạng JSON viết tay.
+- Projects API giữ tương thích member demo cũ. PF05 thêm member `mode: 'local'` không có `fixtureId`; query và member demo không đổi. Consumer phải đọc union `ProjectSchema`, không mặc định mọi project là demo.
 
 ## 2. Source registration (API 2)
 
@@ -31,7 +31,14 @@ Route, API client và message catalog dùng `ANALYZE_API_OPERATIONS` và schema/
 - Project demo có source `kind: 'fixture'` (bộ mẫu `sample-vb6`, revision cố định 1, mapping `unconfigured`). PUT lên project demo trả `409 PROJECT_MODE_CONFLICT`: project demo không tự thành project dùng source thật.
 - `profileId` hợp lệ về hình thức nhưng không thuộc `SOURCE_PROFILE_IDS` → `422 SOURCE_PROFILE_UNSUPPORTED`.
 
-**Quyết định còn mở (B03):** cách tạo project dùng source local. Hướng chốt: thêm member `mode: 'local'` (không `fixtureId`) vào union Project/CreateProject trong PR B03 kèm migration, giữ nguyên member demo hiện tại; UI Projects cập nhật cùng PR. C01 không đổi Project DTO để không phá Projects UI đang chạy.
+**Đã triển khai PF05:** tạo project local bằng `POST /projects` body `{ name, mode: 'local' }`, trả DTO `{ id, name, mode: 'local', createdAt }`. Demo tiếp tục dùng `{ name, fixtureId: 'sample-vb6' }` và DTO cũ. Migration `0003-local-sources.sql` dựng lại bảng projects, giữ nguyên project/run demo và thêm source revisions/snapshot index; không sửa migration 0001/0002.
+
+- Root là thư mục local tồn tại, đọc/liệt kê được; từ chối path tương đối (400 `INVALID_INPUT`), UNC/device path và path có dạng UNC sau canonicalize (422 `SOURCE_FORBIDDEN`), thư mục trùng/nằm trong/chứa repo hoặc data directory và alias trỏ vào đó. Thư mục thiếu hoặc không đọc được trả 422 `SOURCE_UNREADABLE`. Chỉ kiểm root, không walk/copy trong PUT. Chưa kiểm native mapped drive, macOS/Linux hoặc mọi kiểu mount mạng; không suy ra hỗ trợ từ kiểm tra hình dạng path.
+- Mỗi PUT thành công thêm revision bất biến. Run khóa `sourceId` + revision, profile và mapping lúc admission; đổi registration sau đó không chuyển run đang chờ sang root mới. GET kiểm lại root, trả `unreadable` nếu root không còn hợp lệ. Khi sửa source, client nhập lại root vì response không trả absolute path.
+- Khi execution bắt đầu, provider kiểm lại root, copy source allowlist vào `.staging/<snapshotId>` dưới data directory, giữ raw bytes và normalized UTF-8/LF, rồi kiểm listing/identity/size/mtime lần hai. Source đổi → `SOURCE_CHANGED`; vượt số file/tổng bytes → `SOURCE_LIMIT_EXCEEDED`; file quá lớn, link/junction, file ngoài allowlist hoặc không đọc được được giữ trong `skipped` cùng lý do. Link không được đi theo, config agent không được copy/chạy. File decode lỗi vẫn giữ manifest lỗi, không thay byte bằng ký tự thay thế.
+- Publish: staging → atomic rename cùng filesystem → ghi snapshot index DB. Cancel/timeout dọn staging; khởi động dọn staging UUID còn sót. Snapshot chưa có row DB không public; lỗi ghi DB dọn thư mục vừa publish. Snapshot hoàn tất nhưng run bị cancel/crash có thể còn được giữ; orphan cleanup/retention tự động ngoài scope.
+- Snapshot storage kiểm từng thành phần bằng `lstat` và đường dẫn vật lý từ data directory trước đọc/ghi/publish/cleanup; junction/symlink trong storage và file hard link bị từ chối, startup dừng với diagnostic an toàn `SNAPSHOT_STORAGE_INVALID` thay vì cleanup qua link. Data directory phải do app kiểm soát; chưa bảo đảm chống process khác cùng quyền đổi thư mục giữa các syscall của Node.
+- `reuse-snapshot` của local run mở lại snapshot đã ghi, kiểm hash raw/normalized/manifest và đối chiếu ID/hash/profile/fileCount/totalBytes với DB. Thay cả nội dung lẫn manifest hợp lệ nhưng khác DB vẫn bị từ chối; run kết thúc `failed/INTERNAL_ERROR`. Không đọc lại source. Run thành công chỉ xác nhận đã chụp nguồn, chưa xác nhận inventory/BR/Design. Limits hiện tại là baseline dev, chưa có spike để nghiệm thu dữ liệu thật.
 
 ## 3. Start run (API 3)
 

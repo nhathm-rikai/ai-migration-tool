@@ -91,13 +91,24 @@ export function createSnapshotService(deps: {
       return { status: 'published', snapshotId, manifest: result.manifest };
     },
 
-    // A recorded snapshot of the project, verified against its manifest.
+    // Disk contents must match both the manifest and the immutable DB record.
     async open(
       projectId: string,
       snapshotId: string,
     ): Promise<SnapshotManifest | undefined> {
-      if (!deps.repository.findById(projectId, snapshotId)) return undefined;
-      return deps.provider.openSnapshot(snapshotId);
+      const record = deps.repository.findById(projectId, snapshotId);
+      if (!record) return undefined;
+      const manifest = await deps.provider.openSnapshot(snapshotId);
+      if (
+        !manifest ||
+        manifest.snapshotId !== record.id ||
+        manifest.snapshotHash !== record.snapshotHash ||
+        manifest.profileId !== record.profileId ||
+        manifest.fileCount !== record.fileCount ||
+        manifest.totalBytes !== record.totalBytes
+      )
+        return undefined;
+      return manifest;
     },
   };
 }

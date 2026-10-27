@@ -21,8 +21,8 @@ import { createSnapshotRepository } from './modules/snapshots/snapshot.repositor
 import { createSnapshotService } from './modules/snapshots/snapshot.service.js';
 import type { RunExecutor } from './ports/run-executor.js';
 
-// Placeholder limits locked into each run's config until the analysis spike
-// fixes real numbers (JOB-07). The fixture executor does not read source.
+// Development limits locked into each run's config. Local runs enforce them
+// while taking snapshots; a spike must approve real-data limits (JOB-07).
 export const DEFAULT_RUN_LIMITS: RunLimits = {
   maxFiles: 5000,
   maxFileBytes: 4 * 1024 * 1024,

@@ -4,6 +4,8 @@ const RUNTIME_ERRORS = {
   DATA_DIR_FORBIDDEN:
     'Data directory must be outside the application repository and its source directories.',
   DATA_DIR_LOCKED: 'Another backend process is using this data directory.',
+  SNAPSHOT_STORAGE_INVALID:
+    'Snapshot storage must contain only regular app-owned directories and files.',
   INSTANCE_LOCK_INVALID:
     'The instance lock file of the data directory is not usable.',
   UNSUPPORTED_PLATFORM:

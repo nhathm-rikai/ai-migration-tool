@@ -111,7 +111,11 @@ export function ProjectDetail({
           </dl>
           <div className="notice">
             <strong>{copy.ready}</strong>
-            <p>{copy.unavailable}</p>
+            <p>
+              {state.project.mode === 'demo'
+                ? copy.unavailable
+                : messages.runs.localNotice}
+            </p>
           </div>
           {state.project.mode === 'demo' ? (
             runsApi && (

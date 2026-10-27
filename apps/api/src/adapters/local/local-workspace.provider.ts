@@ -1,15 +1,7 @@
 import { constants, type BigIntStats } from 'node:fs';
-import {
-  lstat,
-  mkdir,
-  open,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  writeFile,
-} from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { lstat, open, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createSnapshotStorage } from './snapshot-storage.js';
 import {
   computeSnapshotHash,
   createManifestEntry,
@@ -89,6 +81,7 @@ export function createLocalWorkspaceProvider(options: {
 }): WorkspaceProvider {
   const { snapshotsDir } = options;
   const stagingDir = join(snapshotsDir, STAGING);
+  const storage = createSnapshotStorage(snapshotsDir);
 
   async function collect(
     request: CreateSnapshotRequest,
@@ -185,12 +178,10 @@ export function createLocalWorkspaceProvider(options: {
       });
       entries.push(entry);
       const raw = storagePath(join(staging, RAW), relativePath);
-      await mkdir(dirname(raw), { recursive: true });
-      await writeFile(raw, bytes, { flag: 'wx' });
+      await storage.writeNew(raw, bytes);
       if (lines) {
         const normalized = storagePath(join(staging, NORMALIZED), relativePath);
-        await mkdir(dirname(normalized), { recursive: true });
-        await writeFile(normalized, toNormalizedText(lines), { flag: 'wx' });
+        await storage.writeNew(normalized, toNormalizedText(lines));
       }
       await request.afterFileRead?.(relativePath);
     }
@@ -338,7 +329,7 @@ export function createLocalWorkspaceProvider(options: {
   ): Promise<boolean> {
     for (const entry of manifest.entries) {
       if (!isRelativeSourcePath(entry.relativePath)) return false;
-      const raw = await readFile(
+      const raw = await storage.read(
         storagePath(join(directory, RAW), entry.relativePath),
       );
       if (
@@ -347,7 +338,7 @@ export function createLocalWorkspaceProvider(options: {
       )
         return false;
       if (entry.kind === 'text') {
-        const normalized = await readFile(
+        const normalized = await storage.read(
           storagePath(join(directory, NORMALIZED), entry.relativePath),
         );
         if (sha256(normalized) !== entry.normalizedSha256) return false;
@@ -374,20 +365,20 @@ export function createLocalWorkspaceProvider(options: {
         throw new Error('Snapshot ID must be a server-generated UUID.');
       const staging = join(stagingDir, request.snapshotId);
       const published = join(snapshotsDir, request.snapshotId);
-      await mkdir(stagingDir, { recursive: true });
       // wx-like: a leftover with this ID is never reused.
-      await mkdir(staging);
+      await storage.createDirectory(staging);
       try {
         const manifest = await collect(request, staging);
-        await writeFile(join(staging, MANIFEST), JSON.stringify(manifest), {
-          flag: 'wx',
-        });
+        await storage.writeNew(
+          join(staging, MANIFEST),
+          JSON.stringify(manifest),
+        );
         if (request.signal.aborted) throw new SnapshotStopped();
         // Atomic on one filesystem: readers see the whole snapshot or none.
-        await rename(staging, published);
+        await storage.publish(staging, published);
         return { status: 'published', manifest };
       } catch (error) {
-        await rm(staging, { recursive: true, force: true });
+        await storage.remove(staging);
         if (error instanceof SnapshotStopped) return { status: 'stopped' };
         if (error instanceof SnapshotFailure)
           return { status: 'failed', errorCode: error.code };
@@ -401,7 +392,7 @@ export function createLocalWorkspaceProvider(options: {
       let manifest: SnapshotManifest;
       try {
         const parsed: unknown = JSON.parse(
-          await readFile(join(directory, MANIFEST), 'utf8'),
+          (await storage.read(join(directory, MANIFEST))).toString('utf8'),
         );
         if (!isSnapshotManifest(parsed) || parsed.snapshotId !== snapshotId)
           return undefined;
@@ -415,24 +406,20 @@ export function createLocalWorkspaceProvider(options: {
 
     async discardSnapshot(snapshotId) {
       if (!/^[0-9a-f-]{36}$/.test(snapshotId)) return;
-      await rm(join(snapshotsDir, snapshotId), {
-        recursive: true,
-        force: true,
-      });
+      await storage.remove(join(snapshotsDir, snapshotId));
     },
 
     async cleanupStaging() {
       let names: string[];
       try {
-        names = await readdir(stagingDir);
+        names = await storage.names(stagingDir);
       } catch (error) {
         if (errorCode(error) === 'ENOENT') return 0;
         throw error;
       }
       // Only directories this store created: UUID-named staging copies.
       const owned = names.filter((name) => /^[0-9a-f-]{36}$/.test(name));
-      for (const name of owned)
-        await rm(join(stagingDir, name), { recursive: true, force: true });
+      for (const name of owned) await storage.remove(join(stagingDir, name));
       return owned.length;
     },
   };

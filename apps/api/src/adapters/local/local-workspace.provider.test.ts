@@ -2,11 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -344,5 +346,125 @@ describe('local workspace provider (B06)', () => {
     mkdirSync(join(staging, 'keep-me'));
     expect(await provider.cleanupStaging()).toBe(1);
     expect(readdirSync(staging)).toEqual(['keep-me']);
+  });
+
+  it.each(['snapshots', '.staging'])(
+    'refuses cleanup through a linked %s directory without touching external bytes',
+    async (part) => {
+      mkdirSync(join(base, 'data'), { recursive: true });
+      const target = part === 'snapshots' ? join(outside, '.staging') : outside;
+      const abandoned = join(target, randomUUID());
+      mkdirSync(abandoned, { recursive: true });
+      writeFileSync(join(abandoned, 'keep.txt'), 'external fixture');
+      if (part === '.staging') mkdirSync(snapshotsDir);
+      linkDirectory(
+        outside,
+        part === 'snapshots' ? snapshotsDir : join(snapshotsDir, '.staging'),
+      );
+      const before = treeHashes(outside);
+      await expect(provider.cleanupStaging()).rejects.toMatchObject({
+        code: 'SNAPSHOT_STORAGE_INVALID',
+      });
+      expect(treeHashes(outside)).toEqual(before);
+    },
+  );
+
+  it.each(['snapshots', '.staging'])(
+    'refuses creation through a linked %s directory without writing outside data',
+    async (part) => {
+      mkdirSync(join(base, 'data'), { recursive: true });
+      if (part === '.staging') mkdirSync(snapshotsDir);
+      linkDirectory(
+        outside,
+        part === 'snapshots' ? snapshotsDir : join(snapshotsDir, '.staging'),
+      );
+      const before = treeHashes(outside);
+      await expect(provider.createSnapshot(request())).rejects.toMatchObject({
+        code: 'SNAPSHOT_STORAGE_INVALID',
+      });
+      expect(treeHashes(outside)).toEqual(before);
+    },
+  );
+
+  it('refuses read and discard through a linked published snapshot', async () => {
+    const input = request();
+    await provider.createSnapshot(input);
+    const published = join(snapshotsDir, input.snapshotId);
+    const moved = join(outside, 'published');
+    renameSync(published, moved);
+    linkDirectory(moved, published);
+    const before = treeHashes(outside);
+    await expect(provider.openSnapshot(input.snapshotId)).rejects.toMatchObject(
+      { code: 'SNAPSHOT_STORAGE_INVALID' },
+    );
+    await expect(
+      provider.discardSnapshot(input.snapshotId),
+    ).rejects.toMatchObject({ code: 'SNAPSHOT_STORAGE_INVALID' });
+    expect(treeHashes(outside)).toEqual(before);
+  });
+
+  it('refuses linked subdirectories of a stored snapshot', async () => {
+    const input = request();
+    await provider.createSnapshot(input);
+    const raw = join(snapshotsDir, input.snapshotId, 'raw');
+    const moved = join(outside, 'raw');
+    renameSync(raw, moved);
+    linkDirectory(moved, raw);
+    const before = treeHashes(outside);
+    await expect(provider.openSnapshot(input.snapshotId)).rejects.toMatchObject(
+      { code: 'SNAPSHOT_STORAGE_INVALID' },
+    );
+    await expect(
+      provider.discardSnapshot(input.snapshotId),
+    ).rejects.toMatchObject({ code: 'SNAPSHOT_STORAGE_INVALID' });
+    expect(treeHashes(outside)).toEqual(before);
+  });
+
+  it('refuses a UUID staging junction without deleting the target', async () => {
+    const staging = join(snapshotsDir, '.staging');
+    mkdirSync(staging, { recursive: true });
+    linkDirectory(outside, join(staging, randomUUID()));
+    const before = treeHashes(outside);
+    await expect(provider.cleanupStaging()).rejects.toMatchObject({
+      code: 'SNAPSHOT_STORAGE_INVALID',
+    });
+    expect(treeHashes(outside)).toEqual(before);
+  });
+
+  it('refuses a hard-linked manifest for read and discard', async () => {
+    const input = request();
+    await provider.createSnapshot(input);
+    const manifest = join(snapshotsDir, input.snapshotId, 'manifest.json');
+    linkSync(manifest, join(outside, 'manifest.json'));
+    const before = treeHashes(outside);
+    await expect(provider.openSnapshot(input.snapshotId)).rejects.toMatchObject(
+      {
+        code: 'SNAPSHOT_STORAGE_INVALID',
+      },
+    );
+    await expect(
+      provider.discardSnapshot(input.snapshotId),
+    ).rejects.toMatchObject({
+      code: 'SNAPSHOT_STORAGE_INVALID',
+    });
+    expect(treeHashes(outside)).toEqual(before);
+  });
+
+  it('rechecks storage before writing and error cleanup if its root becomes a junction during copy', async () => {
+    let before: Record<string, string> | undefined;
+    const input = request({
+      afterFileRead() {
+        if (before) return;
+        const moved = join(outside, 'snapshots');
+        renameSync(snapshotsDir, moved);
+        linkDirectory(moved, snapshotsDir);
+        before = treeHashes(outside);
+      },
+    });
+    await expect(provider.createSnapshot(input)).rejects.toMatchObject({
+      code: 'SNAPSHOT_STORAGE_INVALID',
+    });
+    expect(before).toBeDefined();
+    expect(treeHashes(outside)).toEqual(before);
   });
 });

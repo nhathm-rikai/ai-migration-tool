@@ -292,6 +292,84 @@ describe('Source registration form (F01)', () => {
     ).toHaveProperty('disabled', true);
   });
 
+  it.each([
+    { outcome: 'success', when: 'before PUT' },
+    { outcome: 'error', when: 'before PUT' },
+    { outcome: 'success', when: 'during PUT' },
+    { outcome: 'error', when: 'during PUT' },
+  ])(
+    'keeps a saved revision when a GET started $when returns a late $outcome',
+    async ({ outcome, when }) => {
+      let reads = 0;
+      let finishRead: (() => void) | undefined;
+      let finishSave: (() => void) | undefined;
+      const server = createServer({
+        [`GET ${sourceUrl()}`]: () => {
+          if (reads++ === 0) return json(registered());
+          return new Promise((resolve) => {
+            finishRead = () =>
+              resolve(
+                outcome === 'success'
+                  ? json(
+                      registered({ displayName: 'stale source', revision: 1 }),
+                    )
+                  : errorBody('SOURCE_UNREADABLE', 422),
+              );
+          });
+        },
+        [`PUT ${sourceUrl()}`]: () =>
+          new Promise((resolve) => {
+            finishSave = () =>
+              resolve(
+                json(registered({ displayName: 'saved source', revision: 2 })),
+              );
+          }),
+        [`POST /api/v1/projects/${localProject.id}/runs`]: () =>
+          errorBody('RUN_ACTIVE_CONFLICT', 409),
+      });
+      render(detail(server));
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Đổi mã nguồn' }),
+      );
+      fireEvent.change(screen.getByLabelText('Đường dẫn thư mục (tuyệt đối)'), {
+        target: { value: ROOT },
+      });
+      if (when === 'before PUT') {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Tải lại mã nguồn' }),
+        );
+        await waitFor(() => expect(finishRead).toBeDefined());
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+      await waitFor(() => expect(finishSave).toBeDefined());
+      if (when === 'during PUT') {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Tải lại mã nguồn' }),
+        );
+        await waitFor(() => expect(finishRead).toBeDefined());
+      }
+      await act(async () => {
+        finishSave?.();
+        await Promise.resolve();
+      });
+      await screen.findByText('Đã lưu mã nguồn.');
+      await act(async () => {
+        finishRead?.();
+        await Promise.resolve();
+      });
+      expect(screen.getByText('saved source')).toBeTruthy();
+      expect(screen.queryByText('stale source')).toBeNull();
+      expect(screen.queryByText(/Thư mục không tồn tại hoặc/)).toBeNull();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Bắt đầu phân tích' }),
+      );
+      await waitFor(() => expect(server.starts()).toHaveLength(1));
+      expect(server.starts()[0]?.body).toMatchObject({
+        source: { expectedSourceRevision: 2 },
+      });
+    },
+  );
+
   it('F01-AC03 keeps the input and the pending save when the locale changes', async () => {
     let finish: (() => void) | undefined;
     const server = createServer({

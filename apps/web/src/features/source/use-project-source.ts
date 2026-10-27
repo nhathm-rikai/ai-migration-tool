@@ -23,23 +23,31 @@ export function useProjectSource(api: SourcesApi, projectId: string) {
   const [save, setSave] = useState<SaveState>({ status: 'idle' });
   const [reload, setReload] = useState(0);
   const mutation = useRef<AbortController | null>(null);
+  const reading = useRef<AbortController | null>(null);
+  const generation = useRef(0);
   useEffect(() => () => mutation.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
+    reading.current = controller;
+    const startedAt = generation.current;
     setState((previous) =>
       previous.status === 'ready' ? previous : { status: 'loading' },
     );
     void api.get(projectId, controller.signal).then(
       (response) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted && startedAt === generation.current)
           setState({ status: 'ready', source: response.source });
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) setState({ status: 'error', error });
+        if (!controller.signal.aborted && startedAt === generation.current)
+          setState({ status: 'error', error });
       },
     );
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (reading.current === controller) reading.current = null;
+    };
   }, [api, projectId, reload]);
 
   const refresh = useCallback(() => setReload((value) => value + 1), []);
@@ -58,6 +66,10 @@ export function useProjectSource(api: SourcesApi, projectId: string) {
       try {
         const response = await api.put(projectId, input, controller.signal);
         if (controller.signal.aborted) return false;
+        // Invalidate every read started before this save completed, including
+        // refreshes requested while PUT was pending. Late errors are stale too.
+        generation.current++;
+        reading.current?.abort();
         setState({ status: 'ready', source: response.source });
         setSave({ status: 'saved' });
         return true;

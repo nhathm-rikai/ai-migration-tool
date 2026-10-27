@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { projectsApi, type ProjectsApi } from '../../shared/api/projects-api';
+import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import type { SourcesApi } from '../../shared/api/sources-api';
 import { Icon } from '../../shared/ui/icon';
@@ -13,10 +14,12 @@ export function ProjectsPage({
   api = projectsApi,
   runsApi,
   sourcesApi,
+  artifactsApi,
 }: {
   api?: ProjectsApi;
   runsApi?: RunsApi | undefined;
   sourcesApi?: SourcesApi | undefined;
+  artifactsApi?: ArtifactsApi | undefined;
 }) {
   const { messages } = useLocale();
   const copy = messages.projects;
@@ -216,6 +219,7 @@ export function ProjectsPage({
             api={api}
             runsApi={runsApi}
             sourcesApi={sourcesApi}
+            artifactsApi={artifactsApi}
             onClose={() => setSelectedId(null)}
           />
         ) : (

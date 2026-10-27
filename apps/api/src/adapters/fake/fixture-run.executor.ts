@@ -6,8 +6,8 @@ const STAGES: readonly AnalyzeStage[] = ['snapshot', 'inventory', 'publish'];
 
 // Fixture executor for the demo runtime (B05): walks the analyze stages with
 // a delay and reports a new snapshot ID. It reads no source, starts no process
-// and calls no network; real analysis replaces it in B06/B08. A run that
-// "succeeds" here has no artifact yet.
+// and calls no network; real analysis replaces it in B06/B08. The source
+// run executor publishes the demo inventory after it succeeds (B07).
 export function createFixtureRunExecutor(options: {
   stageDelayMs: number;
   nextId(): string;

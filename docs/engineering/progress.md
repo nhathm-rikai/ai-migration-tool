@@ -5,8 +5,16 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 ## Phạm vi hiện tại
 
 - Gate init FE + BE; Projects/UI/API/storage, fixture + fake runner. Fastify → service → repository, SQLite thật, TypeBox contracts.
-- Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Thư viện Analyze tĩnh và CLI `analyze-source` chưa nối vào job để tạo inventory/artifact (B08/B07). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
+- Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Thư viện Analyze tĩnh và CLI `analyze-source` chưa nối vào job để tạo inventory cho local run (B08). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
+
+## 27/10/2026 — PF06 (B07 + F03) artifact store và Assessment overview
+
+- Dùng `portal-implement`; nhánh `feat/pf06-assessment-overview` từ PF05 `6bba800` (PF02 → PF03 → PF04 → PF05 → PF06 chưa merge). Gate FEATURE:api/storage/ui (DATA-05, BE-02/03/04, FE-02/04/06/08/09), dữ liệu fixture: demo run công bố inventory mẫu viết tay; không đọc source khách hàng, không AI/process.
+- BE: migration `0004-artifacts.sql`, port/adapter artifact store (staging → rename thư mục → row DB, tái dùng storage kiểm link của snapshot với mã `ARTIFACT_STORAGE_INVALID`), service/repository/routes `listRunArtifacts`/`getArtifactVersion`, mã `ARTIFACT_NOT_FOUND`. Chỉ artifact của run `succeeded` được đọc; cancel thắng sau publish → artifact cô lập. Đọc kiểm hash/size/schema. Runbook orphan trong README API.
+- FE: `features/assessment` (view model, hook, overview + program list), `artifacts-api`, catalog VI/JA `assessment`. Tổng không trùng và tổng theo program tách riêng; program không phân tích hiển thị “Chưa phân tích”; mapping/complexity draft/cần xem có nhãn. Sửa copy demo notice (demo nay có kết quả mẫu) và selector E2E PF03 chỉ đếm item lịch sử run.
+- Kiểm chứng (Windows x64, Node 24.16.0): `npm run format:check`, `lint`, `typecheck`, `test` (contracts 43, API 37 file 455 pass + 1 skip, web 90), `build`, `npm run e2e` 4/4 smoke pass (thêm [assessment-overview.spec.ts](../../tests/e2e/assessment-overview.spec.ts)), `npm run e2e:self-check` pass. Test mới B07: fault ghi/rename/DB insert, cross-project, version không hợp lệ, restart đọc lại cùng version/hash, cancel race, orphan, tamper, credential. Evidence local ignored ở `test-results/pf06/` (JSON + screenshot desktop VI/mobile JA).
+- Chưa đến mốc/giới hạn: local run chưa có inventory (B08/PF07); chi tiết LoC/CRUD/dependency (F04), SSE (B09), review/export chưa có. Chưa native macOS/Linux, chưa review độc lập, chưa push/merge; tracker Excel không cập nhật.
 
 ## 27/10/2026 — xử lý 3 góp ý P3 của review PF05 lần 2
 

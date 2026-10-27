@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Run } from '@portal/contracts';
+import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import type { RunsApi } from '../../shared/api/runs-api';
+import { AssessmentOverview } from '../assessment/assessment-overview';
 import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { runRequestErrorMessage } from './run-messages';
@@ -15,11 +17,14 @@ import {
 // panel, reloading or switching locale only reads; nothing starts by itself.
 export function AnalyzeRunPanel({
   api,
+  artifactsApi,
   projectId,
   demo,
   sourceRevision,
 }: {
   api: RunsApi;
+  // Without it a succeeded run shows no assessment (run-only tests).
+  artifactsApi?: ArtifactsApi | undefined;
   projectId: string;
   // Demo projects run the fixture executor and say so.
   demo: boolean;
@@ -129,6 +134,14 @@ export function AnalyzeRunPanel({
         />
       ) : (
         <p className="empty-state">{copy.noRun}</p>
+      )}
+      {shown?.status === 'succeeded' && artifactsApi && (
+        <AssessmentOverview
+          key={shown.id}
+          api={artifactsApi}
+          projectId={projectId}
+          runId={shown.id}
+        />
       )}
       {history.length > 0 && (
         <>

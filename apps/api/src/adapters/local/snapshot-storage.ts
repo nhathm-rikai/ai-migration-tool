@@ -10,7 +10,10 @@ import {
   unlink,
 } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { RuntimeError } from '../../shared/runtime-error.js';
+import {
+  RuntimeError,
+  type RuntimeErrorCode,
+} from '../../shared/runtime-error.js';
 
 // Snapshot paths are app-owned. Source links may be skipped, but links in
 // storage are invalid: even cleanup must never traverse one. Check from the
@@ -18,10 +21,17 @@ import { RuntimeError } from '../../shared/runtime-error.js';
 // This guards existing links and replacement between operations. Node has no
 // portable openat/unlinkat; the data directory must remain private to the app
 // to exclude a concurrent process swapping directories between syscalls.
-export function createSnapshotStorage(snapshotsDir: string) {
+// The artifact store (B07) reuses it under its own directory and error code.
+export function createSnapshotStorage(
+  snapshotsDir: string,
+  invalidCode: Extract<
+    RuntimeErrorCode,
+    'SNAPSHOT_STORAGE_INVALID' | 'ARTIFACT_STORAGE_INVALID'
+  > = 'SNAPSHOT_STORAGE_INVALID',
+) {
   const dataDir = dirname(resolve(snapshotsDir));
   let anchor: { path: string; identity: string } | undefined;
-  const invalid = () => new RuntimeError('SNAPSHOT_STORAGE_INVALID');
+  const invalid = () => new RuntimeError(invalidCode);
   const identity = (stats: { dev: bigint; ino: bigint }) =>
     `${stats.dev}:${stats.ino}`;
   // Directories already proven physical (realpath under the anchor), by

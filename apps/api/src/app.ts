@@ -15,6 +15,7 @@ import {
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
+import { registerArtifactRoutes } from './modules/artifacts/artifact.routes.js';
 import { registerSourceRegistrationRoutes } from './modules/projects/source-registration.routes.js';
 import { createLoggerOptions } from './plugins/logger.js';
 import {
@@ -72,5 +73,6 @@ export function buildApp(
   registerProjectRoutes(app, dependencies.projects);
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
+  registerArtifactRoutes(app, dependencies.artifacts);
   return app;
 }

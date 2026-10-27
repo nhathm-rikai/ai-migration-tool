@@ -17,16 +17,21 @@ import {
   sourcesApi as defaultSourcesApi,
   type SourcesApi,
 } from '../shared/api/sources-api';
+import {
+  artifactsApi as defaultArtifactsApi,
+  type ArtifactsApi,
+} from '../shared/api/artifacts-api';
 import { SessionStatus } from './session-status';
 
 type AppProps = {
   api?: ProjectsApi;
   runsApi?: RunsApi;
   sourcesApi?: SourcesApi;
+  artifactsApi?: ArtifactsApi;
   session?: LocalSessionClient;
 };
 
-// `api`, `runsApi` and `sourcesApi` must use `session` as their credential source; tests
+// `api`, `runsApi`, `sourcesApi` and `artifactsApi` must use `session` as their credential source; tests
 // inject them together.
 export function App(props: AppProps) {
   return (
@@ -40,6 +45,7 @@ function AppShell({
   api = projectsApi,
   runsApi = defaultRunsApi,
   sourcesApi = defaultSourcesApi,
+  artifactsApi = defaultArtifactsApi,
   session = localSession,
 }: AppProps) {
   const { locale, setLocale, messages } = useLocale();
@@ -88,7 +94,12 @@ function AppShell({
         </div>
       </header>
       <SessionStatus session={session} />
-      <ProjectsPage api={api} runsApi={runsApi} sourcesApi={sourcesApi} />
+      <ProjectsPage
+        api={api}
+        runsApi={runsApi}
+        sourcesApi={sourcesApi}
+        artifactsApi={artifactsApi}
+      />
     </>
   );
 }

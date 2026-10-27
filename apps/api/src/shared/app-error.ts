@@ -22,9 +22,8 @@ const ERROR_DEFINITIONS = {
   },
 } as const satisfies Record<ApiErrorCode, { status: number; message: string }>;
 
-// Analyze codes produced by the source (B03) and run routes (B04), with the
-// HTTP status of the contract. Codes of routes that do not exist yet
-// (artifacts) join when those routes do.
+// Analyze codes produced by the source (B03), run (B04) and artifact (B07)
+// routes, with the HTTP status of the contract.
 const S = ANALYZE_API_ERROR_HTTP_STATUS;
 const RUN_ERROR_DEFINITIONS = {
   PROJECT_MODE_CONFLICT: {
@@ -68,12 +67,17 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.SNAPSHOT_UNAVAILABLE,
     message: 'The run has no source snapshot to reuse.',
   },
+  ARTIFACT_NOT_FOUND: {
+    status: S.ARTIFACT_NOT_FOUND,
+    message: 'Artifact version not found.',
+  },
   RUNTIME_RECOVERY_REQUIRED: {
     status: S.RUNTIME_RECOVERY_REQUIRED,
     message: 'The runtime needs recovery before it can start runs.',
   },
-} as const satisfies Partial<
-  Record<AnalyzeApiErrorCode, { status: number; message: string }>
+} as const satisfies Record<
+  AnalyzeApiErrorCode,
+  { status: number; message: string }
 >;
 
 const DEFINITIONS = { ...ERROR_DEFINITIONS, ...RUN_ERROR_DEFINITIONS };

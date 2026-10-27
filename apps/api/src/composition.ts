@@ -5,6 +5,7 @@ import { createFixtureRunExecutor } from './adapters/fake/fixture-run.executor.j
 import { createLocalSourceRootPolicy } from './adapters/local/local-source-root.js';
 import { createLocalWorkspaceProvider } from './adapters/local/local-workspace.provider.js';
 import { createSourceRunExecutor } from './adapters/local/source-run.executor.js';
+import { createFilesystemArtifactStore } from './adapters/local/filesystem-artifact.store.js';
 import { APPLICATION_ROOT } from './platform/data-directory.js';
 import type { RunLimits } from './modules/jobs/analyze-run-config.js';
 import {
@@ -19,6 +20,9 @@ import { createSourceRegistrationRepository } from './modules/projects/source-re
 import { createSourceRegistrationService } from './modules/projects/source-registration.service.js';
 import { createSnapshotRepository } from './modules/snapshots/snapshot.repository.js';
 import { createSnapshotService } from './modules/snapshots/snapshot.service.js';
+import { createArtifactRepository } from './modules/artifacts/artifact.repository.js';
+import { createArtifactService } from './modules/artifacts/artifact.service.js';
+import type { ArtifactStore } from './ports/artifact-store.js';
 import type { RunExecutor } from './ports/run-executor.js';
 
 // Development limits locked into each run's config. Local runs enforce them
@@ -40,6 +44,8 @@ export type JobOptions = {
   fixtureExecutor?: RunExecutor;
   limits?: Partial<RunLimits>;
   stopTimeoutMs?: number;
+  // Replaces the filesystem artifact store (fault injection).
+  artifactStore?: ArtifactStore;
 };
 
 // From the instance lock taken by server.ts before the DB opens.
@@ -89,6 +95,28 @@ export function createDependencies(
       now,
     });
     const runs = createRunRepository(db);
+    const artifactStore =
+      options.jobs?.artifactStore ??
+      createFilesystemArtifactStore({
+        artifactsDir: join(dataDir, 'artifacts'),
+      });
+    // Reads go through the job service, created below once the dispatcher
+    // (which needs the executor, which publishes artifacts) exists.
+    const late: { jobs?: ReturnType<typeof createJobService> } = {};
+    const artifacts = createArtifactService({
+      repository: createArtifactRepository(db),
+      store: artifactStore,
+      projects,
+      runs: {
+        get(projectId, runId) {
+          if (!late.jobs) throw new Error('Job service is not ready.');
+          return late.jobs.get(projectId, runId);
+        },
+      },
+      nextId: randomUUID,
+      now,
+      log: options.log,
+    });
     const dispatcher = createJobDispatcher({
       repository: runs,
       executor:
@@ -101,6 +129,7 @@ export function createDependencies(
               nextId: randomUUID,
             }),
           snapshots,
+          artifacts,
         }),
       stopTimeoutMs: options.jobs?.stopTimeoutMs ?? STOP_TIMEOUT_MS,
       now,
@@ -119,15 +148,18 @@ export function createDependencies(
       nextId: randomUUID,
       now,
     });
+    late.jobs = jobs;
     return {
       projects,
       sources,
       jobs,
       snapshots,
+      artifacts,
       // Staging copies a previous process left are app-owned and never
       // public; remove them, then start queued runs from a previous process.
       async start() {
         await workspace.cleanupStaging();
+        await artifactStore.cleanupStaging();
         dispatcher.wake();
       },
       async close() {

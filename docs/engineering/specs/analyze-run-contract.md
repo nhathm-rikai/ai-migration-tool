@@ -1,6 +1,6 @@
 # Hợp đồng Analyze: source, run, artifact (C01)
 
-**Gate:** FEATURE:jobs/storage/analysis; demo dùng executor fixture, project local đọc source đã đăng ký qua snapshot provider PF05 (B03/B06/F01). HTTP local và instance lock đã có ở PF02/PF04. Checkpoint hiện tại tạo snapshot bất biến; local run `succeeded` được UI ghi “Đã chụp nguồn”, chưa tạo inventory/artifact (B08/B07) hoặc SSE (B09). Chỉ kiểm với source fixture sạch, chưa nghiệm thu source khách hàng hoặc LIVE/MS1 toàn bộ. Schema máy đọc được nằm trong `packages/contracts/src`:
+**Gate:** FEATURE:jobs/storage/analysis; demo dùng executor fixture, project local đọc source đã đăng ký qua snapshot provider PF05 (B03/B06/F01). HTTP local và instance lock đã có ở PF02/PF04. Checkpoint hiện tại tạo snapshot bất biến; local run `succeeded` được UI ghi “Đã chụp nguồn”, chưa tạo inventory (B08) hoặc SSE (B09). Artifact store/read API (B07) và Assessment overview (F03) đã có từ PF06; demo run công bố inventory mẫu đi kèm. Chỉ kiểm với source fixture sạch, chưa nghiệm thu source khách hàng hoặc LIVE/MS1 toàn bộ. Schema máy đọc được nằm trong `packages/contracts/src`:
 
 | File | Nội dung |
 |---|---|
@@ -87,7 +87,8 @@ Run DTO theo từng status (schema là union, field mâu thuẫn status bị t�
 
 ## 6. Artifact (API 7)
 
-- `GET .../runs/:runId/artifacts` → `{ items: ArtifactRef[] }`; chỉ liệt kê version đã publish hoàn tất. Run chưa xong trả danh sách rỗng, client dựa vào status run.
+- `GET .../runs/:runId/artifacts` → `{ items: ArtifactRef[] }`; chỉ liệt kê version đã publish hoàn tất của run `succeeded`. Run chưa xong hoặc kết thúc khác `succeeded` (kể cả cancel thắng sau khi payload đã ghi) trả danh sách rỗng, client dựa vào status run.
+- PF06: publish = validate → staging → rename → row DB; chỉ row làm version public. Artifact của run không `succeeded` bị cô lập, GET version trả `404 ARTIFACT_NOT_FOUND`. Bytes đọc lại không khớp hash/size đã ghi → 500, không trả payload.
 - `GET /projects/:projectId/artifacts/:artifactId/versions/:version` → envelope đúng version (`version` là số nguyên dương trong path, không có `latest`). Không thuộc project → `404 ARTIFACT_NOT_FOUND`.
 - Envelope: `id, version, kind: 'source-inventory', schemaVersion, projectId, runId, sourceSnapshotId, sourceSnapshotHash, mode: demo|local, sha256, byteLength, createdAt, payload`. `sha256/byteLength` là của payload đã lưu. Inventory tĩnh không có prompt/model version. Mỗi analyze run thành công tạo một artifact version 1; version tăng dùng cho artifact có review (C02).
 - **Tương thích inventory:** payload là `source-inventory-v1`. Reader phải đọc được bản không có `tableNames`/`normalizedCrud`/`normalizedTables`/`normalizedComplexity` (trước mapping) và bản partial (file `error`, analysis `unsupported`, binary, member `missing`, program `complete: false`, `skipped`). Góc nhìn raw (`crud`, `metrics.tables`, `complexity`) và mapped (`normalized*`) giữ riêng; UI không tự gộp. Cảnh báo partial không được lọc khi validate.

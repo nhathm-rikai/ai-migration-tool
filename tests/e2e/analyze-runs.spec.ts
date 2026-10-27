@@ -42,7 +42,7 @@ test(
     await expect(
       panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
     ).toBeVisible();
-    await expect(panel.getByRole('listitem')).toHaveCount(1);
+    await expect(panel.locator('.run-history > li')).toHaveCount(1);
     expect(runMutations).toHaveLength(1);
 
     await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
@@ -50,7 +50,7 @@ test(
     await expect(
       panel.getByRole('status').filter({ hasText: 'Đã hủy' }),
     ).toBeVisible();
-    await expect(panel.getByRole('listitem')).toHaveCount(2);
+    await expect(panel.locator('.run-history > li')).toHaveCount(2);
     const [first, second, ...cancels] = runMutations;
     expect([first?.status, second?.status]).toEqual([202, 202]);
     // A cancel sent with the version shown right after Start may meet a run

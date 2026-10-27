@@ -12,6 +12,13 @@ import type {
   TableNameMapping,
 } from '@portal/contracts';
 import type { ApiFailureKind } from '../api/api-error';
+import type {
+  AssessmentWarning,
+  ComplexityLevel,
+  MemberFileStatus,
+  MemberResolution,
+  ProgramState,
+} from '../../features/assessment/assessment-summary';
 
 export const viMessages = {
   app: {
@@ -168,7 +175,7 @@ export const viMessages = {
     title: 'Phân tích (demo)',
     titleLocal: 'Phân tích',
     demoNotice:
-      'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: chưa đọc mã nguồn và chưa tạo kết quả phân tích.',
+      'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: không đọc mã nguồn, chỉ công bố kết quả kiểm kê mẫu đi kèm ứng dụng.',
     localNotice:
       'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc). Kiểm kê và báo cáo chưa có trong bản này.',
     snapshotTaken: 'Đã chụp nguồn',
@@ -247,6 +254,127 @@ export const viMessages = {
       RUNTIME_RECOVERY_REQUIRED:
         'Backend cần được khởi động lại sau một lượt chạy chưa dừng hẳn. Chưa có lượt chạy mới nào được tạo.',
     } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,
+  },
+  assessment: {
+    title: 'Đánh giá tổng quan',
+    loading: 'Đang tải kết quả kiểm kê…',
+    retry: 'Tải lại kết quả',
+    empty:
+      'Lượt chạy này chưa có kết quả kiểm kê. Lượt chạy mã nguồn trên máy này hiện chỉ chụp nguồn; kiểm kê sẽ có ở bản sau.',
+    demoData: 'Kết quả mẫu đi kèm ứng dụng, không phải mã nguồn thật',
+    localData: 'Kiểm kê từ bản chụp mã nguồn trên máy này',
+    draftNotice:
+      'Số liệu do phân tích tĩnh tạo ra và là bản nháp cho đến khi được rà soát. Độ phức tạp chỉ để tham khảo, không dùng để tự tính công sức hay báo giá.',
+    partialTitle: 'Kiểm kê chưa đầy đủ.',
+    partialHelp:
+      'Một số file hoặc program chưa phân tích được; các số liệu bên dưới không bao gồm phần đó.',
+    warningsTitle: 'Cảnh báo',
+    fields: {
+      mode: 'Dữ liệu',
+      artifact: 'Kết quả (phiên bản)',
+      snapshot: 'Bản chụp nguồn',
+      createdAt: 'Tạo lúc',
+      versions: 'Phiên bản đếm',
+      tableMapping: 'Ánh xạ tên bảng',
+    },
+    mapping: {
+      unconfigured: 'Chưa cấu hình (chỉ gộp hoa/thường)',
+      assumed: 'Giả định, cần người quản lý DB xác nhận',
+      confirmed: 'Đã xác nhận',
+      absent: 'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
+    } satisfies Record<TableNameMapping['status'] | 'absent', string>,
+    totals: {
+      uniqueTitle: 'Tổng toàn bộ mã nguồn (không trùng)',
+      uniqueHelp: 'Mỗi file chỉ tính một lần, kể cả file dùng chung.',
+      perProgramTitle: 'Tổng theo program',
+      perProgramHelp:
+        'Cộng LoC của từng program: file dùng chung được tính ở mỗi program khai báo nó, nên không phải quy mô mã nguồn.',
+      codeLines: 'Dòng code (LoC)',
+      physicalLines: 'Dòng vật lý',
+      coverage: 'File code đã phân tích',
+      coverageValue: (analyzed: string, total: string) =>
+        `${analyzed} / ${total}`,
+      files: 'Tổng số file',
+      sharedFiles: 'File dùng chung',
+      problemFiles: 'Lỗi / không hỗ trợ / bỏ qua',
+      problemValue: (errors: string, unsupported: string, skipped: string) =>
+        `${errors} / ${unsupported} / ${skipped}`,
+      unknown: 'không rõ',
+      programs: 'Số program',
+      perProgramCodeLines: 'LoC cộng theo program (tính trùng file dùng chung)',
+    },
+    warnings: {
+      PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',
+      PROGRAM_INCOMPLETE: 'Có program thiếu file hoặc có file chưa phân tích.',
+      MEMBER_UNRESOLVED:
+        'Có file khai báo trong project không tìm thấy hoặc không xác định được.',
+      FILE_ERROR: 'Có file không giải mã được.',
+      FILE_UNSUPPORTED: 'Có file code không được hỗ trợ.',
+      FILES_SKIPPED: 'Có file bị bỏ qua (liên kết hoặc quá lớn).',
+      UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
+      TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
+      COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
+      COMPLEXITY_REVIEW:
+        'Có program cần người xem lại mức độ phức tạp (mức cao hoặc gần ngưỡng).',
+    } satisfies Record<AssessmentWarning, string>,
+    programs: {
+      title: 'Danh sách program',
+      search: 'Tìm program',
+      stateFilter: 'Trạng thái',
+      levelFilter: 'Độ phức tạp',
+      all: 'Tất cả',
+      count: (shown: number, total: number) =>
+        `Đang hiển thị ${shown} / ${total} program`,
+      noMatch: 'Không có program khớp bộ lọc.',
+      none: 'Kiểm kê không có program nào.',
+      notAnalyzed: 'Chưa phân tích',
+      mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
+      draft: 'Nháp',
+      needsReview: 'Cần xem lại',
+      columns: {
+        program: 'Program',
+        state: 'Trạng thái',
+        ownCodeLines: 'LoC riêng',
+        codeLines: 'LoC gồm file dùng chung',
+        procedures: 'Procedure riêng',
+        tables: 'Số bảng',
+        complexity: 'Độ phức tạp (tham khảo)',
+      },
+      state: {
+        complete: 'Đầy đủ',
+        partial: 'Chưa đầy đủ',
+        unsupported: 'Không phân tích được',
+      } satisfies Record<ProgramState, string>,
+      level: {
+        low: 'Thấp',
+        medium: 'Trung bình',
+        high: 'Cao',
+      } satisfies Record<ComplexityLevel, string>,
+    },
+    members: {
+      title: (program: string) => `File của ${program}`,
+      issue: 'Lý do không phân tích được:',
+      none: 'Không có file khai báo.',
+      shared: 'Dùng chung',
+      resolution: {
+        'case-mismatch': 'Sai hoa/thường',
+        ambiguous: 'Không xác định',
+        missing: 'Không tìm thấy',
+        'outside-root': 'Ngoài thư mục nguồn',
+        'absolute-path': 'Đường dẫn tuyệt đối',
+      } satisfies Record<Exclude<MemberResolution, 'resolved'>, string>,
+      fileStatus: {
+        unsupported: 'Không hỗ trợ',
+        error: 'Lỗi đọc',
+        other: 'Không phải code',
+      } satisfies Record<Exclude<MemberFileStatus, 'analyzed'>, string>,
+    },
+    errors: {
+      ARTIFACT_NOT_FOUND:
+        'Không tìm thấy phiên bản kết quả này trong dự án. Tải lại lượt chạy.',
+      mismatch:
+        'Kết quả nhận được không khớp phiên bản đã yêu cầu. Tải lại kết quả.',
+    },
   },
   errors: {
     unexpected: 'Có lỗi khi xử lý yêu cầu. Vui lòng thử lại.',

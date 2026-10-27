@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FIXTURE_SOURCE_REVISION, type Project } from '@portal/contracts';
+import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import type { SourcesApi } from '../../shared/api/sources-api';
@@ -21,6 +22,7 @@ export function ProjectDetail({
   api,
   runsApi,
   sourcesApi,
+  artifactsApi,
   onClose,
 }: {
   id: string;
@@ -29,6 +31,8 @@ export function ProjectDetail({
   runsApi?: RunsApi | undefined;
   // Without it a local project shows no source and cannot start runs.
   sourcesApi?: SourcesApi | undefined;
+  // Without it succeeded runs show no assessment overview.
+  artifactsApi?: ArtifactsApi | undefined;
   onClose: () => void;
 }) {
   const { messages, formatDateTime } = useLocale();
@@ -121,6 +125,7 @@ export function ProjectDetail({
             runsApi && (
               <AnalyzeRunPanel
                 api={runsApi}
+                artifactsApi={artifactsApi}
                 projectId={state.project.id}
                 demo
                 sourceRevision={FIXTURE_SOURCE_REVISION}
@@ -131,11 +136,13 @@ export function ProjectDetail({
               projectId={state.project.id}
               runsApi={runsApi}
               sourcesApi={sourcesApi}
+              artifactsApi={artifactsApi}
             />
           ) : (
             runsApi && (
               <AnalyzeRunPanel
                 api={runsApi}
+                artifactsApi={artifactsApi}
                 projectId={state.project.id}
                 demo={false}
                 sourceRevision={null}
@@ -154,10 +161,12 @@ function SourceAndRuns({
   projectId,
   runsApi,
   sourcesApi,
+  artifactsApi,
 }: {
   projectId: string;
   runsApi?: RunsApi | undefined;
   sourcesApi: SourcesApi;
+  artifactsApi?: ArtifactsApi | undefined;
 }) {
   const source = useProjectSource(sourcesApi, projectId);
   return (
@@ -166,6 +175,7 @@ function SourceAndRuns({
       {runsApi && (
         <AnalyzeRunPanel
           api={runsApi}
+          artifactsApi={artifactsApi}
           projectId={projectId}
           demo={false}
           sourceRevision={startableRevision(source.state)}

@@ -158,7 +158,7 @@ export const jaMessages = {
     title: '解析（デモ）',
     titleLocal: '解析',
     demoNotice:
-      'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、解析結果も作成しません。',
+      'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、アプリ同梱のサンプルインベントリ結果のみを公開します。',
     localNotice:
       '実行時に登録フォルダーの不変スナップショットを作成します（読み取りのみ）。インベントリとレポートはこのバージョンでは未対応です。',
     snapshotTaken: 'スナップショット作成済み',
@@ -238,6 +238,126 @@ export const jaMessages = {
       SOURCE_NOT_REGISTERED: 'プロジェクトのソースが登録されていません。',
       RUNTIME_RECOVERY_REQUIRED:
         '停止を確認できなかった実行があるため、バックエンドの再起動が必要です。新しい実行は作成されていません。',
+    },
+  },
+  assessment: {
+    title: 'アセスメント概要',
+    loading: 'インベントリ結果を読み込み中…',
+    retry: '結果を再読み込み',
+    empty:
+      'この実行にはインベントリ結果がありません。このPC上のソースの実行は現在スナップショットのみで、インベントリは今後のバージョンで対応します。',
+    demoData: 'アプリ同梱のサンプル結果です（実ソースではありません）',
+    localData: 'このPC上のソースのスナップショットから作成したインベントリ',
+    draftNotice:
+      '数値は静的解析によるもので、レビューされるまではドラフトです。複雑度は参考値であり、工数や見積の自動算出には使用しません。',
+    partialTitle: 'インベントリは不完全です。',
+    partialHelp:
+      '解析できなかったファイルまたはプログラムがあります。以下の数値にはその部分が含まれていません。',
+    warningsTitle: '警告',
+    fields: {
+      mode: 'データ',
+      artifact: '結果（バージョン）',
+      snapshot: 'ソーススナップショット',
+      createdAt: '作成日時',
+      versions: '計測バージョン',
+      tableMapping: 'テーブル名マッピング',
+    },
+    mapping: {
+      unconfigured: '未設定（大文字・小文字のみ統合）',
+      assumed: '仮定（DB管理者の確認が必要）',
+      confirmed: '確認済み',
+      absent: 'なし（旧インベントリ、ソース上の名前のみ）',
+    },
+    totals: {
+      uniqueTitle: 'ソース全体の合計（重複なし）',
+      uniqueHelp: '共通ファイルも含め、各ファイルを1回だけ数えます。',
+      perProgramTitle: 'プログラム別の合計',
+      perProgramHelp:
+        '各プログラムのLoCを合算します。共通ファイルは宣言した各プログラムで数えられるため、ソース規模ではありません。',
+      codeLines: 'コード行数（LoC）',
+      physicalLines: '物理行数',
+      coverage: '解析済みコードファイル',
+      coverageValue: (analyzed: string, total: string) =>
+        `${analyzed} / ${total}`,
+      files: 'ファイル総数',
+      sharedFiles: '共通ファイル',
+      problemFiles: 'エラー / 未対応 / スキップ',
+      problemValue: (errors: string, unsupported: string, skipped: string) =>
+        `${errors} / ${unsupported} / ${skipped}`,
+      unknown: '不明',
+      programs: 'プログラム数',
+      perProgramCodeLines:
+        'プログラム別LoCの合算（共通ファイルを重複して計上）',
+    },
+    warnings: {
+      PROGRAM_UNSUPPORTED: '解析できないプログラムがあります。',
+      PROGRAM_INCOMPLETE:
+        'ファイルが不足している、または未解析のファイルがあるプログラムがあります。',
+      MEMBER_UNRESOLVED:
+        'プロジェクトで宣言されたファイルが見つからない、または特定できません。',
+      FILE_ERROR: 'デコードできないファイルがあります。',
+      FILE_UNSUPPORTED: '未対応のコードファイルがあります。',
+      FILES_SKIPPED:
+        'スキップされたファイルがあります（リンクまたはサイズ超過）。',
+      UNCLASSIFIED_LINES: '分類できない行があります。',
+      TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
+      COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
+      COMPLEXITY_REVIEW:
+        '複雑度の確認が必要なプログラムがあります（高、またはしきい値付近）。',
+    },
+    programs: {
+      title: 'プログラム一覧',
+      search: 'プログラムを検索',
+      stateFilter: '状態',
+      levelFilter: '複雑度',
+      all: 'すべて',
+      count: (shown: number, total: number) =>
+        `${total} 件中 ${shown} 件のプログラムを表示`,
+      noMatch: '条件に一致するプログラムはありません。',
+      none: 'インベントリにプログラムがありません。',
+      notAnalyzed: '未解析',
+      mappedTables: (count: string) => `（マッピング後: ${count}）`,
+      draft: 'ドラフト',
+      needsReview: '要確認',
+      columns: {
+        program: 'プログラム',
+        state: '状態',
+        ownCodeLines: '固有LoC',
+        codeLines: '共通ファイル込みLoC',
+        procedures: '固有プロシージャ',
+        tables: 'テーブル数',
+        complexity: '複雑度（参考）',
+      },
+      state: {
+        complete: '完全',
+        partial: '不完全',
+        unsupported: '解析不可',
+      },
+      level: { low: '低', medium: '中', high: '高' },
+    },
+    members: {
+      title: (program: string) => `${program} のファイル`,
+      issue: '解析できない理由:',
+      none: '宣言されたファイルはありません。',
+      shared: '共通',
+      resolution: {
+        'case-mismatch': '大文字・小文字の不一致',
+        ambiguous: '特定不可',
+        missing: '見つかりません',
+        'outside-root': 'ソースフォルダー外',
+        'absolute-path': '絶対パス',
+      },
+      fileStatus: {
+        unsupported: '未対応',
+        error: '読み取りエラー',
+        other: 'コード以外',
+      },
+    },
+    errors: {
+      ARTIFACT_NOT_FOUND:
+        'このプロジェクトに該当するバージョンの結果が見つかりません。実行を再読み込みしてください。',
+      mismatch:
+        '受信した結果が要求したバージョンと一致しません。結果を再読み込みしてください。',
     },
   },
   errors: {

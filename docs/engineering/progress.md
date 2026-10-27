@@ -1,12 +1,65 @@
 # Tiến độ kỹ thuật Portal
 
+## 22/10/2026 — P2 phân tích theo ngôn ngữ phát hiện, bỏ profile
+
+- Scope docs-only theo yêu cầu người dùng; pack `p2-rules-0.3.0-draft`, template set `p2-templates-0.2.0-draft`, vẫn Draft/unapproved. Không dùng profile theo ngôn ngữ: source ngôn ngữ nào trong allowlist thì phân tích ngôn ngữ đó.
+- Đổi `analysis-profile.md` thành [quy trình phân tích](../specification-design/analysis-method.md): bước 0 agent tự nhận diện ngôn ngữ/runtime có căn cứ và ghi vào coverage, checklist semantics chung, bảng thuật ngữ trung lập, giới hạn encoding/cột cố định/binary cần bản export text.
+- Tám template và phiếu input gộp về một revision; bỏ thuật ngữ đặc thù VB6 (VBP, Sub/Property, ByRef/ByVal, On Error/Resume, Write #, "Nơi tính VB6"). Coverage thêm bảng ngôn ngữ phát hiện và boundary; phiếu input không bắt buộc khai báo ngôn ngữ; checklist thêm mục kiểm nhận diện.
+- Hai file `profiles/vb6.md`, `profiles/vb6-pilot.md` được dẫn ở mục trước nhưng chưa từng tạo; đã bỏ toàn bộ link. Danh sách 15 program pilot chưa có trong repo, chuyển thành dữ liệu input dự án. Không đổi 35 mã rule, schema, parser hoặc output KUNO0020.
+
+## 22/10/2026 — tổng quát hóa bộ P2 đa ngôn ngữ
+
+- Scope docs-only theo yêu cầu người dùng; pack `p2-rules-0.2.0-draft`, vẫn Draft/unapproved. Rule chung phân tích source theo unit/project/entrypoint và hồ sơ language/dialect/runtime; không bắt buộc VBP hoặc CP932 cho source khác.
+- Thêm [hồ sơ phân tích và mapping template](../specification-design/analysis-method.md), đặc thù VB6 và pilot VB6 ban đầu (hai file profile này thực tế chưa được tạo; xem mục sau). Danh sách 15 program/KPI gốc chỉ áp pilot tương ứng; bổ sung cách xử lý mixed-language, generated/binary, thiếu parser và số đo chưa có.
+- Giữ nguyên tám file template output và revision; chỉ cập nhật phiếu input với revision `p2-input-context-0.2.0-draft`. README/runbook/checklist/contract mapping/truy vết đồng bộ cách áp thuật ngữ template theo source thực tế. Không sửa output KUNO0020, schema, parser hoặc runtime; không đọc/chạy source khách hàng trong task này.
+- Kiểm liên kết bằng repository verifier, kiểm 35 mã rule duy nhất và đối chiếu SHA-256 tám template output với trước thay đổi. Chưa calibration ngôn ngữ khác; bộ hướng dẫn chung không chứng minh Portal có parser đa ngôn ngữ.
+
+## 22/10/2026 — chuẩn bị handoff calibration P2
+
+- Sửa entrypoint và verifier theo tên thư mục `docs/specification-design`; cập nhật toàn bộ link lịch sử còn trỏ `docs/p2`.
+- [README P2](../specification-design/README.md) và [runbook](../specification-design/runbook.md) tách calibration trực tiếp bằng Codex/Claude CLI khỏi Portal LIVE. Direct CLI dùng rule + template + input context, không có prompt file riêng; Portal automation vẫn chưa được triển khai.
+- Chuẩn bị ngoài repo gói input `KUNO0020` từ P1 inventory hiện có. Sáu file allowlist có raw hash khớp source hiện tại; sau giao việc tường minh, phiên Codex hiện tại sinh sáu Markdown calibration Draft để TL review. Không chạy VB6, SQL, COM hoặc macro.
+- Self-check gói KUNO0020: đủ 6 tài liệu, 14 BR, 10 Q-ID, coverage 32/32 procedure form và 7/7 shared procedure reachable; 22/22 quote evidence khớp normalized source, path đã chuẩn hóa POSIX relative, raw hash 6/6 file source không đổi. Program không có report/export reachable nên hai section report ghi rõ không áp dụng.
+- Môi trường kiểm tra: Windows x64, Codex CLI 0.163.0 có sẵn; `codex exec` riêng bị automatic approval review chặn trước khi gọi model vì provider/quyền gửi source chưa được xác nhận; Claude CLI chưa cài. Output hiện tại do phiên Codex desktop tạo, chưa chứng minh CLI smoke độc lập. Pack/artifact vẫn Draft, không điền reviewer hoặc approval.
+
+## 22/10/2026 — bỏ file prompt P2 riêng
+
+- Theo yêu cầu người dùng, xóa generate-p2.md; README hướng dẫn dùng trực tiếp rule + template + context, giữ điều kiện xác nhận identity/quyền đọc và calibration Draft. Cập nhật link và truy vết yêu cầu, không tạo prompt thay thế.
+- Kiểm chứng: verify-repository pass (57 tài liệu, 425 link), git diff --check pass; không còn tham chiếu generate-p2 hoặc p2-prompt trong bộ P2/README hiện hành.
+- Giữ yêu cầu lưu chỉ dẫn thực tế/version của run theo contract; không đổi schema hay policy runtime. Các mục nhật ký trước phản ánh lịch sử tại thời điểm thực hiện.
+
+## 22/10/2026 — template Basic/Detail cho report và export
+
+- Scope docs-only P2 Draft. Theo yêu cầu người dùng, tham khảo layout workbook 帳票_消化実績比較表.xlsx, InternalReview/帳票_日報年集計.md và ảnh danh mục chức năng export; không đọc/chạy VB6 hoặc SQL, không tạo report nghiệp vụ.
+- Thêm [Basic report](../specification-design/templates/basic-design-report.md), [Detail report](../specification-design/templates/detail-design-report.md) và [hướng dẫn/nguồn](../specification-design/report-templates.md). Bao phủ layout/blocks/fields/print-helper, query/loop/aggregation/formula owner, serialization CSV, config path, mode, consumer/RPA, lỗi file lock/partial output và cleanup.
+- Ghép section trong Basic/Detail hiện có, không tăng sáu artifact mặc định; cập nhật README/input/chỉ dẫn tác vụ/rule/checklist/mapping/decisions/traceability. Schema và source runtime không thay đổi.
+- Kiểm chứng Windows x64: verify-repository pass (58 tài liệu, 427 link), Prettier kiểm 23 Markdown P2 pass, 35 định nghĩa rule unique, cấu trúc 6 mục Basic report/12 mục Detail report (0–11) đúng; git diff --check pass. Bundled Node 24.19.0 dùng để render tham khảo; repo checks dùng Node 24.16.0. Không runtime tests/build vì docs-only.
+- Workbook được đọc chỉ đọc bằng ZIP/XML và bundled artifact-tool; render vùng A1:Z22 để xem layout. Không sửa/export workbook gốc hoặc công nhận công thức đã đúng; ghi giới hạn placeholder/cached errors/defined names trong hướng dẫn nguồn. Ảnh chỉ là bối cảnh, không mở rộng pilot hoặc xác nhận nghiệp vụ.
+
 Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định kỹ thuật ghi scope, command/bằng chứng và giới hạn ở đây; review-only chỉ báo trong chat.
 
 ## Phạm vi hiện tại
 
+### 22/10/2026 — điều chỉnh Detail Design theo CustomerReview
+
+- Theo yêu cầu người dùng, đọc archive tham khảo chỉ đọc: danh mục 51 Markdown (17 screen, 15 report, 19 common), xem nội dung/cấu trúc mẫu tiêu biểu; không chạy legacy hoặc sinh tài liệu nghiệp vụ.
+- [Detail Design](../specification-design/templates/detail-design.md) revision p2-detail-design-0.1.1-draft: tổng quan/entry/event, inventory, khối xử lý nghiệp vụ với trigger/I-O/logic/components/BR/SQL/transaction/message, report output mapping, common caller mapping và coverage/evidence. Tham chiếu Basic/DB/BR chuẩn; không mang MVC/.NET/PostgreSQL của mẫu vào hiện trạng VB6.
+- Thêm [căn cứ tham khảo](../specification-design/detail-design-reference.md), cập nhật README/checklist. Giữ Draft, schema và đóng gói sáu artifact; chưa có runtime change.
+- Kiểm trên Windows x64/Node 24.16.0: verify-repository pass (55 tài liệu, 397 link); template có một tiêu đề chính, 7 section, 8 mục con mỗi xử lý; Prettier và git diff --check pass. Không chạy runtime tests vì chỉ đổi tài liệu.
+
 - Gate init FE + BE; Projects/UI/API/storage, fixture + fake runner. Fastify → service → repository, SQLite thật, TypeBox contracts.
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật. Đã có thư viện Analyze tĩnh (decode/manifest/LoC, SQL/CRUD, call graph, complexity v0) tại `apps/api/src/modules/analysis` và CLI `analyze-source`, chưa nối API/job. Chưa Understand, Claude CLI, LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
+
+## 22/10/2026 — bộ tài liệu P2 Draft
+
+- Scope: tài liệu thiết kế feature P2, không source thật/CLI AI. Đọc Draft người dùng cung cấp, AGENTS/CLAUDE, workflow implement, CORE, JOB/AI, DATA, QA, GIT, source-analysis/inventory và schema understanding-v1 trước sửa.
+- Tạo [bộ P2](../specification-design/README.md): 19 Markdown gồm README, bốn file rule, bảy template (sáu output + phiếu input), chỉ dẫn tác vụ dùng chung Codex/Claude, mapping contract, review checklist/KPI, KB, runbook, decisions và truy vết 17 mục Draft. Giữ 35 định nghĩa mã rule, toàn bộ trạng thái Draft, không chỉ định reviewer hay approval.
+- Tái sử dụng engineering/schema hiện hành; mapping nêu giới hạn bảng P2, shared BR reference trong cùng payload, provenance bên ngoài và metadata envelope đề xuất. Không đổi schema/TypeBox/API, không xây context builder/runner/backend/UI/export/index.
+- README root/engineering dẫn tới pack; mở rộng danh sách tài liệu của verify-repository để các lần kiểm link sau bao gồm `docs/specification-design`. Đây chỉ là kiểm tra repo, không phải runner P2.
+- Kiểm ban đầu: kiểm riêng 19 tài liệu P2/90 link nội bộ, đủ 35 mã rule nguồn và đúng 35 định nghĩa; kiểm repo hiện hữu pass. Phát hiện CRLF gây diff nhiễu, chuẩn hóa LF cho file đang sửa; docs bị prettierignore bỏ qua nên format P2 bằng API Prettier trực tiếp.
+- Kiểm cuối trên Windows x64 / Node 24.16.0: verify-repository pass (54 tài liệu, 388 link); Prettier API kiểm cả 19 Markdown P2 pass, Prettier CLI kiểm script/README root pass; đủ 35 mã/35 định nghĩa và 15 pilot ID; git diff --check pass.
+- Không đọc/chạy corpus VB6, không sinh tài liệu nghiệp vụ; không chạy backend tests/build vì không đổi runtime/contracts. Workbook/zip được dẫn gián tiếp từ Draft, chưa xác minh trực tiếp. CLI discovery/permissions, source evidence, nghiệp vụ, LIVE/G1 và macOS/Linux chưa kiểm trong task này.
 
 ## 19/10/2026 — mapping tên bảng theo schema (giả định)
 

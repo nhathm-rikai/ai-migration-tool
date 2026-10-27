@@ -20,6 +20,7 @@ const documents = [
   'apps/api/README.md',
   'apps/web/README.md',
   ...files('docs/engineering'),
+  ...files('docs/specification-design'),
   ...files('.agents/skills'),
   ...files('.claude/skills'),
   ...files('.cursor/rules'),

@@ -32,9 +32,47 @@ export type PublishOutcome =
 export type PublishInventoryRequest = {
   run: Run;
   sourceSnapshotId: string;
-  // Hash of the snapshot the payload was derived from; must match it.
+  // Hash of the snapshot record the payload was derived from.
   sourceSnapshotHash: string;
+  // What the payload's own `snapshotHash` (content of the files it read)
+  // must be for that snapshot.
+  payloadSnapshotHash: string;
   payload: unknown;
+};
+
+// A payload that passed the inventory schema and the snapshot hash check,
+// serialized as the bytes to store. Built by `prepareInventory`, possibly in
+// a worker thread so a large inventory does not block the API.
+export type PreparedInventory = {
+  status: 'prepared';
+  schemaVersion: SourceInventoryArtifact['schemaVersion'];
+  bytes: Uint8Array;
+};
+
+// Pure: validate (partial warnings are part of the schema and kept as they
+// are), check the payload names the expected snapshot content, serialize.
+export function prepareInventory(
+  payload: unknown,
+  payloadSnapshotHash: string,
+): PreparedInventory | { status: 'invalid' } {
+  if (
+    !Check(SourceInventorySchema, payload) ||
+    payload.snapshotHash !== payloadSnapshotHash
+  )
+    return { status: 'invalid' };
+  return {
+    status: 'prepared',
+    schemaVersion: payload.schemaVersion,
+    // Own ArrayBuffer (no pooled Buffer), so it can be transferred.
+    bytes: new TextEncoder().encode(JSON.stringify(payload)),
+  };
+}
+
+export type PublishPreparedRequest = {
+  run: Run;
+  sourceSnapshotId: string;
+  sourceSnapshotHash: string;
+  prepared: PreparedInventory;
 };
 
 type ArtifactLog = {
@@ -68,63 +106,77 @@ export function createArtifactService(deps: {
     return { status: 'failed', errorCode: code };
   }
 
+  // Write staging → rename, then commit the row (DATA-05).
+  async function publishPrepared(
+    request: PublishPreparedRequest,
+  ): Promise<PublishOutcome> {
+    const { run, prepared } = request;
+    const { bytes } = prepared;
+    const id = deps.nextId();
+    const version = 1;
+    let stored;
+    try {
+      stored = await store.publish(id, version, bytes);
+    } catch (error) {
+      return fail('ARTIFACT_WRITE_FAILED', run.id, error);
+    }
+    const artifact: ArtifactRef = {
+      id,
+      version,
+      kind: 'source-inventory',
+      schemaVersion: prepared.schemaVersion,
+      projectId: run.projectId,
+      runId: run.id,
+      sourceSnapshotId: request.sourceSnapshotId,
+      sourceSnapshotHash: request.sourceSnapshotHash,
+      mode: run.source.kind === 'fixture' ? 'demo' : 'local',
+      sha256: stored.sha256,
+      byteLength: stored.byteLength,
+      createdAt: deps.now().toISOString(),
+    };
+    try {
+      repository.insert(artifact);
+    } catch (error) {
+      // Not recorded, so not public. Remove the app-owned directory; if
+      // that fails too it stays an orphan nobody reads (runbook in the
+      // API README).
+      try {
+        await store.discard(id, version);
+      } catch (discardError) {
+        log.error(
+          {
+            code: 'ARTIFACT_ORPHANED',
+            runId: run.id,
+            artifactId: id,
+            reason: getErrorReason(discardError),
+          },
+          'Unrecorded artifact could not be removed.',
+        );
+      }
+      return fail('ARTIFACT_WRITE_FAILED', run.id, error);
+    }
+    return { status: 'published', artifact };
+  }
+
   return {
+    publishPrepared,
+
+    // Schema before any side effect.
     async publishInventory(
       request: PublishInventoryRequest,
     ): Promise<PublishOutcome> {
-      const { run, payload } = request;
-      // Schema before any side effect; partial warnings are part of the
-      // schema and are kept as they are.
-      if (
-        !Check(SourceInventorySchema, payload) ||
-        payload.snapshotHash !== request.sourceSnapshotHash
-      )
-        return fail('ANALYSIS_OUTPUT_INVALID', run.id);
-      const bytes = Buffer.from(JSON.stringify(payload), 'utf8');
-      const id = deps.nextId();
-      const version = 1;
-      let stored;
-      try {
-        stored = await store.publish(id, version, bytes);
-      } catch (error) {
-        return fail('ARTIFACT_WRITE_FAILED', run.id, error);
-      }
-      const artifact: ArtifactRef = {
-        id,
-        version,
-        kind: 'source-inventory',
-        schemaVersion: payload.schemaVersion,
-        projectId: run.projectId,
-        runId: run.id,
+      const prepared = prepareInventory(
+        request.payload,
+        request.payloadSnapshotHash,
+      );
+      if (prepared.status !== 'prepared')
+        return fail('ANALYSIS_OUTPUT_INVALID', request.run.id);
+      return publishPrepared({
+        run: request.run,
         sourceSnapshotId: request.sourceSnapshotId,
         sourceSnapshotHash: request.sourceSnapshotHash,
-        mode: run.source.kind === 'fixture' ? 'demo' : 'local',
-        sha256: stored.sha256,
-        byteLength: stored.byteLength,
-        createdAt: deps.now().toISOString(),
-      };
-      try {
-        repository.insert(artifact);
-      } catch (error) {
-        // Not recorded, so not public. Remove the app-owned directory; if
-        // that fails too it stays an orphan nobody reads (runbook in the
-        // API README).
-        try {
-          await store.discard(id, version);
-        } catch (discardError) {
-          log.error(
-            {
-              code: 'ARTIFACT_ORPHANED',
-              runId: run.id,
-              artifactId: id,
-              reason: getErrorReason(discardError),
-            },
-            'Unrecorded artifact could not be removed.',
-          );
-        }
-        return fail('ARTIFACT_WRITE_FAILED', run.id, error);
-      }
-      return { status: 'published', artifact };
+        prepared,
+      });
     },
 
     listForRun(projectId: string, runId: string): ArtifactList {

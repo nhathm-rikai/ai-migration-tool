@@ -4,8 +4,12 @@ import { openDatabase } from './db/database.js';
 import { createFixtureRunExecutor } from './adapters/fake/fixture-run.executor.js';
 import { createLocalSourceRootPolicy } from './adapters/local/local-source-root.js';
 import { createLocalWorkspaceProvider } from './adapters/local/local-workspace.provider.js';
-import { createSourceRunExecutor } from './adapters/local/source-run.executor.js';
+import {
+  createSourceRunExecutor,
+  type SourceRunHooks,
+} from './adapters/local/source-run.executor.js';
 import { createFilesystemArtifactStore } from './adapters/local/filesystem-artifact.store.js';
+import { createWorkerInventoryBuilder } from './adapters/local/worker-inventory.builder.js';
 import { APPLICATION_ROOT } from './platform/data-directory.js';
 import type { RunLimits } from './modules/jobs/analyze-run-config.js';
 import {
@@ -46,6 +50,8 @@ export type JobOptions = {
   stopTimeoutMs?: number;
   // Replaces the filesystem artifact store (fault injection).
   artifactStore?: ArtifactStore;
+  // Fault injection points of the local pipeline.
+  sourceRunHooks?: SourceRunHooks;
 };
 
 // From the instance lock taken by server.ts before the DB opens.
@@ -130,6 +136,10 @@ export function createDependencies(
             }),
           snapshots,
           artifacts,
+          inventory: createWorkerInventoryBuilder(),
+          ...(options.jobs?.sourceRunHooks
+            ? { hooks: options.jobs.sourceRunHooks }
+            : {}),
         }),
       stopTimeoutMs: options.jobs?.stopTimeoutMs ?? STOP_TIMEOUT_MS,
       now,

@@ -54,6 +54,7 @@ const request = {
   run,
   sourceSnapshotId: randomUUID(),
   sourceSnapshotHash: DEMO_SNAPSHOT_HASH,
+  payloadSnapshotHash: DEMO_SNAPSHOT_HASH,
   payload: demoInventory,
 };
 
@@ -70,7 +71,7 @@ describe('artifact service publish (B07)', () => {
     });
     const otherSnapshot = await service.publishInventory({
       ...request,
-      sourceSnapshotHash: 'f'.repeat(64),
+      payloadSnapshotHash: 'f'.repeat(64),
     });
     expect(otherSnapshot.status).toBe('failed');
     expect(publish).not.toHaveBeenCalled();

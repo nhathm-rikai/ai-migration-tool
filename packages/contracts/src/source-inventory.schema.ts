@@ -394,7 +394,9 @@ export const SourceInventorySchema = Type.Object(
       },
       Strict,
     ),
-    // Files the reader did not load (CLI only), with the reason.
+    // Files the reader did not load, with the reason: the CLI reader
+    // (symlink, too-large) or a run's snapshot (all reasons; files outside the
+    // profile's source types are not listed). Absent = unknown, [] = none.
     skipped: Type.Optional(
       Type.Array(
         Type.Object(
@@ -403,6 +405,11 @@ export const SourceInventorySchema = Type.Object(
             reason: Type.Union([
               Type.Literal('symlink'),
               Type.Literal('too-large'),
+              // Snapshot only: no permission to read the file or directory,
+              // not a regular file, or a name that is not a portable path.
+              Type.Literal('unreadable'),
+              Type.Literal('special'),
+              Type.Literal('invalid-name'),
             ]),
           },
           Strict,

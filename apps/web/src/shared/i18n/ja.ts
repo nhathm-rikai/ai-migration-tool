@@ -160,8 +160,8 @@ export const jaMessages = {
     demoNotice:
       'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、アプリ同梱のサンプルインベントリ結果のみを公開します。',
     localNotice:
-      '実行時に登録フォルダーの不変スナップショットを作成します（読み取りのみ）。インベントリとレポートはこのバージョンでは未対応です。',
-    snapshotTaken: 'スナップショット作成済み',
+      '実行時に登録フォルダーの不変スナップショットを作成し（読み取りのみ）、そのスナップショットから静的インベントリを作成します。業務理解とレポートはこのバージョンでは未対応です。',
+    localSucceeded: '完了',
     loading: '実行を読み込み中…',
     reload: '実行を再読み込み',
     start: '解析を開始',
@@ -245,7 +245,7 @@ export const jaMessages = {
     loading: 'インベントリ結果を読み込み中…',
     retry: '結果を再読み込み',
     empty:
-      'この実行にはインベントリ結果がありません。このPC上のソースの実行は現在スナップショットのみで、インベントリは今後のバージョンで対応します。',
+      'この実行にはインベントリ結果がありません（以前のバージョンで作成したこのPC上のソースの実行はスナップショットのみです）。再実行するとインベントリを作成します。',
     demoData: 'アプリ同梱のサンプル結果です（実ソースではありません）',
     localData: 'このPC上のソースのスナップショットから作成したインベントリ',
     draftNotice:
@@ -298,7 +298,7 @@ export const jaMessages = {
       FILE_ERROR: 'デコードできないファイルがあります。',
       FILE_UNSUPPORTED: '未対応のコードファイルがあります。',
       FILES_SKIPPED:
-        'スキップされたファイルがあります（リンクまたはサイズ超過）。',
+        'スキップされたファイルがあります（リンク、サイズ超過、または読み取り不可）。',
       UNCLASSIFIED_LINES: '分類できない行があります。',
       TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
       COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
@@ -351,6 +351,75 @@ export const jaMessages = {
         unsupported: '未対応',
         error: '読み取りエラー',
         other: 'コード以外',
+      },
+    },
+    detail: {
+      title: (program: string) => `プログラム ${program} の詳細`,
+      issue: '解析できない理由:',
+      incomplete:
+        'このプログラムは不完全です（ファイル不足、未対応、または未分類の行があります）。数値は解析できた部分のみです。',
+      unavailable:
+        'このプログラムは解析されていないため、LoC・CRUD・呼び出しはありません（0とは表示しません）。',
+      notAnalyzed: '未解析',
+      ownCodeLines: '固有LoC',
+      codeLines: '共通ファイル込みLoC',
+      ownProcedures: '固有プロシージャ',
+      rawComplexity: '複雑度（ソース上のテーブル名）',
+      mappedComplexity: 'マッピング後の複雑度',
+      proceduresTitle: 'プロシージャとLoC',
+      proceduresHelp:
+        'プロシージャごとのLoCはインベントリの計測バージョンによります。共通ファイルのプロシージャは他のプログラムにも属します。',
+      noProcedures: '解析済みファイルにプロシージャはありません。',
+      crudTitle: 'テーブル別CRUD',
+      crudView: 'テーブル名の表示',
+      crudViews: {
+        raw: 'ソース上の名前',
+        mapped: 'テーブル名マッピング後',
+      },
+      crudRawHelp: 'ソースに書かれたとおりのテーブル名です。',
+      crudMappedHelp:
+        '同じテーブルと仮定した名前を統合しています。「ソース上の名前」列に元の名前を残しています。',
+      mappingStatus: 'マッピング:',
+      mappedAbsent:
+        'このインベントリにはマッピング後のデータがないため、ソース上の名前で表示しています。',
+      noCrud: 'テーブルへのアクセスは検出されませんでした。',
+      viaShared: '共通ファイル経由のみ',
+      callsTitle: '呼び出し',
+      callsHelp:
+        '名前による静的解析です（実行はしません）。複数のプロシージャに一致する名前は推測せず、未特定とします。',
+      noCalls: '記録された呼び出しはありません。',
+      ambiguousTarget: '未特定',
+      candidates: '候補:',
+      resolution: {
+        local: '同一ファイル内',
+        program: 'プログラム内',
+        ambiguous: '未特定',
+        external: '外部API',
+      },
+      externalTitle: '外部依存',
+      noExternal: '外部参照・外部APIはありません。',
+      externalApi: '外部API',
+      referenceKind: {
+        reference: '参照',
+        component: 'コンポーネント',
+      },
+      columns: {
+        file: 'ファイル',
+        kind: '種別',
+        codeLines: 'LoC',
+        procedures: 'プロシージャ',
+        procedure: 'プロシージャ',
+        lines: '行',
+        decisions: '分岐数',
+        table: 'テーブル',
+        sourceNames: 'ソース上の名前',
+        operations: '操作',
+        evidence: '根拠',
+        caller: '呼び出し元',
+        callee: '呼び出し名',
+        resolution: '特定',
+        targets: '呼び出し先',
+        uses: '回数',
       },
     },
     errors: {

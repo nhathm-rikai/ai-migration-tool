@@ -20,6 +20,7 @@ import {
   type CreateSnapshotResult,
   type SkippedEntry,
   type SnapshotFailureCode,
+  type SnapshotFile,
   type SnapshotManifest,
   type WorkspaceProvider,
 } from '../../ports/workspace-provider.js';
@@ -402,6 +403,30 @@ export function createLocalWorkspaceProvider(options: {
         if (isChange(error) || error instanceof SyntaxError) return undefined;
         throw error;
       }
+    },
+
+    async readSnapshotFiles(manifest) {
+      if (!/^[0-9a-f-]{36}$/.test(manifest.snapshotId)) return undefined;
+      const directory = join(snapshotsDir, manifest.snapshotId, RAW);
+      const files: SnapshotFile[] = [];
+      try {
+        for (const entry of manifest.entries) {
+          if (!isRelativeSourcePath(entry.relativePath)) return undefined;
+          const bytes = await storage.read(
+            storagePath(directory, entry.relativePath),
+          );
+          if (
+            bytes.byteLength !== entry.byteLength ||
+            sha256(bytes) !== entry.rawSha256
+          )
+            return undefined;
+          files.push({ relativePath: entry.relativePath, bytes });
+        }
+      } catch (error) {
+        if (isChange(error)) return undefined;
+        throw error;
+      }
+      return files;
     },
 
     async discardSnapshot(snapshotId) {

@@ -993,17 +993,72 @@ dd {
 .program-unsupported {
   color: var(--high);
 }
-.program-members {
-  margin-top: 12px;
+/* Program detail (F04) */
+.program-detail {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.program-detail h5,
+.program-detail h6 {
+  margin: 0;
+}
+.program-detail h6 {
+  font-size: 13px;
+}
+.program-detail section {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 12px;
 }
-.program-members ul {
-  margin: 6px 0 0;
+.detail-table th,
+.detail-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.detail-table thead th {
+  color: var(--fg-3);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.detail-table tbody th {
+  font-weight: 400;
+}
+.detail-table .badge {
+  margin-left: 4px;
+}
+.crud-view {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.crud-view legend {
+  padding: 0 4px;
+  color: var(--fg-3);
+}
+.detail-list {
+  margin: 0;
   padding-left: 18px;
   display: grid;
   gap: 4px;
 }
-.program-members li {
+.detail-list li {
   overflow-wrap: anywhere;
 }
 @media (max-width: 760px) {

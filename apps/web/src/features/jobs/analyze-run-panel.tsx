@@ -36,10 +36,11 @@ export function AnalyzeRunPanel({
   const runs = useAnalyzeRuns(api, projectId, sourceRevision);
   // A Start whose outcome is unknown can still be resent as it was.
   const blocked = sourceRevision === null && !runs.uncertainStart;
-  // A local run ends once its snapshot exists; it is not an analysis result.
+  // `succeeded` of a demo run is labelled as demo; a local run has its own
+  // inventory from the registered source (B08).
   const statusLabel = (run: Run) =>
     run.status === 'succeeded' && !demo
-      ? copy.snapshotTaken
+      ? copy.localSucceeded
       : copy.status[run.status];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { state, action } = runs;

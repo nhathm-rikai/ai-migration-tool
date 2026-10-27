@@ -110,6 +110,12 @@ export function createSnapshotService(deps: {
         return undefined;
       return manifest;
     },
+
+    // Raw bytes of a snapshot returned by createForRun/open, verified
+    // against its manifest; undefined when the stored bytes changed since.
+    readFiles(manifest: SnapshotManifest) {
+      return deps.provider.readSnapshotFiles(manifest);
+    },
   };
 }
 

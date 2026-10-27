@@ -180,7 +180,7 @@ test(
 
     await start.click();
     await expect(
-      runPanel.getByRole('status').filter({ hasText: 'Đã chụp nguồn' }),
+      runPanel.getByRole('status').filter({ hasText: 'Hoàn tất' }),
     ).toBeVisible();
     const currentResponse = await page.request.get(
       `/api/v1/projects/${project.id}/runs/current`,
@@ -246,7 +246,7 @@ test(
 
     await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
     await expect(
-      page.getByRole('status').filter({ hasText: 'スナップショット作成済み' }),
+      page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(
@@ -268,7 +268,7 @@ test(
       .getByRole('button', { name: projectName, exact: true })
       .click();
     await expect(
-      page.getByRole('status').filter({ hasText: 'スナップショット作成済み' }),
+      page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();
     await expect(page.getByText(run.id, { exact: true }).first()).toBeVisible();
     expect(starts).toBe(1);

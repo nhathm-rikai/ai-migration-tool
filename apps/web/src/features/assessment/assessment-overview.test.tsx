@@ -270,7 +270,7 @@ describe('Assessment overview (F03)', () => {
         runId={runId}
       />,
     );
-    expect(await screen.findByText(/chưa có kết quả kiểm kê/)).toBeTruthy();
+    expect(await screen.findByText(/không có kết quả kiểm kê/)).toBeTruthy();
     expect(server.calls).toHaveLength(1);
   });
 
@@ -342,7 +342,7 @@ describe('Assessment overview (F03)', () => {
         runId={otherRun}
       />,
     );
-    expect(await screen.findByText(/chưa có kết quả kiểm kê/)).toBeTruthy();
+    expect(await screen.findByText(/không có kết quả kiểm kê/)).toBeTruthy();
     releaseOld();
     await waitFor(() => expect(server.calls).toHaveLength(2));
     expect(screen.queryByText('Danh sách program')).toBeNull();

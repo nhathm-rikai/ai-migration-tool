@@ -340,6 +340,32 @@ describe('local workspace provider (B06)', () => {
     expect(await provider.openSnapshot('../escape')).toBeUndefined();
   });
 
+  it('reads the raw bytes of a snapshot only while they match the manifest (B08)', async () => {
+    const input = request();
+    const created = await provider.createSnapshot(input);
+    if (created.status !== 'published') throw new Error('not published');
+    const { manifest } = created;
+    const files = await provider.readSnapshotFiles(manifest);
+    expect(files?.map((file) => file.relativePath)).toEqual(
+      manifest.entries.map((entry) => entry.relativePath),
+    );
+    const main = files?.find(
+      (file) => file.relativePath === 'programs/受注/MAIN.BAS',
+    );
+    expect(Buffer.from(main?.bytes ?? [])).toEqual(CP932_BYTES);
+
+    writeFileSync(
+      join(snapshotsDir, input.snapshotId, 'raw', 'programs', 'UTF.BAS'),
+      'x',
+    );
+    expect(await provider.readSnapshotFiles(manifest)).toBeUndefined();
+    rmSync(join(snapshotsDir, input.snapshotId), { recursive: true });
+    expect(await provider.readSnapshotFiles(manifest)).toBeUndefined();
+    expect(
+      await provider.readSnapshotFiles({ ...manifest, snapshotId: '../x' }),
+    ).toBeUndefined();
+  });
+
   it('cleans only the UUID staging copies it owns', async () => {
     const staging = join(snapshotsDir, '.staging');
     mkdirSync(join(staging, randomUUID()), { recursive: true });

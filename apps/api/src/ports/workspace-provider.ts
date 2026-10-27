@@ -44,6 +44,8 @@ export type SnapshotManifest = {
   skipped: SkippedEntry[];
 };
 
+export type SnapshotFile = { relativePath: string; bytes: Uint8Array };
+
 export type SnapshotLimits = {
   maxFiles: number;
   maxFileBytes: number;
@@ -78,6 +80,11 @@ export interface WorkspaceProvider {
   // Reads a published snapshot back and verifies every hash; undefined when
   // it is missing or does not match its manifest.
   openSnapshot(snapshotId: string): Promise<SnapshotManifest | undefined>;
+  // Raw bytes of every manifest entry, in manifest order, each checked
+  // against its recorded hash and size; undefined when any does not match.
+  readSnapshotFiles(
+    manifest: SnapshotManifest,
+  ): Promise<SnapshotFile[] | undefined>;
   // Removes a published snapshot the database never recorded.
   discardSnapshot(snapshotId: string): Promise<void>;
   // Startup: removes staging copies a previous process left behind.

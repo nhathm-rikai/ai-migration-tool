@@ -19,6 +19,10 @@ import type {
   MemberResolution,
   ProgramState,
 } from '../../features/assessment/assessment-summary';
+import type {
+  CallResolution,
+  CrudView,
+} from '../../features/assessment/program-detail-model';
 
 export const viMessages = {
   app: {
@@ -177,8 +181,8 @@ export const viMessages = {
     demoNotice:
       'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: không đọc mã nguồn, chỉ công bố kết quả kiểm kê mẫu đi kèm ứng dụng.',
     localNotice:
-      'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc). Kiểm kê và báo cáo chưa có trong bản này.',
-    snapshotTaken: 'Đã chụp nguồn',
+      'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc) rồi kiểm kê tĩnh trên bản chụp đó. Hiểu nghiệp vụ và báo cáo chưa có trong bản này.',
+    localSucceeded: 'Hoàn tất',
     loading: 'Đang tải lượt chạy…',
     reload: 'Tải lại lượt chạy',
     start: 'Bắt đầu phân tích',
@@ -260,7 +264,7 @@ export const viMessages = {
     loading: 'Đang tải kết quả kiểm kê…',
     retry: 'Tải lại kết quả',
     empty:
-      'Lượt chạy này chưa có kết quả kiểm kê. Lượt chạy mã nguồn trên máy này hiện chỉ chụp nguồn; kiểm kê sẽ có ở bản sau.',
+      'Lượt chạy này không có kết quả kiểm kê (lượt chạy mã nguồn trên máy tạo bởi bản trước chỉ chụp nguồn). Chạy lại để có kiểm kê.',
     demoData: 'Kết quả mẫu đi kèm ứng dụng, không phải mã nguồn thật',
     localData: 'Kiểm kê từ bản chụp mã nguồn trên máy này',
     draftNotice:
@@ -310,7 +314,8 @@ export const viMessages = {
         'Có file khai báo trong project không tìm thấy hoặc không xác định được.',
       FILE_ERROR: 'Có file không giải mã được.',
       FILE_UNSUPPORTED: 'Có file code không được hỗ trợ.',
-      FILES_SKIPPED: 'Có file bị bỏ qua (liên kết hoặc quá lớn).',
+      FILES_SKIPPED:
+        'Có file bị bỏ qua (liên kết, quá lớn hoặc không đọc được).',
       UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
@@ -368,6 +373,75 @@ export const viMessages = {
         error: 'Lỗi đọc',
         other: 'Không phải code',
       } satisfies Record<Exclude<MemberFileStatus, 'analyzed'>, string>,
+    },
+    detail: {
+      title: (program: string) => `Chi tiết program ${program}`,
+      issue: 'Lý do không phân tích được:',
+      incomplete:
+        'Program chưa đầy đủ: có file thiếu, không hỗ trợ hoặc dòng chưa phân loại. Số liệu chỉ gồm phần đã phân tích.',
+      unavailable:
+        'Program này chưa được phân tích nên không có LoC, CRUD hay lời gọi (không hiển thị 0).',
+      notAnalyzed: 'Chưa phân tích',
+      ownCodeLines: 'LoC riêng',
+      codeLines: 'LoC gồm file dùng chung',
+      ownProcedures: 'Procedure riêng',
+      rawComplexity: 'Độ phức tạp (tên bảng gốc)',
+      mappedComplexity: 'Độ phức tạp sau ánh xạ',
+      proceduresTitle: 'Procedure và LoC',
+      proceduresHelp:
+        'LoC từng procedure theo phiên bản đếm của kiểm kê. Procedure trong file dùng chung cũng thuộc các program khác.',
+      noProcedures: 'Không có procedure trong các file đã phân tích.',
+      crudTitle: 'CRUD theo bảng',
+      crudView: 'Cách hiển thị tên bảng',
+      crudViews: {
+        raw: 'Tên như trong mã nguồn',
+        mapped: 'Sau ánh xạ tên bảng',
+      } satisfies Record<CrudView, string>,
+      crudRawHelp: 'Tên bảng đúng như viết trong mã nguồn.',
+      crudMappedHelp:
+        'Các tên được giả định là cùng một bảng đã được gộp; cột “Tên trong mã nguồn” giữ tên gốc.',
+      mappingStatus: 'Ánh xạ:',
+      mappedAbsent:
+        'Kiểm kê này không có góc nhìn sau ánh xạ; đang hiển thị tên như trong mã nguồn.',
+      noCrud: 'Không phát hiện truy cập bảng.',
+      viaShared: 'Chỉ qua file dùng chung',
+      callsTitle: 'Lời gọi',
+      callsHelp:
+        'Phân tích theo tên (không chạy chương trình). Tên khớp nhiều procedure được để là chưa xác định, không đoán.',
+      noCalls: 'Không có lời gọi được ghi nhận.',
+      ambiguousTarget: 'Chưa xác định',
+      candidates: 'Ứng viên:',
+      resolution: {
+        local: 'Trong cùng file',
+        program: 'Trong program',
+        ambiguous: 'Chưa xác định',
+        external: 'API ngoài',
+      } satisfies Record<CallResolution, string>,
+      externalTitle: 'Phụ thuộc bên ngoài',
+      noExternal: 'Không có tham chiếu hoặc API ngoài.',
+      externalApi: 'API ngoài',
+      referenceKind: {
+        reference: 'Tham chiếu',
+        component: 'Component',
+      },
+      columns: {
+        file: 'File',
+        kind: 'Loại',
+        codeLines: 'LoC',
+        procedures: 'Procedure',
+        procedure: 'Procedure',
+        lines: 'Dòng',
+        decisions: 'Điểm rẽ nhánh',
+        table: 'Bảng',
+        sourceNames: 'Tên trong mã nguồn',
+        operations: 'Thao tác',
+        evidence: 'Dẫn chứng',
+        caller: 'Nơi gọi',
+        callee: 'Tên được gọi',
+        resolution: 'Xác định',
+        targets: 'Đích',
+        uses: 'Số lần',
+      },
     },
     errors: {
       ARTIFACT_NOT_FOUND:

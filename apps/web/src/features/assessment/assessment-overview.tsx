@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
-import type { ArtifactEnvelope } from '@portal/contracts';
+import type {
+  ArtifactEnvelope,
+  SourceInventoryDocument,
+} from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
@@ -12,6 +15,7 @@ import {
   type ProgramFilter,
   type ProgramRow,
 } from './assessment-summary';
+import { ProgramDetail } from './program-detail';
 import { useRunAssessment } from './use-run-assessment';
 
 // Assessment overview of one succeeded run (F03): header of the exact
@@ -136,7 +140,7 @@ function ArtifactView({ artifact }: { artifact: ArtifactEnvelope }) {
           </ul>
         </>
       )}
-      <ProgramList rows={summary.programs} />
+      <ProgramList rows={summary.programs} inventory={artifact.payload} />
     </>
   );
 }
@@ -221,7 +225,13 @@ function Totals({ summary }: { summary: AssessmentSummary }) {
 
 const EMPTY_FILTER: ProgramFilter = { query: '', state: 'all', level: 'all' };
 
-function ProgramList({ rows }: { rows: ProgramRow[] }) {
+function ProgramList({
+  rows,
+  inventory,
+}: {
+  rows: ProgramRow[];
+  inventory: SourceInventoryDocument;
+}) {
   const { messages } = useLocale();
   const copy = messages.assessment.programs;
   const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
@@ -364,49 +374,12 @@ function ProgramList({ rows }: { rows: ProgramRow[] }) {
           </table>
         </div>
       )}
-      {selected && <ProgramMembers row={selected} />}
+      {selected && (
+        <ProgramDetail
+          inventory={inventory}
+          projectPath={selected.projectPath}
+        />
+      )}
     </section>
-  );
-}
-
-function ProgramMembers({ row }: { row: ProgramRow }) {
-  const { messages } = useLocale();
-  const copy = messages.assessment.members;
-  return (
-    <div
-      className="program-members"
-      aria-label={copy.title(row.name ?? row.projectPath)}
-    >
-      <h5>{copy.title(row.name ?? row.projectPath)}</h5>
-      {row.issue && (
-        <p className="error">
-          {copy.issue} <span className="mono">{row.issue}</span>
-        </p>
-      )}
-      {row.members.length === 0 ? (
-        <p className="empty-state">{copy.none}</p>
-      ) : (
-        <ul>
-          {row.members.map((member) => (
-            <li key={member.declaredPath}>
-              <span className="mono">
-                {member.relativePath ?? member.declaredPath}
-              </span>{' '}
-              {member.resolution !== 'resolved' && (
-                <span className="badge">
-                  {copy.resolution[member.resolution]}
-                </span>
-              )}
-              {member.shared && <span className="badge">{copy.shared}</span>}
-              {member.fileStatus && member.fileStatus !== 'analyzed' && (
-                <span className="badge">
-                  {copy.fileStatus[member.fileStatus]}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }

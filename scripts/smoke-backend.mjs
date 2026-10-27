@@ -195,11 +195,30 @@ try {
     }
     throw new Error('Local snapshot run did not finish.');
   };
+  // PF07: each local run publishes its inventory; reads verify hash/size.
+  const inventoryOf = async (run) => {
+    const list = await fetch(
+      `${base}/projects/${local.id}/runs/${run.id}/artifacts`,
+      { headers: { authorization } },
+    );
+    assert.equal(list.status, 200);
+    const [ref] = (await list.json()).items;
+    assert.equal(ref?.mode, 'local');
+    const read = await fetch(
+      `${base}/projects/${local.id}/artifacts/${ref.id}/versions/${ref.version}`,
+      { headers: { authorization } },
+    );
+    assert.equal(read.status, 200);
+    return read.json();
+  };
   const first = await startRun({
     kind: 'analyze',
     source: { strategy: 'current-source', expectedSourceRevision: 1 },
     retryOfRunId: null,
   });
+  const firstInventory = await inventoryOf(first);
+  assert.equal(firstInventory.sourceSnapshotId, first.sourceSnapshotId);
+  assert.equal(firstInventory.payload.totals.analyzedCodeFiles, 1);
   const snapshot = join(dataDir, 'snapshots', first.sourceSnapshotId);
   const manifestBefore = readFileSync(join(snapshot, 'manifest.json'));
   assert.deepEqual(readFileSync(join(snapshot, 'raw', 'MAIN.BAS')), bytes);
@@ -222,13 +241,20 @@ try {
     retryOfRunId: first.id,
   });
   assert.equal(reused.sourceSnapshotId, first.sourceSnapshotId);
+  // After the restart the first version reads back byte-identical, and the
+  // reproduction on the same snapshot has the same inventory.
+  assert.deepEqual(await inventoryOf(first), firstInventory);
+  const reusedInventory = await inventoryOf(reused);
+  assert.notEqual(reusedInventory.id, firstInventory.id);
+  assert.equal(reusedInventory.sha256, firstInventory.sha256);
+  assert.deepEqual(reusedInventory.payload, firstInventory.payload);
   assert.deepEqual(
     readFileSync(join(snapshot, 'manifest.json')),
     manifestBefore,
   );
   assert.deepEqual(readFileSync(join(movedRoot, 'MAIN.BAS')), bytes);
   console.log(
-    `PASS: compiled startup, migration, demo reopen/credential rotation, 4 protected paths; local snapshot/restart/reuse without source, original bytes unchanged. ${process.platform}/${process.arch} ${process.version}`,
+    `PASS: compiled startup, migration, demo reopen/credential rotation, 4 protected paths; local snapshot + inventory/restart/reuse without source (same inventory), original bytes unchanged. ${process.platform}/${process.arch} ${process.version}`,
   );
 } finally {
   await stop();

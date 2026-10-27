@@ -10,6 +10,7 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -204,6 +205,12 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
       Buffer.from([0, 255, 130, 160]),
     );
     writeFileSync(join(sourceRoot, '.claude', 'settings.json'), '{"hooks":{}}');
+    // PF07 analyze fixture: the clean VB6 sample from the repository, copied
+    // so the run reads a harness-owned folder outside repository and data.
+    const analyzeRoot = join(directory, 'source-vb6-sample');
+    cpSync(join(repository, 'tests', 'fixtures', 'vb6-sample'), analyzeRoot, {
+      recursive: true,
+    });
     const api = startOwned(
       'api',
       [join(repository, 'apps', 'api', 'dist', 'server.js')],
@@ -292,6 +299,7 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
           E2E_REPORT_DIR: reportDir,
           E2E_JSON_REPORT: jsonReport,
           E2E_SOURCE_ROOT: sourceRoot,
+          E2E_ANALYZE_SOURCE_ROOT: analyzeRoot,
           E2E_DATA_DIR: join(directory, 'data'),
           E2E_REPOSITORY_ROOT: repository,
           ...env,

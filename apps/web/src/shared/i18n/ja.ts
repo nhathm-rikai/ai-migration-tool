@@ -275,6 +275,7 @@ export const jaMessages = {
     stateTitle: 'プログラムの解析状況',
     programCount: (count: string) => `${count} プログラム`,
     showPrograms: '一覧を表示',
+    moreMissing: (count: string) => `ほか ${count} ファイル`,
     loading: 'インベントリ結果を読み込み中…',
     retry: '結果を再読み込み',
     empty:

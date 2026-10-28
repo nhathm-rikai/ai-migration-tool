@@ -10,6 +10,7 @@ import {
   type ManifestEntry,
 } from '../../modules/analysis/source-manifest.js';
 import { SOURCE_DECODER_VERSION } from '../../modules/analysis/source-decoder.js';
+import { declaredCodeMemberPaths } from '../../modules/analysis/source-inventory.js';
 import {
   SOURCE_NORMALIZATION_VERSION,
   toNormalizedText,
@@ -130,22 +131,28 @@ export function createLocalWorkspaceProvider(options: {
       }
     }
 
+    // Files outside the profile's source types, held until every project
+    // file was read: one a project declares as code (a module kept as .TXT)
+    // is copied, the rest stay listed for coverage only.
+    const excludedFiles: {
+      absolute: string;
+      relativePath: string;
+      stats: BigIntStats;
+    }[] = [];
+    const projects: { relativePath: string; lines: string[] }[] = [];
+
     async function addFile(
       absolute: string,
       relativePath: string,
       stats: BigIntStats,
+      declaredRole?: 'code',
     ): Promise<void> {
       const byteLength = Number(stats.size);
-      const role = profile.analyzer.fileRole(relativePath);
-      // Not source: listed for coverage, never read (keeps agent settings,
-      // hooks and secrets of the source out of the snapshot).
+      const role = declaredRole ?? profile.analyzer.fileRole(relativePath);
+      // Not source: never read unless a project declares it (keeps agent
+      // settings, hooks and secrets of the source out of the snapshot).
       if (role === 'excluded') {
-        skipped.push({
-          relativePath,
-          kind: 'file',
-          reason: 'excluded',
-          byteLength,
-        });
+        excludedFiles.push({ absolute, relativePath, stats });
         return;
       }
       if (byteLength > limits.maxFileBytes) {
@@ -178,6 +185,8 @@ export function createLocalWorkspaceProvider(options: {
         profileEncoding: profile.defaultEncoding,
       });
       entries.push(entry);
+      if (role === 'project' && lines)
+        projects.push({ relativePath, lines: lines.lines });
       const raw = storagePath(join(staging, RAW), relativePath);
       await storage.writeNew(raw, bytes);
       if (lines) {
@@ -297,7 +306,31 @@ export function createLocalWorkspaceProvider(options: {
       }
     }
 
+    // Declared paths are matched case-insensitively, like member resolution.
+    async function addDeclaredMembers(): Promise<void> {
+      const declared = new Set(
+        projects.flatMap(({ relativePath, lines }) =>
+          declaredCodeMemberPaths(profile, relativePath, lines).map((path) =>
+            path.toLowerCase(),
+          ),
+        ),
+      );
+      for (const file of excludedFiles) {
+        checkpoint();
+        if (declared.has(file.relativePath.toLowerCase()))
+          await addFile(file.absolute, file.relativePath, file.stats, 'code');
+        else
+          skipped.push({
+            relativePath: file.relativePath,
+            kind: 'file',
+            reason: 'excluded',
+            byteLength: Number(file.stats.size),
+          });
+      }
+    }
+
     await walk(root, '');
+    await addDeclaredMembers();
     await verify();
     const coverage = [...skipped]
       .sort((a, b) => byName(a.relativePath, b.relativePath))

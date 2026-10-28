@@ -291,6 +291,7 @@ export const viMessages = {
     stateTitle: 'Tình trạng phân tích program',
     programCount: (count: string) => `${count} program`,
     showPrograms: 'Xem danh sách',
+    moreMissing: (count: string) => `và ${count} file khác`,
     loading: 'Đang tải kết quả kiểm kê…',
     retry: 'Tải lại kết quả',
     empty:
@@ -341,7 +342,7 @@ export const viMessages = {
       PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',
       PROGRAM_INCOMPLETE: 'Có program thiếu file hoặc có file chưa phân tích.',
       MEMBER_UNRESOLVED:
-        'Có file khai báo trong project không tìm thấy hoặc không xác định được.',
+        'Có file khai báo trong project (.vbp) không tìm thấy hoặc không xác định được trong thư mục nguồn.',
       FILE_ERROR: 'Có file không giải mã được.',
       FILE_UNSUPPORTED: 'Có file code không được hỗ trợ.',
       FILES_SKIPPED:

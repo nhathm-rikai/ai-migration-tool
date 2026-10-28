@@ -137,6 +137,26 @@ function joinRelative(baseDir: string, path: string): string | null {
   return segments.join('/');
 }
 
+// Root-relative paths a project file declares as code (e.g. a module kept
+// as .TXT), as written: callers match them case-insensitively, like member
+// resolution does. Absolute or out-of-root members are left out.
+export function declaredCodeMemberPaths(
+  profile: SourceProfile,
+  projectPath: string,
+  lines: string[],
+): string[] {
+  const { analyzer } = profile;
+  const parsed = analyzer.parseProjectFile(lines);
+  if (parsed.status !== 'parsed') return [];
+  const baseDir = projectPath.split('/').slice(0, -1).join('/');
+  return parsed.members.flatMap((member) => {
+    if (analyzer.roleForProjectMember(member.kind) !== 'code') return [];
+    const relative = analyzer.toRelativeMemberPath(member.declaredPath);
+    const joined = relative === null ? null : joinRelative(baseDir, relative);
+    return joined === null ? [] : [joined];
+  });
+}
+
 function memberFileStatus(file: InventoryFile): MemberFileStatus {
   if (file.manifest.kind === 'error') return 'error';
   if (file.manifest.role === 'unsupported') return 'unsupported';

@@ -55,7 +55,16 @@ export type ProgramRow = {
   unresolvedMembers: number;
 };
 
+// A declared member file that was not found, with the number of programs
+// declaring it; grouped by file name (case-insensitive).
+export type MissingMember = {
+  fileName: string;
+  resolution: Exclude<MemberResolution, 'resolved' | 'case-mismatch'>;
+  programs: number;
+};
+
 export type AssessmentSummary = {
+  missingMembers: MissingMember[];
   unique: {
     files: number;
     codeFiles: number;
@@ -112,8 +121,12 @@ function programRow(program: Program): ProgramRow {
     complexity: analysis ? complexityView(analysis.complexity) : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
+    // A case-only difference still finds the file (Windows), so it is not
+    // a missing member.
     unresolvedMembers: program.members.filter(
-      (member) => member.resolution !== 'resolved',
+      (member) =>
+        member.resolution !== 'resolved' &&
+        member.resolution !== 'case-mismatch',
     ).length,
   };
 }
@@ -164,7 +177,37 @@ export function summarizeInventory(
     programs.some((row) => row.complexity?.needsReview),
   );
 
+  const missing = new Map<string, MissingMember>();
+  for (const program of inventory.programs) {
+    const seen = new Set<string>();
+    for (const member of program.members) {
+      if (
+        member.resolution === 'resolved' ||
+        member.resolution === 'case-mismatch'
+      )
+        continue;
+      // Projects in different folders reach the same file by different
+      // relative paths; the file name groups them.
+      const fileName =
+        member.declaredPath.split(/[\\/]/).pop() ?? member.declaredPath;
+      const key = fileName.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const entry = missing.get(key);
+      if (entry) entry.programs += 1;
+      else
+        missing.set(key, {
+          fileName,
+          resolution: member.resolution,
+          programs: 1,
+        });
+    }
+  }
+
   return {
+    missingMembers: [...missing.values()].sort(
+      (a, b) => b.programs - a.programs || a.fileName.localeCompare(b.fileName),
+    ),
     unique: {
       files: totals.files,
       codeFiles: totals.codeFiles,

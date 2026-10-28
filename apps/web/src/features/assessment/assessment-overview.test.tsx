@@ -427,6 +427,75 @@ describe('Assessment overview (F03)', () => {
     expect(names()[0]).toBe('P00');
   });
 
+  it('names missing member files and does not count a case-only difference as missing', async () => {
+    const base: Inventory = structuredClone(
+      mappedInventoryArtifactFixture.payload,
+    );
+    const [program] = base.programs;
+    if (!program) throw new Error('fixture has a program');
+    const member = (
+      declaredPath: string,
+      resolution: 'missing' | 'case-mismatch',
+    ) => ({
+      kind: 'module',
+      name: null,
+      declaredPath,
+      relativePath: resolution === 'missing' ? null : 'cmn/Common.bas',
+      resolution,
+      fileStatus: resolution === 'missing' ? null : ('analyzed' as const),
+      shared: false,
+    });
+    const payload: Inventory = {
+      ...base,
+      programs: [
+        {
+          ...structuredClone(program),
+          projectPath: 'a/A.vbp',
+          members: [
+            ...program.members,
+            member('..\\cmn\\SFTP.BAS', 'missing'),
+            member('..\\cmn\\COMMON.BAS', 'case-mismatch'),
+          ],
+        },
+        {
+          ...structuredClone(program),
+          projectPath: 'b/c/B.vbp',
+          members: [
+            ...program.members,
+            member('..\\..\\cmn\\sftp.bas', 'missing'),
+          ],
+        },
+        {
+          ...structuredClone(program),
+          projectPath: 'd/D.vbp',
+          members: [
+            ...program.members,
+            member('..\\cmn\\COMMON.BAS', 'case-mismatch'),
+          ],
+        },
+      ],
+    };
+    const summary = summarizeInventory(payload);
+    expect(summary.missingMembers).toEqual([
+      { fileName: 'SFTP.BAS', resolution: 'missing', programs: 2 },
+    ]);
+    expect(
+      summary.programs.find((row) => row.projectPath === 'd/D.vbp')
+        ?.unresolvedMembers,
+    ).toBe(0);
+    const server = serve({ ...mappedInventoryArtifactFixture, payload });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    const item = (await screen.findByText('SFTP.BAS')).closest('li');
+    expect(item?.textContent).toContain('2 program');
+    expect(item?.textContent).toContain('không tìm thấy');
+  });
+
   it('opens the list filtered from a warning of the overview', async () => {
     const server = serve(partialInventoryArtifactFixture);
     render(

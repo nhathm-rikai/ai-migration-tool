@@ -2,10 +2,25 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from './app';
-import { json, project } from '../testing/fixtures';
+import { json, project, testCredentials } from '../testing/fixtures';
+import { createProjectsApi } from '../shared/api/projects-api';
+
 import { LOCALE_STORAGE_KEY } from '../shared/i18n/locale';
 import { LocaleProvider } from '../shared/i18n/locale-provider';
 import { useLocale } from '../shared/i18n/locale-context';
+
+// Global fetch is stubbed per test; the credential is ready without network.
+function TestApp() {
+  return (
+    <App
+      api={createProjectsApi(
+        (input, init) => fetch(input, init),
+        testCredentials,
+      )}
+      session={testCredentials}
+    />
+  );
+}
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -50,7 +65,7 @@ it('synchronizes document language before descendant passive effects on mount an
 
 it('switches Vietnamese/Japanese, preserves input, persists the locale and exposes no theme toggle', async () => {
   const fetcher = mockEmptyList();
-  const view = render(<App />);
+  const view = render(<TestApp />);
   await screen.findByText('Chưa có dự án');
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: '入力した名前' },
@@ -69,7 +84,7 @@ it('switches Vietnamese/Japanese, preserves input, persists the locale and expos
   expect(screen.queryByRole('button', { name: /Giao diện|テーマ/ })).toBeNull();
   expect(fetcher).toHaveBeenCalledTimes(1);
   view.unmount();
-  render(<App />);
+  render(<TestApp />);
   expect(screen.getByLabelText('プロジェクト名')).toBeTruthy();
   await screen.findByText('プロジェクトはまだありません');
   fireEvent.change(screen.getByLabelText('言語'), { target: { value: 'vi' } });
@@ -79,7 +94,7 @@ it('switches Vietnamese/Japanese, preserves input, persists the locale and expos
 
 it('retranslates an existing validation error without submitting or clearing the form', async () => {
   const fetcher = mockEmptyList();
-  render(<App />);
+  render(<TestApp />);
   await screen.findByText('Chưa có dự án');
   fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
   expect(screen.getByRole('alert').textContent).toContain('1 đến 120');
@@ -112,7 +127,7 @@ it('preserves a pending create, then selection, success notice and dates when sw
       ),
     );
   vi.stubGlobal('fetch', fetcher);
-  render(<App />);
+  render(<TestApp />);
   await screen.findByText('Chưa có dự án');
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: project.name },
@@ -161,7 +176,7 @@ it('retranslates list and detail HTTP errors without refetching them', async () 
     ),
   );
   vi.stubGlobal('fetch', fetcher);
-  const view = render(<App />);
+  const view = render(<TestApp />);
   expect((await screen.findByRole('alert')).textContent).toContain(
     'Không tìm thấy API',
   );
@@ -186,7 +201,7 @@ it('retranslates list and detail HTTP errors without refetching them', async () 
         404,
       ),
     );
-  render(<App />);
+  render(<TestApp />);
   fireEvent.click(await screen.findByRole('button', { name: project.name }));
   expect((await screen.findByRole('alert')).textContent).toBe(
     'プロジェクトが見つかりません。',
@@ -204,7 +219,7 @@ it('retranslates an uncertain submission outcome and preserves a valid name', as
     .mockResolvedValueOnce(json({ items: [], nextCursor: null }))
     .mockResolvedValueOnce(json({ stored: true }, 201));
   vi.stubGlobal('fetch', fetcher);
-  render(<App />);
+  render(<TestApp />);
   await screen.findByText('Chưa có dự án');
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: '変更しない名前' },
@@ -226,7 +241,7 @@ it('retranslates an uncertain submission outcome and preserves a valid name', as
 it('falls back safely for unsupported preferences and still switches when storage is blocked', async () => {
   mockEmptyList();
   window.localStorage.setItem(LOCALE_STORAGE_KEY, 'unsupported-locale');
-  const view = render(<App />);
+  const view = render(<TestApp />);
   await screen.findByText('Chưa có dự án');
   expect(screen.getByLabelText('Ngôn ngữ')).toBeTruthy();
   view.unmount();
@@ -236,7 +251,7 @@ it('falls back safely for unsupported preferences and still switches when storag
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
     throw new DOMException('Blocked', 'SecurityError');
   });
-  render(<App />);
+  render(<TestApp />);
   fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
     target: { value: 'ja' },
   });

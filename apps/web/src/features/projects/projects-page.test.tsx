@@ -10,7 +10,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProjectsPage } from './projects-page';
 import { ProjectDetail } from './project-detail';
 import { createProjectsApi } from '../../shared/api/projects-api';
-import { json, project } from '../../testing/fixtures';
+import {
+  json,
+  localProject,
+  project,
+  testCredentials,
+} from '../../testing/fixtures';
 import type { Project } from '@portal/contracts';
 import type { ReactElement } from 'react';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
@@ -39,7 +44,7 @@ describe('Projects UI', () => {
           ),
         ),
       );
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     const navigation = screen.getByRole('navigation', { name: 'Cây dự án' });
     const firstNode = await within(navigation).findByRole('button', {
       name: project.name,
@@ -76,7 +81,7 @@ describe('Projects UI', () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValue(json({ items: [], nextCursor: null }));
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     expect(screen.getByText('Đang tải dự án…')).toBeTruthy();
     await screen.findByText('Chưa có dự án');
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
@@ -104,7 +109,7 @@ describe('Projects UI', () => {
             : json({ items: [project], nextCursor: null }),
         ),
       );
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     await screen.findByText('Chưa có dự án');
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
       target: { value: project.name },
@@ -123,13 +128,40 @@ describe('Projects UI', () => {
       fetcher.mock.calls.filter(([, init]) => init?.method === 'POST'),
     ).toHaveLength(1);
   });
+  it('creates a local source project without a fixture and opens it', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation((url, init) =>
+        Promise.resolve(
+          init?.method === 'POST'
+            ? json(localProject, 201)
+            : typeof url === 'string' && url.endsWith(localProject.id)
+              ? json(localProject)
+              : json({ items: [], nextCursor: null }),
+        ),
+      );
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
+    await screen.findByText('Chưa có dự án');
+    fireEvent.change(screen.getByLabelText('Tên dự án'), {
+      target: { value: localProject.name },
+    });
+    fireEvent.click(screen.getByLabelText(/Mã nguồn trên máy này/));
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo dự án' }));
+    await screen.findByText(localProject.id);
+    const post = fetcher.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(
+      typeof post?.[1]?.body === 'string' ? JSON.parse(post[1].body) : null,
+    ).toEqual({ name: localProject.name, mode: 'local' });
+    expect(screen.getByText('LOCAL')).toBeTruthy();
+  });
+
   it('recovers a list failure and paginates using the server cursor', async () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(json({ items: [project], nextCursor: project.id }))
       .mockResolvedValueOnce(json({ items: [], nextCursor: null }));
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     await screen.findByRole('alert');
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại danh sách' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Trang tiếp' }));
@@ -154,7 +186,7 @@ describe('Projects UI', () => {
           }),
       )
       .mockResolvedValueOnce(json(second));
-    const api = createProjectsApi(fetcher);
+    const api = createProjectsApi(fetcher, testCredentials);
     const view = render(
       <ProjectDetail
         key={project.id}
@@ -184,7 +216,7 @@ describe('Projects UI', () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(json({ items: [], nextCursor: null }))
       .mockRejectedValueOnce(new Error('offline'));
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     await screen.findByText('Chưa có dự án');
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
       target: { value: 'Giữ tên này' },
@@ -212,7 +244,7 @@ describe('Projects UI', () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(json({ items: [], nextCursor: null }))
       .mockResolvedValueOnce(json({ stored: true }, 201));
-    render(<ProjectsPage api={createProjectsApi(fetcher)} />);
+    render(<ProjectsPage api={createProjectsApi(fetcher, testCredentials)} />);
     await screen.findByText('Chưa có dự án');
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
       target: { value: 'Tên hợp lệ' },

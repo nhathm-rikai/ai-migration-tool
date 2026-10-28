@@ -3,6 +3,7 @@ import {
   ListProjectsQuerySchema,
   PROJECT_PAGE_SIZE_DEFAULT,
   PROJECT_DEMO_MODE,
+  PROJECT_LOCAL_MODE,
   type CreateProjectInput,
   type ListProjectsQuery,
   type Project,
@@ -22,13 +23,16 @@ export function createProjectService(deps: {
       const name = input.name.trim();
       if (!Check(CreateProjectSchema, { ...input, name }))
         throw new AppError('INVALID_INPUT');
-      return deps.repository.create({
+      const common = {
         id: deps.nextId(),
         name,
-        fixtureId: input.fixtureId,
-        mode: PROJECT_DEMO_MODE,
         createdAt: deps.now().toISOString(),
-      });
+      };
+      return deps.repository.create(
+        'fixtureId' in input
+          ? { ...common, fixtureId: input.fixtureId, mode: PROJECT_DEMO_MODE }
+          : { ...common, mode: PROJECT_LOCAL_MODE },
+      );
     },
     get(id: string): Project {
       const project = deps.repository.findById(id);

@@ -4,9 +4,20 @@ import {
   type CreateProjectInput,
 } from '@portal/contracts';
 import { createApiClient } from './api-client';
+import {
+  createLocalSession,
+  localSession,
+  type CredentialSource,
+} from './local-session';
 
-export function createProjectsApi(fetcher?: typeof fetch) {
-  const request = createApiClient(fetcher);
+// A custom fetcher gets its own session over the same fetcher (tests).
+export function createProjectsApi(
+  fetcher?: typeof fetch,
+  credentials: CredentialSource = fetcher
+    ? createLocalSession(fetcher)
+    : localSession,
+) {
+  const request = createApiClient(credentials, fetcher);
   return {
     list: (cursor: string | null, signal: AbortSignal) =>
       request(

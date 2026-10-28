@@ -346,6 +346,37 @@ describe('C01-AC02 Projects API stays compatible', () => {
     expectInvalid(ProjectSchema, { ...fixtures.legacyProject, mode: 'local' });
   });
 
+  it('accepts local projects without a fixture and stays strict (PF05)', () => {
+    expectValid(CreateProjectSchema, fixtures.createLocalProjectRequest);
+    expectValid(ProjectSchema, fixtures.localProject);
+    expectValid(ProjectListSchema, {
+      items: [fixtures.legacyProject, fixtures.localProject],
+      nextCursor: null,
+    });
+    // A local project never names the demo fixture or carries a path.
+    expectInvalid(ProjectSchema, {
+      ...fixtures.localProject,
+      fixtureId: 'sample-vb6',
+    });
+    expectInvalid(ProjectSchema, {
+      ...fixtures.localProject,
+      rootPath: '/src',
+    });
+    expectInvalid(CreateProjectSchema, {
+      ...fixtures.createLocalProjectRequest,
+      rootPath: '/src',
+    });
+    expectInvalid(CreateProjectSchema, {
+      ...fixtures.createLocalProjectRequest,
+      fixtureId: 'sample-vb6',
+    });
+    expectInvalid(CreateProjectSchema, {
+      ...fixtures.createLocalProjectRequest,
+      mode: 'demo',
+    });
+    expectInvalid(CreateProjectSchema, { name: '   ', mode: 'local' });
+  });
+
   it('keeps every Projects error code', () => {
     for (const code of [
       'INVALID_INPUT',
@@ -354,6 +385,9 @@ describe('C01-AC02 Projects API stays compatible', () => {
       'PAYLOAD_TOO_LARGE',
       'UNSUPPORTED_MEDIA_TYPE',
       'INTERNAL_ERROR',
+      'HOST_NOT_ALLOWED',
+      'ORIGIN_NOT_ALLOWED',
+      'CREDENTIAL_INVALID',
     ]) {
       expect(Check(ApiErrorCodeSchema, code)).toBe(true);
     }

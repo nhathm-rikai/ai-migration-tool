@@ -2,7 +2,7 @@
 
 Mẫu cho Dev khi mở rộng Projects/API/UI: [policy và lỗi API](../../docs/engineering/patterns/api-errors-policy.md). Policy tên/default pagination/fixture dùng chung từ contracts; public error code có type chung, status/message an toàn nằm tại BE. Handler chỉ ánh xạ AppError và lỗi Fastify đã nhận diện; dependency error chưa biết dùng INTERNAL_ERROR, không biến mọi status 4xx thành INVALID_INPUT. Schema/HTTP response và DB hiện có giữ tương thích, migration cũ không sửa.
 
-API hiện chạy ở gate **init**, feature **Projects/API/storage**. Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật và fake AgentRunner dùng trong test. API chỉ quản lý metadata project demo; `fixtureId: sample-vb6` là nhãn dữ liệu mẫu. Thư viện/CLI Analyze VB6 đã có riêng, chưa nối vào Projects/API/job. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID.
+API có Projects demo/local, run lifecycle và source registration/snapshot (PF05). Fastify + TypeScript strict ESM, TypeBox contracts, SQLite thật; demo dùng executor fixture, local run đọc source đã đăng ký để tạo snapshot bất biến. Artifact store/read API (PF06/B07) đã có: demo run công bố inventory mẫu đi kèm; local run (PF07/B08) chạy thư viện Analyze VB6 trên bytes của snapshot trong worker thread rồi công bố inventory; chưa Claude CLI. Tên project không unique: hai project được phép trùng tên, phân biệt bằng UUID. Phần security/instance của LIVE đã có, chưa nghiệm thu LIVE/MS1 toàn bộ; chỉ dùng fixture sạch khi kiểm thử.
 
 ## Chạy và cấu hình
 
@@ -42,7 +42,7 @@ Naming hiện tại độc lập công ty: env `PORTAL_*`, package `@portal/*`, 
 
 Override tới DB cũ cũng phải nằm ngoài repo/source. Nếu DB cũ nằm trong repo, cấu hình đó sẽ bị từ chối; cần xử lý di chuyển dữ liệu nhất quán khi backend đã dừng trước khi dùng lại. App không tự move/xóa DB.
 
-Chỉ dùng dữ liệu demo sạch. Chưa có local credential/Host/Origin protection, instance lock hay tính năng đọc source thật. Không expose backend này ra LAN. LIVE phải đạt gate trước khi bổ sung đường đọc source/CLI; đổi env không bật được các tính năng đó.
+Đã có bảo vệ Host/Origin và credential local theo [local-http-security](../../docs/engineering/specs/local-http-security.md), instance lock/recovery PF04 và đường đọc source local PF05. Không expose backend ra LAN. `mode: fixture`/`runner: fake` trên health không có nghĩa local project không đọc file: local run thực sự tạo snapshot, chỉ chưa gọi analyzer/AI. Chưa nghiệm thu source khách hàng; path/process smoke hiện chỉ có Windows với fixture sạch.
 
 ## Gọi thử một luồng
 
@@ -51,20 +51,71 @@ Mở PowerShell thứ hai khi server đang chạy:
 ```powershell
 $base = 'http://127.0.0.1:4310/api/v1'
 Invoke-RestMethod "$base/health"
+# Bootstrap credential như UI tin cậy; token chỉ đi trong header Authorization.
+$session = Invoke-RestMethod "$base/session" -Method Post -Headers @{ Origin = 'http://127.0.0.1:4310' }
+$auth = @{ Authorization = "Bearer $($session.token)" }
 $body = @{ name = 'Project demo'; fixtureId = 'sample-vb6' } | ConvertTo-Json
-$project = Invoke-RestMethod "$base/projects" -Method Post -ContentType 'application/json' -Body $body
-Invoke-RestMethod "$base/projects/$($project.id)"
-Invoke-RestMethod "$base/projects?limit=20"
+$project = Invoke-RestMethod "$base/projects" -Method Post -Headers $auth -ContentType 'application/json' -Body $body
+Invoke-RestMethod "$base/projects/$($project.id)" -Headers $auth
+Invoke-RestMethod "$base/projects?limit=20" -Headers $auth
 ```
 
 Endpoint đang có:
 
-- `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI.
-- `POST /api/v1/projects`: 201 và `Location`. Body gồm `name` (1–120 ký tự, có nội dung sau trim), `fixtureId` đúng `sample-vb6`. Không nhận `sourcePath` hay field lạ.
+- `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI. Public nhưng vẫn kiểm Host/Origin.
+- `POST /api/v1/session`: bootstrap credential, cần `Origin` tin cậy; trả `{ token }`. Mọi endpoint khác cần `Authorization: Bearer <token>`; 401 `CREDENTIAL_INVALID`, 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`. Policy đầy đủ, gồm request thiếu Origin và `PORTAL_WEB_PORT`: [local-http-security](../../docs/engineering/specs/local-http-security.md).
+- `POST /api/v1/projects`: 201 và `Location`. Demo dùng `{ name, fixtureId: 'sample-vb6' }`; local dùng `{ name, mode: 'local' }` và đăng ký source bằng endpoint riêng. Name 1–120 Unicode code point, có nội dung sau trim; không nhận `sourcePath` hay field lạ.
 - `GET /api/v1/projects/:projectId`: 200 hoặc 404; ID sai định dạng trả 400.
 - `GET /api/v1/projects?limit=20&cursor=<nextCursor>`: `{ items, nextCursor }`; limit 1–100, mặc định 20. Dùng nguyên cursor từ response; thứ tự theo UUID tăng dần, **không phải ngày tạo**. Đây không phải snapshot pagination khi có request tạo project đồng thời.
 
-Project trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 500 lỗi nội bộ. Chưa có update/delete/job endpoint; không có conflict nghiệp vụ cần 409 trong slice này.
+Project demo trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC; local trả cùng metadata với `mode: local`, không có `fixtureId`. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 409 revision/state conflict, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 422 source không dùng được, 500 lỗi nội bộ. Chưa có update/delete project.
+
+### Source registration và snapshot (PF05: B03 + B06 + F01)
+
+- [source-registration.routes.ts](src/modules/projects/source-registration.routes.ts): `GET/PUT /api/v1/projects/:projectId/source`, cần credential local. PUT gồm root tuyệt đối, `profileId: vb6-cp932-v1`, mapping `unconfigured|assumed|confirmed`, `expectedSourceRevision: null` lần đầu hoặc revision đã đọc khi sửa. Demo PUT trả 409 `PROJECT_MODE_CONFLICT`.
+- [source-registration.service.ts](src/modules/projects/source-registration.service.ts) + repository: kiểm profile/root trước khi ghi, CAS revision trong transaction; mỗi revision bất biến. GET chỉ trả sourceId/displayName/profile/revision/status, không trả absolute path. Path không được dùng trả lỗi an toàn, không ghi DB.
+- [local-source-root.ts](src/adapters/local/local-source-root.ts): canonicalize, kiểm containment theo segment/physical path, từ chối overlap repo/data và alias, path tương đối/UNC/device. Kiểm đọc/liệt kê root không walk source. Root thay bằng link sang nơi khác bị coi không đọc được. Native mapped drive và các mount mạng khác chưa được kiểm chứng.
+- [snapshot.service.ts](src/modules/snapshots/snapshot.service.ts), [local-workspace.provider.ts](src/adapters/local/local-workspace.provider.ts): khi run chạy mới đọc revision đã khóa; copy vào `snapshots/.staging/<id>`, giữ raw/normalized/manifest, kiểm source đổi rồi atomic rename và ghi DB. Link không đi theo, file loại trừ/quá lớn/không đọc được có `skipped`; file decode lỗi có manifest lỗi. Reopen/reuse kiểm hash raw/normalized/manifest và đối chiếu ID, hash, profile, số file/tổng bytes với record DB; không dùng root hiện tại để thay snapshot cũ.
+- [snapshot-storage.ts](src/adapters/local/snapshot-storage.ts) kiểm `lstat`/đường dẫn vật lý từ data directory trước đọc, ghi, publish và cleanup, kể cả thư mục con và cleanup sau lỗi. Junction/symlink hoặc file hard link trong storage bị từ chối (`SNAPSHOT_STORAGE_INVALID`); startup không cleanup qua link. Data directory phải do app kiểm soát: Node không có API portable để loại trừ hoàn toàn process khác cùng quyền đổi thư mục giữa hai filesystem syscall.
+- [0003-local-sources.sql](migrations/0003-local-sources.sql) giữ demo/run cũ khi nâng DB từ 0001/0002. Migration runner tắt foreign keys chỉ quanh transaction migration và kiểm `foreign_key_check` trước commit; không sửa migration cũ. Hạ phiên bản không tự downgrade DB: dừng backend và dùng backup nhất quán nếu cần rollback.
+
+Chi tiết contract/path/error/giới hạn: [analyze-run-contract §2](../../docs/engineering/specs/analyze-run-contract.md#2-source-registration-api-2). Source chỉ được mở read-only. Không chạy script/hooks/config trong source. Chỉ fixture sạch được dùng trong E2E; đây chưa phải bằng chứng nghiệm thu customer source, analyzer job hoặc CLI.
+
+### Analyze run (PF03: B04 + B05, fixture)
+
+Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-contract.md) §3–5. Demo dùng `sample-vb6` revision 1. Local dùng revision hiện tại từ GET source; chưa đăng ký trả `SOURCE_NOT_REGISTERED`, revision cũ trả `SOURCE_REVISION_CONFLICT`. [source-run.executor.ts](src/adapters/local/source-run.executor.ts) chọn executor fixture cho demo hoặc snapshot service cho local. Local `succeeded` chỉ có nghĩa đã chụp nguồn, chưa tạo inventory/artifact.
+
+- `POST /api/v1/projects/:projectId/runs` + header `Idempotency-Key`: lưu run `queued` rồi trả **202** + `Location` ngay; không chờ chạy. Cùng key + cùng body (không phụ thuộc thứ tự field) trả lại đúng run đó; cùng key khác body 409 `IDEMPOTENCY_KEY_CONFLICT`; project còn run active 409 `RUN_ACTIVE_CONFLICT`; retry (`retryOfRunId`) luôn là run mới; `reuse-snapshot` cần run cũ có snapshot (409 `SNAPSHOT_UNAVAILABLE`); runtime cần recovery 503 `RUNTIME_RECOVERY_REQUIRED`.
+- `GET .../runs?limit&cursor` (mới nhất trước, cursor opaque), `GET .../runs/current`, `GET .../runs/:runId`: chỉ đọc, run của project khác trả 404 `RUN_NOT_FOUND`.
+- `POST .../runs/:runId/cancel` `{ expectedStateVersion }`: queued → `cancelled` (200), running → `cancelling` (202) rồi dispatcher ghi `cancelled`; lặp lại idempotent, và cancel lặp trên run `cancelling` yêu cầu dispatcher đối chiếu lại (execution đã dừng thì ghi `cancelled`, 200); version lệch hoặc terminal 409 `RUN_STATE_CONFLICT`.
+- `GET /api/v1/runtime/status`: `ready` hoặc `recovery_required`.
+
+Ràng buộc nằm ở DB ([0002-runs.sql](migrations/0002-runs.sql)): unique run active mỗi project, unique một run đang chạy toàn runtime, unique `(project, idempotency key)`; mọi chuyển trạng thái là compare-and-set theo status + `stateVersion` ([run.repository.ts](src/modules/jobs/run.repository.ts), quyết định đích ở [job-state.ts](src/modules/jobs/job-state.ts)). [job-dispatcher.ts](src/modules/jobs/job-dispatcher.ts) claim nguyên tử và chạy một execution ngoài request/transaction: timeout → `failed/TIMEOUT`; executor không dừng trong hạn → `failed/STOP_UNCONFIRMED` và runtime `recovery_required` (chặn Start tới khi restart); không ghi được trạng thái kết thúc vào DB cũng chuyển runtime `recovery_required` (run còn `running` giữ slot, restart đánh dấu `interrupted`), cancel run đó vẫn kết thúc `cancelled` vì execution đã dừng; khởi động đánh dấu run running/cancelling cũ `interrupted`, không tự chạy lại; shutdown dừng dispatch và ghi `interrupted`. Executor hiện là [fixture-run.executor.ts](src/adapters/fake/fixture-run.executor.ts): đi qua các stage, không đọc source, không process/network; sau khi nó thành công, source run executor công bố inventory mẫu (mục dưới). Limits trong config run là số giữ chỗ (JOB-07).
+
+### Artifact store và read API (PF06: B07)
+
+Hợp đồng: [analyze-run-contract](../../docs/engineering/specs/analyze-run-contract.md) §6. Code: [artifact.service.ts](src/modules/artifacts/artifact.service.ts), [artifact.repository.ts](src/modules/artifacts/artifact.repository.ts), [artifact.routes.ts](src/modules/artifacts/artifact.routes.ts), port [artifact-store.ts](src/ports/artifact-store.ts), adapter [filesystem-artifact.store.ts](src/adapters/local/filesystem-artifact.store.ts), migration [0004-artifacts.sql](migrations/0004-artifacts.sql).
+
+- Publish (DATA-05): validate payload theo `source-inventory-v1` và `snapshotHash` khớp snapshot của run → ghi `artifacts/.staging/<id>-v<version>/payload.json` → rename thư mục vào `artifacts/<id>-v<version>/` (cùng filesystem) → insert row. Chỉ row làm version public. Payload sai → run `failed/ANALYSIS_OUTPUT_INVALID`; ghi/rename/DB lỗi → `failed/ARTIFACT_WRITE_FAILED`, không còn bản dở dưới tên public. ID do server sinh; client không truyền path. Storage dùng cùng kiểm tra link/junction/hard link như snapshot (`ARTIFACT_STORAGE_INVALID`).
+- Demo run: [source-run.executor.ts](src/adapters/local/source-run.executor.ts) công bố [demo-inventory.ts](src/adapters/fake/demo-inventory.ts) (bộ mẫu viết tay, 3 program, 1 module dùng chung, 1 program chưa đầy đủ, mapping `assumed`) ở stage `publish`. Local run (B08): snapshot (hoặc mở lại snapshot đã ghi khi `reuse-snapshot`) → `readSnapshotFiles` kiểm hash/size từng file raw → [worker-inventory.builder.ts](src/adapters/local/worker-inventory.builder.ts) chạy [run-inventory.ts](src/modules/analysis/run-inventory.ts) (`buildSourceInventory` với profile/mapping run đã khóa, kiểm phiên bản analyzer khớp `config.analyzer`, validate schema, serialize) trong worker → `publishPrepared` (staging → rename → row). Cancel/timeout terminate worker; cancel thắng sau publish để artifact cô lập như B07. `inventory.snapshotHash` là hash nội dung các entry, `sourceSnapshotHash` của artifact là hash bản ghi snapshot (gồm cả `skipped`). File bị snapshot bỏ qua (link, quá lớn, không đọc được, đặc biệt, tên không hợp lệ) vào `skipped` của inventory; file ngoài loại source của profile (`excluded`) không được copy nên không liệt kê. Run khóa phiên bản analyzer khác bản build đang chạy (queued qua nâng cấp) kết thúc `ANALYSIS_OUTPUT_INVALID`; bytes snapshot bị đổi → `INTERNAL_ERROR`, không publish.
+- `GET .../runs/:runId/artifacts`: chỉ trả artifact khi run `succeeded`; run khác trạng thái trả `{ items: [] }`. `GET .../artifacts/:artifactId/versions/:version`: đúng version, project khác hoặc run không `succeeded` (cancel thắng sau khi đã publish) trả 404 `ARTIFACT_NOT_FOUND`, không lộ nội dung. Đọc kiểm lại `sha256`/`byteLength` và schema; lệch thì 500 `INTERNAL_ERROR`, không trả payload.
+
+**Runbook orphan artifact.** Thư mục `artifacts/<id>-v<n>/` không có row trong bảng `artifacts` (log `ARTIFACT_ORPHANED`, hoặc crash giữa rename và insert) không bao giờ được đọc. `artifacts/.staging/` được dọn khi khởi động. Muốn thu hồi dung lượng: dừng backend, đối chiếu tên thư mục với `SELECT id, version FROM artifacts`, chỉ xóa thư mục không có row. Chưa có tự dọn orphan/retention (DATA-10, LATER).
+
+### Instance lock và recovery (PF04: B02)
+
+Mỗi data directory chỉ một backend. [server.ts](src/server.ts) khóa trước khi mở `portal.db` hoặc listen bằng [instance-lock.ts](src/platform/instance-lock.ts): file `instance.lock` cạnh `portal.db`, giữ lock EXCLUSIVE của SQLite, tức file lock của OS (Windows `LockFileEx`, POSIX `fcntl`). Process thứ hai cùng data directory thoát với `STARTUP_FAILED`/`DATA_DIR_LOCKED`, không mở DB; data directory khác độc lập. Shutdown đóng dispatcher và DB rồi mới nhả lock, ghi `released_at` vào owner record. Process crash/bị kill thì OS tự nhả lock, không có lock file cũ phải xóa tay; lần khởi động sau log `INSTANCE_PREVIOUS_UNRELEASED` và đánh dấu run running/cancelling cũ `interrupted` (không tự chạy lại).
+
+Owner record (owner id, pid, thời điểm start/release) chỉ để chẩn đoán: không bao giờ kill hoặc xóa gì theo pid trong đó. Record không đọc được (format khác, cột thiếu/sai kiểu, bảng lạ) nghĩa là không xác định được process cũ và những gì nó đã chạy: backend vẫn khởi động, đánh dấu run cũ `interrupted`, nhưng runtime `recovery_required` (`PROCESS_CLEANUP_UNCONFIRMED`, Start 503, queue không dispatch), log `INSTANCE_OWNER_UNKNOWN`. Record giữ nguyên qua các lần restart tới khi người vận hành xác nhận. `instance.lock` phải là một file thường có đúng một tên: symlink, hard link (ví dụ trỏ tới `portal.db`), thư mục hoặc file không phải SQLite làm startup fail `INSTANCE_LOCK_INVALID` trước mọi thao tác ghi. Lock kiểm lại path sau khi đã giữ khóa OS; file bị tráo giữa lúc kiểm và lúc mở cũng bị từ chối.
+
+**Runbook xử lý thủ công**
+
+1. `DATA_DIR_LOCKED` khi khởi động: một backend khác đang dùng data directory. Dùng backend đó hoặc dừng nó bằng cách bình thường (Ctrl+C trong terminal của nó). Không xóa `instance.lock`; lock tự nhả khi process kết thúc.
+2. Runtime `recovery_required` sau khởi động (log `INSTANCE_OWNER_UNKNOWN`), hoặc trong lúc chạy (log `RUN_STOP_UNCONFIRMED`/`RUN_STATE_WRITE_FAILED`): dừng backend. Kiểm bằng Task Manager (Windows), Activity Monitor hoặc `ps` (macOS/Linux) rằng không còn process backend/job nào của data directory này; tự xác định process bằng command line, không dựa vào pid trong owner record. Nếu còn, dừng nó theo cách bình thường của công cụ đó.
+3. Với `INSTANCE_OWNER_UNKNOWN`, sau bước 2 chạy `PORTAL_DATA_DIR=<dir> node apps/api/dist/cli/confirm-recovery.js --confirm` (cần `npm run build`; PowerShell đặt `$env:PORTAL_DATA_DIR` trước). Lệnh lấy lock nên từ chối (`DATA_DIR_LOCKED`) nếu backend còn chạy; chỉ reset owner record, không đụng process, run hoặc `portal.db`. File lock là link hoặc chứa bảng khác ngoài owner record thì lệnh từ chối (`INSTANCE_LOCK_INVALID`) và không sửa gì; xử lý theo bước 4. Khởi động lại backend: runtime `ready`, queue tiếp tục. Với lỗi trong lúc chạy, khởi động lại là đủ.
+4. `INSTANCE_LOCK_INVALID`: dừng mọi backend của data directory, đổi tên `instance.lock` sang tên khác để giữ lại phân tích rồi khởi động lại. Không xóa hoặc sửa file đó khi chưa rõ nó trỏ tới đâu: nếu là link tới `portal.db`, chỉ xóa đúng tên `instance.lock` (link), không xóa file đích.
+
+Process ownership của job CLI (A03/A04) chưa có: executor fixture chạy trong process backend nên chết cùng nó. Khi có process con, record sẽ phải ghi các process con để restart chặn dispatch khi chúng có thể còn sống.
 
 ## Đọc source theo một request
 
@@ -112,6 +163,6 @@ Tests kiểm API success/input/not-found/pagination (cả limit mặc định), 
 
 Rule trọng tâm: CORE-01..10, BE-01..05/07, DATA-01/02/09, QA-01/02/06/07/09 và AI-01/05 cho fake port. Phạm vi reviewer cần xem: schema/validation trước side effect, ranh giới service/repo, DB lifecycle, containment và nhãn demo.
 
-Ngày 15/10 đã bổ sung [UI Projects](../web/README.md) nối API fixture. Chưa nghiệm thu LIVE/MS1: Claude process, job state/queue/SSE, decoder CP932, LoC, BR/Design/evidence, review/export, local HTTP security và instance/recovery là các task tiếp theo. Không có VB6 → C# conversion trong source này.
+[UI Projects](../web/README.md), local HTTP security PF02, run lifecycle PF03, instance lock/recovery PF04 và source registration/snapshot PF05 đã có. Analyzer đã nối vào local run và artifact (B08/B07); chưa SSE, Claude process, BR/Design/evidence, review/export hoặc nghiệm thu LIVE/MS1. Process ownership/cleanup của CLI còn ở A03/A04. Không có VB6 → C# conversion trong source này.
 
 Tham khảo API gốc khi mở rộng: [Fastify type provider](https://github.com/fastify/fastify-type-provider-typebox), [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [better-sqlite3](https://github.com/WiseLibs/better-sqlite3). Phiên bản thực tế được khóa trong package/lockfile, không copy API từ major khác.

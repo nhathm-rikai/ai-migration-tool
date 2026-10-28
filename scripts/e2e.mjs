@@ -10,12 +10,15 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import {
+  cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { connect, createServer } from 'node:net';
@@ -181,6 +184,33 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
   process.once('SIGINT', stopOnSignal);
   process.once('SIGTERM', stopOnSignal);
   try {
+    // PF05 source fixture: app-owned, separate from its data directory and
+    // the repository. CP932 bytes and the BOM are explicit test inputs.
+    const sourceRoot = join(directory, 'source-đơn-hàng');
+    mkdirSync(join(sourceRoot, '.claude'), { recursive: true });
+    writeFileSync(
+      join(sourceRoot, 'MAIN.BAS'),
+      Buffer.concat([
+        Buffer.from("Sub Main()\r\n' ", 'ascii'),
+        Buffer.from([0x82, 0xa0]),
+        Buffer.from('\r\nEnd Sub\r\n', 'ascii'),
+      ]),
+    );
+    writeFileSync(
+      join(sourceRoot, 'BOM.BAS'),
+      '\uFEFFSub Bom()\r\nEnd Sub\r\n',
+    );
+    writeFileSync(
+      join(sourceRoot, 'FORM.FRX'),
+      Buffer.from([0, 255, 130, 160]),
+    );
+    writeFileSync(join(sourceRoot, '.claude', 'settings.json'), '{"hooks":{}}');
+    // PF07 analyze fixture: the clean VB6 sample from the repository, copied
+    // so the run reads a harness-owned folder outside repository and data.
+    const analyzeRoot = join(directory, 'source-vb6-sample');
+    cpSync(join(repository, 'tests', 'fixtures', 'vb6-sample'), analyzeRoot, {
+      recursive: true,
+    });
     const api = startOwned(
       'api',
       [join(repository, 'apps', 'api', 'dist', 'server.js')],
@@ -189,6 +219,8 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
         env: {
           ...process.env,
           PORTAL_PORT: String(apiPort),
+          // The API trusts the preview origin only on this port.
+          PORTAL_WEB_PORT: String(webPort),
           PORTAL_DATA_DIR: join(directory, 'data'),
           PORTAL_MODE: 'fixture',
           PORTAL_RUNNER: 'fake',
@@ -201,9 +233,23 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
     await waitFor(`${apiBase}/health`, api, 'API');
 
     const seedName = 'E2E seed project';
+    // Seed as a trusted local client: bootstrap the credential from the API
+    // origin, then send it in the Authorization header only.
+    const origin = `http://127.0.0.1:${apiPort}`;
+    const session = await fetch(`${apiBase}/session`, {
+      method: 'POST',
+      headers: { origin },
+    });
+    if (session.status !== 200)
+      throw new Error(`Bootstrap failed: ${session.status}`);
+    const { token } = await session.json();
     const seed = await fetch(`${apiBase}/projects`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        origin,
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ name: seedName, fixtureId: 'sample-vb6' }),
     });
     if (seed.status !== 201) throw new Error(`Seed failed: ${seed.status}`);
@@ -252,6 +298,10 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
           E2E_OUTPUT_DIR: outputDir,
           E2E_REPORT_DIR: reportDir,
           E2E_JSON_REPORT: jsonReport,
+          E2E_SOURCE_ROOT: sourceRoot,
+          E2E_ANALYZE_SOURCE_ROOT: analyzeRoot,
+          E2E_DATA_DIR: join(directory, 'data'),
+          E2E_REPOSITORY_ROOT: repository,
           ...env,
         },
       },
@@ -473,7 +523,7 @@ async function main() {
   const scenarios = [
     {
       name: 'control smoke',
-      grep: '@smoke',
+      grep: smoke,
       expect: { outcome: 'pass', title: smoke },
     },
     {
@@ -487,7 +537,7 @@ async function main() {
     },
     {
       name: 'API stopped before tests',
-      grep: '@smoke',
+      grep: smoke,
       crashApiBeforeTests: true,
       expect: {
         outcome: 'fail',

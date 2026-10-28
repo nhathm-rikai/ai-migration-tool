@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createProjectsApi } from './projects-api';
 import { ApiError } from './api-error';
 import { API_REQUEST_TIMEOUT_MS } from './api-client';
-import { json, project } from '../../testing/fixtures';
+import { json, project, testCredentials } from '../../testing/fixtures';
 
 const signal = () => new AbortController().signal;
 const input = { name: project.name, fixtureId: project.fixtureId };
@@ -10,9 +10,9 @@ const input = { name: project.name, fixtureId: project.fixtureId };
 describe('Projects API boundary', () => {
   it('uses the public API and validates its response', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(project));
-    expect(await createProjectsApi(fetcher).create(input, signal())).toEqual(
-      project,
-    );
+    expect(
+      await createProjectsApi(fetcher, testCredentials).create(input, signal()),
+    ).toEqual(project);
     expect(fetcher).toHaveBeenCalledWith(
       '/api/v1/projects',
       expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
@@ -39,7 +39,7 @@ describe('Projects API boundary', () => {
           status,
         ),
       );
-      const failure: unknown = await createProjectsApi(fetcher)
+      const failure: unknown = await createProjectsApi(fetcher, testCredentials)
         .get(project.id, signal())
         .catch((error: unknown) => error);
       expect(failure).toMatchObject({
@@ -56,10 +56,12 @@ describe('Projects API boundary', () => {
   );
 
   it('preserves an HTTP failure with a malformed body without inventing a business code', async () => {
-    const api = createProjectsApi(() =>
-      Promise.resolve(
-        new Response('<html>private-path-secret</html>', { status: 404 }),
-      ),
+    const api = createProjectsApi(
+      () =>
+        Promise.resolve(
+          new Response('<html>private-path-secret</html>', { status: 404 }),
+        ),
+      testCredentials,
     );
     await expect(api.get(project.id, signal())).rejects.toMatchObject({
       kind: 'http',
@@ -82,14 +84,14 @@ describe('Projects API boundary', () => {
           ),
         );
       await expect(
-        createProjectsApi(fetcher).get(project.id, signal()),
+        createProjectsApi(fetcher, testCredentials).get(project.id, signal()),
       ).rejects.toMatchObject({
         kind: 'invalid-response',
         status: 200,
         outcomeUnknown: false,
       });
       await expect(
-        createProjectsApi(fetcher).create(input, signal()),
+        createProjectsApi(fetcher, testCredentials).create(input, signal()),
       ).rejects.toMatchObject({
         kind: 'invalid-response',
         outcomeUnknown: true,
@@ -105,7 +107,7 @@ describe('Projects API boundary', () => {
         .fn<typeof fetch>()
         .mockResolvedValue(json({ message: 'private-path-secret' }, status));
       await expect(
-        createProjectsApi(fetcher).create(input, signal()),
+        createProjectsApi(fetcher, testCredentials).create(input, signal()),
       ).rejects.toMatchObject({ kind: 'http', outcomeUnknown: status >= 500 });
       expect(fetcher).toHaveBeenCalledTimes(1);
     },
@@ -115,7 +117,7 @@ describe('Projects API boundary', () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockRejectedValue(new Error('private-path-secret'));
-    const api = createProjectsApi(fetcher);
+    const api = createProjectsApi(fetcher, testCredentials);
     await expect(api.get(project.id, signal())).rejects.toMatchObject({
       kind: 'network',
       outcomeUnknown: false,
@@ -135,7 +137,7 @@ describe('Projects API boundary', () => {
     const controller = new AbortController();
     controller.abort();
     await expect(
-      createProjectsApi(fetcher).list(null, controller.signal),
+      createProjectsApi(fetcher, testCredentials).list(null, controller.signal),
     ).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -156,7 +158,7 @@ describe('Projects API boundary', () => {
             }),
         );
         const controller = new AbortController();
-        const api = createProjectsApi(fetcher);
+        const api = createProjectsApi(fetcher, testCredentials);
         const pending =
           scenario === 'timeout-create'
             ? api.create(input, controller.signal)
@@ -197,7 +199,10 @@ describe('Projects API boundary', () => {
           }),
         ),
       );
-      const pending = createProjectsApi(fetcher).get(project.id, signal());
+      const pending = createProjectsApi(fetcher, testCredentials).get(
+        project.id,
+        signal(),
+      );
       const assertion = expect(pending).rejects.toBeInstanceOf(ApiError);
       const classification = expect(pending).rejects.toMatchObject({
         kind: 'timeout',

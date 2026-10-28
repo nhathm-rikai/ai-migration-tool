@@ -1,13 +1,31 @@
 import { useState } from 'react';
 import { projectsApi, type ProjectsApi } from '../../shared/api/projects-api';
+import type { ArtifactsApi } from '../../shared/api/artifacts-api';
+import type { RunsApi } from '../../shared/api/runs-api';
+import type { SourcesApi } from '../../shared/api/sources-api';
 import { Icon } from '../../shared/ui/icon';
 import { useProjectList } from './use-project-list';
 import { CreateProjectForm } from './create-project-form';
 import { ProjectDetail } from './project-detail';
+import { AssessmentOverview } from '../assessment/assessment-overview';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { projectErrorMessage } from './project-messages';
 
-export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
+// Results page of one run, opened from the project overview. Kept in page
+// state (no router yet): selecting a project or "back" leaves it.
+type ResultsView = { projectId: string; runId: string };
+
+export function ProjectsPage({
+  api = projectsApi,
+  runsApi,
+  sourcesApi,
+  artifactsApi,
+}: {
+  api?: ProjectsApi;
+  runsApi?: RunsApi | undefined;
+  sourcesApi?: SourcesApi | undefined;
+  artifactsApi?: ArtifactsApi | undefined;
+}) {
   const { messages } = useLocale();
   const copy = messages.projects;
   const stages = Object.entries(copy.stages);
@@ -17,6 +35,18 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
     new Set(),
   );
   const [created, setCreated] = useState(false);
+  const [results, setResults] = useState<ResultsView | null>(null);
+  const select = (id: string | null) => {
+    setSelectedId(id);
+    setResults(null);
+  };
+  const openResults =
+    results && results.projectId === selectedId ? results : null;
+  const selectedProject =
+    list.state.status === 'ready'
+      ? (list.state.page.items.find((project) => project.id === selectedId) ??
+        null)
+      : null;
   return (
     <main id="main-content" className="app-layout">
       <aside className="project-sidebar" aria-labelledby="list-title">
@@ -37,7 +67,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
         <button
           className="button primary new-project"
           onClick={() => {
-            setSelectedId(null);
+            select(null);
             setCreated(false);
           }}
         >
@@ -89,7 +119,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                             else next.add(project.id);
                             return next;
                           });
-                          setSelectedId(project.id);
+                          select(project.id);
                           setCreated(false);
                         }}
                       >
@@ -98,6 +128,11 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                         </span>
                         <Icon name="folder" />
                         <span className="node-name">{project.name}</span>
+                        {project.mode === 'demo' && (
+                          <span className="chip demo" aria-hidden="true">
+                            {copy.demoBadge}
+                          </span>
+                        )}
                       </button>
                       <ul
                         id={`project-${project.id}`}
@@ -108,31 +143,49 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                           <button
                             className={
                               'branch' +
-                              (selectedId === project.id ? ' selected' : '')
+                              (selectedId === project.id && !openResults
+                                ? ' selected'
+                                : '')
                             }
                             aria-current={
-                              selectedId === project.id ? 'page' : undefined
+                              selectedId === project.id && !openResults
+                                ? 'page'
+                                : undefined
                             }
-                            onClick={() => setSelectedId(project.id)}
+                            onClick={() => select(project.id)}
                           >
                             <Icon name="file" /> {copy.overview}
                           </button>
                         </li>
-                        {stages.map(([stageId, stage]) => (
-                          <li key={stageId}>
+                        {openResults && selectedId === project.id && (
+                          <li>
                             <button
-                              className="branch"
-                              disabled
-                              title={copy.unavailable}
+                              className="branch selected"
+                              aria-current="page"
                             >
-                              <Icon name="file" />
-                              {stage.title}
-                              <span className="soon">
-                                {copy.notAvailableYet}
-                              </span>
+                              <Icon name="file" /> {copy.results}
                             </button>
                           </li>
-                        ))}
+                        )}
+                        {/* Static analysis runs from the overview; only the
+                            stages still to come are listed as such. */}
+                        {stages
+                          .filter(([stageId]) => stageId !== 'analysis')
+                          .map(([stageId, stage]) => (
+                            <li key={stageId}>
+                              <button
+                                className="branch"
+                                disabled
+                                title={copy.unavailable}
+                              >
+                                <Icon name="file" />
+                                {stage.title}
+                                <span className="soon">
+                                  {copy.notAvailableYet}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
                       </ul>
                     </li>
                   ))}
@@ -166,17 +219,29 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
           )}
         </nav>
         <div className="sidebar-footer">
-          <span className="status-dot" /> {copy.localWorkspace}{' '}
-          <span className="chip demo">{copy.demoBadge}</span>
+          <span className="status-dot" /> {copy.localWorkspace}
         </div>
       </aside>
       <div className="project-workspace">
         <div className="workspace-toolbar">
           <span className="breadcrumb">
             {copy.breadcrumb} <span aria-hidden="true">/</span>{' '}
-            <strong>{selectedId ? copy.overview : copy.createNew}</strong>
+            {selectedProject && (
+              <>
+                {selectedProject.name} <span aria-hidden="true">/</span>{' '}
+              </>
+            )}
+            <strong>
+              {!selectedId
+                ? copy.createNew
+                : openResults
+                  ? copy.results
+                  : copy.overview}
+            </strong>
           </span>
-          <span className="chip demo">{copy.fixture}</span>
+          {selectedProject?.mode === 'demo' && (
+            <span className="chip demo">{copy.fixture}</span>
+          )}
         </div>
         <nav aria-label={copy.assessmentSteps}>
           <ol className="stepper">
@@ -187,7 +252,7 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
                   <span>
                     <strong>{stage.title}</strong>
                     <small>{stage.description}</small>
-                    <span className="stage-status">{copy.unavailable}</span>
+                    <span className="stage-status">{stage.status}</span>
                   </span>
                 </button>
               </li>
@@ -199,18 +264,45 @@ export function ProjectsPage({ api = projectsApi }: { api?: ProjectsApi }) {
             {copy.created}
           </p>
         )}
-        {selectedId ? (
+        {selectedId && openResults && artifactsApi ? (
+          <section
+            className="panel results-panel"
+            aria-labelledby="results-title"
+          >
+            <div className="section-heading">
+              <h2 id="results-title">
+                {copy.results}
+                {selectedProject && <> · {selectedProject.name}</>}
+              </h2>
+              <button className="button small" onClick={() => setResults(null)}>
+                {messages.assessment.back}
+              </button>
+            </div>
+            <AssessmentOverview
+              key={openResults.runId}
+              api={artifactsApi}
+              projectId={openResults.projectId}
+              runId={openResults.runId}
+            />
+          </section>
+        ) : selectedId ? (
           <ProjectDetail
             key={selectedId}
             id={selectedId}
             api={api}
-            onClose={() => setSelectedId(null)}
+            runsApi={runsApi}
+            sourcesApi={sourcesApi}
+            artifactsApi={artifactsApi}
+            onOpenResults={(runId) =>
+              setResults({ projectId: selectedId, runId })
+            }
+            onClose={() => select(null)}
           />
         ) : (
           <CreateProjectForm
             api={api}
             onCreated={(project) => {
-              setSelectedId(project.id);
+              select(project.id);
               setExpandedIds((previous) => new Set([...previous, project.id]));
               setCreated(true);
               list.refresh();

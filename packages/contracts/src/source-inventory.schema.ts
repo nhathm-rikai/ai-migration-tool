@@ -130,6 +130,15 @@ const ProcedureSchema = Type.Object(
   Strict,
 );
 
+const SqlUseSchema = Type.Object(
+  {
+    operation: SqlOperationSchema,
+    line: Line,
+    procedureId: Nullable(Type.String()),
+  },
+  Strict,
+);
+
 const CodeFileAnalysisSchema = Type.Union([
   Type.Object(
     {
@@ -148,16 +157,12 @@ const CodeFileAnalysisSchema = Type.Union([
           Strict,
         ),
       ),
-      dynamicSql: Type.Array(
-        Type.Object(
-          {
-            operation: SqlOperationSchema,
-            line: Line,
-            procedureId: Nullable(Type.String()),
-          },
-          Strict,
-        ),
-      ),
+      dynamicSql: Type.Array(SqlUseSchema),
+      // sql-access-v5: one per SQL text with runtime values concatenated
+      // outside the table name / using bind parameters. Optional for
+      // inventories written before sql-access-v5.
+      concatenatedSql: Type.Optional(Type.Array(SqlUseSchema)),
+      parameterizedSql: Type.Optional(Type.Array(SqlUseSchema)),
       externalDeclarations: Type.Array(
         Type.Object(
           {
@@ -301,6 +306,9 @@ const ProgramAnalysisSchema = Type.Object(
         tables: Count,
         normalizedTables: Type.Optional(Count),
         dynamicSql: Count,
+        // sql-access-v5; optional for older inventories. Not scored.
+        concatenatedSql: Type.Optional(Count),
+        parameterizedSql: Type.Optional(Count),
         components: Count,
         externalApis: Count,
       },

@@ -143,9 +143,20 @@ describe('scoreComplexity (v0)', () => {
     tables: 0,
     normalizedTables: 0,
     dynamicSql: 0,
+    concatenatedSql: 0,
+    parameterizedSql: 0,
     components: 0,
     externalApis: 0,
   };
+
+  it('scores runtime table names only, not concatenated or bound SQL', () => {
+    const counted = scoreComplexity({
+      ...zero,
+      concatenatedSql: 1e3,
+      parameterizedSql: 1e3,
+    });
+    expect(counted).toMatchObject({ score: 0, parts: { dynamicSql: 0 } });
+  });
 
   it('stays within 0-100 and caps every part', () => {
     expect(scoreComplexity(zero)).toMatchObject({ score: 0, level: 'low' });

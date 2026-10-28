@@ -9,7 +9,7 @@
 | `schemaVersion` | `source-inventory-v1` | Hình dạng JSON. Thêm trường optional giữ version; đổi tên, bỏ hoặc đổi nghĩa trường phải tăng version. |
 | `metricVersion` | `vb6-physical-code-v1` | Cách đếm dòng, theo [source-analysis](source-analysis.md) §4. |
 | `procedureLinesVersion` | `vb6-procedure-lines-v1` | Breakdown Physical/Code/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có. |
-| `sqlAccessVersion` | `sql-access-v4` | Cách dựng chuỗi SQL (theo biến, nhánh, property) và trích bảng/CRUD. |
+| `sqlAccessVersion` | `sql-access-v5` | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
 | `complexityVersion` | `complexity-v0` | Công thức điểm complexity, duyệt có giới hạn ngày 23/10/2026: chỉ là phân loại tham khảo (mục 5). Inventory cũ ghi `complexity-v0-draft`, cùng công thức. |
 | `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
@@ -22,6 +22,9 @@ Số liệu khác version không được trộn trong cùng report.
 - `analysis` (file code): `counters`, `procedures[]` (ID `<path>#<kind>:<name>`, `visibility`, dòng bắt đầu/kết thúc, `codeLines`, `decisionPoints`, breakdown `physicalLines`/`executableLines`/`commentOnlyLines`/`blankLines`/`metadataLines`/`unclassifiedLines`/`sqlLines` khi có `procedureLinesVersion`), `fileLevelCodeLines`.
 - `sqlTables[]`: bảng, thao tác `C|R|U|D|X`, dòng, procedure. `X` là DDL trên bảng (CREATE/DROP/TRUNCATE/ALTER TABLE), thường gặp với bảng tạm.
 - `dynamicSql[]`: tên bảng là giá trị runtime, hoặc dính liền với giá trị runtime (`"FROM ORD_" & tenant`, `"UPDATE HAN01." & t`). Parser gắn cờ, không đoán tên bảng.
+- `concatenatedSql[]` (từ `sql-access-v5`, optional với inventory cũ): mỗi chuỗi SQL có giá trị runtime ghép vào **ngoài tên bảng** một dòng, kể cả giá trị trong dấu nháy (`" WHERE A = " & x`, `"'" & x & "'"`, mệnh đề trong biến không biết giá trị như `strWHERE` tham số). Dòng là nơi ghép giá trị runtime đầu tiên, `operation` là statement chứa nó. Chỉ tính khi chuỗi có statement mà detector đọc được (cùng điều kiện với `sqlLines`); không tính giá trị nằm trong comment SQL, phần chỉ khác nhau giữa các nhánh đã gộp (mỗi nhánh đã được phân tích riêng), và dòng comment VB6 (`'`, `Rem`). Một chuỗi vừa có tên bảng runtime vừa ghép giá trị có ở cả hai danh sách.
+- `parameterizedSql[]` (từ `sql-access-v5`, optional): mỗi chuỗi SQL dùng bind parameter `:name` (ngoài string literal/comment, ví dụ OO4O `CreateDynaset`/`ExecuteSQL` với `Parameters.Add`) một dòng, tại bind đầu tiên. Bind parameter không phải ghép chuỗi nên không tính vào `concatenatedSql`.
+- Các fact SQL ghép trong cùng procedure ở cùng dòng chỉ giữ một lần (chuỗi được ghép vào chuỗi khác cũng được phân tích riêng).
 - `externalDeclarations[]`: procedure khai báo từ thư viện native (VB6 `Declare ... Lib`, ví dụ Win32 API).
 - `labels[]`: label/số dòng dùng làm đích `GoTo`/`On Error`.
 
@@ -41,7 +44,7 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 - `crud[]`: bảng × thao tác từ code riêng và từ procedure shared **gọi tới được** từ code riêng, tên bảng giữ như trong source. `evidence` là vị trí gặp đầu tiên. `viaSharedOnly` cho biết bảng chỉ được truy cập qua module dùng chung.
 - `normalizedCrud[]`: cùng dữ liệu sau mapping tên bảng (mục 4.1). Mỗi dòng là một object được giả định là cùng một bảng; `names` liệt kê các tên trong source đã gộp vào. `metrics.normalizedTables` và `normalizedComplexity` tính trên góc nhìn này; `metrics.tables` và `complexity` vẫn tính trên tên như trong source.
 - `externalApis[]`: API native thực sự được gọi tới.
-- `metrics`: số file/dòng/procedure riêng, decision points, số procedure shared gọi tới được, số bảng, SQL động, số component (OCX) trong project, số API native.
+- `metrics`: số file/dòng/procedure riêng, decision points, số procedure shared gọi tới được, số bảng, SQL động (`dynamicSql`, tên bảng runtime), `concatenatedSql` và `parameterizedSql` (số fact trong code riêng và procedure shared gọi tới được, như `dynamicSql`; optional với inventory cũ), số component (OCX) trong project, số API native. Theo procedure: lọc fact theo `procedureId`.
 - `complexity`: xem mục 5.
 
 ## 4. Giới hạn của phân tích lexical
@@ -73,9 +76,11 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 | size | `ownCodeLines` | 30 | 10.000 dòng |
 | decisions | `decisionPoints` | 20 | 2.000 |
 | tables | số bảng trong `crud` | 15 | 30 |
-| dynamicSql | số SQL động | 15 | 30 |
+| dynamicSql | số SQL có tên bảng runtime (`metrics.dynamicSql`) | 15 | 30 |
 | components | số OCX | 10 | 8 |
 | externalApis | số API native gọi tới | 10 | 10 |
+
+`concatenatedSql` và `parameterizedSql` **không** vào điểm `complexity-v0`; đưa chúng vào công thức là đổi công thức (version mới), cần quyết định của TL và tập nhãn để calibrate lại.
 
 Mức: `low` < 40 ≤ `medium` < 55 ≤ `high`, so trên điểm đã làm tròn. Ngưỡng được chọn để khớp danh sách Low/Medium/High của 15 program pilot (15/15 khớp trên source thật ngày 15/10/2026), nên đó là calibration, không phải độ chính xác. Đối chiếu 10 program holdout có nhãn: 7/10 khớp, High 1/3, mọi ca lệch thấp hơn nhãn một bậc. Đổi công thức phải tăng `complexityVersion`.
 

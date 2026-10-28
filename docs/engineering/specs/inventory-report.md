@@ -12,13 +12,14 @@
 | Bảng (sheet) | Nội dung | Truy vết |
 |---|---|---|
 | `source` (Summary) | `snapshotHash`, profile, mọi version của inventory (`metricVersion`, `procedureLinesVersion`, decoder, normalization, `sqlAccessVersion`, call graph, complexity, table name) và mapping tên bảng. | Snapshot |
-| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics, complexity raw/normalized, `complexityReviewFlags` (`high`, `near-threshold`, `known-mismatch`). | `projectPath` |
+| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics (gồm `concatenatedSql`, `parameterizedSql`; trống với inventory cũ), complexity raw/normalized, `complexityReviewFlags` (`high`, `near-threshold`, `known-mismatch`). | `projectPath` |
 | `members` | Member khai báo trong project, path thật, `resolution`, `fileStatus`, `shared` (trong toàn corpus). | `declaredPath`, `relativePath` |
 | `files` | File riêng biệt của các program đã chọn, `rawSha256`, encoding, counters, `usedBy`. | `relativePath`, hash |
 | `procedures` | LoC theo function: Physical/Code/Executable/Comment/Blank/Metadata/Unclassified/SQL theo [source-analysis](source-analysis.md) §4.1, decision points, `usedBy`. | file, procedure ID, `startLine..endLine` |
 | `calls` | Lời gọi theo program, `resolution` `local/program/external/ambiguous`, mọi đích. | `from` (procedure hoặc `#file`), dòng đầu |
 | `crud` | View `raw` (tên như trong source) và `normalized` (sau mapping, kèm `names` đã gộp), `viaSharedOnly`. | evidence path + dòng |
 | `dynamicSql` | SQL có tên bảng runtime. | file, procedure, dòng |
+| `concatenatedSql` (ConcatenatedSQL) | SQL ghép giá trị runtime ngoài tên bảng (`sql-access-v5`); rỗng với inventory cũ. Không sinh cảnh báo từng dòng. | file, procedure, dòng |
 | `externalReferences`, `externalApis` | Reference/OCX của project, API native được gọi. | program |
 | `totals` | `perProgramSum` và `unique` (mục 3). | — |
 | `warnings` | Mục 4. | program/file/dòng nếu có |

@@ -19,6 +19,14 @@ const NUMBER =
   /^(?:&[HhOo][0-9A-Fa-f]+&?|\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?[%&!#@]?)/;
 const DATE = /^#[^#]*#/;
 const CONCAT = new Set(['&', '+']);
+// Built-in string constants: line breaks and tabs, not runtime values.
+const WHITESPACE_CONSTANTS = new Map([
+  ['vbcrlf', '\r\n'],
+  ['vbnewline', '\r\n'],
+  ['vbcr', '\r'],
+  ['vblf', '\n'],
+  ['vbtab', '\t'],
+]);
 
 export function tokenizeVb6(pieces: readonly CodePiece[]): Token[] {
   const tokens: Token[] = [];
@@ -315,6 +323,11 @@ export class Vb6StringTracker {
             // Every branch adds a separate word (or nothing): the text
             // before the gap is complete.
             boundary: tails.every(startsWithSpace),
+            // Only literal text differs: each branch's value already
+            // reported its own runtime values.
+            branch: tails.every((tail) =>
+              tail.every((segment) => segment.text !== null || segment.branch),
+            ),
           },
         ],
         hasLiteral: known.some((value) => value.hasLiteral),
@@ -397,10 +410,15 @@ export class Vb6StringTracker {
           end = close;
         } else {
           const known = token.member ? undefined : this.variables.get(name);
+          const constant = token.member
+            ? undefined
+            : WHITESPACE_CONSTANTS.get(name);
           if (known) {
             segments.push(...known.segments);
             hasLiteral ||= known.hasLiteral;
-          } else segments.push({ text: null, line: token.line });
+          } else if (constant !== undefined)
+            segments.push({ text: constant, line: token.line });
+          else segments.push({ text: null, line: token.line });
           names.add(name);
         }
         i = end;

@@ -128,6 +128,8 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ['tables', 8, (p) => p.metrics?.tables ?? null],
         ['normalizedTables', 12, (p) => p.metrics?.normalizedTables ?? null],
         ['dynamicSql', 10, (p) => p.metrics?.dynamicSql ?? null],
+        ['concatenatedSql', 14, (p) => p.metrics?.concatenatedSql ?? null],
+        ['parameterizedSql', 15, (p) => p.metrics?.parameterizedSql ?? null],
         ['components', 11, (p) => p.metrics?.components ?? null],
         ['externalApis', 11, (p) => p.metrics?.externalApis ?? null],
         ['complexityScore', 12, (p) => p.complexity?.score ?? null],
@@ -247,6 +249,17 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ['usedBy', 30, (d) => list(d.usedBy)],
       ],
       report.dynamicSql,
+    ),
+    table(
+      'ConcatenatedSQL',
+      [
+        ['relativePath', 32, (d) => d.relativePath],
+        ['procedureId', 50, (d) => d.procedureId],
+        ['operation', 10, (d) => d.operation],
+        ['line', 8, (d) => d.line],
+        ['usedBy', 30, (d) => list(d.usedBy)],
+      ],
+      report.concatenatedSql,
     ),
     table(
       'ExternalRefs',

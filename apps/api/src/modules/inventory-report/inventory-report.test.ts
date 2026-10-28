@@ -41,7 +41,7 @@ const FILES = [
   ]),
   text('b/B.BAS', [
     'Sub Main()',
-    '    s = "DELETE FROM " & t',
+    '    s = "DELETE FROM " & t & " WHERE A = " & k',
     '    LogIt',
     'End Sub',
   ]),
@@ -148,6 +148,15 @@ describe('buildInventoryReport', () => {
       viaSharedOnly: true,
     });
     expect(report.dynamicSql).toEqual([
+      {
+        relativePath: 'b/B.BAS',
+        procedureId: 'b/B.BAS#sub:Main',
+        operation: 'D',
+        line: 2,
+        usedBy: ['PB'],
+      },
+    ]);
+    expect(report.concatenatedSql).toEqual([
       {
         relativePath: 'b/B.BAS',
         procedureId: 'b/B.BAS#sub:Main',
@@ -302,6 +311,7 @@ describe('inventory report workbook', () => {
       'Calls',
       'CRUD',
       'DynamicSQL',
+      'ConcatenatedSQL',
       'ExternalRefs',
       'ExternalAPIs',
       'Totals',
@@ -313,7 +323,7 @@ describe('inventory report workbook', () => {
     const rowCount = (xml: string) => [...xml.matchAll(/<row /g)].length;
     expect(rowCount(sheetXml(2))).toBe(1 + report.programs.length);
     expect(rowCount(sheetXml(5))).toBe(1 + report.procedures.length);
-    expect(rowCount(sheetXml(12))).toBe(1 + report.warnings.length);
+    expect(rowCount(sheetXml(13))).toBe(1 + report.warnings.length);
   });
 
   it('keeps a formula-like program name as quoted text', () => {

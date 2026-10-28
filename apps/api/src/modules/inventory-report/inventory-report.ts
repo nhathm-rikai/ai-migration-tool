@@ -16,6 +16,16 @@ type AnalyzedFile = Extract<
   NonNullable<InventoryFile['analysis']>,
   { status: 'analyzed' }
 >;
+type SqlUse = AnalyzedFile['dynamicSql'][number];
+
+// One SQL fact of a selected file (dynamic table name, concatenated value).
+export type SqlUseRow = {
+  relativePath: string;
+  procedureId: string | null;
+  operation: string;
+  line: number;
+  usedBy: string[];
+};
 
 // Procedure breakdown (procedureLinesVersion); null in older inventories.
 export type ProcedureLineTotals = {
@@ -148,13 +158,9 @@ export type InventoryReport = {
     line: number;
     viaSharedOnly: boolean;
   }[];
-  dynamicSql: {
-    relativePath: string;
-    procedureId: string | null;
-    operation: string;
-    line: number;
-    usedBy: string[];
-  }[];
+  dynamicSql: SqlUseRow[];
+  // Empty for inventories written before sql-access-v5.
+  concatenatedSql: SqlUseRow[];
   externalReferences: {
     programId: string;
     kind: string;
@@ -446,15 +452,21 @@ export function buildInventoryReport(
     ];
   });
 
-  const dynamicSql = selectedPaths.flatMap((path) =>
-    (analyzed(path)?.dynamicSql ?? []).map((use) => ({
-      relativePath: path,
-      procedureId: use.procedureId,
-      operation: use.operation,
-      line: use.line,
-      usedBy: usedBy.get(path) ?? [],
-    })),
-  );
+  const sqlUseRows = (
+    uses: (file: AnalyzedFile) => readonly SqlUse[] | undefined,
+  ): SqlUseRow[] =>
+    selectedPaths.flatMap((path) => {
+      const file = analyzed(path);
+      return (file ? (uses(file) ?? []) : []).map((use) => ({
+        relativePath: path,
+        procedureId: use.procedureId,
+        operation: use.operation,
+        line: use.line,
+        usedBy: usedBy.get(path) ?? [],
+      }));
+    });
+  const dynamicSql = sqlUseRows((file) => file.dynamicSql);
+  const concatenatedSql = sqlUseRows((file) => file.concatenatedSql);
 
   const externalReferences = selected.flatMap(({ id, program }) =>
     program.externalReferences.map((reference) => ({
@@ -653,6 +665,7 @@ export function buildInventoryReport(
     calls,
     crud,
     dynamicSql,
+    concatenatedSql,
     externalReferences,
     externalApis,
     totals: {

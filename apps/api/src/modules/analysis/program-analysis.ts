@@ -65,7 +65,12 @@ export type ProgramMetrics = {
   tables: number;
   // Distinct tables after table name mapping.
   normalizedTables: number;
+  // SQL with a runtime table name; the only SQL input of complexity-v0.
   dynamicSql: number;
+  // SQL texts with runtime values concatenated outside the table name, and
+  // SQL texts using bind parameters (sql-access-v5). Not scored.
+  concatenatedSql: number;
+  parameterizedSql: number;
   components: number;
   externalApis: number;
 };
@@ -322,6 +327,8 @@ export function analyzeProgram(
 
   const crud = new Map<string, CrudEntry>();
   let dynamicSql = 0;
+  let concatenatedSql = 0;
+  let parameterizedSql = 0;
   let reachableSharedProcedures = 0;
   for (const file of files) {
     const counts = (procedureId: string | null) =>
@@ -332,6 +339,10 @@ export function analyzeProgram(
       ).length;
     for (const use of file.analysis.dynamicSql)
       if (counts(use.procedureId)) dynamicSql += 1;
+    for (const use of file.analysis.concatenatedSql)
+      if (counts(use.procedureId)) concatenatedSql += 1;
+    for (const use of file.analysis.parameterizedSql)
+      if (counts(use.procedureId)) parameterizedSql += 1;
     for (const access of file.analysis.sqlTables) {
       if (!counts(access.procedureId)) continue;
       const entry = crud.get(access.table);
@@ -380,6 +391,8 @@ export function analyzeProgram(
     tables: crud.size,
     normalizedTables: normalizedCrud.length,
     dynamicSql,
+    concatenatedSql,
+    parameterizedSql,
     components: externalReferences.filter(
       (reference) => reference.kind === 'component',
     ).length,

@@ -56,9 +56,11 @@ export type ProgramRow = {
 };
 
 // A declared member file that was not found, with the number of programs
-// declaring it; grouped by file name (case-insensitive).
+// declaring it; grouped by target path (case-insensitive) and reason.
 export type MissingMember = {
-  fileName: string;
+  // Root-relative path the member points to; the declared path as written
+  // when it is absolute or leaves the source root.
+  path: string;
   resolution: Exclude<MemberResolution, 'resolved' | 'case-mismatch'>;
   programs: number;
 };
@@ -131,6 +133,23 @@ function programRow(program: Program): ProgramRow {
   };
 }
 
+// The path a declared member points to, from the project file's folder,
+// with `\` and `.`/`..` resolved. Display only: the analyzer already
+// decided the resolution; this never looks for the file.
+function memberTarget(projectPath: string, declaredPath: string): string {
+  const declared = declaredPath.trim().replace(/\\/g, '/');
+  if (/^([A-Za-z]:|\/)/.test(declared)) return declaredPath.trim();
+  const segments = projectPath.split('/').slice(0, -1);
+  for (const segment of declared.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length === 0) return declaredPath.trim();
+      segments.pop();
+    } else segments.push(segment);
+  }
+  return segments.join('/');
+}
+
 export function summarizeInventory(
   inventory: SourceInventoryDocument,
 ): AssessmentSummary {
@@ -187,17 +206,17 @@ export function summarizeInventory(
       )
         continue;
       // Projects in different folders reach the same file by different
-      // relative paths; the file name groups them.
-      const fileName =
-        member.declaredPath.split(/[\\/]/).pop() ?? member.declaredPath;
-      const key = fileName.toLowerCase();
+      // relative paths: grouped by the path they point to and the reason,
+      // since a missing file and an absolute path need different fixes.
+      const path = memberTarget(program.projectPath, member.declaredPath);
+      const key = `${member.resolution}|${path.toLowerCase()}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const entry = missing.get(key);
       if (entry) entry.programs += 1;
       else
         missing.set(key, {
-          fileName,
+          path,
           resolution: member.resolution,
           programs: 1,
         });
@@ -206,7 +225,10 @@ export function summarizeInventory(
 
   return {
     missingMembers: [...missing.values()].sort(
-      (a, b) => b.programs - a.programs || a.fileName.localeCompare(b.fileName),
+      (a, b) =>
+        b.programs - a.programs ||
+        a.path.localeCompare(b.path) ||
+        a.resolution.localeCompare(b.resolution),
     ),
     unique: {
       files: totals.files,

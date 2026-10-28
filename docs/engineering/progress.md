@@ -8,6 +8,12 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 28/10/2026 — sửa finding P2 review `f818184`: gộp file thiếu theo đường dẫn đích và nguyên nhân
+
+- Review (CHANGES_REQUIRED, phần BE `.TXT` đúng): cảnh báo file thiếu gộp chỉ theo tên file, `resolution` lấy từ member gặp đầu tiên; `one-lib/Common.bas` thiếu và `C:\legacy\Common.bas` tuyệt đối bị gộp “2 program”, nguyên nhân đổi theo thứ tự program. Xác minh đúng.
+- Sửa `assessment-summary.ts`: key = nguyên nhân + đường dẫn đích (thư mục `.vbp` + đường dẫn khai báo, chuẩn hóa `\`, `.`, `..`, không phân biệt hoa/thường); đường dẫn tuyệt đối hoặc ra ngoài gốc giữ nguyên văn. UI hiện đường dẫn đích thay cho tên file.
+- Regression: trùng tên khác thư mục, khác nguyên nhân (missing/absolute-path), đảo thứ tự program; hai đường dẫn tương đối khác nhau tới cùng file vẫn gộp. Kiểm chứng: lint (assessment), typecheck web, web 104 test, `npm run e2e` 5/5.
+
 ## 28/10/2026 — snapshot giữ file .vbp khai báo là code; cảnh báo nêu tên file thiếu
 
 - Dùng `portal-implement`; nhánh `fix/snapshot-declared-members` từ master `fdd47de` (đã merge PR #6). Lý do: VB6 pilot có 189/284 program “Chưa đầy đủ” dù 457/457 file code đã phân tích. Đọc artifact: cả 189 chỉ do member `missing`; 183 thiếu `cmn/ORACONST.TXT` (có trong source nhưng snapshot bỏ đuôi `.TXT` vì `excluded`), 7 thiếu `SFTP.BAS` (không có trong source; ByteInsight cũng 0 dòng). Đây là giới hạn đã ghi ở PF07.

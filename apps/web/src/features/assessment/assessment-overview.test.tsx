@@ -476,8 +476,9 @@ describe('Assessment overview (F03)', () => {
       ],
     };
     const summary = summarizeInventory(payload);
+    // Two relative paths from different folders point to the same file.
     expect(summary.missingMembers).toEqual([
-      { fileName: 'SFTP.BAS', resolution: 'missing', programs: 2 },
+      { path: 'cmn/SFTP.BAS', resolution: 'missing', programs: 2 },
     ]);
     expect(
       summary.programs.find((row) => row.projectPath === 'd/D.vbp')
@@ -491,9 +492,56 @@ describe('Assessment overview (F03)', () => {
         runId={runId}
       />,
     );
-    const item = (await screen.findByText('SFTP.BAS')).closest('li');
+    const item = (await screen.findByText('cmn/SFTP.BAS')).closest('li');
     expect(item?.textContent).toContain('2 program');
     expect(item?.textContent).toContain('không tìm thấy');
+  });
+
+  it('keeps missing files apart by folder and by reason, whatever the program order', () => {
+    const base: Inventory = structuredClone(
+      mappedInventoryArtifactFixture.payload,
+    );
+    const [program] = base.programs;
+    if (!program) throw new Error('fixture has a program');
+    const withMember = (
+      projectPath: string,
+      declaredPath: string,
+      resolution: 'missing' | 'absolute-path',
+    ) => ({
+      ...structuredClone(program),
+      projectPath,
+      members: [
+        ...program.members,
+        {
+          kind: 'module',
+          name: null,
+          declaredPath,
+          relativePath: null,
+          resolution,
+          fileStatus: null,
+          shared: false,
+        },
+      ],
+    });
+    const programs = [
+      withMember('app/A.vbp', 'one-lib\\Common.bas', 'missing'),
+      withMember('app/B.vbp', 'two-lib\\Common.bas', 'missing'),
+      withMember('app/C.vbp', 'C:\\legacy\\Common.bas', 'absolute-path'),
+    ];
+    const expected = [
+      { path: 'app/one-lib/Common.bas', resolution: 'missing', programs: 1 },
+      { path: 'app/two-lib/Common.bas', resolution: 'missing', programs: 1 },
+      {
+        path: 'C:\\legacy\\Common.bas',
+        resolution: 'absolute-path',
+        programs: 1,
+      },
+    ];
+    for (const order of [programs, [...programs].reverse()]) {
+      const summary = summarizeInventory({ ...base, programs: order });
+      expect(summary.missingMembers).toEqual(expect.arrayContaining(expected));
+      expect(summary.missingMembers).toHaveLength(3);
+    }
   });
 
   it('opens the list filtered from a warning of the overview', async () => {

@@ -453,8 +453,8 @@ function Warnings({
                     {summary.missingMembers
                       .slice(0, MISSING_SHOWN)
                       .map((member) => (
-                        <li key={member.fileName}>
-                          <span className="mono">{member.fileName}</span>{' '}
+                        <li key={`${member.resolution}|${member.path}`}>
+                          <span className="mono">{member.path}</span>{' '}
                           <span className="muted">
                             (
                             {messages.assessment.members.resolution[

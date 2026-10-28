@@ -8,6 +8,11 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 28/10/2026 — bỏ cờ review complexity (mức cao, gần ngưỡng, ca lệch đã biết)
+
+- Người dùng yêu cầu: complexity chỉ cần điểm và mức, không gắn cờ cần kiểm chứng hay gần ngưỡng. `scoreComplexity` không còn ghi `reviewFlags`; report bỏ cột `complexityReviewFlags`, cảnh báo `COMPLEXITY_HIGH`/`COMPLEXITY_NEAR_THRESHOLD`/`COMPLEXITY_KNOWN_MISMATCH`, trường `complexityKnownMismatches` và tùy chọn CLI `--complexity-review`; UI bỏ badge “Cần xem lại” và cảnh báo tương ứng (kể cả với inventory v0 còn cờ). Contract giữ `reviewFlags` optional để inventory v0 vẫn hợp schema. `COMPLEXITY_REFERENCE_ONLY` (không tính effort/báo giá từ điểm) giữ nguyên.
+- Kiểm chứng (Windows x64, Node 24.16.0): `lint`, `typecheck`, `npm test` (contracts 43; API 486 + 1 skip, 2 test timing timeout khi chạy cả bộ và pass khi chạy riêng: job-dispatcher claim retry, project page size; web 105), `build`, `npm run e2e` 5/5. Điểm/mức không đổi so với commit `320d0b7`.
+
 ## 28/10/2026 — `complexity-v1`: tính SQL ghép giá trị vào điểm, ngưỡng 45/60, thêm Very High
 
 - Dùng `portal-implement`; cùng nhánh `feat/sql-concatenated-values`. Người dùng duyệt phương án TL trong thread: SQL ghép giá trị là SQL dựng lúc chạy nên được tính điểm, nhẹ hơn tên bảng runtime.

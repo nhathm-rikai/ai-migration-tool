@@ -274,7 +274,6 @@ describe('Assessment overview (F03)', () => {
       version: 'complexity-v1',
       score: 78,
       level: 'very-high',
-      reviewFlags: ['high'],
     };
     const server = serve({
       ...mappedInventoryArtifactFixture,

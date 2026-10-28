@@ -1149,11 +1149,6 @@ dd {
 .program-table .tag-group .badge {
   margin-left: 0;
 }
-.badge.review {
-  background: var(--surface);
-  border: 1px dashed var(--line-2);
-  color: var(--fg-2);
-}
 .declared-name {
   display: block;
   font-size: 11px;

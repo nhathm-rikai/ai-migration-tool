@@ -182,15 +182,14 @@ describe('scoreComplexity (v1)', () => {
   // Unrounded scores in comments; levels use the rounded score.
   it.each([
     // 34.45: far from every threshold.
-    [{ ownCodeLines: 393, decisionPoints: 47, tables: 2 }, 34, 'low', []],
-    // 43.33: Low, within 3 points of 45.
+    [{ ownCodeLines: 393, decisionPoints: 47, tables: 2 }, 34, 'low'],
+    // 43.33: Low, just below 45.
     [
       { ownCodeLines: 577, decisionPoints: 73, tables: 3, concatenatedSql: 4 },
       43,
       'low',
-      ['near-threshold'],
     ],
-    // 46.66: Medium, within 3 points of 45.
+    // 46.66: Medium.
     [
       {
         ownCodeLines: 1000,
@@ -200,9 +199,8 @@ describe('scoreComplexity (v1)', () => {
       },
       47,
       'medium',
-      ['near-threshold'],
     ],
-    // 59.24: Medium, within 3 points of 60.
+    // 59.24: Medium, just below 60.
     [
       {
         ownCodeLines: 3000,
@@ -212,9 +210,8 @@ describe('scoreComplexity (v1)', () => {
       },
       59,
       'medium',
-      ['near-threshold'],
     ],
-    // 67.01: High is always flagged, and within 3 points of 70.
+    // 67.01: High.
     [
       {
         ownCodeLines: 5175,
@@ -225,9 +222,8 @@ describe('scoreComplexity (v1)', () => {
       },
       67,
       'high',
-      ['high', 'near-threshold'],
     ],
-    // 79.68: Very High is flagged like High.
+    // 79.68: Very High from 70.
     [
       {
         ownCodeLines: 9206,
@@ -238,14 +234,14 @@ describe('scoreComplexity (v1)', () => {
       },
       80,
       'very-high',
-      ['high'],
     ],
-  ])('flags %j for review', (metrics, score, level, reviewFlags) => {
-    expect(scoreComplexity({ ...zero, ...metrics })).toMatchObject({
+  ])('scores %j', (metrics, score, level) => {
+    const complexity = scoreComplexity({ ...zero, ...metrics });
+    expect(complexity).toMatchObject({
       version: 'complexity-v1',
       score,
       level,
-      reviewFlags,
     });
+    expect(complexity).not.toHaveProperty('reviewFlags');
   });
 });

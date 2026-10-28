@@ -336,8 +336,6 @@ export const jaMessages = {
       UNCLASSIFIED_LINES: '分類できない行があります。',
       TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
       COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
-      COMPLEXITY_REVIEW:
-        '複雑度の確認が必要なプログラムがあります（高、またはしきい値付近）。',
     },
     programs: {
       title: 'プログラム一覧',
@@ -352,7 +350,6 @@ export const jaMessages = {
       notAnalyzed: '未解析',
       mappedTables: (count: string) => `（マッピング後: ${count}）`,
       draft: 'ドラフト',
-      needsReview: '要確認',
       declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
       sortBy: (column: string) => `${column}で並べ替え`,
       pageSize: '1ページの行数',

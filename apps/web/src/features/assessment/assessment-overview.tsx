@@ -417,8 +417,6 @@ function Warnings({
         return programs.filter((row) => row.state === 'unsupported').length;
       case 'MEMBER_UNRESOLVED':
         return programs.filter((row) => row.unresolvedMembers > 0).length;
-      case 'COMPLEXITY_REVIEW':
-        return programs.filter((row) => row.complexity?.needsReview).length;
       default:
         return null;
     }

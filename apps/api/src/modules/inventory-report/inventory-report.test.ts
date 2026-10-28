@@ -180,25 +180,7 @@ describe('buildInventoryReport', () => {
     ]);
   });
 
-  it('flags known mismatches given to the report and keeps the full list', () => {
-    const known = [
-      { program: 'pb', note: 'label Medium, model Low' },
-      { program: 'OTHER', note: 'not selected' },
-    ];
-    const flagged = buildInventoryReport(inventory(), ['PA', 'PB'], known);
-    expect(flagged.programs.map((p) => p.complexityReviewFlags)).toEqual([
-      [],
-      ['known-mismatch'],
-    ]);
-    expect(
-      flagged.warnings
-        .filter((w) => w.code.startsWith('COMPLEXITY_KNOWN'))
-        .map((w) => [w.programId, w.detail]),
-    ).toEqual([['PB', 'label Medium, model Low']]);
-    expect(flagged.complexityKnownMismatches).toEqual(known);
-  });
-
-  it('warns about a draft model and about each model flag', () => {
+  it('warns about a draft model, not about review flags of old inventories', () => {
     const doc = inventory();
     doc.complexityVersion = 'complexity-v0-draft';
     const program = doc.programs.find((p) => p.projectPath === 'a/PA.VBP');
@@ -208,11 +190,7 @@ describe('buildInventoryReport', () => {
       buildInventoryReport(doc, ['PA'])
         .warnings.filter((w) => w.code.startsWith('COMPLEXITY'))
         .map((w) => [w.code, w.programId]),
-    ).toEqual([
-      ['COMPLEXITY_DRAFT', null],
-      ['COMPLEXITY_HIGH', 'PA'],
-      ['COMPLEXITY_NEAR_THRESHOLD', 'PA'],
-    ]);
+    ).toEqual([['COMPLEXITY_DRAFT', null]]);
   });
 
   it('names a program after its project file', () => {

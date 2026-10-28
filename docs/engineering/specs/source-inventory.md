@@ -84,11 +84,11 @@ SQL ghép giá trị cũng là SQL dựng lúc chạy, nhưng nhẹ hơn tên b�
 
 Mức, so trên điểm đã làm tròn: `low` < 45 ≤ `medium` < 60 ≤ `high` < 70 ≤ `very-high`.
 
-**Calibration (28/10/2026, `sql-access-v5`, VB6 pilot 284 program):** thêm SQL ghép làm điểm cả corpus tăng khoảng 5, nên giữ ngưỡng 40/55 thì pilot chỉ khớp 9/15. Ngưỡng 45/60 cho 15/15 pilot (danh sách dùng để chọn ngưỡng của v0) và 7/10 holdout. Holdout lệch: NUKO0110 và NUKO0030 (nhãn Medium, tool Low), KUKO0080 (nhãn High, tool Medium); KNRO2040 (lệch ở v0) nay khớp High. Phân bố: Low 122, Medium 101, High 52, Very High 9 (điểm 70–79). Ngưỡng được chọn trên cả 25 program đã có nhãn từ trước, nên đây vẫn là calibration, không phải độ chính xác. `very-high` chưa có nhãn nào: dùng để ưu tiên review, chưa phải mức đã kiểm chứng. Cần tập nhãn mới chưa từng xem (có program ≥ 70) để xác nhận. Đổi công thức phải tăng `complexityVersion`.
+Ngưỡng 45/60 chọn trên VB6 pilot (28/10/2026, `sql-access-v5`): thêm SQL ghép làm điểm cả corpus tăng khoảng 5, nên giữ 40/55 thì 15 program pilot chỉ khớp 9/15; với 45/60 khớp 15/15 và 10 program holdout khớp 7/10. Phân bố 284 program: Low 122, Medium 101, High 52, Very High 9 (điểm 70–79). Đổi công thức phải tăng `complexityVersion`.
 
-**Phạm vi dùng (giữ từ quyết định 23/10/2026 cho v0, approved-limited; v1 do người dùng duyệt 28/10/2026):** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback; các yếu tố này phải được review bổ sung.
+**Phạm vi dùng:** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback.
 
-`reviewFlags` trên mỗi điểm complexity: `high` (mức High hoặc Very High, model kém tin cậy nhất ở các mức này) và `near-threshold` (điểm chưa làm tròn cách 45, 60 hoặc 70 không quá 3 điểm). Program có cờ phải được người xem trước khi dùng mức (pilot: 117/284). Danh sách ca lệch đã biết là dữ liệu của corpus, đưa vào báo cáo qua `--complexity-review` ([inventory-report](inventory-report.md)), không ghi trong code; danh sách lập cho v0 phải được lập lại cho v1.
+v1 không gắn cờ review (`reviewFlags`, mức cao hoặc gần ngưỡng) như v0; trường đó chỉ còn trong inventory v0 và không được report/UI dùng (quyết định của người dùng 28/10/2026).
 
 ## 6. Chạy
 

@@ -21,9 +21,6 @@ export const CALL_GRAPH_VERSION = 'call-graph-v2';
 // thresholds 45/60 and a Very High level from 70.
 export const COMPLEXITY_VERSION = 'complexity-v1';
 
-// Points around a level threshold (unrounded score) that call for a person
-// to look at the program before the level is used.
-export const NEAR_THRESHOLD_POINTS = 3;
 // Medium, High and Very High start here (rounded score).
 const THRESHOLDS = [45, 60, 70] as const;
 // A runtime table name weighs as much as this many concatenated SQL texts.
@@ -80,16 +77,10 @@ export type ProgramMetrics = {
   externalApis: number;
 };
 
-// high: High or Very High, where the model is least reliable (holdout
-// High 1/3 for v0; Very High has no labels yet);
-// near-threshold: a small change of the source or count changes the level.
-export type ComplexityReviewFlag = 'high' | 'near-threshold';
-
 export type ComplexityScore = {
   version: typeof COMPLEXITY_VERSION;
   score: number;
   level: 'low' | 'medium' | 'high' | 'very-high';
-  reviewFlags: ComplexityReviewFlag[];
   parts: Record<
     | 'size'
     | 'decisions'
@@ -288,9 +279,8 @@ function scale(value: number, full: number, weight: number): number {
 }
 
 // Weighted log scales capped per part, total 0-100. Thresholds were fitted
-// to 25 labelled programs (15 pilot, 10 holdout already seen), so they are
-// a calibration, not a validated model; Very High has no labels.
-// The dynamicSql part counts runtime table names and concatenated SQL.
+// to 25 labelled programs (15 pilot, 10 holdout). The dynamicSql part counts
+// runtime table names and concatenated SQL.
 export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
   const parts = {
     size: scale(metrics.ownCodeLines, 10000, 30),
@@ -321,15 +311,10 @@ export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
         : score < veryHigh
           ? 'high'
           : 'very-high';
-  const reviewFlags: ComplexityReviewFlag[] = [];
-  if (level === 'high' || level === 'very-high') reviewFlags.push('high');
-  if (THRESHOLDS.some((t) => Math.abs(exact - t) <= NEAR_THRESHOLD_POINTS))
-    reviewFlags.push('near-threshold');
   return {
     version: COMPLEXITY_VERSION,
     score,
     level,
-    reviewFlags,
     parts: rounded,
   };
 }

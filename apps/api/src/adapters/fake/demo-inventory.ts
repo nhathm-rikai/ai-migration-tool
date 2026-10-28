@@ -195,16 +195,11 @@ function member(
   };
 }
 
-function complexity(
-  score: number,
-  parts: Complexity['parts'],
-  reviewFlags?: Complexity['reviewFlags'],
-): Complexity {
+function complexity(score: number, parts: Complexity['parts']): Complexity {
   return {
     version: 'complexity-v0',
     score,
     level: score < 40 ? 'low' : score < 55 ? 'medium' : 'high',
-    ...(reviewFlags ? { reviewFlags } : {}),
     parts,
   };
 }
@@ -348,10 +343,8 @@ const programs: Program[] = [
         names: ['APP.ORDERS', 'ORDERS'],
       },
     ],
-    complexity: complexity(42, parts(18.6, 12.1, 11.3), ['near-threshold']),
-    normalizedComplexity: complexity(40, parts(18.6, 12.1, 9.6), [
-      'near-threshold',
-    ]),
+    complexity: complexity(42, parts(18.6, 12.1, 11.3)),
+    normalizedComplexity: complexity(40, parts(18.6, 12.1, 9.6)),
   }),
   program({
     name: 'CUSTOMER',

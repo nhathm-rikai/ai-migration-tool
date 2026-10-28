@@ -207,7 +207,7 @@ function Overview({
   );
 }
 
-const LEVELS: ComplexityLevel[] = ['low', 'medium', 'high'];
+const LEVELS: ComplexityLevel[] = ['low', 'medium', 'high', 'very-high'];
 const STATES: ProgramState[] = ['complete', 'partial', 'unsupported'];
 const STATE_TONE: Record<ProgramState, ComplexityLevel> = {
   complete: 'low',
@@ -666,7 +666,8 @@ function ProgramList({
                 value === 'all' ||
                 value === 'low' ||
                 value === 'medium' ||
-                value === 'high'
+                value === 'high' ||
+                value === 'very-high'
               )
                 changeFilter({ ...filter, level: value });
             }}
@@ -675,6 +676,7 @@ function ProgramList({
             <option value="low">{copy.level.low}</option>
             <option value="medium">{copy.level.medium}</option>
             <option value="high">{copy.level.high}</option>
+            <option value="very-high">{copy.level['very-high']}</option>
           </select>
         </label>
       </div>

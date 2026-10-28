@@ -11,7 +11,7 @@
 | `procedureLinesVersion` | `vb6-procedure-lines-v1` | Breakdown Physical/Code/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có. |
 | `sqlAccessVersion` | `sql-access-v5` | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
-| `complexityVersion` | `complexity-v0` | Công thức điểm complexity, duyệt có giới hạn ngày 23/10/2026: chỉ là phân loại tham khảo (mục 5). Inventory cũ ghi `complexity-v0-draft`, cùng công thức. |
+| `complexityVersion` | `complexity-v1` | Công thức điểm complexity (mục 5), chỉ là phân loại tham khảo. Inventory cũ ghi `complexity-v0` hoặc `complexity-v0-draft` (cùng công thức v0: SQL động chỉ đếm tên bảng runtime, ngưỡng 40/55, không có `very-high`). |
 | `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
 
 Số liệu khác version không được trộn trong cùng report.
@@ -67,7 +67,7 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 - Quy tắc: phần tên không có dấu nháy chuyển chữ hoa, phần trong `"..."` giữ nguyên; `<defaultSchema>.X` thành `X`; schema khác giữ nguyên. Hai tên gộp là cùng **tên tham chiếu được giả định**, chưa chứng minh cùng object đích (một tên có thể là synonym).
 - Một lần chạy dùng một schema cho mọi program. Corpus có program kết nối bằng user khác thì phải chạy riêng hoặc chờ mapping theo program.
 
-## 5. Complexity v0 (bản nháp)
+## 5. Complexity v1
 
 Điểm 0–100, tổng 6 phần, mỗi phần theo thang log và có trần:
 
@@ -76,17 +76,19 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 | size | `ownCodeLines` | 30 | 10.000 dòng |
 | decisions | `decisionPoints` | 20 | 2.000 |
 | tables | số bảng trong `crud` | 15 | 30 |
-| dynamicSql | số SQL có tên bảng runtime (`metrics.dynamicSql`) | 15 | 30 |
+| dynamicSql | 3 × `metrics.dynamicSql` (tên bảng runtime) + `metrics.concatenatedSql` (SQL ghép giá trị runtime) | 15 | 100 |
 | components | số OCX | 10 | 8 |
 | externalApis | số API native gọi tới | 10 | 10 |
 
-`concatenatedSql` và `parameterizedSql` **không** vào điểm `complexity-v0`; đưa chúng vào công thức là đổi công thức (version mới), cần quyết định của TL và tập nhãn để calibrate lại.
+SQL ghép giá trị cũng là SQL dựng lúc chạy, nhưng nhẹ hơn tên bảng runtime: phần lớn là đổi sang bind parameter và test lại (SQL injection, format ngày/số), còn tên bảng runtime làm CRUD không biết trước. Vì vậy một tên bảng runtime tính bằng 3 câu ghép. `parameterizedSql` (bind `:name`) không vào điểm. Tên phần `dynamicSql` giữ như v0 để inventory cũ vẫn hợp schema.
 
-Mức: `low` < 40 ≤ `medium` < 55 ≤ `high`, so trên điểm đã làm tròn. Ngưỡng được chọn để khớp danh sách Low/Medium/High của 15 program pilot (15/15 khớp trên source thật ngày 15/10/2026), nên đó là calibration, không phải độ chính xác. Đối chiếu 10 program holdout có nhãn: 7/10 khớp, High 1/3, mọi ca lệch thấp hơn nhãn một bậc. Đổi công thức phải tăng `complexityVersion`.
+Mức, so trên điểm đã làm tròn: `low` < 45 ≤ `medium` < 60 ≤ `high` < 70 ≤ `very-high`.
 
-**Phạm vi dùng của `complexity-v0` (quyết định 23/10/2026, approved-limited):** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback; các yếu tố này phải được review bổ sung.
+**Calibration (28/10/2026, `sql-access-v5`, VB6 pilot 284 program):** thêm SQL ghép làm điểm cả corpus tăng khoảng 5, nên giữ ngưỡng 40/55 thì pilot chỉ khớp 9/15. Ngưỡng 45/60 cho 15/15 pilot (danh sách dùng để chọn ngưỡng của v0) và 7/10 holdout. Holdout lệch: NUKO0110 và NUKO0030 (nhãn Medium, tool Low), KUKO0080 (nhãn High, tool Medium); KNRO2040 (lệch ở v0) nay khớp High. Phân bố: Low 122, Medium 101, High 52, Very High 9 (điểm 70–79). Ngưỡng được chọn trên cả 25 program đã có nhãn từ trước, nên đây vẫn là calibration, không phải độ chính xác. `very-high` chưa có nhãn nào: dùng để ưu tiên review, chưa phải mức đã kiểm chứng. Cần tập nhãn mới chưa từng xem (có program ≥ 70) để xác nhận. Đổi công thức phải tăng `complexityVersion`.
 
-`reviewFlags` trên mỗi điểm complexity: `high` (mức High, model kém tin cậy nhất ở mức này) và `near-threshold` (điểm chưa làm tròn cách 40 hoặc 55 không quá 3 điểm). Program có cờ phải được người xem trước khi dùng mức. Danh sách ca lệch đã biết là dữ liệu của corpus, đưa vào báo cáo qua `--complexity-review` ([inventory-report](inventory-report.md)), không ghi trong code. Cải tiến model (v1) là task riêng, cần tập nhãn mới chưa từng xem.
+**Phạm vi dùng (giữ từ quyết định 23/10/2026 cho v0, approved-limited; v1 do người dùng duyệt 28/10/2026):** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback; các yếu tố này phải được review bổ sung.
+
+`reviewFlags` trên mỗi điểm complexity: `high` (mức High hoặc Very High, model kém tin cậy nhất ở các mức này) và `near-threshold` (điểm chưa làm tròn cách 45, 60 hoặc 70 không quá 3 điểm). Program có cờ phải được người xem trước khi dùng mức (pilot: 117/284). Danh sách ca lệch đã biết là dữ liệu của corpus, đưa vào báo cáo qua `--complexity-review` ([inventory-report](inventory-report.md)), không ghi trong code; danh sách lập cho v0 phải được lập lại cho v1.
 
 ## 6. Chạy
 

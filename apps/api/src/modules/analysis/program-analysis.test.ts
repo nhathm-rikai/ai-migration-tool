@@ -132,7 +132,7 @@ describe('analyzeProgram', () => {
   });
 });
 
-describe('scoreComplexity (v0)', () => {
+describe('scoreComplexity (v1)', () => {
   const zero: ProgramMetrics = {
     ownFiles: 0,
     ownCodeLines: 0,
@@ -149,13 +149,13 @@ describe('scoreComplexity (v0)', () => {
     externalApis: 0,
   };
 
-  it('scores runtime table names only, not concatenated or bound SQL', () => {
-    const counted = scoreComplexity({
-      ...zero,
-      concatenatedSql: 1e3,
-      parameterizedSql: 1e3,
-    });
-    expect(counted).toMatchObject({ score: 0, parts: { dynamicSql: 0 } });
+  it('scores concatenated SQL, a runtime table name as three, not binds', () => {
+    const sql = (metrics: Partial<ProgramMetrics>) =>
+      scoreComplexity({ ...zero, ...metrics }).parts.dynamicSql;
+    expect(sql({ parameterizedSql: 1e3 })).toBe(0);
+    expect(sql({ concatenatedSql: 3 })).toBeGreaterThan(0);
+    expect(sql({ dynamicSql: 1 })).toBe(sql({ concatenatedSql: 3 }));
+    expect(sql({ dynamicSql: 10, concatenatedSql: 70 })).toBe(15);
   });
 
   it('stays within 0-100 and caps every part', () => {
@@ -166,10 +166,11 @@ describe('scoreComplexity (v0)', () => {
       decisionPoints: 1e6,
       tables: 1e3,
       dynamicSql: 1e3,
+      concatenatedSql: 1e3,
       components: 1e3,
       externalApis: 1e3,
     });
-    expect(huge).toMatchObject({ score: 100, level: 'high' });
+    expect(huge).toMatchObject({ score: 100, level: 'very-high' });
   });
 
   it('grows with size', () => {
@@ -178,41 +179,70 @@ describe('scoreComplexity (v0)', () => {
     expect(large).toBeGreaterThan(small);
   });
 
-  // Unrounded scores in comments; levels still use the rounded score.
+  // Unrounded scores in comments; levels use the rounded score.
   it.each([
-    // 34.45: far from both thresholds.
+    // 34.45: far from every threshold.
     [{ ownCodeLines: 393, decisionPoints: 47, tables: 2 }, 34, 'low', []],
-    // 38.09: Low, within 3 points of 40.
+    // 43.33: Low, within 3 points of 45.
     [
-      { ownCodeLines: 577, decisionPoints: 73, tables: 3 },
-      38,
+      { ownCodeLines: 577, decisionPoints: 73, tables: 3, concatenatedSql: 4 },
+      43,
       'low',
       ['near-threshold'],
     ],
-    // 39.71: Medium only through rounding, so it is flagged.
+    // 46.66: Medium, within 3 points of 45.
     [
-      { ownCodeLines: 580, decisionPoints: 65, tables: 2, components: 1 },
-      40,
+      {
+        ownCodeLines: 1000,
+        decisionPoints: 120,
+        tables: 4,
+        concatenatedSql: 3,
+      },
+      47,
       'medium',
       ['near-threshold'],
     ],
-    // 65.92: High is always flagged.
+    // 59.24: Medium, within 3 points of 60.
     [
-      { ownCodeLines: 9206, decisionPoints: 1408, tables: 15, components: 2 },
-      66,
-      'high',
-      ['high'],
+      {
+        ownCodeLines: 3000,
+        decisionPoints: 400,
+        tables: 8,
+        concatenatedSql: 10,
+      },
+      59,
+      'medium',
+      ['near-threshold'],
     ],
-    // 57.11: High and within 3 points of 55.
+    // 67.01: High is always flagged, and within 3 points of 70.
     [
-      { ownCodeLines: 5175, decisionPoints: 804, tables: 6, components: 1 },
-      57,
+      {
+        ownCodeLines: 5175,
+        decisionPoints: 804,
+        tables: 6,
+        components: 1,
+        concatenatedSql: 20,
+      },
+      67,
       'high',
       ['high', 'near-threshold'],
     ],
+    // 79.68: Very High is flagged like High.
+    [
+      {
+        ownCodeLines: 9206,
+        decisionPoints: 1408,
+        tables: 15,
+        components: 2,
+        concatenatedSql: 68,
+      },
+      80,
+      'very-high',
+      ['high'],
+    ],
   ])('flags %j for review', (metrics, score, level, reviewFlags) => {
     expect(scoreComplexity({ ...zero, ...metrics })).toMatchObject({
-      version: 'complexity-v0',
+      version: 'complexity-v1',
       score,
       level,
       reviewFlags,

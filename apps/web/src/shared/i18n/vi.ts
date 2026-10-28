@@ -392,6 +392,7 @@ export const viMessages = {
         low: 'Thấp',
         medium: 'Trung bình',
         high: 'Cao',
+        'very-high': 'Rất cao',
       } satisfies Record<ComplexityLevel, string>,
     },
     members: {

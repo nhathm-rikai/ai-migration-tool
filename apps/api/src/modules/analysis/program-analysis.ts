@@ -16,14 +16,18 @@ import {
 // of being guessed.
 
 export const CALL_GRAPH_VERSION = 'call-graph-v2';
-// Approved for reference classification only (decision 23/10/2026): same
-// formula, weights, thresholds and rounding as complexity-v0-draft.
-export const COMPLEXITY_VERSION = 'complexity-v0';
+// Reference classification only, like complexity-v0 (decision 23/10/2026).
+// v1 (28/10/2026): the SQL part also counts concatenated runtime values,
+// thresholds 45/60 and a Very High level from 70.
+export const COMPLEXITY_VERSION = 'complexity-v1';
 
 // Points around a level threshold (unrounded score) that call for a person
 // to look at the program before the level is used.
 export const NEAR_THRESHOLD_POINTS = 3;
-const THRESHOLDS = [40, 55] as const;
+// Medium, High and Very High start here (rounded score).
+const THRESHOLDS = [45, 60, 70] as const;
+// A runtime table name weighs as much as this many concatenated SQL texts.
+const DYNAMIC_TABLE_WEIGHT = 3;
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
 
@@ -65,24 +69,26 @@ export type ProgramMetrics = {
   tables: number;
   // Distinct tables after table name mapping.
   normalizedTables: number;
-  // SQL with a runtime table name; the only SQL input of complexity-v0.
+  // SQL with a runtime table name.
   dynamicSql: number;
   // SQL texts with runtime values concatenated outside the table name, and
-  // SQL texts using bind parameters (sql-access-v5). Not scored.
+  // SQL texts using bind parameters (sql-access-v5). Bind parameters are
+  // not scored.
   concatenatedSql: number;
   parameterizedSql: number;
   components: number;
   externalApis: number;
 };
 
-// high: the model is least reliable for High (holdout 1/3);
+// high: High or Very High, where the model is least reliable (holdout
+// High 1/3 for v0; Very High has no labels yet);
 // near-threshold: a small change of the source or count changes the level.
 export type ComplexityReviewFlag = 'high' | 'near-threshold';
 
 export type ComplexityScore = {
   version: typeof COMPLEXITY_VERSION;
   score: number;
-  level: 'low' | 'medium' | 'high';
+  level: 'low' | 'medium' | 'high' | 'very-high';
   reviewFlags: ComplexityReviewFlag[];
   parts: Record<
     | 'size'
@@ -281,15 +287,20 @@ function scale(value: number, full: number, weight: number): number {
   return Math.min(weight, (weight * Math.log1p(value)) / Math.log1p(full));
 }
 
-// Draft v0 for the TL to calibrate: weighted log scales capped per part,
-// total 0-100. Level thresholds were fitted to the 15-program pilot list
-// (Low/Medium/High), so they are a starting point, not a validated model.
+// Weighted log scales capped per part, total 0-100. Thresholds were fitted
+// to 25 labelled programs (15 pilot, 10 holdout already seen), so they are
+// a calibration, not a validated model; Very High has no labels.
+// The dynamicSql part counts runtime table names and concatenated SQL.
 export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
   const parts = {
     size: scale(metrics.ownCodeLines, 10000, 30),
     decisions: scale(metrics.decisionPoints, 2000, 20),
     tables: scale(metrics.tables, 30, 15),
-    dynamicSql: scale(metrics.dynamicSql, 30, 15),
+    dynamicSql: scale(
+      DYNAMIC_TABLE_WEIGHT * metrics.dynamicSql + metrics.concatenatedSql,
+      100,
+      15,
+    ),
     components: scale(metrics.components, 8, 10),
     externalApis: scale(metrics.externalApis, 10, 10),
   };
@@ -301,10 +312,17 @@ export function scoreComplexity(metrics: ProgramMetrics): ComplexityScore {
   ) as ComplexityScore['parts'];
   const exact = Object.values(parts).reduce((sum, value) => sum + value, 0);
   const score = Math.round(exact);
-  const [medium, high] = THRESHOLDS;
-  const level = score < medium ? 'low' : score < high ? 'medium' : 'high';
+  const [medium, high, veryHigh] = THRESHOLDS;
+  const level =
+    score < medium
+      ? 'low'
+      : score < high
+        ? 'medium'
+        : score < veryHigh
+          ? 'high'
+          : 'very-high';
   const reviewFlags: ComplexityReviewFlag[] = [];
-  if (level === 'high') reviewFlags.push('high');
+  if (level === 'high' || level === 'very-high') reviewFlags.push('high');
   if (THRESHOLDS.some((t) => Math.abs(exact - t) <= NEAR_THRESHOLD_POINTS))
     reviewFlags.push('near-threshold');
   return {

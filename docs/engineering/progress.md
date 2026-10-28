@@ -8,6 +8,14 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 28/10/2026 — `complexity-v1`: tính SQL ghép giá trị vào điểm, ngưỡng 45/60, thêm Very High
+
+- Dùng `portal-implement`; cùng nhánh `feat/sql-concatenated-values`. Người dùng duyệt phương án TL trong thread: SQL ghép giá trị là SQL dựng lúc chạy nên được tính điểm, nhẹ hơn tên bảng runtime.
+- Công thức: phần `dynamicSql` (15 điểm) nhận 3 × tên bảng runtime + `concatenatedSql`, đạt trần ở 100 (v0: tên bảng runtime, trần 30); bind parameter không tính. Ngưỡng 45/60 (v0 40/55), mức mới `very-high` từ 70; cờ `high` cho cả High và Very High, `near-threshold` quanh 45/60/70. Contract thêm `very-high` vào `level`; UI hiện tag “Rất cao”/「非常に高」(đỏ), thanh phân bố và bộ lọc. Demo inventory viết tay giữ `complexity-v0`.
+- Lý do đổi ngưỡng: giữ 40/55 với phần SQL mới thì 15 pilot chỉ khớp 9/15 (điểm cả corpus tăng khoảng 5). Đã thử 4 cách tính (trần 30 hoặc 100, trọng số 15 hoặc 10) × nhiều ngưỡng trên 25 program có nhãn; chọn 3×bảng + ghép, trần 100, 45/60.
+- VB6 pilot (CLI, `sql-access-v5`): pilot 15/15, holdout 7/10 (lệch NUKO0110, NUKO0030, KUKO0080; KNRO2040 nay khớp). Low 122 / Medium 101 / High 52 / Very High 9 (KNRO1046, KNRO1090, KOKO0010, KOKO0015, KSHO0010, KSHO0099, KSHO1010, KTBO0010, KTBO1020; điểm 70–79); 117/284 program có cờ review (v0: 121).
+- Giới hạn: ngưỡng chọn trên 25 nhãn đã xem (có overfit); Very High chưa có nhãn. Danh sách ca lệch đã biết (`--complexity-review`, ngoài repo) lập cho v0, cần lập lại cho v1. Inventory cũ giữ điểm v0; không trộn hai version trong một report.
+
 ## 28/10/2026 — `sql-access-v5`: đếm SQL ghép giá trị runtime và SQL dùng bind parameter
 
 - Dùng `portal-implement`; nhánh `feat/sql-concatenated-values` từ `c7c9263` (`fix/snapshot-declared-members`), chỉ BE + contract + spec, không đổi UI. Lý do: `dynamicSql` chỉ đếm tên bảng runtime nên bằng 0 trên toàn VB6 pilot, trong khi source ghép giá trị vào SQL rất nhiều (`Sql & " where SHNCD = " & wkSycd`).

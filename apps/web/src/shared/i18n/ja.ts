@@ -374,7 +374,7 @@ export const jaMessages = {
         partial: '不完全',
         unsupported: '解析不可',
       },
-      level: { low: '低', medium: '中', high: '高' },
+      level: { low: '低', medium: '中', high: '高', 'very-high': '非常に高' },
     },
     members: {
       title: (program: string) => `${program} のファイル`,

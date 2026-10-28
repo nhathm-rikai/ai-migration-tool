@@ -8,6 +8,10 @@ export const ApiErrorCodeSchema = Type.Union([
   Type.Literal('PAYLOAD_TOO_LARGE'),
   Type.Literal('UNSUPPORTED_MEDIA_TYPE'),
   Type.Literal('INTERNAL_ERROR'),
+  // Local request protection (B01): rejected before any route side effect.
+  Type.Literal('HOST_NOT_ALLOWED'),
+  Type.Literal('ORIGIN_NOT_ALLOWED'),
+  Type.Literal('CREDENTIAL_INVALID'),
 ]);
 export type ApiErrorCode = Static<typeof ApiErrorCodeSchema>;
 

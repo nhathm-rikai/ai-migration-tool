@@ -10,6 +10,7 @@ export const SOURCE_ROOT_PATH_MAX_LENGTH = 4096;
 export const SOURCE_DISPLAY_NAME_MAX_LENGTH = 255;
 // Profiles compiled into the analyzer. Adding one is an additive change.
 export const SOURCE_PROFILE_IDS = ['vb6-cp932-v1'] as const;
+export type SourceProfileId = (typeof SOURCE_PROFILE_IDS)[number];
 // The bundled demo source never changes, so its revision is fixed.
 export const FIXTURE_SOURCE_REVISION = 1;
 

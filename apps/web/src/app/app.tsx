@@ -4,16 +4,50 @@ import { ProjectsPage } from '../features/projects/projects-page';
 import { LocaleProvider } from '../shared/i18n/locale-provider';
 import { useLocale } from '../shared/i18n/locale-context';
 import { isLocale, LOCALES } from '../shared/i18n/locale';
+import { projectsApi, type ProjectsApi } from '../shared/api/projects-api';
+import {
+  runsApi as defaultRunsApi,
+  type RunsApi,
+} from '../shared/api/runs-api';
+import {
+  localSession,
+  type LocalSessionClient,
+} from '../shared/api/local-session';
+import {
+  sourcesApi as defaultSourcesApi,
+  type SourcesApi,
+} from '../shared/api/sources-api';
+import {
+  artifactsApi as defaultArtifactsApi,
+  type ArtifactsApi,
+} from '../shared/api/artifacts-api';
+import { SessionStatus } from './session-status';
 
-export function App() {
+type AppProps = {
+  api?: ProjectsApi;
+  runsApi?: RunsApi;
+  sourcesApi?: SourcesApi;
+  artifactsApi?: ArtifactsApi;
+  session?: LocalSessionClient;
+};
+
+// `api`, `runsApi`, `sourcesApi` and `artifactsApi` must use `session` as their credential source; tests
+// inject them together.
+export function App(props: AppProps) {
   return (
     <LocaleProvider>
-      <AppShell />
+      <AppShell {...props} />
     </LocaleProvider>
   );
 }
 
-function AppShell() {
+function AppShell({
+  api = projectsApi,
+  runsApi = defaultRunsApi,
+  sourcesApi = defaultSourcesApi,
+  artifactsApi = defaultArtifactsApi,
+  session = localSession,
+}: AppProps) {
   const { locale, setLocale, messages } = useLocale();
   useEffect(() => {
     const original = document.title;
@@ -59,7 +93,13 @@ function AppShell() {
           </label>
         </div>
       </header>
-      <ProjectsPage />
+      <SessionStatus session={session} />
+      <ProjectsPage
+        api={api}
+        runsApi={runsApi}
+        sourcesApi={sourcesApi}
+        artifactsApi={artifactsApi}
+      />
     </>
   );
 }

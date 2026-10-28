@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { RuntimeError } from '../shared/runtime-error.js';
 
 // Same relative layout in src/platform and dist/platform; independent of process.cwd().
-const APPLICATION_ROOT = fileURLToPath(
+export const APPLICATION_ROOT = fileURLToPath(
   new URL('../../../../', import.meta.url),
 );
 

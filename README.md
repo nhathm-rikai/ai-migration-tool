@@ -4,7 +4,7 @@ Dev mở rộng nền tảng bắt đầu từ [mẫu policy và lỗi API](docs
 
 Thư mục chứa file này là **root repo sản phẩm**. Backend đã init trong [apps/api](apps/api/README.md); schema/DTO dùng chung nằm trong `packages/contracts`. Đọc **README backend trước**, sau đó lần theo module Projects. Repo tự đủ: không cần proposal, demo HTML, source khách hàng hay tài liệu ở parent directory.
 
-Phạm vi hiện tại: **Projects UI/API + SQLite demo; thư viện và CLI Analyze VB6 độc lập; E2E browser fixture**. UI tạo/list/xem project; Analyze CLI đọc source local và xuất JSON/CSV, chưa nối vào API/job/UI. Chưa Understand/Claude CLI, review/export workflow hoặc conversion. Đây chưa phải bản release cho Sales.
+Phạm vi hiện tại: **Projects demo/local + SQLite, đăng ký source/profile/mapping và snapshot bất biến; thư viện/CLI Analyze VB6 độc lập; E2E browser fixture**. Local run đọc revision source đã khóa để chụp nguồn; UI ghi “Đã chụp nguồn”. Analyzer inventory/artifact chưa nối vào job (B08/B07). Chưa Understand/Claude CLI, review/export workflow hoặc conversion. Đây chưa phải bản release cho Sales; chỉ dùng fixture sạch để kiểm đường đọc source local.
 
 ## Chạy trên máy Dev
 

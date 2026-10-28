@@ -5,6 +5,7 @@ import {
   PROJECT_PAGE_SIZE_DEFAULT,
   PROJECT_FIXTURE_ID,
   PROJECT_DEMO_MODE,
+  PROJECT_LOCAL_MODE,
 } from './project-policy.js';
 
 const ProjectNameSchema = Type.String({
@@ -15,11 +16,21 @@ const ProjectNameSchema = Type.String({
 export const ProjectIdSchema = Type.String({ format: 'uuid' });
 // Init only: an explicit demo marker, not a filesystem path or an analysis result.
 export const FixtureIdSchema = Type.Literal(PROJECT_FIXTURE_ID);
-export const CreateProjectSchema = Type.Object(
+// A demo project names the bundled fixture; a local project has no fixture
+// and gets its source from registration (B03). The demo payload is unchanged.
+export const CreateDemoProjectSchema = Type.Object(
   { name: ProjectNameSchema, fixtureId: FixtureIdSchema },
   { additionalProperties: false },
 );
-export const ProjectSchema = Type.Object(
+export const CreateLocalProjectSchema = Type.Object(
+  { name: ProjectNameSchema, mode: Type.Literal(PROJECT_LOCAL_MODE) },
+  { additionalProperties: false },
+);
+export const CreateProjectSchema = Type.Union([
+  CreateDemoProjectSchema,
+  CreateLocalProjectSchema,
+]);
+export const DemoProjectSchema = Type.Object(
   {
     id: ProjectIdSchema,
     name: ProjectNameSchema,
@@ -29,6 +40,19 @@ export const ProjectSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+export const LocalProjectSchema = Type.Object(
+  {
+    id: ProjectIdSchema,
+    name: ProjectNameSchema,
+    mode: Type.Literal(PROJECT_LOCAL_MODE),
+    createdAt: Type.String({ format: 'date-time' }),
+  },
+  { additionalProperties: false },
+);
+export const ProjectSchema = Type.Union([
+  DemoProjectSchema,
+  LocalProjectSchema,
+]);
 export const ProjectParamsSchema = Type.Object(
   { projectId: ProjectIdSchema },
   { additionalProperties: false },
@@ -55,5 +79,7 @@ export const ProjectListSchema = Type.Object(
 );
 export type CreateProjectInput = Static<typeof CreateProjectSchema>;
 export type Project = Static<typeof ProjectSchema>;
+export type DemoProject = Static<typeof DemoProjectSchema>;
+export type LocalProject = Static<typeof LocalProjectSchema>;
 export type ListProjectsQuery = Static<typeof ListProjectsQuerySchema>;
 export type ProjectList = Static<typeof ProjectListSchema>;

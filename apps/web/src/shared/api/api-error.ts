@@ -1,6 +1,8 @@
+// `credential`: the local credential bootstrap failed, so the request itself
+// was never sent.
 export type ApiFailureKind =
-  'http' | 'network' | 'timeout' | 'invalid-response';
-export type ApiMethod = 'GET' | 'POST';
+  'http' | 'network' | 'timeout' | 'invalid-response' | 'credential';
+export type ApiMethod = 'GET' | 'POST' | 'PUT';
 
 export class ApiError extends Error {
   readonly outcomeUnknown: boolean;
@@ -16,7 +18,8 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     // A lost/invalid success response or a server failure can follow a committed write.
     this.outcomeUnknown =
-      method === 'POST' &&
+      method !== 'GET' &&
+      kind !== 'credential' &&
       !(
         kind === 'http' &&
         status !== undefined &&

@@ -8,23 +8,37 @@ import { RuntimeError } from './shared/runtime-error.js';
 export type AppConfig = {
   host: '127.0.0.1';
   port: number;
+  // Loopback ports whose origin may call the API: the dev/preview UI behind
+  // the Vite proxy. The API's own port is always trusted.
+  webPorts: readonly number[];
   dataDir: string;
   mode: 'fixture';
   runner: 'fake';
   logLevel: 'info' | 'warn' | 'error' | 'silent';
 };
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const portText = env.PORTAL_PORT ?? '4310';
-  const port = Number(portText);
+// Default Vite dev (5173) and preview (4173) ports, same as vite.config.ts.
+const DEFAULT_WEB_PORTS = [5173, 4173] as const;
+
+function parsePort(text: string): number {
+  const port = Number(text);
   if (
-    !/^\d+$/.test(portText) ||
+    !/^\d+$/.test(text) ||
     !Number.isInteger(port) ||
     port < 1 ||
     port > 65535
   ) {
     throw new RuntimeError('INVALID_CONFIG');
   }
+  return port;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const port = parsePort(env.PORTAL_PORT ?? '4310');
+  const webPorts =
+    env.PORTAL_WEB_PORT === undefined
+      ? [...DEFAULT_WEB_PORTS]
+      : [parsePort(env.PORTAL_WEB_PORT)];
   if (
     (env.PORTAL_MODE ?? 'fixture') !== 'fixture' ||
     (env.PORTAL_RUNNER ?? 'fake') !== 'fake'
@@ -57,6 +71,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     host: '127.0.0.1',
     port,
+    webPorts,
     dataDir,
     mode: 'fixture',
     runner: 'fake',

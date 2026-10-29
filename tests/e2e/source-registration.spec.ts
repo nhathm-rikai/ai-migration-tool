@@ -244,7 +244,7 @@ test(
       fullPage: true,
     });
 
-    await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
+    await page.getByRole('radio', { name: '日本語' }).check();
     await expect(
       page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();
@@ -259,14 +259,8 @@ test(
       path: testInfo.outputPath('pf05-mobile-ja.png'),
       fullPage: true,
     });
+    // Reload stays on the project's source step.
     await page.reload();
-    await page
-      .getByRole('navigation')
-      .filter({
-        has: page.getByRole('button', { name: projectName, exact: true }),
-      })
-      .getByRole('button', { name: projectName, exact: true })
-      .click();
     await expect(
       page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();

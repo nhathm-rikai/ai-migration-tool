@@ -39,53 +39,77 @@ export const viMessages = {
       retry: 'Thử kết nối lại',
     },
   },
+  shell: {
+    project: 'Dự án',
+    allProjects: 'Tất cả dự án',
+    stepsTitle: 'Quy trình',
+    steps: {
+      source: 'Nạp source',
+      analysis: 'Phân tích',
+      documents: 'Tạo tài liệu',
+      review: 'Review & duyệt',
+      quote: 'Báo giá',
+    },
+    stepState: {
+      done: 'Đã xong',
+      todo: 'Chưa làm',
+      unavailable: 'Chưa khả dụng',
+    },
+    selectProjectFirst: 'Chọn hoặc tạo dự án để mở các bước.',
+    projectLoading: 'Đang mở dự án…',
+    retry: 'Thử lại',
+    stepEyebrow: (index: number) => `Bước ${index} / 5`,
+    unavailable: {
+      title: 'Chưa khả dụng',
+      reasons: {
+        documents:
+          'Tạo tài liệu bằng AI chưa có trong bản này. Khi có, bước này dùng kết quả phân tích ở bước 2 và tạo tài liệu cho từng program.',
+        review:
+          'Review & duyệt cần tài liệu từ bước Tạo tài liệu, chưa có trong bản này.',
+        quote:
+          'Báo giá từ kết quả phân tích chưa có trong bản này: mô hình ước tính chưa được cấu hình và duyệt.',
+      },
+      back: 'Về bước Phân tích',
+    },
+    analysis: {
+      loading: 'Đang tìm kết quả phân tích…',
+      loadFailed: 'Không đọc được trạng thái phân tích của dự án.',
+      empty: 'Chưa có kết quả phân tích',
+      emptyHelp:
+        'Bắt đầu phân tích ở bước Nạp source. Kết quả hiện ở đây khi lượt chạy hoàn tất và có kiểm kê.',
+      goSource: 'Đến bước Nạp source',
+      olderRun: 'Đang xem kết quả của một lượt chạy cụ thể.',
+      latest: 'Xem kết quả mới nhất',
+    },
+    notFound: {
+      title: 'Không tìm thấy trang',
+      help: 'Địa chỉ này không có trong ứng dụng.',
+      projectTitle: 'Không tìm thấy dự án',
+      projectHelp: 'Dự án trong địa chỉ không tồn tại hoặc đã bị xóa.',
+      back: 'Về danh sách dự án',
+    },
+  },
   projects: {
     workspace: 'Không gian làm việc',
     title: 'Dự án của bạn',
     refresh: 'Làm mới dự án',
     createNew: 'Tạo dự án mới',
-    tree: 'Cây dự án',
+    listTitle: 'Danh sách dự án',
     loading: 'Đang tải dự án…',
     retryList: 'Thử lại danh sách',
     noMore: 'Không còn dự án ở trang này',
     empty: 'Chưa có dự án',
     emptyHelp: 'Tạo dự án để bắt đầu không gian làm việc.',
-    overview: 'Tổng quan dự án',
-    unavailable: 'Sắp có',
-    notAvailableYet: 'Sắp có',
     results: 'Kết quả phân tích',
     pageCount: (count: number) => `${count} dự án trong trang`,
     firstPage: 'Về trang đầu',
     nextPage: 'Trang tiếp',
     localWorkspace: 'Trên máy này',
-    breadcrumb: 'Dự án',
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
     localData: 'Mã nguồn trên máy này',
     assessmentSteps: 'Các bước đánh giá',
-    stages: {
-      analysis: {
-        title: 'Phân tích',
-        description: 'Phân tích tĩnh + tác nhân AI',
-        status: 'Phân tích tĩnh đã có · AI sắp có',
-      },
-      report: {
-        title: 'Báo cáo đánh giá',
-        description: 'Kết quả phân tích',
-        status: 'Sắp có',
-      },
-      review: {
-        title: 'Rà soát',
-        description: 'SA/PM phê duyệt',
-        status: 'Sắp có',
-      },
-      proposal: {
-        title: 'Đề xuất',
-        description: 'Bản nháp đề xuất',
-        status: 'Sắp có',
-      },
-    },
     created: 'Đã tạo dự án.',
     footer:
       'Dự án và kết quả được lưu trên máy này. Đã có: đăng ký mã nguồn và phân tích tĩnh. Sắp có: hiểu nghiệp vụ bằng AI, rà soát và xuất báo cáo.',
@@ -279,7 +303,6 @@ export const viMessages = {
   },
   assessment: {
     title: 'Đánh giá tổng quan',
-    back: '← Tổng quan dự án',
     tabsLabel: 'Các phần của kết quả phân tích',
     tabs: {
       overview: 'Tổng quan',

@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { ArtifactListSchema, type ArtifactRef } from '@portal/contracts';
 import { Check } from 'typebox/value';
 
@@ -9,14 +9,6 @@ const required = (name: string) => {
   if (!value) throw new Error(`${name} is not set; run \`npm run e2e\`.`);
   return value;
 };
-
-async function openProject(page: Page, name: string) {
-  await page
-    .getByRole('navigation')
-    .filter({ has: page.getByRole('button', { name, exact: true }) })
-    .getByRole('button', { name, exact: true })
-    .click();
-}
 
 // PF06: a demo run publishes the bundled inventory artifact; the Assessment
 // overview reads that exact version, keeps unique and per-program totals
@@ -113,7 +105,7 @@ test(
       fullPage: true,
     });
 
-    await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
+    await page.getByRole('radio', { name: '日本語' }).check();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
@@ -128,10 +120,10 @@ test(
       fullPage: true,
     });
 
-    // Reload reads the same version back and starts nothing.
+    // Reload stays on this run's analysis URL, reads the same version back
+    // and starts nothing.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/);
     await page.reload();
-    await openProject(page, projectName);
-    await page.getByRole('button', { name: '解析結果を表示' }).click();
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('655');
     expect(new Set(artifactReads)).toEqual(

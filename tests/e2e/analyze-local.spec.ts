@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   ArtifactListSchema,
   SourceInventoryArtifactSchema,
@@ -29,14 +29,6 @@ async function treeHash(root: string): Promise<string> {
       .update('\0')
       .update(await readFile(path));
   return hash.digest('hex');
-}
-
-async function openProject(page: Page, name: string) {
-  await page
-    .getByRole('navigation')
-    .filter({ has: page.getByRole('button', { name, exact: true }) })
-    .getByRole('button', { name, exact: true })
-    .click();
 }
 
 // PF07: a local run reads the registered fixture folder through its snapshot,
@@ -165,7 +157,7 @@ test(
     });
     expect(await readdir(join(dataDir, 'artifacts', '.staging'))).toEqual([]);
 
-    await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
+    await page.getByRole('radio', { name: '日本語' }).check();
     await expect(page.getByText('プログラム SAMPLE の詳細')).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     expect(
@@ -180,9 +172,8 @@ test(
     });
 
     // Reload: same version and bytes, nothing started again.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/);
     await page.reload();
-    await openProject(page, projectName);
-    await page.getByRole('button', { name: '解析結果を表示' }).click();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('52');
     const again: unknown = await (

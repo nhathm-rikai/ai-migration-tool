@@ -19,53 +19,77 @@ export const jaMessages = {
       retry: '再接続',
     },
   },
+  shell: {
+    project: 'プロジェクト',
+    allProjects: 'すべてのプロジェクト',
+    stepsTitle: 'ワークフロー',
+    steps: {
+      source: 'ソース取り込み',
+      analysis: '解析',
+      documents: 'ドキュメント生成',
+      review: 'レビュー・承認',
+      quote: '見積',
+    },
+    stepState: {
+      done: '完了済み',
+      todo: '未実施',
+      unavailable: '利用不可',
+    },
+    selectProjectFirst: 'プロジェクトを選択または作成すると各手順を開けます。',
+    projectLoading: 'プロジェクトを開いています…',
+    retry: '再試行',
+    stepEyebrow: (index: number) => `ステップ ${index} / 5`,
+    unavailable: {
+      title: 'まだ利用できません',
+      reasons: {
+        documents:
+          'AIによるドキュメント生成はこの版では未提供です。提供後は手順2の解析結果を使い、プログラムごとにドキュメントを生成します。',
+        review:
+          'レビュー・承認にはドキュメント生成の成果物が必要ですが、この版では未提供です。',
+        quote:
+          '解析結果に基づく見積はこの版では未提供です。見積モデルがまだ設定・承認されていません。',
+      },
+      back: '解析に戻る',
+    },
+    analysis: {
+      loading: '解析結果を探しています…',
+      loadFailed: 'プロジェクトの解析状況を読み込めませんでした。',
+      empty: '解析結果はまだありません',
+      emptyHelp:
+        'ソース取り込みの手順で解析を開始してください。実行が完了し棚卸しが作成されると、ここに表示されます。',
+      goSource: 'ソース取り込みへ',
+      olderRun: '特定の実行の結果を表示しています。',
+      latest: '最新の結果を表示',
+    },
+    notFound: {
+      title: 'ページが見つかりません',
+      help: 'このアドレスはアプリにありません。',
+      projectTitle: 'プロジェクトが見つかりません',
+      projectHelp: 'アドレスのプロジェクトは存在しないか、削除されています。',
+      back: 'プロジェクト一覧へ',
+    },
+  },
   projects: {
     workspace: 'ワークスペース',
     title: 'プロジェクト一覧',
     refresh: 'プロジェクトを再読み込み',
     createNew: '新規プロジェクト',
-    tree: 'プロジェクトツリー',
+    listTitle: 'プロジェクト一覧',
     loading: 'プロジェクトを読み込み中…',
     retryList: '一覧を再読み込み',
     noMore: 'このページにプロジェクトはありません',
     empty: 'プロジェクトはまだありません',
     emptyHelp: 'プロジェクトを作成して、作業を開始してください。',
-    overview: 'プロジェクト概要',
-    unavailable: '今後対応',
-    notAvailableYet: '今後対応',
     results: '解析結果',
     pageCount: (count: number) => `このページのプロジェクト数：${count}件`,
     firstPage: '最初のページ',
     nextPage: '次のページ',
     localWorkspace: 'ローカル環境',
-    breadcrumb: 'プロジェクト',
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
     localData: 'このPC上のソースコード',
     assessmentSteps: 'アセスメントの手順',
-    stages: {
-      analysis: {
-        title: '解析',
-        description: '静的解析 + AIエージェント',
-        status: '静的解析は対応済み · AIは今後対応',
-      },
-      report: {
-        title: '評価レポート',
-        description: '解析結果',
-        status: '今後対応',
-      },
-      review: {
-        title: 'レビュー',
-        description: 'SA/PMによる承認',
-        status: '今後対応',
-      },
-      proposal: {
-        title: '提案書',
-        description: '提案書のドラフト',
-        status: '今後対応',
-      },
-    },
     created: 'プロジェクトを作成しました。',
     footer:
       'プロジェクトと結果はこのPCに保存されます。対応済み：ソース登録と静的解析。今後対応：AIによる業務理解、レビュー、レポート出力。',
@@ -263,7 +287,6 @@ export const jaMessages = {
   },
   assessment: {
     title: 'アセスメント概要',
-    back: '← プロジェクト概要',
     tabsLabel: '解析結果の項目',
     tabs: {
       overview: '概要',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Run } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import type { RunsApi } from '../../shared/api/runs-api';
@@ -22,6 +22,7 @@ export function AnalyzeRunPanel({
   demo,
   sourceRevision,
   onOpenResults,
+  onRunSettled,
 }: {
   api: RunsApi;
   // Without it a succeeded run shows no assessment (run-only tests).
@@ -34,6 +35,8 @@ export function AnalyzeRunPanel({
   demo: boolean;
   // Revision a new run locks; null blocks Start (no readable source).
   sourceRevision: number | null;
+  // Called when a run seen active here reaches a terminal state.
+  onRunSettled?: (() => void) | undefined;
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.runs;
@@ -49,6 +52,15 @@ export function AnalyzeRunPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { state, action } = runs;
   const pending = action.status === 'pending';
+  const current = state.status === 'ready' ? state.current : null;
+  const activeRunId =
+    current && isActiveRun(current.status) ? current.id : null;
+  const wasActive = useRef<string | null>(null);
+  useEffect(() => {
+    if (wasActive.current !== null && activeRunId !== wasActive.current)
+      onRunSettled?.();
+    wasActive.current = activeRunId;
+  }, [activeRunId, onRunSettled]);
 
   if (state.status === 'loading')
     return (

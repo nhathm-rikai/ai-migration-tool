@@ -70,14 +70,12 @@ it('switches Vietnamese/Japanese, preserves input, persists the locale and expos
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: '入力した名前' },
   });
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByLabelText('プロジェクト名')).toBe(
     screen.getByDisplayValue('入力した名前'),
   );
   expect(
-    screen.getByRole('navigation', { name: 'プロジェクトツリー' }),
+    screen.getByRole('navigation', { name: 'プロジェクト一覧' }),
   ).toBeTruthy();
   expect(document.documentElement.lang).toBe('ja');
   expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('ja');
@@ -87,7 +85,7 @@ it('switches Vietnamese/Japanese, preserves input, persists the locale and expos
   render(<TestApp />);
   expect(screen.getByLabelText('プロジェクト名')).toBeTruthy();
   await screen.findByText('プロジェクトはまだありません');
-  fireEvent.change(screen.getByLabelText('言語'), { target: { value: 'vi' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
   expect(screen.getByLabelText('Tên dự án')).toBeTruthy();
   expect(document.documentElement.lang).toBe('vi');
 });
@@ -98,9 +96,7 @@ it('retranslates an existing validation error without submitting or clearing the
   await screen.findByText('Chưa có dự án');
   fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
   expect(screen.getByRole('alert').textContent).toContain('1 đến 120');
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByRole('alert').textContent).toContain('1～120文字');
   expect(
     screen.getByLabelText('プロジェクト名').getAttribute('aria-invalid'),
@@ -133,9 +129,7 @@ it('preserves a pending create, then selection, success notice and dates when sw
     target: { value: project.name },
   });
   fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(
     screen.getByRole('button', { name: '作成中…' }).hasAttribute('disabled'),
   ).toBe(true);
@@ -156,7 +150,7 @@ it('preserves a pending create, then selection, success notice and dates when sw
   }).format(new Date(project.createdAt));
   expect(screen.getByText(formatted)).toBeTruthy();
   const requestsBeforeSwitch = fetcher.mock.calls.length;
-  fireEvent.change(screen.getByLabelText('言語'), { target: { value: 'vi' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
   expect(screen.getByText(project.id)).toBeTruthy();
   expect(screen.getByText('Đã tạo dự án.')).toBeTruthy();
   expect(fetcher).toHaveBeenCalledTimes(requestsBeforeSwitch);
@@ -180,36 +174,41 @@ it('retranslates list and detail HTTP errors without refetching them', async () 
   expect((await screen.findByRole('alert')).textContent).toContain(
     'Không tìm thấy API',
   );
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByRole('alert').textContent).toContain('要求されたAPI');
   expect(fetcher).toHaveBeenCalledTimes(1);
   view.unmount();
-  fetcher
-    .mockReset()
-    .mockResolvedValueOnce(json({ items: [project], nextCursor: null }))
-    .mockResolvedValueOnce(
-      json(
-        {
-          error: {
-            code: 'PROJECT_NOT_FOUND',
-            message: 'safe-server-message',
-            requestId: 'request-002',
-          },
-        },
-        404,
-      ),
-    );
+  // A project that no longer exists shows the not-found page, translated in
+  // place without reading it again.
+  fetcher.mockReset().mockImplementation((url) =>
+    Promise.resolve(
+      typeof url === 'string' && url.endsWith(project.id)
+        ? json(
+            {
+              error: {
+                code: 'PROJECT_NOT_FOUND',
+                message: 'safe-server-message',
+                requestId: 'request-002',
+              },
+            },
+            404,
+          )
+        : json({ items: [project], nextCursor: null }),
+    ),
+  );
   render(<TestApp />);
-  fireEvent.click(await screen.findByRole('button', { name: project.name }));
-  expect((await screen.findByRole('alert')).textContent).toBe(
-    'プロジェクトが見つかりません。',
-  );
-  fireEvent.change(screen.getByLabelText('言語'), { target: { value: 'vi' } });
-  expect(screen.getByRole('alert').textContent).toBe(
-    'Không tìm thấy dự án này.',
-  );
+  fireEvent.click(await screen.findByRole('link', { name: project.name }));
+  expect(
+    await screen.findByRole('heading', {
+      level: 1,
+      name: 'プロジェクトが見つかりません',
+    }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
+  expect(
+    screen.getByRole('heading', { level: 1, name: 'Không tìm thấy dự án' }),
+  ).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Về danh sách dự án' })).toBeTruthy();
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
 
@@ -228,9 +227,7 @@ it('retranslates an uncertain submission outcome and preserves a valid name', as
   expect((await screen.findByRole('alert')).textContent).toContain(
     'Làm mới danh sách',
   );
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByRole('alert').textContent).toContain('再作成する前に');
   expect(
     screen.getByDisplayValue('変更しない名前').getAttribute('aria-invalid'),
@@ -243,7 +240,7 @@ it('falls back safely for unsupported preferences and still switches when storag
   window.localStorage.setItem(LOCALE_STORAGE_KEY, 'unsupported-locale');
   const view = render(<TestApp />);
   await screen.findByText('Chưa có dự án');
-  expect(screen.getByLabelText('Ngôn ngữ')).toBeTruthy();
+  expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeTruthy();
   view.unmount();
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
     throw new DOMException('Blocked', 'SecurityError');
@@ -252,9 +249,7 @@ it('falls back safely for unsupported preferences and still switches when storag
     throw new DOMException('Blocked', 'SecurityError');
   });
   render(<TestApp />);
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByLabelText('プロジェクト名')).toBeTruthy();
   expect(document.documentElement.lang).toBe('ja');
 });

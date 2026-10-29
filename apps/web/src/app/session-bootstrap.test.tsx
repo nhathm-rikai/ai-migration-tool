@@ -94,13 +94,11 @@ it('does not bootstrap or mutate again when the locale changes while bootstrap i
       }),
   );
   expect(await screen.findByText('Đang kết nối backend cục bộ…')).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('Ngôn ngữ'), {
-    target: { value: 'ja' },
-  });
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(
     screen.getByText('ローカルバックエンドに接続しています…'),
   ).toBeTruthy();
-  fireEvent.change(screen.getByLabelText('言語'), { target: { value: 'vi' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
   // StrictMode mounts effects twice; both share the same bootstrap.
   expect(app.sessionCalls()).toHaveLength(1);
   await act(async () => {

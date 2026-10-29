@@ -27,8 +27,6 @@ import type {
 export const viMessages = {
   app: {
     skipToContent: 'Đến nội dung chính',
-    subtitle: 'Đánh giá hệ thống cũ',
-    demo: 'Bản thử nghiệm',
     language: 'Ngôn ngữ',
     session: {
       pending: 'Đang kết nối backend cục bộ…',
@@ -39,53 +37,89 @@ export const viMessages = {
       retry: 'Thử kết nối lại',
     },
   },
+  shell: {
+    project: 'Dự án',
+    allProjects: 'Tất cả dự án',
+    chooseProject: 'Chọn dự án để bắt đầu',
+    projectDetail: {
+      demo: 'VB6 · dữ liệu mẫu',
+      local: 'VB6 · mã nguồn trên máy này',
+      noSource: 'Chưa chọn source',
+    },
+    pageTitles: {
+      source: 'Nạp source code của khách hàng',
+      analysis: 'Phân tích source code',
+      documents: 'Tạo tài liệu',
+      review: 'Review & duyệt tài liệu',
+      quote: 'Báo giá',
+    },
+    stepsTitle: 'Quy trình',
+    steps: {
+      source: 'Nạp source',
+      analysis: 'Phân tích',
+      documents: 'Tạo tài liệu',
+      review: 'Review & duyệt',
+      quote: 'Báo giá',
+    },
+    stepState: {
+      done: 'Đã xong',
+      todo: 'Chưa làm',
+      unavailable: 'Chưa khả dụng',
+    },
+    selectProjectFirst: 'Chọn hoặc tạo dự án để mở các bước.',
+    projectLoading: 'Đang mở dự án…',
+    retry: 'Thử lại',
+    stepEyebrow: (index: number) => `Bước ${index} / 5`,
+    unavailable: {
+      title: 'Chưa khả dụng',
+      reasons: {
+        documents:
+          'Tạo tài liệu bằng AI chưa có trong bản này. Khi có, bước này dùng kết quả phân tích ở bước 2 và tạo tài liệu cho từng program.',
+        review:
+          'Review & duyệt cần tài liệu từ bước Tạo tài liệu, chưa có trong bản này.',
+        quote:
+          'Báo giá từ kết quả phân tích chưa có trong bản này: mô hình ước tính chưa được cấu hình và duyệt.',
+      },
+      back: 'Về bước Phân tích',
+    },
+    analysis: {
+      loading: 'Đang tìm kết quả phân tích…',
+      loadFailed: 'Không đọc được trạng thái phân tích của dự án.',
+      empty: 'Chưa có kết quả phân tích',
+      emptyHelp:
+        'Bắt đầu phân tích ở bước Nạp source. Kết quả hiện ở đây khi lượt chạy hoàn tất và có kiểm kê.',
+      goSource: 'Đến bước Nạp source',
+      olderRun: 'Đang xem kết quả của một lượt chạy cụ thể.',
+      latest: 'Xem kết quả mới nhất',
+    },
+    notFound: {
+      title: 'Không tìm thấy trang',
+      help: 'Địa chỉ này không có trong ứng dụng.',
+      projectTitle: 'Không tìm thấy dự án',
+      projectHelp: 'Dự án trong địa chỉ không tồn tại hoặc đã bị xóa.',
+      back: 'Về danh sách dự án',
+    },
+  },
   projects: {
     workspace: 'Không gian làm việc',
     title: 'Dự án của bạn',
     refresh: 'Làm mới dự án',
     createNew: 'Tạo dự án mới',
-    tree: 'Cây dự án',
+    listTitle: 'Danh sách dự án',
     loading: 'Đang tải dự án…',
     retryList: 'Thử lại danh sách',
     noMore: 'Không còn dự án ở trang này',
     empty: 'Chưa có dự án',
     emptyHelp: 'Tạo dự án để bắt đầu không gian làm việc.',
-    overview: 'Tổng quan dự án',
-    unavailable: 'Sắp có',
-    notAvailableYet: 'Sắp có',
     results: 'Kết quả phân tích',
     pageCount: (count: number) => `${count} dự án trong trang`,
     firstPage: 'Về trang đầu',
     nextPage: 'Trang tiếp',
-    localWorkspace: 'Trên máy này',
-    breadcrumb: 'Dự án',
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
     localData: 'Mã nguồn trên máy này',
     assessmentSteps: 'Các bước đánh giá',
-    stages: {
-      analysis: {
-        title: 'Phân tích',
-        description: 'Phân tích tĩnh + tác nhân AI',
-        status: 'Phân tích tĩnh đã có · AI sắp có',
-      },
-      report: {
-        title: 'Báo cáo đánh giá',
-        description: 'Kết quả phân tích',
-        status: 'Sắp có',
-      },
-      review: {
-        title: 'Rà soát',
-        description: 'SA/PM phê duyệt',
-        status: 'Sắp có',
-      },
-      proposal: {
-        title: 'Đề xuất',
-        description: 'Bản nháp đề xuất',
-        status: 'Sắp có',
-      },
-    },
     created: 'Đã tạo dự án.',
     footer:
       'Dự án và kết quả được lưu trên máy này. Đã có: đăng ký mã nguồn và phân tích tĩnh. Sắp có: hiểu nghiệp vụ bằng AI, rà soát và xuất báo cáo.',
@@ -279,26 +313,82 @@ export const viMessages = {
   },
   assessment: {
     title: 'Đánh giá tổng quan',
-    back: '← Tổng quan dự án',
     tabsLabel: 'Các phần của kết quả phân tích',
     tabs: {
-      overview: 'Tổng quan',
       programs: 'Danh sách program',
-      detail: 'Chi tiết program',
+      graph: 'Call graph',
+      tables: 'Bảng DB',
+    },
+    dashboard: {
+      kpis: {
+        programs: 'Program',
+        programsSub: (complete: string) => `${complete} đầy đủ`,
+        physical: 'Physical LoC',
+        physicalSub: 'Code',
+        procedures: 'Procedure',
+        proceduresSub: 'File code đã phân tích',
+        perProgram: 'Cộng theo program (tính trùng file dùng chung)',
+        sql: 'Vị trí truy cập SQL',
+        sqlSub: (count: string) => `${count} chuỗi SQL ghép giá trị runtime`,
+        sqlSubOld: 'Dòng có truy cập bảng, mỗi file một lần',
+        tables: 'Bảng được truy cập',
+        tablesMapped: 'Sau ánh xạ tên bảng',
+        tablesInferred: (schema: string) =>
+          `Sau ánh xạ · giả định schema ${schema}`,
+        tablesRaw: 'Tên như trong source',
+        high: 'Program High + Very High',
+        highSub: (analyzed: string) =>
+          `trên ${analyzed} program đã phân tích · tham khảo`,
+      },
+      analysedAt: (time: string) => `Phân tích xong lúc ${time}`,
+      files: (count: string) => `${count} file`,
+      sharedFiles: (count: string) => `${count} file dùng chung`,
+      locTitle: 'Phân bổ dòng code',
+      locTotal: 'Physical LoC',
+      loc: {
+        code: 'Code',
+        comment: 'Comment',
+        blank: 'Dòng trống',
+        designer: 'Designer + metadata',
+        unclassified: 'Chưa phân loại',
+      },
+      histogramTitle: 'Phân bố complexity',
+      histogramPrograms: (count: string) => `${count} program`,
+      histogramNote: (version: string) => `Tham khảo · ${version}`,
+      notAnalyzed: (count: string) => `${count} program chưa phân tích`,
+      sectionLabel: 'Chi tiết phân tích',
+      graphSoon:
+        'Call graph toàn dự án sẽ có ở bước tiếp theo. Lời gọi của từng program xem ở tab Lời gọi trong chi tiết program.',
+      tablesNone: 'Không phát hiện truy cập bảng.',
+      tablesPagination: 'Phân trang bảng DB',
+      columns: {
+        table: 'Bảng',
+        programs: 'Program',
+        locations: 'Vị trí truy cập',
+        top: 'Program truy cập nhiều nhất',
+      },
+      createDocs: 'Tạo tài liệu cho program này',
+      expand: (program: string) => `Mở chi tiết ${program}`,
+      kinds: {
+        form: 'Form',
+        module: 'Module',
+        class: 'Class',
+        'user-control': 'UserControl',
+        'property-page': 'PropertyPage',
+        'user-document': 'UserDocument',
+        designer: 'Designer',
+      } as Record<string, string>,
     },
     technical: 'Thông tin kỹ thuật',
-    distributionTitle: 'Phân bố độ phức tạp (tham khảo)',
-    stateTitle: 'Tình trạng phân tích program',
     programCount: (count: string) => `${count} program`,
     showPrograms: 'Xem danh sách',
+    moreMissing: (count: string) => `và ${count} file khác`,
     loading: 'Đang tải kết quả kiểm kê…',
     retry: 'Tải lại kết quả',
     empty:
       'Lượt chạy này không có kết quả kiểm kê (lượt chạy mã nguồn trên máy tạo bởi bản trước chỉ chụp nguồn). Chạy lại để có kiểm kê.',
     demoData: 'Kết quả mẫu đi kèm ứng dụng, không phải mã nguồn thật',
     localData: 'Kiểm kê từ bản chụp mã nguồn trên máy này',
-    draftNotice:
-      'Số liệu do phân tích tĩnh tạo ra và là bản nháp cho đến khi được rà soát. Độ phức tạp chỉ để tham khảo, không dùng để tự tính công sức hay báo giá.',
     partialTitle: 'Kiểm kê chưa đầy đủ.',
     partialHelp:
       'Một số file hoặc program chưa phân tích được; các số liệu bên dưới không bao gồm phần đó.',
@@ -317,31 +407,17 @@ export const viMessages = {
       confirmed: 'Đã xác nhận',
       absent: 'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
     } satisfies Record<TableNameMapping['status'] | 'absent', string>,
+    mappingInferred: (schema: string) =>
+      `Giả định schema ${schema} (tiền tố xuất hiện nhiều nhất trong mã nguồn), chưa được xác nhận`,
     totals: {
-      uniqueTitle: 'Tổng toàn bộ mã nguồn (không trùng)',
-      uniqueHelp: 'Mỗi file chỉ tính một lần, kể cả file dùng chung.',
-      perProgramTitle: 'Tổng theo program',
-      perProgramHelp:
-        'Cộng LoC của từng program: file dùng chung được tính ở mỗi program khai báo nó, nên không phải quy mô mã nguồn.',
-      codeLines: 'Dòng code (LoC)',
-      physicalLines: 'Dòng vật lý',
-      coverage: 'File code đã phân tích',
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
-      files: 'Tổng số file',
-      sharedFiles: 'File dùng chung',
-      problemFiles: 'Lỗi / không hỗ trợ / bỏ qua',
-      problemValue: (errors: string, unsupported: string, skipped: string) =>
-        `${errors} / ${unsupported} / ${skipped}`,
-      unknown: 'không rõ',
-      programs: 'Số program',
-      perProgramCodeLines: 'LoC cộng theo program (tính trùng file dùng chung)',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',
       PROGRAM_INCOMPLETE: 'Có program thiếu file hoặc có file chưa phân tích.',
       MEMBER_UNRESOLVED:
-        'Có file khai báo trong project không tìm thấy hoặc không xác định được.',
+        'Có file khai báo trong project (.vbp) không tìm thấy hoặc không xác định được trong thư mục nguồn.',
       FILE_ERROR: 'Có file không giải mã được.',
       FILE_UNSUPPORTED: 'Có file code không được hỗ trợ.',
       FILES_SKIPPED:
@@ -349,8 +425,6 @@ export const viMessages = {
       UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
-      COMPLEXITY_REVIEW:
-        'Có program cần người xem lại mức độ phức tạp (mức cao hoặc gần ngưỡng).',
     } satisfies Record<AssessmentWarning, string>,
     programs: {
       title: 'Danh sách program',
@@ -365,7 +439,6 @@ export const viMessages = {
       notAnalyzed: 'Chưa phân tích',
       mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
       draft: 'Nháp',
-      needsReview: 'Cần xem lại',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,
       pageSize: 'Số dòng mỗi trang',
@@ -375,6 +448,7 @@ export const viMessages = {
       pagination: 'Phân trang danh sách program',
       columns: {
         program: 'Program',
+        kind: 'Loại',
         state: 'Trạng thái',
         ownCodeLines: 'LoC riêng',
         codeLines: 'LoC gồm file dùng chung',
@@ -391,6 +465,7 @@ export const viMessages = {
         low: 'Thấp',
         medium: 'Trung bình',
         high: 'Cao',
+        'very-high': 'Rất cao',
       } satisfies Record<ComplexityLevel, string>,
     },
     members: {
@@ -413,7 +488,6 @@ export const viMessages = {
     },
     detail: {
       title: (program: string) => `Chi tiết program ${program}`,
-      back: '← Quay lại danh sách',
       tabsLabel: 'Các phần của chi tiết program',
       tabs: {
         summary: 'Tóm tắt',
@@ -422,9 +496,9 @@ export const viMessages = {
         crud: 'CRUD',
         calls: 'Lời gọi',
       },
-      showingFirst: (shown: string, total: string) =>
-        `Đang hiện ${shown} / ${total} dòng.`,
-      showAll: 'Xem tất cả',
+      rowRange: (from: string, to: string, total: string) =>
+        `Dòng ${from}–${to} / ${total}`,
+      rowsPagination: 'Phân trang bảng',
       issue: 'Lý do không phân tích được:',
       incomplete:
         'Program chưa đầy đủ: có file thiếu, không hỗ trợ hoặc dòng chưa phân loại. Số liệu chỉ gồm phần đã phân tích.',
@@ -441,17 +515,12 @@ export const viMessages = {
         'LoC từng procedure theo phiên bản đếm của kiểm kê. Procedure trong file dùng chung cũng thuộc các program khác.',
       noProcedures: 'Không có procedure trong các file đã phân tích.',
       crudTitle: 'CRUD theo bảng',
-      crudView: 'Cách hiển thị tên bảng',
+      showRaw: 'Xem tên gốc',
+      showMapped: 'Xem sau ánh xạ',
       crudViews: {
         raw: 'Tên như trong mã nguồn',
         mapped: 'Sau ánh xạ tên bảng',
       } satisfies Record<CrudView, string>,
-      crudRawHelp: 'Tên bảng đúng như viết trong mã nguồn.',
-      crudMappedHelp:
-        'Các tên được giả định là cùng một bảng đã được gộp; cột “Tên trong mã nguồn” giữ tên gốc.',
-      mappingStatus: 'Ánh xạ:',
-      mappedAbsent:
-        'Kiểm kê này không có góc nhìn sau ánh xạ; đang hiển thị tên như trong mã nguồn.',
       noCrud: 'Không phát hiện truy cập bảng.',
       viaShared: 'Chỉ qua file dùng chung',
       callsTitle: 'Lời gọi',

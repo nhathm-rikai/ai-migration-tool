@@ -44,17 +44,23 @@ describe('Program detail (F04)', () => {
       <ProgramDetail inventory={mappedInventoryFixture} projectPath={PATH} />,
     );
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
+    // The mapped view opens first when the inventory has one.
+    expect(screen.getByTestId('crud-mapped')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tên gốc' }));
     const raw = screen.getByTestId('crud-raw');
     expect(within(raw).getByText('APP.ORDERS')).toBeTruthy();
     expect(within(raw).getByText('ORDERS')).toBeTruthy();
     expect(screen.getByTestId('detail-raw-complexity').textContent).toContain(
       'Thấp · 12',
     );
-    expect(screen.getByRole('note').textContent).toContain(
-      'Giả định, cần người quản lý DB xác nhận (APP)',
+    expect(screen.getByRole('note').textContent).toBe(
+      'Tên như trong mã nguồn · Xem sau ánh xạ',
     );
 
-    fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem sau ánh xạ' }));
+    expect(screen.getByRole('note').textContent).toBe(
+      'Giả định, cần người quản lý DB xác nhận (APP) · Xem tên gốc',
+    );
     const mapped = screen.getByTestId('crud-mapped');
     const row = within(mapped).getByText('ORDERS').closest('tr');
     expect(row?.textContent).toContain('APP.ORDERS, ORDERS');
@@ -67,19 +73,23 @@ describe('Program detail (F04)', () => {
     expect(screen.getByText('Độ phức tạp sau ánh xạ')).toBeTruthy();
     expect(screen.getByTestId('detail-own-code-lines').textContent).toBe('6');
 
-    fireEvent.click(screen.getByLabelText('Tên như trong mã nguồn'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tên gốc' }));
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
   });
 
   it('falls back to the names as written, labelled, when the mapped view is absent', () => {
-    render(
-      <ProgramDetail inventory={unmappedInventoryFixture} projectPath={PATH} />,
-    );
+    // An old inventory whose names carry no schema prefix to infer from.
+    const inventory = clone(unmappedInventoryFixture);
+    for (const file of inventory.files)
+      if (file.analysis?.status === 'analyzed')
+        for (const access of file.analysis.sqlTables)
+          access.table = access.table.replace('APP.', '');
+    render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
-    fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
+    // No mapped view: only the names as written, and no link to switch.
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
     expect(screen.queryByTestId('crud-mapped')).toBeNull();
-    expect(screen.getByText(/không có góc nhìn sau ánh xạ/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Xem sau ánh xạ' })).toBeNull();
     expect(screen.getByRole('note').textContent).toContain(
       'Không có (kiểm kê cũ',
     );
@@ -278,17 +288,16 @@ describe('Program detail (F04)', () => {
     expect(document.activeElement).toBe(crudTab);
     fireEvent.click(crudTab);
     expect(crudTab.getAttribute('aria-selected')).toBe('true');
-    const mapped = screen.getByRole('radio', {
-      name: 'テーブル名マッピング後',
-    });
-    mapped.focus();
-    expect(document.activeElement).toBe(mapped);
-    fireEvent.click(mapped);
     expect(screen.getByTestId('crud-mapped')).toBeTruthy();
+    const raw = screen.getByRole('button', { name: '元の名前を表示' });
+    raw.focus();
+    expect(document.activeElement).toBe(raw);
+    fireEvent.click(raw);
+    expect(screen.getByTestId('crud-raw')).toBeTruthy();
     expect(screen.getByText('プロシージャとLoC')).toBeTruthy();
   });
 
-  it('shows the first rows of a long table and the rest on request', () => {
+  it('pages a long table 10 rows at a time', () => {
     const inventory = clone(mappedInventoryFixture);
     const analysis = firstProgram(inventory).analysis;
     if (!analysis) throw new Error('fixture is analyzed');
@@ -302,14 +311,30 @@ describe('Program detail (F04)', () => {
     }));
     render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
     fireEvent.click(screen.getByRole('tab', { name: /^Lời gọi/ }));
-    expect(screen.getByText('Đang hiện 50 / 60 dòng.')).toBeTruthy();
-    expect(screen.queryByText('Callee55')).toBeNull();
+    expect(screen.getByText('Dòng 1–10 / 60')).toBeTruthy();
+    expect(screen.getByText('Trang 1 / 6')).toBeTruthy();
+    expect(screen.queryByText('Callee10')).toBeNull();
     // The caller shows its procedure and file; the full ID stays as title.
     const caller = screen.getByText('Caller0').closest('th');
     expect(caller?.getAttribute('title')).toBe(
       'cmn/OrderRules.bas#Function:Caller0',
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
-    expect(screen.getByText('Callee55')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+    expect(screen.getByText('Dòng 11–20 / 60')).toBeTruthy();
+    expect(screen.getByText('Callee10')).toBeTruthy();
+    expect(screen.queryByText('Callee0')).toBeNull();
+  });
+
+  it('opens the mapped view with the schema prefix written most often, labelled as assumed', () => {
+    render(
+      <ProgramDetail inventory={unmappedInventoryFixture} projectPath={PATH} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
+    const mapped = screen.getByTestId('crud-mapped');
+    const row = within(mapped).getByText('ORDERS').closest('tr');
+    expect(row?.textContent).toContain('APP.ORDERS, ORDERS');
+    expect(screen.getByRole('note').textContent).toContain(
+      'Giả định schema APP (tiền tố xuất hiện nhiều nhất trong mã nguồn)',
+    );
   });
 });

@@ -21,6 +21,7 @@ import type {
   SourceInventoryDocument,
 } from '@portal/contracts';
 import { AssessmentOverview } from './assessment-overview';
+import { inferredCorpus } from '../../testing/inventory-fixtures';
 import { summarizeInventory } from './assessment-summary';
 import { createArtifactsApi } from '../../shared/api/artifacts-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
@@ -85,7 +86,7 @@ function sharedInventory(): Inventory {
 }
 
 const openPrograms = () =>
-  fireEvent.click(screen.getByRole('tab', { name: 'Danh sách program' }));
+  fireEvent.click(screen.getByRole('tab', { name: /^Danh sách program/ }));
 
 afterEach(() => {
   window.localStorage.clear();
@@ -213,7 +214,7 @@ describe('Assessment overview (F03)', () => {
     expect(screen.getByText('Không tìm thấy')).toBeTruthy();
   });
 
-  it('reads an inventory written before table name mapping', async () => {
+  it('assumes the most common schema prefix for an inventory without a configured schema', async () => {
     const server = serve(unmappedInventoryArtifactFixture);
     render(
       <AssessmentOverview
@@ -223,11 +224,14 @@ describe('Assessment overview (F03)', () => {
       />,
     );
     expect(
-      await screen.findByText(
-        'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
-      ),
+      await screen.findByText('Sau ánh xạ · giả định schema APP'),
     ).toBeTruthy();
-    expect(screen.queryByText(/sau ánh xạ/)).toBeNull();
+    expect(
+      screen.getAllByText(/Giả định schema APP \(tiền tố xuất hiện nhiều nhất/)
+        .length,
+    ).toBeGreaterThan(0);
+    // The list counts tables on the inferred view (APP.ORDERS = ORDERS).
+    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
   });
 
   it('searches, filters and selects programs', async () => {
@@ -261,8 +265,39 @@ describe('Assessment overview (F03)', () => {
     });
     const invoice = screen.getByRole('button', { name: 'Invoice' });
     fireEvent.click(invoice);
-    expect(invoice.getAttribute('aria-pressed')).toBe('true');
+    expect(invoice.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('File của Invoice')).toBeTruthy();
+  });
+
+  it('shows and filters the Very High level', async () => {
+    const inventory = sharedInventory();
+    const invoice = inventory.programs[1];
+    if (!invoice?.analysis) throw new Error('fixture has an analysis');
+    invoice.analysis.complexity = {
+      ...invoice.analysis.complexity,
+      version: 'complexity-v1',
+      score: 78,
+      level: 'very-high',
+    };
+    const server = serve({
+      ...mappedInventoryArtifactFixture,
+      payload: inventory,
+    });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Đang hiển thị 2 / 2 program');
+    expect(screen.getByRole('button', { name: /Rất cao/ })).toBeTruthy();
+    openPrograms();
+    fireEvent.change(screen.getByLabelText('Độ phức tạp'), {
+      target: { value: 'very-high' },
+    });
+    expect(screen.getByText('Đang hiển thị 1 / 2 program')).toBeTruthy();
+    expect(screen.getByText('Rất cao · 78')).toBeTruthy();
   });
 
   it('shows an empty state when the run has no published inventory', async () => {
@@ -373,7 +408,7 @@ describe('Assessment overview (F03)', () => {
     await screen.findByText('Danh sách program');
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     expect(screen.getByText('プログラム一覧')).toBeTruthy();
-    expect(screen.getByText('ソース全体の合計（重複なし）')).toBeTruthy();
+    expect(screen.getByText('コード行の内訳')).toBeTruthy();
     expect(server.calls).toHaveLength(2);
   });
 
@@ -410,7 +445,7 @@ describe('Assessment overview (F03)', () => {
     openPrograms();
     const names = () =>
       screen
-        .getAllByRole('button', { pressed: false })
+        .getAllByRole('button', { expanded: false })
         .map((button) => button.textContent)
         .filter((text) => text?.startsWith('P'));
     // Default: highest complexity first, 50 rows per page.
@@ -425,6 +460,123 @@ describe('Assessment overview (F03)', () => {
     );
     expect(screen.getByText('Trang 1 / 2')).toBeTruthy();
     expect(names()[0]).toBe('P00');
+  });
+
+  it('names missing member files and does not count a case-only difference as missing', async () => {
+    const base: Inventory = structuredClone(
+      mappedInventoryArtifactFixture.payload,
+    );
+    const [program] = base.programs;
+    if (!program) throw new Error('fixture has a program');
+    const member = (
+      declaredPath: string,
+      resolution: 'missing' | 'case-mismatch',
+    ) => ({
+      kind: 'module',
+      name: null,
+      declaredPath,
+      relativePath: resolution === 'missing' ? null : 'cmn/Common.bas',
+      resolution,
+      fileStatus: resolution === 'missing' ? null : ('analyzed' as const),
+      shared: false,
+    });
+    const payload: Inventory = {
+      ...base,
+      programs: [
+        {
+          ...structuredClone(program),
+          projectPath: 'a/A.vbp',
+          members: [
+            ...program.members,
+            member('..\\cmn\\SFTP.BAS', 'missing'),
+            member('..\\cmn\\COMMON.BAS', 'case-mismatch'),
+          ],
+        },
+        {
+          ...structuredClone(program),
+          projectPath: 'b/c/B.vbp',
+          members: [
+            ...program.members,
+            member('..\\..\\cmn\\sftp.bas', 'missing'),
+          ],
+        },
+        {
+          ...structuredClone(program),
+          projectPath: 'd/D.vbp',
+          members: [
+            ...program.members,
+            member('..\\cmn\\COMMON.BAS', 'case-mismatch'),
+          ],
+        },
+      ],
+    };
+    const summary = summarizeInventory(payload);
+    // Two relative paths from different folders point to the same file.
+    expect(summary.missingMembers).toEqual([
+      { path: 'cmn/SFTP.BAS', resolution: 'missing', programs: 2 },
+    ]);
+    expect(
+      summary.programs.find((row) => row.projectPath === 'd/D.vbp')
+        ?.unresolvedMembers,
+    ).toBe(0);
+    const server = serve({ ...mappedInventoryArtifactFixture, payload });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    const item = (await screen.findByText('cmn/SFTP.BAS')).closest('li');
+    expect(item?.textContent).toContain('2 program');
+    expect(item?.textContent).toContain('không tìm thấy');
+  });
+
+  it('keeps missing files apart by folder and by reason, whatever the program order', () => {
+    const base: Inventory = structuredClone(
+      mappedInventoryArtifactFixture.payload,
+    );
+    const [program] = base.programs;
+    if (!program) throw new Error('fixture has a program');
+    const withMember = (
+      projectPath: string,
+      declaredPath: string,
+      resolution: 'missing' | 'absolute-path',
+    ) => ({
+      ...structuredClone(program),
+      projectPath,
+      members: [
+        ...program.members,
+        {
+          kind: 'module',
+          name: null,
+          declaredPath,
+          relativePath: null,
+          resolution,
+          fileStatus: null,
+          shared: false,
+        },
+      ],
+    });
+    const programs = [
+      withMember('app/A.vbp', 'one-lib\\Common.bas', 'missing'),
+      withMember('app/B.vbp', 'two-lib\\Common.bas', 'missing'),
+      withMember('app/C.vbp', 'C:\\legacy\\Common.bas', 'absolute-path'),
+    ];
+    const expected = [
+      { path: 'app/one-lib/Common.bas', resolution: 'missing', programs: 1 },
+      { path: 'app/two-lib/Common.bas', resolution: 'missing', programs: 1 },
+      {
+        path: 'C:\\legacy\\Common.bas',
+        resolution: 'absolute-path',
+        programs: 1,
+      },
+    ];
+    for (const order of [programs, [...programs].reverse()]) {
+      const summary = summarizeInventory({ ...base, programs: order });
+      expect(summary.missingMembers).toEqual(expect.arrayContaining(expected));
+      expect(summary.missingMembers).toHaveLength(3);
+    }
   });
 
   it('opens the list filtered from a warning of the overview', async () => {
@@ -442,11 +594,124 @@ describe('Assessment overview (F03)', () => {
     fireEvent.click(show);
     expect(
       screen
-        .getByRole('tab', { name: 'Danh sách program' })
+        .getByRole('tab', { name: /^Danh sách program/ })
         .getAttribute('aria-selected'),
     ).toBe('true');
     const state = screen.getByLabelText('Trạng thái');
     if (!(state instanceof HTMLSelectElement)) throw new Error('select');
     expect(state.value).not.toBe('all');
+  });
+
+  it('UI02 opens the program detail inline under its row and links to document generation', async () => {
+    const server = serve(mappedInventoryArtifactFixture);
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    const toggle = await screen.findByRole('button', { name: 'Order' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const detail = screen.getByRole('region', {
+      name: 'Chi tiết program Order',
+    });
+    // The detail row directly follows the program row.
+    const row = toggle.closest('tr');
+    expect(row?.nextElementSibling?.contains(detail)).toBe(true);
+    expect(
+      screen
+        .getByRole('link', { name: /Tạo tài liệu cho program này/ })
+        .getAttribute('href'),
+    ).toBe(
+      `/projects/${projectId}/documents?program=${encodeURIComponent('programs/Order/Order.vbp')}`,
+    );
+    fireEvent.click(toggle);
+    expect(
+      screen.queryByRole('region', { name: 'Chi tiết program Order' }),
+    ).toBeNull();
+  });
+
+  it('UI02 shows KPI cards, the line split and the histogram filtering the list', async () => {
+    const server = serve(mappedInventoryArtifactFixture);
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Phân bổ dòng code');
+    const kpi = (key: string) => {
+      const card = document.querySelector(`[data-kpi="${key}"]`);
+      if (!(card instanceof HTMLElement)) throw new Error(key);
+      return card;
+    };
+    expect(within(kpi('programs')).getByText('1')).toBeTruthy();
+    expect(within(kpi('physical')).getByText('9')).toBeTruthy();
+    expect(within(kpi('sql')).getByText('2')).toBeTruthy();
+    expect(within(kpi('tables')).getByText('Sau ánh xạ tên bảng')).toBeTruthy();
+    expect(screen.getByTestId('loc-code').textContent).toBe('6');
+    expect(screen.queryByTestId('loc-unclassified')).toBeNull();
+    expect(screen.getByText(/Tham khảo · complexity-v0-draft/)).toBeTruthy();
+    // Empty levels cannot be picked; a bar opens the list filtered on it.
+    expect(
+      screen
+        .getByRole('button', { name: /^0Trung bình/ })
+        .hasAttribute('disabled'),
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^1Thấp/ }));
+    const level = screen.getByLabelText('Độ phức tạp');
+    if (!(level instanceof HTMLSelectElement)) throw new Error('select');
+    expect(level.value).toBe('low');
+  });
+
+  it('UI02 lists project-wide CRUD in the DB tab, raw and mapped', async () => {
+    const server = serve(mappedInventoryArtifactFixture);
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('tab', { name: /^Bảng DB/ }));
+    const matrix = screen.getByRole('region', { name: 'Bảng DB' });
+    expect(within(matrix).getAllByRole('row')).toHaveLength(2);
+    expect(within(matrix).getByRole('rowheader').textContent).toBe('ORDERS');
+    fireEvent.click(
+      within(matrix).getByRole('button', { name: 'Xem tên gốc' }),
+    );
+    expect(
+      within(matrix)
+        .getAllByRole('rowheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['APP.ORDERS', 'ORDERS']);
+  });
+
+  it('UI02 shows one table in KPI, list and detail on an inferred schema, without the stored mapped score (review fix)', async () => {
+    const payload = inferredCorpus();
+    const server = serve({ ...mappedInventoryArtifactFixture, payload });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Sau ánh xạ · giả định schema HAN01');
+    const tables = document.querySelector('[data-kpi="tables"]');
+    if (!(tables instanceof HTMLElement)) throw new Error('kpi');
+    expect(within(tables).getByText('1')).toBeTruthy();
+    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Order' }));
+    const detail = screen.getByRole('region', {
+      name: 'Chi tiết program Order',
+    });
+    expect(within(detail).queryByText('Độ phức tạp sau ánh xạ')).toBeNull();
+    fireEvent.click(within(detail).getByRole('tab', { name: /^CRUD/ }));
+    expect(within(detail).getAllByRole('rowheader')).toHaveLength(1);
   });
 });

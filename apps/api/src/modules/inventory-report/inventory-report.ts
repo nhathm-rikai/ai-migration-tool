@@ -16,6 +16,30 @@ type AnalyzedFile = Extract<
   NonNullable<InventoryFile['analysis']>,
   { status: 'analyzed' }
 >;
+type SqlUse = AnalyzedFile['dynamicSql'][number];
+type InventoryComplexity = NonNullable<
+  InventoryProgram['analysis']
+>['complexity'];
+// Score and level only: review flags written by complexity-v0 inventories
+// are not reported.
+export type ReportComplexity = Omit<InventoryComplexity, 'reviewFlags'>;
+
+function reportComplexity(
+  complexity: InventoryComplexity | undefined,
+): ReportComplexity | null {
+  if (!complexity) return null;
+  const { version, score, level, parts } = complexity;
+  return { version, score, level, parts: { ...parts } };
+}
+
+// One SQL fact of a selected file (dynamic table name, concatenated value).
+export type SqlUseRow = {
+  relativePath: string;
+  procedureId: string | null;
+  operation: string;
+  line: number;
+  usedBy: string[];
+};
 
 // Procedure breakdown (procedureLinesVersion); null in older inventories.
 export type ProcedureLineTotals = {
@@ -62,7 +86,6 @@ export type InventoryReport = {
     programs: { id: string; projectPath: string }[];
   };
   // As given to the report, including programs outside the selection.
-  complexityKnownMismatches: ComplexityKnownMismatch[];
   programs: {
     id: string;
     projectPath: string;
@@ -77,12 +100,8 @@ export type InventoryReport = {
     procedures: number;
     procedureLines: ProcedureLineTotals;
     metrics: NonNullable<InventoryProgram['analysis']>['metrics'] | null;
-    complexity: NonNullable<InventoryProgram['analysis']>['complexity'] | null;
-    normalizedComplexity:
-      NonNullable<InventoryProgram['analysis']>['complexity'] | null;
-    // Model flags (high, near-threshold) plus `known-mismatch` from the
-    // complexity review given to the report; empty when none applies.
-    complexityReviewFlags: string[];
+    complexity: ReportComplexity | null;
+    normalizedComplexity: ReportComplexity | null;
   }[];
   members: {
     programId: string;
@@ -148,13 +167,9 @@ export type InventoryReport = {
     line: number;
     viaSharedOnly: boolean;
   }[];
-  dynamicSql: {
-    relativePath: string;
-    procedureId: string | null;
-    operation: string;
-    line: number;
-    usedBy: string[];
-  }[];
+  dynamicSql: SqlUseRow[];
+  // Empty for inventories written before sql-access-v5.
+  concatenatedSql: SqlUseRow[];
   externalReferences: {
     programId: string;
     kind: string;
@@ -279,18 +294,11 @@ function addBreakdown(
 const fileOf = (procedureId: string) =>
   procedureId.slice(0, procedureId.lastIndexOf('#'));
 
-// Programs a reviewed comparison found misclassified (program ID + note).
-// Kept outside the inventory and the code: it is data about one corpus.
-export type ComplexityKnownMismatch = { program: string; note: string };
-
 export function buildInventoryReport(
   inventory: Inventory,
   requested: readonly string[],
-  knownMismatches: readonly ComplexityKnownMismatch[] = [],
 ): InventoryReport {
   const selected = selectPrograms(inventory, requested);
-  const mismatchOf = (id: string) =>
-    knownMismatches.find((m) => m.program.toUpperCase() === id.toUpperCase());
   const filesByPath = new Map(
     inventory.files.map((file) => [file.manifest.relativePath, file]),
   );
@@ -346,12 +354,10 @@ export function buildInventoryReport(
       procedures: procedures.length,
       procedureLines: breakdownOf(procedures),
       metrics: program.analysis?.metrics ?? null,
-      complexity: program.analysis?.complexity ?? null,
-      normalizedComplexity: program.analysis?.normalizedComplexity ?? null,
-      complexityReviewFlags: [
-        ...(program.analysis?.complexity.reviewFlags ?? []),
-        ...(mismatchOf(id) ? ['known-mismatch'] : []),
-      ],
+      complexity: reportComplexity(program.analysis?.complexity),
+      normalizedComplexity: reportComplexity(
+        program.analysis?.normalizedComplexity,
+      ),
     };
   });
 
@@ -446,15 +452,21 @@ export function buildInventoryReport(
     ];
   });
 
-  const dynamicSql = selectedPaths.flatMap((path) =>
-    (analyzed(path)?.dynamicSql ?? []).map((use) => ({
-      relativePath: path,
-      procedureId: use.procedureId,
-      operation: use.operation,
-      line: use.line,
-      usedBy: usedBy.get(path) ?? [],
-    })),
-  );
+  const sqlUseRows = (
+    uses: (file: AnalyzedFile) => readonly SqlUse[] | undefined,
+  ): SqlUseRow[] =>
+    selectedPaths.flatMap((path) => {
+      const file = analyzed(path);
+      return (file ? (uses(file) ?? []) : []).map((use) => ({
+        relativePath: path,
+        procedureId: use.procedureId,
+        operation: use.operation,
+        line: use.line,
+        usedBy: usedBy.get(path) ?? [],
+      }));
+    });
+  const dynamicSql = sqlUseRows((file) => file.dynamicSql);
+  const concatenatedSql = sqlUseRows((file) => file.concatenatedSql);
 
   const externalReferences = selected.flatMap(({ id, program }) =>
     program.externalReferences.map((reference) => ({
@@ -543,24 +555,6 @@ export function buildInventoryReport(
       `${inventory.skipped.length} corpus files were not read (symlink/too-large)`,
     );
   for (const { id, program } of selected) {
-    const complexity = program.analysis?.complexity;
-    for (const flag of complexity?.reviewFlags ?? [])
-      warn(
-        flag === 'high' ? 'COMPLEXITY_HIGH' : 'COMPLEXITY_NEAR_THRESHOLD',
-        id,
-        program.projectPath,
-        null,
-        `${complexity?.level ?? ''} (${complexity?.score ?? ''}): review before use`,
-      );
-    const mismatch = mismatchOf(id);
-    if (mismatch)
-      warn(
-        'COMPLEXITY_KNOWN_MISMATCH',
-        id,
-        program.projectPath,
-        null,
-        mismatch.note,
-      );
     if (program.status !== 'parsed')
       warn(
         'PROGRAM_UNSUPPORTED',
@@ -645,7 +639,6 @@ export function buildInventoryReport(
         projectPath: program.projectPath,
       })),
     },
-    complexityKnownMismatches: [...knownMismatches],
     programs,
     members,
     files,
@@ -653,6 +646,7 @@ export function buildInventoryReport(
     calls,
     crud,
     dynamicSql,
+    concatenatedSql,
     externalReferences,
     externalApis,
     totals: {

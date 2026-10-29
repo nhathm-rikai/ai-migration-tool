@@ -752,3 +752,103 @@ it('links calls written with the $ type character', () => {
     ).map((r) => `${r.name}:${r.line}`),
   ).toEqual(['F:2', 'F:5']);
 });
+
+describe('SQL with runtime values (sql-access-v5)', () => {
+  const facts = (body: string[]) => {
+    const result = analyzeVb6CodeFile(
+      'M.BAS',
+      ['Sub P(wkSycd As String)', ...body, 'End Sub'],
+      { module: 'standard' },
+    );
+    if (result.status !== 'analyzed') throw new Error(result.status);
+    const uses = (list: { operation: string; line: number }[]) =>
+      list.map((use) => `${use.operation}:${use.line}`);
+    return {
+      tables: result.sqlTables.length,
+      dynamic: uses(result.dynamicSql),
+      concatenated: uses(result.concatenatedSql),
+      parameterized: uses(result.parameterizedSql),
+    };
+  };
+
+  it.each([
+    [
+      'a value after =',
+      [
+        'Sql = "select * "',
+        'Sql = Sql & " from HAN01.KTSJNL where SHNCD = " & wkSycd',
+      ],
+      ['R:3'],
+    ],
+    [
+      'a quoted value',
+      ['Sql = "UPDATE T1 SET A = \'" & Trim(txtA.Text) & "\'"'],
+      ['U:2'],
+    ],
+    [
+      'a WHERE clause built in another variable over several lines',
+      [
+        'strWHERE = " WHERE A = " & wkSycd',
+        'strWHERE = strWHERE & _',
+        '    " AND B = \'" & txtB & "\'"',
+        'strSQL = "DELETE FROM T1" & strWHERE',
+      ],
+      ['D:2'],
+    ],
+    [
+      'a value in one branch only',
+      [
+        's = "SELECT * FROM T1 WHERE 1 = 1"',
+        'If wkSycd <> "" Then',
+        '    s = s & " AND A = " & wkSycd',
+        'Else',
+        '    s = s & " AND A IS NULL"',
+        'End If',
+      ],
+      ['R:4'],
+    ],
+  ])('counts %s once as concatenated', (_label, body, concatenated) => {
+    expect(facts(body)).toMatchObject({ dynamic: [], concatenated });
+  });
+
+  it('counts bind parameters as parameterized, not concatenated', () => {
+    expect(
+      facts([
+        'Sql = "SELECT * FROM T1 WHERE A = :wkSycd"',
+        'Set dyn = gDb.CreateDynaset(Sql, 0&)',
+      ]),
+    ).toMatchObject({ concatenated: [], parameterized: ['R:2'] });
+  });
+
+  it('skips commented-out SQL and line-break constants', () => {
+    expect(
+      facts([
+        '\'Sql = "SELECT * FROM T1 WHERE A = " & wkSycd',
+        'Sql = "SELECT A" & vbCrLf & "FROM T1" & vbCrLf & "WHERE B = 1"',
+        'Rem Sql = "DELETE FROM T1 WHERE A = " & wkSycd',
+      ]),
+    ).toEqual({ tables: 1, dynamic: [], concatenated: [], parameterized: [] });
+  });
+
+  it('does not count text that only differs between merged branches', () => {
+    // Four optional filters give 16 paths, past the limit, so they merge.
+    const filters = [1, 2, 3, 4].flatMap((n) => [
+      `If f${n} Then s = s & " AND C${n} = ${n}"`,
+    ]);
+    const merged = facts(['s = "SELECT * FROM T1 WHERE 1 = 1"', ...filters]);
+    expect(merged.concatenated).toEqual([]);
+    const withValue = facts([
+      's = "SELECT * FROM T1 WHERE 1 = 1"',
+      ...filters,
+      'If f5 Then s = s & " AND C5 = " & wkSycd',
+    ]);
+    expect(withValue.concatenated).toEqual(['R:7']);
+  });
+
+  it('keeps a runtime table name as dynamic only', () => {
+    expect(facts(['s = "SELECT * FROM ORD_" & wkSycd'])).toMatchObject({
+      dynamic: ['R:2'],
+      concatenated: [],
+    });
+  });
+});

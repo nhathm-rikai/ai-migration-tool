@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   ArtifactListSchema,
   SourceInventoryArtifactSchema,
@@ -29,14 +29,6 @@ async function treeHash(root: string): Promise<string> {
       .update('\0')
       .update(await readFile(path));
   return hash.digest('hex');
-}
-
-async function openProject(page: Page, name: string) {
-  await page
-    .getByRole('navigation')
-    .filter({ has: page.getByRole('button', { name, exact: true }) })
-    .getByRole('button', { name, exact: true })
-    .click();
 }
 
 // PF07: a local run reads the registered fixture folder through its snapshot,
@@ -103,7 +95,7 @@ test(
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(
-      assessment.getByRole('tab', { name: 'Danh sách program' }),
+      assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
     await assessment.getByText('Thông tin kỹ thuật').click();
     await expect(
@@ -117,7 +109,7 @@ test(
     await expect(assessment.getByTestId('coverage')).toHaveText('4 / 4');
     await expect(assessment.getByText('MEMBER_UNRESOLVED')).toBeVisible();
 
-    await assessment.getByRole('tab', { name: 'Danh sách program' }).click();
+    await assessment.getByRole('tab', { name: /^Danh sách program/ }).click();
     await assessment.getByRole('button', { name: 'SAMPLE' }).click();
     const detail = assessment.getByRole('region', {
       name: 'Chi tiết program SAMPLE',
@@ -138,7 +130,10 @@ test(
     await detail.getByRole('tab', { name: /^Lời gọi/ }).click();
     await expect(detail.getByText('Lời gọi', { exact: true })).toBeVisible();
     await detail.getByRole('tab', { name: /^CRUD/ }).click();
-    await detail.getByLabel('Sau ánh xạ tên bảng').check();
+    // The mapped view opens first; its line names the assumed schema.
+    await expect(
+      detail.getByText(/Giả định, cần người quản lý DB xác nhận/),
+    ).toBeVisible();
     await expect(
       detail.getByText('Không phát hiện truy cập bảng.'),
     ).toBeVisible();
@@ -165,24 +160,18 @@ test(
     });
     expect(await readdir(join(dataDir, 'artifacts', '.staging'))).toEqual([]);
 
-    await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
+    await page.getByRole('radio', { name: '日本語' }).check();
     await expect(page.getByText('プログラム SAMPLE の詳細')).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
-      path: testInfo.outputPath('pf07-mobile-ja.png'),
-      fullPage: true,
-    });
 
     // Reload: same version and bytes, nothing started again.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/);
     await page.reload();
-    await openProject(page, projectName);
-    await page.getByRole('button', { name: '解析結果を表示' }).click();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('52');
     const again: unknown = await (

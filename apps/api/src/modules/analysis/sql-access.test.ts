@@ -27,6 +27,8 @@ describe('detectSqlAccess', () => {
     expect(at('DELETE FROM ', null, ' WHERE A = 1')).toEqual({
       tables: [],
       dynamic: [{ operation: 'D', line: 2 }],
+      concatenated: null,
+      parameterized: null,
       lines: [1, 3],
     });
   });
@@ -67,5 +69,61 @@ describe('detectSqlAccess on concatenated text', () => {
     expect(at("SELECT A FROM T1 WHERE B = '", null, "'").tables).toEqual([
       { table: 'T1', operation: 'R', line: 1 },
     ]);
+  });
+});
+
+describe('detectSqlAccess on runtime values (sql-access-v5)', () => {
+  it.each([
+    ['a value after =', ['SELECT * FROM T1 WHERE A = ', null], 'R:2'],
+    ['a quoted value', ["UPDATE T1 SET A = '", null, "'"], 'U:2'],
+    [
+      'a clause kept in an unknown variable',
+      ['DELETE FROM T1 ', null, ' AND B = 1'],
+      'D:2',
+    ],
+    [
+      'a value in the second statement of a text',
+      ['SELECT A FROM T1 UNION SELECT B FROM T2 WHERE C = ', null],
+      'R:2',
+    ],
+  ])('reports %s as concatenated', (_label, texts, use) => {
+    const result = at(...texts);
+    expect(result.dynamic).toEqual([]);
+    expect(
+      result.concatenated &&
+        `${result.concatenated.operation}:${result.concatenated.line}`,
+    ).toBe(use);
+  });
+
+  it('keeps a runtime table name apart from concatenated values', () => {
+    expect(at('SELECT * FROM ', null)).toMatchObject({
+      dynamic: [{ operation: 'R', line: 2 }],
+      concatenated: null,
+    });
+    expect(at('SELECT * FROM ORD_', null, ' WHERE A = ', null)).toMatchObject({
+      dynamic: [{ operation: 'R', line: 1 }],
+      concatenated: { operation: 'R', line: 4 },
+    });
+  });
+
+  it('reports bind parameters as parameterized, not concatenated', () => {
+    expect(
+      at("SELECT * FROM T1 WHERE A = :code AND B = 'HH24:MI'"),
+    ).toMatchObject({
+      concatenated: null,
+      parameterized: { operation: 'R', line: 1 },
+    });
+    expect(at("SELECT * FROM T1 WHERE B = ':x'").parameterized).toBeNull();
+  });
+
+  it('ignores runtime values without a statement, in comments or between branches', () => {
+    expect(at(' WHERE A = ', null).concatenated).toBeNull();
+    expect(at('SELECT * FROM T1 -- A = ', null).concatenated).toBeNull();
+    expect(
+      detectSqlAccess([
+        { text: 'SELECT * FROM T1 WHERE ', line: 1 },
+        { text: null, line: 2, boundary: true, branch: true },
+      ]).concatenated,
+    ).toBeNull();
   });
 });

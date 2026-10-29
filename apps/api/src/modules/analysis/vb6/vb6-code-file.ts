@@ -2,6 +2,7 @@ import type {
   CodeFileAnalysis,
   CodeReference,
   DynamicSqlFact,
+  SqlUseFact,
   ExternalDeclaration,
   LineCounters,
   ProcedureMetrics,
@@ -319,6 +320,8 @@ function scanVb6CodeFile(
 
   const sqlTables: SqlTableFact[] = [];
   const dynamicSql: DynamicSqlFact[] = [];
+  const concatenatedSql: SqlUseFact[] = [];
+  const parameterizedSql: SqlUseFact[] = [];
   // A value inlined into another (strSQL = strSELECT & strFROM) is also
   // emitted on its own; the same fact is kept once.
   const seen = new Set<string>();
@@ -336,6 +339,11 @@ function scanVb6CodeFile(
       for (const d of detected.dynamic)
         if (once(`${procedureId}|*|${d.operation}|${d.line}`))
           dynamicSql.push({ ...d, procedureId });
+      const { concatenated, parameterized } = detected;
+      if (concatenated && once(`${procedureId}|&|${concatenated.line}`))
+        concatenatedSql.push({ ...concatenated, procedureId });
+      if (parameterized && once(`${procedureId}|:|${parameterized.line}`))
+        parameterizedSql.push({ ...parameterized, procedureId });
     }
   const procedures = closed.map((procedure): ProcedureMetrics => ({
     id: procedure.id,
@@ -370,6 +378,8 @@ function scanVb6CodeFile(
       fileLevelCodeLines: counters.codeLines - procedureCodeLines,
       sqlTables,
       dynamicSql,
+      concatenatedSql,
+      parameterizedSql,
       externalDeclarations,
       labels,
     },

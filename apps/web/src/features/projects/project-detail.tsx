@@ -19,15 +19,22 @@ type DetailState =
   | { status: 'ready'; project: Project };
 export function ProjectDetail({
   id,
+  project,
   api,
   runsApi,
   sourcesApi,
   artifactsApi,
   onOpenResults,
+  onProgress,
   onClose,
 }: {
   id: string;
+  // Already loaded by the caller: shown without reading it again.
+  project?: Project | undefined;
   api: ProjectsApi;
+  // Called after a source save or when a run starts or ends, so step marks
+  // re-read.
+  onProgress?: (() => void) | undefined;
   // Opens a succeeded run's results page; without it they show inline.
   onOpenResults?: ((runId: string) => void) | undefined;
   // Without it the analyze runs panel is not shown (Projects-only tests).
@@ -40,9 +47,13 @@ export function ProjectDetail({
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.projects.detail;
-  const [state, setState] = useState<DetailState>({ status: 'loading' });
+  const [state, setState] = useState<DetailState>(
+    project ? { status: 'ready', project } : { status: 'loading' },
+  );
   const [retry, setRetry] = useState(0);
+  const preloaded = project !== undefined;
   useEffect(() => {
+    if (preloaded) return;
     const controller = new AbortController();
     setState({ status: 'loading' });
     void api.get(id, controller.signal).then(
@@ -58,7 +69,7 @@ export function ProjectDetail({
       },
     );
     return () => controller.abort();
-  }, [api, id, retry]);
+  }, [api, id, retry, preloaded]);
   return (
     <section className="panel detail-panel" aria-labelledby="detail-title">
       <div className="section-heading">
@@ -83,11 +94,8 @@ export function ProjectDetail({
       )}
       {state.status === 'ready' && (
         <>
-          <div className="project-title">
-            <span className="eyebrow">{messages.projects.overview}</span>
-            <h1>{state.project.name}</h1>
-            <p className="muted">{copy.description}</p>
-          </div>
+          {/* The page header names the project; this keeps the summary. */}
+          <p className="muted project-title">{copy.description}</p>
           <dl className="project-metadata">
             <div>
               <dt>{copy.data}</dt>
@@ -133,6 +141,7 @@ export function ProjectDetail({
                 api={runsApi}
                 artifactsApi={artifactsApi}
                 onOpenResults={onOpenResults}
+                onRunChange={onProgress}
                 projectId={state.project.id}
                 demo
                 sourceRevision={FIXTURE_SOURCE_REVISION}
@@ -145,6 +154,7 @@ export function ProjectDetail({
               sourcesApi={sourcesApi}
               artifactsApi={artifactsApi}
               onOpenResults={onOpenResults}
+              onProgress={onProgress}
             />
           ) : (
             runsApi && (
@@ -152,6 +162,7 @@ export function ProjectDetail({
                 api={runsApi}
                 artifactsApi={artifactsApi}
                 onOpenResults={onOpenResults}
+                onRunChange={onProgress}
                 projectId={state.project.id}
                 demo={false}
                 sourceRevision={null}
@@ -172,14 +183,20 @@ function SourceAndRuns({
   sourcesApi,
   artifactsApi,
   onOpenResults,
+  onProgress,
 }: {
   projectId: string;
   runsApi?: RunsApi | undefined;
   sourcesApi: SourcesApi;
   artifactsApi?: ArtifactsApi | undefined;
   onOpenResults?: ((runId: string) => void) | undefined;
+  onProgress?: (() => void) | undefined;
 }) {
   const source = useProjectSource(sourcesApi, projectId);
+  const saved = source.save.status === 'saved';
+  useEffect(() => {
+    if (saved) onProgress?.();
+  }, [saved, onProgress]);
   return (
     <>
       <SourcePanel control={source} />
@@ -188,6 +205,7 @@ function SourceAndRuns({
           api={runsApi}
           artifactsApi={artifactsApi}
           onOpenResults={onOpenResults}
+          onRunChange={onProgress}
           projectId={projectId}
           demo={false}
           sourceRevision={startableRevision(source.state)}

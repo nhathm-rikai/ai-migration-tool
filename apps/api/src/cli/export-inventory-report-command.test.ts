@@ -113,38 +113,6 @@ describe('export-inventory-report command', () => {
     expect(await readdir(source)).toEqual(Object.keys(SOURCE_FILES).sort());
   });
 
-  it('flags known mismatches from a complexity review file', async () => {
-    const review = join(base, 'review.json');
-    await writeFile(
-      review,
-      JSON.stringify({ knownMismatches: [{ program: 'P', note: 'n' }] }),
-    );
-    const args = (path: string) => [
-      '--inventory',
-      inventory,
-      '--source-root',
-      source,
-      '--programs',
-      'P',
-      '--out-json',
-      join(base, 'r.json'),
-      '--out-xlsx',
-      join(base, 'r.xlsx'),
-      '--complexity-review',
-      path,
-    ];
-    await expect(main(args(review))).resolves.toBe(0);
-    const report: unknown = JSON.parse(
-      await readFile(join(base, 'r.json'), 'utf8'),
-    );
-    expect(report).toHaveProperty('programs.0.complexityReviewFlags', [
-      'known-mismatch',
-    ]);
-    await writeFile(review, JSON.stringify({ knownMismatches: [{ id: 'P' }] }));
-    await expect(main(args(review))).resolves.toBe(2);
-    await expect(main(args(join(base, 'r.json')))).resolves.toBe(2);
-  });
-
   it('requires the source root', async () => {
     await expect(
       main([

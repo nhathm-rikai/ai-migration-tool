@@ -25,14 +25,12 @@ export type AssessmentWarning =
   | 'FILES_SKIPPED'
   | 'UNCLASSIFIED_LINES'
   | 'TABLE_NAMES_NOT_CONFIRMED'
-  | 'COMPLEXITY_DRAFT'
-  | 'COMPLEXITY_REVIEW';
+  | 'COMPLEXITY_DRAFT';
 
 export type ComplexityView = {
   score: number;
   level: ComplexityLevel;
   draft: boolean;
-  needsReview: boolean;
 };
 
 export type ProgramRow = {
@@ -55,7 +53,18 @@ export type ProgramRow = {
   unresolvedMembers: number;
 };
 
+// A declared member file that was not found, with the number of programs
+// declaring it; grouped by target path (case-insensitive) and reason.
+export type MissingMember = {
+  // Root-relative path the member points to; the declared path as written
+  // when it is absolute or leaves the source root.
+  path: string;
+  resolution: Exclude<MemberResolution, 'resolved' | 'case-mismatch'>;
+  programs: number;
+};
+
 export type AssessmentSummary = {
+  missingMembers: MissingMember[];
   unique: {
     files: number;
     codeFiles: number;
@@ -86,7 +95,6 @@ function complexityView(complexity: Complexity): ComplexityView {
     score: complexity.score,
     level: complexity.level,
     draft: isDraft(complexity.version),
-    needsReview: (complexity.reviewFlags?.length ?? 0) > 0,
   };
 }
 
@@ -112,10 +120,31 @@ function programRow(program: Program): ProgramRow {
     complexity: analysis ? complexityView(analysis.complexity) : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
+    // A case-only difference still finds the file (Windows), so it is not
+    // a missing member.
     unresolvedMembers: program.members.filter(
-      (member) => member.resolution !== 'resolved',
+      (member) =>
+        member.resolution !== 'resolved' &&
+        member.resolution !== 'case-mismatch',
     ).length,
   };
+}
+
+// The path a declared member points to, from the project file's folder,
+// with `\` and `.`/`..` resolved. Display only: the analyzer already
+// decided the resolution; this never looks for the file.
+function memberTarget(projectPath: string, declaredPath: string): string {
+  const declared = declaredPath.trim().replace(/\\/g, '/');
+  if (/^([A-Za-z]:|\/)/.test(declared)) return declaredPath.trim();
+  const segments = projectPath.split('/').slice(0, -1);
+  for (const segment of declared.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length === 0) return declaredPath.trim();
+      segments.pop();
+    } else segments.push(segment);
+  }
+  return segments.join('/');
 }
 
 export function summarizeInventory(
@@ -159,12 +188,41 @@ export function summarizeInventory(
     isDraft(inventory.complexityVersion) ||
       programs.some((row) => row.complexity?.draft),
   );
-  warn(
-    'COMPLEXITY_REVIEW',
-    programs.some((row) => row.complexity?.needsReview),
-  );
+
+  const missing = new Map<string, MissingMember>();
+  for (const program of inventory.programs) {
+    const seen = new Set<string>();
+    for (const member of program.members) {
+      if (
+        member.resolution === 'resolved' ||
+        member.resolution === 'case-mismatch'
+      )
+        continue;
+      // Projects in different folders reach the same file by different
+      // relative paths: grouped by the path they point to and the reason,
+      // since a missing file and an absolute path need different fixes.
+      const path = memberTarget(program.projectPath, member.declaredPath);
+      const key = `${member.resolution}|${path.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const entry = missing.get(key);
+      if (entry) entry.programs += 1;
+      else
+        missing.set(key, {
+          path,
+          resolution: member.resolution,
+          programs: 1,
+        });
+    }
+  }
 
   return {
+    missingMembers: [...missing.values()].sort(
+      (a, b) =>
+        b.programs - a.programs ||
+        a.path.localeCompare(b.path) ||
+        a.resolution.localeCompare(b.resolution),
+    ),
     unique: {
       files: totals.files,
       codeFiles: totals.codeFiles,
@@ -225,6 +283,7 @@ export function programLabel(projectPath: string): string {
 
 export type ProgramSortKey =
   | 'program'
+  | 'kind'
   | 'state'
   | 'ownCodeLines'
   | 'codeLines'
@@ -243,6 +302,12 @@ function sortValue(row: ProgramRow, key: ProgramSortKey): number | string {
   switch (key) {
     case 'program':
       return programLabel(row.projectPath).toLowerCase();
+    case 'kind':
+      // Member kinds, sorted: programs of the same make-up sort together.
+      return row.members
+        .map((member) => member.kind.toLowerCase())
+        .sort()
+        .join(',');
     case 'state':
       return STATE_ORDER[row.state];
     case 'complexity':

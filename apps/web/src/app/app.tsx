@@ -496,10 +496,10 @@ function AnalysisStep({
     );
   }
   return (
-    <section className="panel results-panel" aria-labelledby="results-title">
-      <div className="section-heading">
-        <h2 id="results-title">{messages.projects.results}</h2>
-      </div>
+    <section className="results" aria-labelledby="results-title">
+      <h2 id="results-title" className="sr-only">
+        {messages.projects.results}
+      </h2>
       {runId && latest && runId !== latest && (
         <p className="notice">
           {copy.olderRun}{' '}

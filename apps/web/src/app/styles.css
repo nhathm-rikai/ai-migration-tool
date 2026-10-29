@@ -944,9 +944,7 @@ dd {
 
 /* Assessment overview and program list (F03) */
 .assessment {
-  margin-top: 24px;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
+  margin: 0;
 }
 .assessment h4 {
   margin: 20px 0 6px;
@@ -1141,11 +1139,6 @@ dd {
 }
 
 /* Results page: tabs, tags, distributions, pagination, technical info */
-.results-panel .assessment {
-  margin-top: 0;
-  border-top: 0;
-  padding-top: 0;
-}
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1262,33 +1255,6 @@ dd {
   border-radius: 6px;
   background: var(--surface);
 }
-.assessment-charts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 12px 0 4px;
-}
-.distribution {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px 14px;
-  min-width: 0;
-}
-.assessment .distribution h4 {
-  margin: 0 0 10px;
-}
-.stack {
-  display: flex;
-  height: 12px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--line);
-}
-.stack i {
-  display: block;
-  height: 100%;
-}
 .tone-low {
   background: var(--low);
 }
@@ -1300,23 +1266,6 @@ dd {
 }
 .tone-very-high {
   background: var(--high);
-}
-.legend {
-  list-style: none;
-  margin: 10px 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  font-size: 12px;
-}
-.legend .link-button {
-  font-weight: 500;
-  color: var(--fg);
-}
-.legend .link-button:disabled {
-  cursor: default;
-  opacity: 0.6;
 }
 .assessment-warnings .link-button {
   font-size: 12px;
@@ -1370,8 +1319,349 @@ details.technical[open] > summary {
   margin-top: 12px;
 }
 @media (max-width: 760px) {
-  .assessment-totals,
-  .assessment-charts {
+  .assessment-totals {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Analysis step dashboard (UI02, demo02): KPI cards, line split, complexity
+   histogram, tabbed program list with inline detail and CRUD matrix. Bars
+   grow and numbers count up with the data duration; reduced motion stops
+   both (global rule above). */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.kpi-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.kpi {
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
+}
+.kpi:nth-child(2) {
+  animation-delay: calc(var(--stagger) * 1);
+}
+.kpi:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+.kpi:nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+.kpi:nth-child(5) {
+  animation-delay: calc(var(--stagger) * 4);
+}
+.kpi:nth-child(6) {
+  animation-delay: calc(var(--stagger) * 5);
+}
+.kpi-label {
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.kpi-risk .kpi-value {
+  color: var(--risk);
+}
+.kpi-sub {
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.dashboard-charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.chart-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.loc-split {
+  flex: 2 1 460px;
+}
+.histogram {
+  flex: 1 1 320px;
+}
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+.dashboard .chart-heading h4,
+.dashboard .panel > h4,
+.dashboard .assessment-totals h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.loc-bar {
+  display: flex;
+  height: 18px;
+  gap: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.loc-bar i {
+  display: block;
+  height: 100%;
+  transform-origin: left;
+  animation: barGrow var(--dur-data) var(--ease-out) both;
+}
+.loc-bar i:nth-child(2) {
+  animation-delay: calc(var(--stagger) * 1);
+}
+.loc-bar i:nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+.loc-bar i:nth-child(n + 4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+.loc-code {
+  background: var(--brand);
+}
+.loc-comment {
+  background: var(--brand-mid);
+}
+.loc-blank {
+  background: var(--brand-light);
+}
+.loc-designer {
+  background: var(--info);
+}
+.loc-unclassified {
+  background: var(--warn);
+}
+.loc-legend {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+}
+.loc-legend > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.loc-legend dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.loc-legend dd {
+  margin: 0;
+  font-size: 12px;
+}
+.loc-legend dd.mono {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.histogram-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 10px;
+  height: 150px;
+}
+.histogram-bars li {
+  flex: 1;
+  min-width: 0;
+}
+.histogram-bar {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: inherit;
+}
+.histogram-bar i {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  max-height: calc(100% - 40px);
+  border-radius: 6px 6px 2px 2px;
+  transform-origin: bottom;
+  animation: barUp var(--dur-data) var(--ease-out) both;
+  transition: filter var(--dur-fast);
+}
+.histogram-bar:hover:not(:disabled) i {
+  filter: brightness(1.1);
+}
+.histogram-bars li:nth-child(2) i {
+  animation-delay: calc(var(--stagger) * 1);
+}
+.histogram-bars li:nth-child(3) i {
+  animation-delay: calc(var(--stagger) * 2);
+}
+.histogram-bars li:nth-child(4) i {
+  animation-delay: calc(var(--stagger) * 3);
+}
+.histogram-count {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+.histogram-label {
+  font-size: 11px;
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.histogram-note {
+  font-size: 12px;
+}
+.histogram .tone-low {
+  background: var(--brand);
+}
+.histogram .tone-medium {
+  background: var(--warn);
+}
+.histogram .tone-high {
+  background: #e0712b;
+}
+.histogram .tone-very-high {
+  background: var(--risk);
+}
+.dashboard .assessment-totals,
+.warnings-card {
+  margin: 0;
+}
+.warnings-card .assessment-warnings {
+  margin-top: 10px;
+}
+.analysis-tabs {
+  padding: 0;
+  overflow: hidden;
+}
+.dashboard-tabs {
+  margin: 0;
+  padding: 0 12px;
+}
+.dashboard-tabs .tab {
+  height: 52px;
+  padding: 0 24px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.analysis-tabs [role='tabpanel'] {
+  padding: 18px;
+}
+.program-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+.program-toggle::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.program-toggle[aria-expanded='true']::before {
+  transform: rotate(45deg);
+}
+.program-detail-row > td {
+  background: var(--surface-3);
+  padding: 16px 18px;
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+.detail-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+.kind-list {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+.program-list .program-table thead th {
+  white-space: normal;
+  min-width: 64px;
+}
+.crud-matrix .crud-op {
+  text-align: center;
+  width: 44px;
+}
+.crud-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.crud-C {
+  background: var(--low-bg);
+  color: var(--low);
+}
+.crud-R {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.crud-U {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+.crud-D {
+  background: var(--risk-bg);
+  color: var(--risk);
+}
+@keyframes barGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes barUp {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
   }
 }

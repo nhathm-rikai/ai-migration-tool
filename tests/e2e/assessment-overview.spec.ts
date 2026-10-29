@@ -50,7 +50,7 @@ test(
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(
-      assessment.getByRole('tab', { name: 'Danh sách program' }),
+      assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
     await assessment.getByText('Thông tin kỹ thuật').click();
     expect(listed).toBeDefined();
@@ -81,7 +81,7 @@ test(
     ).toBeVisible();
 
     const programsTab = assessment.getByRole('tab', {
-      name: 'Danh sách program',
+      name: /^Danh sách program/,
     });
     await programsTab.click();
     await assessment.getByLabel('Tìm program').fill('rep');

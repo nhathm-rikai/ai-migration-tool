@@ -95,7 +95,7 @@ test(
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(
-      assessment.getByRole('tab', { name: 'Danh sách program' }),
+      assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
     await assessment.getByText('Thông tin kỹ thuật').click();
     await expect(
@@ -109,7 +109,7 @@ test(
     await expect(assessment.getByTestId('coverage')).toHaveText('4 / 4');
     await expect(assessment.getByText('MEMBER_UNRESOLVED')).toBeVisible();
 
-    await assessment.getByRole('tab', { name: 'Danh sách program' }).click();
+    await assessment.getByRole('tab', { name: /^Danh sách program/ }).click();
     await assessment.getByRole('button', { name: 'SAMPLE' }).click();
     const detail = assessment.getByRole('region', {
       name: 'Chi tiết program SAMPLE',

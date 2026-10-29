@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { mappedInventoryFixture } from '@portal/contracts/fixtures';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { summarizeInventory } from './assessment-summary';
+import { inferredCorpus } from '../../testing/inventory-fixtures';
 import {
   complexityHistogram,
   crudMatrix,
   dashboardKpis,
   locDistribution,
   memberKinds,
+  rowsForMappedView,
 } from './analysis-dashboard';
 
 type Inventory = SourceInventoryDocument;
@@ -405,5 +407,71 @@ describe('analysis dashboard (UI02)', () => {
     expect(dashboardKpis(inventory, summarizeInventory(inventory)).tables).toBe(
       2,
     );
+  });
+
+  it('UI02-AC03 counts a file declared twice by one program once (review fix)', () => {
+    // A declares own/A.frm twice (1 access); B owns own/B.frm (2 accesses).
+    const inventory = structuredClone(mappedInventoryFixture) as Inventory;
+    const [projectFile, sharedFile] = inventory.files;
+    const order = inventory.programs[0];
+    const base = sharedFile?.analysis;
+    if (!projectFile || !sharedFile || base?.status !== 'analyzed' || !order)
+      throw new Error('fixture changed');
+    const file = (name: string, lines: number[]) => ({
+      manifest: { ...sharedFile.manifest, relativePath: `own/${name}.frm` },
+      analysis: {
+        ...base,
+        sqlTables: lines.map((line) => ({
+          table: 'T',
+          operation: 'R' as const,
+          line,
+          procedureId: null,
+        })),
+      },
+    });
+    const member = (name: string) => ({
+      ...order.members[0]!,
+      relativePath: `own/${name}.frm`,
+    });
+    const crud = [
+      {
+        table: 'T',
+        operations: ['R' as const],
+        evidence: { relativePath: 'own/A.frm', line: 1 },
+        viaSharedOnly: false,
+      },
+    ];
+    const withoutMapped: Analysis = { ...order.analysis!, calls: [], crud };
+    delete withoutMapped.normalizedCrud;
+    inventory.files = [projectFile, file('A', [1]), file('B', [1, 2])];
+    inventory.programs = [
+      {
+        ...order,
+        projectPath: 'programs/A/A.vbp',
+        members: [member('A'), member('A')],
+        analysis: withoutMapped,
+      },
+      {
+        ...order,
+        projectPath: 'programs/B/B.vbp',
+        members: [member('B')],
+        analysis: withoutMapped,
+      },
+    ];
+    expect(crudMatrix(inventory, 'raw')[0]?.top).toEqual({
+      program: 'B',
+      locations: 2,
+    });
+  });
+
+  it('UI02-AC01 keeps list counts on the inferred schema view (review fix)', () => {
+    const inventory = inferredCorpus();
+    const summary = summarizeInventory(inventory);
+    expect(dashboardKpis(inventory, summary).tables).toBe(1);
+    // The stored count was made without a schema (2 tables).
+    expect(summary.programs[0]?.mappedTables).toBe(2);
+    expect(
+      rowsForMappedView(inventory, summary.programs)[0]?.mappedTables,
+    ).toBe(1);
   });
 });

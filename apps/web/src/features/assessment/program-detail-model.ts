@@ -218,9 +218,12 @@ export function programDetail(
           })),
           externalApis: analysis.externalApis,
           complexity: complexityValue(analysis.complexity),
-          mappedComplexity: analysis.normalizedComplexity
-            ? complexityValue(analysis.normalizedComplexity)
-            : null,
+          // The stored mapped score was computed with the stored mapping; an
+          // inferred schema has no score of its own, so none is shown.
+          mappedComplexity:
+            !mapping.inferred && analysis.normalizedComplexity
+              ? complexityValue(analysis.normalizedComplexity)
+              : null,
         }
       : null,
     externalReferences: program.externalReferences,

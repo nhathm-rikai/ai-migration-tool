@@ -21,6 +21,7 @@ import type {
   SourceInventoryDocument,
 } from '@portal/contracts';
 import { AssessmentOverview } from './assessment-overview';
+import { inferredCorpus } from '../../testing/inventory-fixtures';
 import { summarizeInventory } from './assessment-summary';
 import { createArtifactsApi } from '../../shared/api/artifacts-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
@@ -229,8 +230,8 @@ describe('Assessment overview (F03)', () => {
       screen.getAllByText(/Giả định schema APP \(tiền tố xuất hiện nhiều nhất/)
         .length,
     ).toBeGreaterThan(0);
-    // The analyzer's own per-program mapped count does not exist here.
-    expect(screen.queryByText(/\(sau ánh xạ:/)).toBeNull();
+    // The list counts tables on the inferred view (APP.ORDERS = ORDERS).
+    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
   });
 
   it('searches, filters and selects programs', async () => {
@@ -686,5 +687,29 @@ describe('Assessment overview (F03)', () => {
         .getAllByRole('rowheader')
         .map((cell) => cell.textContent),
     ).toEqual(['APP.ORDERS', 'ORDERS']);
+  });
+
+  it('UI02 shows one table in KPI, list and detail on an inferred schema, without the stored mapped score (review fix)', async () => {
+    const payload = inferredCorpus();
+    const server = serve({ ...mappedInventoryArtifactFixture, payload });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Sau ánh xạ · giả định schema HAN01');
+    const tables = document.querySelector('[data-kpi="tables"]');
+    if (!(tables instanceof HTMLElement)) throw new Error('kpi');
+    expect(within(tables).getByText('1')).toBeTruthy();
+    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Order' }));
+    const detail = screen.getByRole('region', {
+      name: 'Chi tiết program Order',
+    });
+    expect(within(detail).queryByText('Độ phức tạp sau ánh xạ')).toBeNull();
+    fireEvent.click(within(detail).getByRole('tab', { name: /^CRUD/ }));
+    expect(within(detail).getAllByRole('rowheader')).toHaveLength(1);
   });
 });

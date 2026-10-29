@@ -240,16 +240,21 @@ export function crudMatrix(
   type Entry = {
     table: string;
     operations: Set<SqlOperation>;
-    programs: Map<string, number>;
+    // Distinct (file, line) accesses per program.
+    programs: Map<string, Set<string>>;
     locations: Set<string>;
   };
   const tables = new Map<string, Entry>();
   const mapping = effectiveMapping(inventory);
   for (const program of inventory.programs) {
-    const memberFiles = program.members
-      .map((member) => member.relativePath)
-      .filter((path): path is string => path !== null)
-      .map((path) => [path, files.get(path)] as const);
+    // A file declared twice by one program is still one file.
+    const memberFiles = [
+      ...new Set(
+        program.members
+          .map((member) => member.relativePath)
+          .filter((path): path is string => path !== null),
+      ),
+    ].map((path) => [path, files.get(path)] as const);
     const reached = reachedProcedures(program, files);
     for (const entry of crudEntries(program, view, mapping)) {
       const key = entry.table;
@@ -265,31 +270,28 @@ export function crudMatrix(
       }
       for (const operation of entry.operations) row.operations.add(operation);
       const names = entry.names;
-      let uses = 0;
+      const uses = row.programs.get(program.projectPath) ?? new Set<string>();
       for (const [path, file] of memberFiles) {
         if (!file) continue;
-        const lines = new Set<number>();
         for (const use of file.sqlTables)
           if (
             names.has(use.table) &&
             reached.has(use.procedureId ?? fileOwner(path))
-          )
-            lines.add(use.line);
-        uses += lines.size;
-        for (const line of lines) row.locations.add(`${path}\u0000${line}`);
+          ) {
+            const location = `${path}\u0000${use.line}`;
+            uses.add(location);
+            row.locations.add(location);
+          }
       }
-      row.programs.set(
-        program.projectPath,
-        (row.programs.get(program.projectPath) ?? 0) + uses,
-      );
+      row.programs.set(program.projectPath, uses);
     }
   }
   return [...tables.values()]
     .map((row): TableAccess => {
       let top: TableAccess['top'] = null;
-      for (const [projectPath, locations] of row.programs)
-        if (!top || locations > top.locations)
-          top = { program: programLabel(projectPath), locations };
+      for (const [projectPath, uses] of row.programs)
+        if (!top || uses.size > top.locations)
+          top = { program: programLabel(projectPath), locations: uses.size };
       return {
         table: row.table,
         operations: {
@@ -339,4 +341,26 @@ export function memberKinds(
     .sort(
       (a, b) => rank(a.kind) - rank(b.kind) || a.kind.localeCompare(b.kind),
     );
+}
+
+// Program rows whose "after mapping" table count matches the mapped view
+// shown: with an inferred schema the analyzer's stored count (made with
+// the stored mapping) is replaced by the count of the inferred view.
+export function rowsForMappedView(
+  inventory: Inventory,
+  rows: ProgramRow[],
+): ProgramRow[] {
+  const mapping = effectiveMapping(inventory);
+  if (!mapping.inferred) return rows;
+  const programs = new Map(
+    inventory.programs.map((program) => [program.projectPath, program]),
+  );
+  return rows.map((row) => {
+    const analysis = programs.get(row.projectPath)?.analysis;
+    if (!analysis) return row;
+    return {
+      ...row,
+      mappedTables: mappedCrud(analysis, mapping)?.length ?? null,
+    };
+  });
 }

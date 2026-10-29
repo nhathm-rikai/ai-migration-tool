@@ -34,6 +34,7 @@ import {
   hasMappedCrud,
   locDistribution,
   memberKinds,
+  rowsForMappedView,
 } from './analysis-dashboard';
 import type { CrudView } from './program-detail-model';
 import { ProgramDetail } from './program-detail';
@@ -168,6 +169,10 @@ function ArtifactView({
     () => summarizeInventory(artifact.payload),
     [artifact.payload],
   );
+  const listRows = useMemo(
+    () => rowsForMappedView(artifact.payload, summary.programs),
+    [artifact.payload, summary.programs],
+  );
   const [tab, setTab] = useState<Tab>('programs');
   const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -246,7 +251,7 @@ function ArtifactView({
           <ProgramList
             artifact={artifact}
             projectId={projectId}
-            rows={summary.programs}
+            rows={listRows}
             filter={filter}
             onFilter={setFilter}
             openKey={openKey}

@@ -199,6 +199,59 @@ describe('local workspace provider (B06)', () => {
     expect(await provider.openSnapshot(input.snapshotId)).toEqual(manifest);
   });
 
+  it('copies a file of another type only when a project declares it as code', async () => {
+    // A module kept as .TXT (e.g. ORACONST.TXT), declared with other case
+    // and a parent path, next to a .TXT nobody declares.
+    mkdirSync(join(source, 'cmn'));
+    const constants = 'Attribute VB_Name = "ORACONST"\r\nConst A = 1\r\n';
+    writeFileSync(join(source, 'cmn', 'ORACONST.TXT'), constants);
+    writeFileSync(join(source, 'cmn', 'NOTES.TXT'), 'not code\r\n');
+    writeFileSync(
+      join(source, 'programs', 'APP.vbp'),
+      'Type=Exe\r\nModule=ORACONST; ..\\cmn\\oraconst.txt\r\nModule=MAIN; 受注\\MAIN.BAS\r\n',
+    );
+    const before = treeHashes(source);
+    const input = request();
+    const result = await provider.createSnapshot(input);
+    if (result.status !== 'published') throw new Error('should publish');
+    const byPath = new Map(
+      result.manifest.entries.map((entry) => [entry.relativePath, entry]),
+    );
+    expect(byPath.get('cmn/ORACONST.TXT')).toMatchObject({
+      role: 'code',
+      kind: 'text',
+      rawSha256: sha(constants),
+    });
+    expect(byPath.has('cmn/NOTES.TXT')).toBe(false);
+    expect(result.manifest.skipped).toEqual(
+      expect.arrayContaining([
+        {
+          relativePath: 'cmn/NOTES.TXT',
+          kind: 'file',
+          reason: 'excluded',
+          byteLength: 10,
+        },
+      ]),
+    );
+    expect(
+      result.manifest.skipped.some(
+        (entry) => entry.relativePath === 'cmn/ORACONST.TXT',
+      ),
+    ).toBe(false);
+    // Agent settings stay out even though a project exists now.
+    expect(byPath.has('.claude/settings.json')).toBe(false);
+    expect(
+      readFileSync(
+        join(snapshotsDir, input.snapshotId, 'raw', 'cmn', 'ORACONST.TXT'),
+        'utf8',
+      ),
+    ).toBe(constants);
+    expect(treeHashes(source)).toEqual(before);
+    expect(await provider.openSnapshot(input.snapshotId)).toEqual(
+      result.manifest,
+    );
+  });
+
   it('gives the same bytes the same snapshot hash and a different one after an edit', async () => {
     const first = await provider.createSnapshot(request());
     const second = await provider.createSnapshot(request());

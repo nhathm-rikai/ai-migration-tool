@@ -55,7 +55,18 @@ export type ProgramRow = {
   unresolvedMembers: number;
 };
 
+// A declared member file that was not found, with the number of programs
+// declaring it; grouped by target path (case-insensitive) and reason.
+export type MissingMember = {
+  // Root-relative path the member points to; the declared path as written
+  // when it is absolute or leaves the source root.
+  path: string;
+  resolution: Exclude<MemberResolution, 'resolved' | 'case-mismatch'>;
+  programs: number;
+};
+
 export type AssessmentSummary = {
+  missingMembers: MissingMember[];
   unique: {
     files: number;
     codeFiles: number;
@@ -112,10 +123,31 @@ function programRow(program: Program): ProgramRow {
     complexity: analysis ? complexityView(analysis.complexity) : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
+    // A case-only difference still finds the file (Windows), so it is not
+    // a missing member.
     unresolvedMembers: program.members.filter(
-      (member) => member.resolution !== 'resolved',
+      (member) =>
+        member.resolution !== 'resolved' &&
+        member.resolution !== 'case-mismatch',
     ).length,
   };
+}
+
+// The path a declared member points to, from the project file's folder,
+// with `\` and `.`/`..` resolved. Display only: the analyzer already
+// decided the resolution; this never looks for the file.
+function memberTarget(projectPath: string, declaredPath: string): string {
+  const declared = declaredPath.trim().replace(/\\/g, '/');
+  if (/^([A-Za-z]:|\/)/.test(declared)) return declaredPath.trim();
+  const segments = projectPath.split('/').slice(0, -1);
+  for (const segment of declared.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length === 0) return declaredPath.trim();
+      segments.pop();
+    } else segments.push(segment);
+  }
+  return segments.join('/');
 }
 
 export function summarizeInventory(
@@ -164,7 +196,40 @@ export function summarizeInventory(
     programs.some((row) => row.complexity?.needsReview),
   );
 
+  const missing = new Map<string, MissingMember>();
+  for (const program of inventory.programs) {
+    const seen = new Set<string>();
+    for (const member of program.members) {
+      if (
+        member.resolution === 'resolved' ||
+        member.resolution === 'case-mismatch'
+      )
+        continue;
+      // Projects in different folders reach the same file by different
+      // relative paths: grouped by the path they point to and the reason,
+      // since a missing file and an absolute path need different fixes.
+      const path = memberTarget(program.projectPath, member.declaredPath);
+      const key = `${member.resolution}|${path.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const entry = missing.get(key);
+      if (entry) entry.programs += 1;
+      else
+        missing.set(key, {
+          path,
+          resolution: member.resolution,
+          programs: 1,
+        });
+    }
+  }
+
   return {
+    missingMembers: [...missing.values()].sort(
+      (a, b) =>
+        b.programs - a.programs ||
+        a.path.localeCompare(b.path) ||
+        a.resolution.localeCompare(b.resolution),
+    ),
     unique: {
       files: totals.files,
       codeFiles: totals.codeFiles,

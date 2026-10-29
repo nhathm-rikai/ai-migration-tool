@@ -385,8 +385,12 @@ function Totals({ summary }: { summary: AssessmentSummary }) {
   );
 }
 
+const MISSING_SHOWN = 5;
+
 // Warnings that concern programs carry their count and open the list
-// filtered on them; the others are corpus-wide notes.
+// filtered on them; the others are corpus-wide notes. Missing member files
+// are named, since one shared file usually explains most incomplete
+// programs.
 function warningTarget(code: AssessmentWarning): Partial<ProgramFilter> | null {
   if (code === 'PROGRAM_INCOMPLETE') return { state: 'partial' };
   if (code === 'PROGRAM_UNSUPPORTED') return { state: 'unsupported' };
@@ -443,6 +447,33 @@ function Warnings({
                   </button>
                 </>
               )}
+              {code === 'MEMBER_UNRESOLVED' &&
+                summary.missingMembers.length > 0 && (
+                  <ul className="missing-members">
+                    {summary.missingMembers
+                      .slice(0, MISSING_SHOWN)
+                      .map((member) => (
+                        <li key={`${member.resolution}|${member.path}`}>
+                          <span className="mono">{member.path}</span>{' '}
+                          <span className="muted">
+                            (
+                            {messages.assessment.members.resolution[
+                              member.resolution
+                            ].toLowerCase()}
+                            )
+                          </span>{' '}
+                          {copy.programCount(number(member.programs))}
+                        </li>
+                      ))}
+                    {summary.missingMembers.length > MISSING_SHOWN && (
+                      <li className="muted">
+                        {copy.moreMissing(
+                          number(summary.missingMembers.length - MISSING_SHOWN),
+                        )}
+                      </li>
+                    )}
+                  </ul>
+                )}
             </li>
           );
         })}

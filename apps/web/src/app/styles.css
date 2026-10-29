@@ -1247,6 +1247,12 @@ dd {
 .assessment-warnings .link-button {
   font-size: 12px;
 }
+.missing-members {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
 details.technical {
   margin: 14px 0 0;
   border: 1px solid var(--line);

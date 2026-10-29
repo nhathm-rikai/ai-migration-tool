@@ -180,6 +180,32 @@ describe('buildInventoryReport', () => {
     ]);
   });
 
+  it('leaves review flags of an old inventory out of the JSON report', () => {
+    const doc = inventory();
+    doc.complexityVersion = 'complexity-v0';
+    for (const program of doc.programs)
+      if (program.analysis) {
+        program.analysis.complexity.reviewFlags = ['high', 'near-threshold'];
+        if (program.analysis.normalizedComplexity)
+          program.analysis.normalizedComplexity.reviewFlags = ['high'];
+      }
+    const before = JSON.stringify(doc);
+    const report = buildInventoryReport(doc, ['PA', 'PB']);
+    const exported = JSON.stringify(report);
+    expect(exported).not.toContain('reviewFlags');
+    expect(exported).not.toContain('near-threshold');
+    const [first] = report.programs;
+    const source = doc.programs.find((p) => p.projectPath === 'a/PA.VBP');
+    expect(first?.complexity).toEqual({
+      version: source?.analysis?.complexity.version,
+      score: source?.analysis?.complexity.score,
+      level: source?.analysis?.complexity.level,
+      parts: source?.analysis?.complexity.parts,
+    });
+    expect(first?.normalizedComplexity).not.toHaveProperty('reviewFlags');
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+
   it('warns about a draft model, not about review flags of old inventories', () => {
     const doc = inventory();
     doc.complexityVersion = 'complexity-v0-draft';

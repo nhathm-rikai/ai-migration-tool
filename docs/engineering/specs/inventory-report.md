@@ -12,7 +12,7 @@
 | Bảng (sheet) | Nội dung | Truy vết |
 |---|---|---|
 | `source` (Summary) | `snapshotHash`, profile, mọi version của inventory (`metricVersion`, `procedureLinesVersion`, decoder, normalization, `sqlAccessVersion`, call graph, complexity, table name) và mapping tên bảng. | Snapshot |
-| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics (gồm `concatenatedSql`, `parameterizedSql`; trống với inventory cũ), complexity raw/normalized. | `projectPath` |
+| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics (gồm `concatenatedSql`, `parameterizedSql`; trống với inventory cũ), complexity raw/normalized (chỉ `version`, `score`, `level`, `parts`; `reviewFlags` của inventory v0 không được xuất). | `projectPath` |
 | `members` | Member khai báo trong project, path thật, `resolution`, `fileStatus`, `shared` (trong toàn corpus). | `declaredPath`, `relativePath` |
 | `files` | File riêng biệt của các program đã chọn, `rawSha256`, encoding, counters, `usedBy`. | `relativePath`, hash |
 | `procedures` | LoC theo function: Physical/Code/Executable/Comment/Blank/Metadata/Unclassified/SQL theo [source-analysis](source-analysis.md) §4.1, decision points, `usedBy`. | file, procedure ID, `startLine..endLine` |

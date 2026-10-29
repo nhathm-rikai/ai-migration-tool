@@ -17,6 +17,20 @@ type AnalyzedFile = Extract<
   { status: 'analyzed' }
 >;
 type SqlUse = AnalyzedFile['dynamicSql'][number];
+type InventoryComplexity = NonNullable<
+  InventoryProgram['analysis']
+>['complexity'];
+// Score and level only: review flags written by complexity-v0 inventories
+// are not reported.
+export type ReportComplexity = Omit<InventoryComplexity, 'reviewFlags'>;
+
+function reportComplexity(
+  complexity: InventoryComplexity | undefined,
+): ReportComplexity | null {
+  if (!complexity) return null;
+  const { version, score, level, parts } = complexity;
+  return { version, score, level, parts: { ...parts } };
+}
 
 // One SQL fact of a selected file (dynamic table name, concatenated value).
 export type SqlUseRow = {
@@ -86,9 +100,8 @@ export type InventoryReport = {
     procedures: number;
     procedureLines: ProcedureLineTotals;
     metrics: NonNullable<InventoryProgram['analysis']>['metrics'] | null;
-    complexity: NonNullable<InventoryProgram['analysis']>['complexity'] | null;
-    normalizedComplexity:
-      NonNullable<InventoryProgram['analysis']>['complexity'] | null;
+    complexity: ReportComplexity | null;
+    normalizedComplexity: ReportComplexity | null;
   }[];
   members: {
     programId: string;
@@ -341,8 +354,10 @@ export function buildInventoryReport(
       procedures: procedures.length,
       procedureLines: breakdownOf(procedures),
       metrics: program.analysis?.metrics ?? null,
-      complexity: program.analysis?.complexity ?? null,
-      normalizedComplexity: program.analysis?.normalizedComplexity ?? null,
+      complexity: reportComplexity(program.analysis?.complexity),
+      normalizedComplexity: reportComplexity(
+        program.analysis?.normalizedComplexity,
+      ),
     };
   });
 

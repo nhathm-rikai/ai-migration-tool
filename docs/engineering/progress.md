@@ -12,6 +12,7 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 
 - Người dùng yêu cầu: complexity chỉ cần điểm và mức, không gắn cờ cần kiểm chứng hay gần ngưỡng. `scoreComplexity` không còn ghi `reviewFlags`; report bỏ cột `complexityReviewFlags`, cảnh báo `COMPLEXITY_HIGH`/`COMPLEXITY_NEAR_THRESHOLD`/`COMPLEXITY_KNOWN_MISMATCH`, trường `complexityKnownMismatches` và tùy chọn CLI `--complexity-review`; UI bỏ badge “Cần xem lại” và cảnh báo tương ứng (kể cả với inventory v0 còn cờ). Contract giữ `reviewFlags` optional để inventory v0 vẫn hợp schema. `COMPLEXITY_REFERENCE_ONLY` (không tính effort/báo giá từ điểm) giữ nguyên.
 - Kiểm chứng (Windows x64, Node 24.16.0): `lint`, `typecheck`, `npm test` (contracts 43; API 486 + 1 skip, 2 test timing timeout khi chạy cả bộ và pass khi chạy riêng: job-dispatcher claim retry, project page size; web 105), `build`, `npm run e2e` 5/5. Điểm/mức không đổi so với commit `320d0b7`.
+- Sửa finding P2 review `7eaf662`: JSON report vẫn chép nguyên `complexity`/`normalizedComplexity` của inventory nên inventory v0 còn `reviewFlags`. Report giờ dựng object chỉ gồm `version`, `score`, `level`, `parts`; inventory đầu vào không bị sửa. Regression: inventory v0 có cờ ở cả raw/normalized → JSON không còn `reviewFlags` (test fail trên code cũ, pass sau sửa).
 
 ## 28/10/2026 — `complexity-v1`: tính SQL ghép giá trị vào điểm, ngưỡng 45/60, thêm Very High
 

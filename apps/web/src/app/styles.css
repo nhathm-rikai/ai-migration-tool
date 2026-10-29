@@ -1635,11 +1635,6 @@ details.technical[open] > summary {
 .program-toggle[aria-expanded='true']::before {
   transform: rotate(45deg);
 }
-.program-detail-row > td {
-  background: var(--surface-3);
-  padding: 16px 18px;
-  animation: fadeUp var(--dur-base) var(--ease-out) both;
-}
 .detail-actions {
   display: flex;
   justify-content: flex-start;
@@ -1734,4 +1729,195 @@ details.technical[open] > summary {
 .table-name-view {
   margin: 4px 0 8px;
   font-size: 12px;
+}
+
+/* demo02 tabs: fixed-width tabs, a sliding indicator and panels fading in. */
+.dashboard-tabs {
+  position: relative;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.dashboard-tabs .tab {
+  flex: 0 0 220px;
+  border-bottom: 0;
+  color: var(--fg-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: color var(--dur-fast);
+}
+.dashboard-tabs .tab[aria-selected='true'] {
+  color: var(--fg);
+}
+.dashboard-tabs .tab-count {
+  margin: 0;
+  border: 0;
+  background: #e6ecf3;
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  padding: 2px 7px;
+}
+.tab-indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 12px;
+  width: 220px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  transition: transform 350ms var(--ease-out);
+}
+.analysis-tabs [role='tabpanel']:not([hidden]) {
+  animation: fadeUp 350ms ease both;
+}
+
+/* demo02 program list: header bar, 56px rows, mono numbers, complexity bar,
+   chevron; the whole row opens the detail card. */
+.program-list .table-scroll {
+  border-radius: 12px;
+}
+.program-list .program-table thead th {
+  background: #f2f6fa;
+  color: var(--fg-2);
+  font-size: 12px;
+  padding: 10px 12px;
+  border-bottom: 0;
+}
+.program-list .program-table tbody td,
+.program-list .program-table tbody th {
+  padding: 10px 12px;
+  border-bottom: 0;
+  border-top: 1px solid #e6ecf3;
+  vertical-align: middle;
+  font-size: 13px;
+}
+.program-row {
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  animation: fadeUp 350ms ease both;
+}
+.program-row:hover {
+  background: var(--bg);
+}
+.program-row.selected {
+  background: var(--tint);
+}
+.program-row:nth-child(n + 2) {
+  animation-delay: 30ms;
+}
+.program-row:nth-child(n + 6) {
+  animation-delay: 60ms;
+}
+.program-row .program-toggle {
+  font-family: var(--f-mono);
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+}
+.program-row .program-toggle::before {
+  content: none;
+}
+.program-list .program-table td.num {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+.raw-count {
+  font-family: var(--f-ui);
+  font-size: 11px;
+}
+.kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--fg-body);
+  font-size: 11px;
+}
+.kind-chip i {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--info);
+}
+.cx-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.cx-bar {
+  width: 100%;
+  max-width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e3eaf2;
+  overflow: hidden;
+}
+.cx-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left;
+  animation: barGrow 700ms var(--ease-out) both;
+}
+.cx-bar .tone-low {
+  background: var(--brand);
+}
+.cx-bar .tone-medium {
+  background: var(--warn);
+}
+.cx-bar .tone-high {
+  background: #e0712b;
+}
+.cx-bar .tone-very-high {
+  background: var(--risk);
+}
+.program-list .chevron-col {
+  width: 44px;
+  text-align: center;
+}
+.program-list td.chevron-col svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.program-row.selected td.chevron-col svg {
+  transform: rotate(180deg);
+}
+.program-detail-row > td {
+  background: var(--tint);
+  padding: 0 16px 16px 18px;
+  animation: none;
+}
+.detail-card {
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid #dce4ee;
+  animation: fadeUp 300ms var(--ease-out) both;
+}
+.detail-card .program-detail {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.program-list .program-table thead th {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.program-list .kind-chip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

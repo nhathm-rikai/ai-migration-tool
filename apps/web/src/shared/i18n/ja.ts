@@ -351,6 +351,7 @@ export const jaMessages = {
         top: '最も多くアクセスするプログラム',
       },
       createDocs: 'このプログラムのドキュメントを生成',
+      detailColumn: '詳細を開く',
       expand: (program: string) => `${program} の詳細を開く`,
       kinds: {
         form: 'Form',
@@ -421,7 +422,7 @@ export const jaMessages = {
       noMatch: '条件に一致するプログラムはありません。',
       none: 'インベントリにプログラムがありません。',
       notAnalyzed: '未解析',
-      mappedTables: (count: string) => `（マッピング後: ${count}）`,
+      rawTables: (count: string) => `（元: ${count}）`,
       draft: 'ドラフト',
       declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
       sortBy: (column: string) => `${column}で並べ替え`,

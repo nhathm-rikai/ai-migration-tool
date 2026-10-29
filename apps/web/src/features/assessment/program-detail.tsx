@@ -52,7 +52,9 @@ export function ProgramDetail({
     if (value === 'files') return detail.members.length;
     if (!analysis) return null;
     if (value === 'procedures') return analysis.procedures.length;
-    if (value === 'crud') return analysis.rawCrud.length;
+    // The mapped view opens first, so its count is the one shown.
+    if (value === 'crud')
+      return (analysis.mappedCrud ?? analysis.rawCrud).length;
     if (value === 'calls') return analysis.calls.length;
     return null;
   };

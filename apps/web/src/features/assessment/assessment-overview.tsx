@@ -246,6 +246,12 @@ function ArtifactView({
               )}
             </button>
           ))}
+          {/* Slides under the selected tab (demo02 tab indicator). */}
+          <span
+            className="tab-indicator"
+            aria-hidden="true"
+            style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }}
+          />
         </div>
         <div
           role="tabpanel"
@@ -692,7 +698,11 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 8;
+const COLUMNS = 9;
+
+// List row: the table count shown first is the mapped one when there is a
+// mapped view (configured or inferred); the count as written stays beside it.
+type ListRow = ProgramRow & { rawTables: number | null };
 
 function ProgramList({
   artifact,
@@ -717,9 +727,18 @@ function ProgramList({
   const [sort, setSort] = useState<ProgramSort>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
+  const listRows = useMemo(
+    (): ListRow[] =>
+      rows.map((row) => ({
+        ...row,
+        tables: row.mappedTables ?? row.tables,
+        rawTables: row.tables,
+      })),
+    [rows],
+  );
   const visible = useMemo(
-    () => sortPrograms(filterPrograms(rows, filter), sort),
-    [rows, filter, sort],
+    () => sortPrograms(filterPrograms(listRows, filter), sort),
+    [listRows, filter, sort],
   );
   const current = pageOf(visible, page, pageSize);
   const number = useNumber();
@@ -846,6 +865,9 @@ function ProgramList({
                   {header('procedures', copy.columns.procedures)}
                   {header('tables', copy.columns.tables)}
                   {header('complexity', copy.columns.complexity)}
+                  <th scope="col" className="chevron-col">
+                    <span className="sr-only">{dashboard.detailColumn}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -853,15 +875,25 @@ function ProgramList({
                   const label = programLabel(row.projectPath);
                   const open = row.key === openKey;
                   const detailId = `program-detail-${row.key}`;
+                  const kindText = memberKinds(row)
+                    .map(
+                      (item) =>
+                        `${item.count} ${dashboard.kinds[item.kind] ?? item.kind}`,
+                    )
+                    .join(' · ');
                   return (
                     <Fragment key={row.key}>
-                      <tr className={open ? 'selected' : undefined}>
+                      {/* The whole row opens the detail; the button keeps it
+                          reachable by keyboard (its click bubbles here). */}
+                      <tr
+                        className={`program-row${open ? ' selected' : ''}`}
+                        onClick={() => onToggle(row.key)}
+                      >
                         <th scope="row">
                           <button
                             className="link-button program-toggle"
                             aria-expanded={open}
                             aria-controls={open ? detailId : undefined}
-                            onClick={() => onToggle(row.key)}
                           >
                             {label}
                           </button>
@@ -875,50 +907,63 @@ function ProgramList({
                           </span>
                         </th>
                         <td>
-                          <span className="kind-list">
-                            {memberKinds(row)
-                              .map(
-                                (item) =>
-                                  `${item.count} ${dashboard.kinds[item.kind] ?? item.kind}`,
-                              )
-                              .join(' · ')}
+                          <span className="kind-chip" title={kindText}>
+                            <i aria-hidden="true" />
+                            {kindText}
                           </span>
                         </td>
                         <td>
                           <ProgramStateTag state={row.state} />
                         </td>
-                        <td>{metric(row.ownCodeLines)}</td>
-                        <td>{metric(row.codeLines)}</td>
-                        <td>{metric(row.procedures)}</td>
-                        <td>
+                        <td className="num">{metric(row.ownCodeLines)}</td>
+                        <td className="num">{metric(row.codeLines)}</td>
+                        <td className="num">{metric(row.procedures)}</td>
+                        <td className="num">
                           {metric(row.tables)}
-                          {row.mappedTables !== null &&
-                            row.mappedTables !== row.tables && (
-                              <span className="muted">
+                          {row.rawTables !== null &&
+                            row.rawTables !== row.tables && (
+                              <span className="muted raw-count">
                                 {' '}
-                                {copy.mappedTables(number(row.mappedTables))}
+                                {copy.rawTables(number(row.rawTables))}
                               </span>
                             )}
                         </td>
                         <td>
-                          <ComplexityCell complexity={row.complexity} />
+                          <span className="cx-cell">
+                            {row.complexity && (
+                              <span className="cx-bar" aria-hidden="true">
+                                <i
+                                  className={`tone-${row.complexity.level}`}
+                                  style={{ width: `${row.complexity.score}%` }}
+                                />
+                              </span>
+                            )}
+                            <ComplexityCell complexity={row.complexity} />
+                          </span>
+                        </td>
+                        <td className="chevron-col">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
                         </td>
                       </tr>
                       {open && (
                         <tr className="program-detail-row" id={detailId}>
                           <td colSpan={COLUMNS}>
-                            <div className="detail-actions">
-                              <Link
-                                className="button primary small"
-                                to={`${stepPath(projectId, 'documents')}?program=${encodeURIComponent(row.projectPath)}`}
-                              >
-                                {dashboard.createDocs} →
-                              </Link>
+                            <div className="detail-card">
+                              <div className="detail-actions">
+                                <Link
+                                  className="button primary small"
+                                  to={`${stepPath(projectId, 'documents')}?program=${encodeURIComponent(row.projectPath)}`}
+                                >
+                                  {dashboard.createDocs} →
+                                </Link>
+                              </div>
+                              <ProgramDetail
+                                inventory={artifact.payload}
+                                projectPath={row.key}
+                              />
                             </div>
-                            <ProgramDetail
-                              inventory={artifact.payload}
-                              projectPath={row.key}
-                            />
                           </td>
                         </tr>
                       )}

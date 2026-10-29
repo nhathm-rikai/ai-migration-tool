@@ -231,7 +231,7 @@ describe('Assessment overview (F03)', () => {
         .length,
     ).toBeGreaterThan(0);
     // The list counts tables on the inferred view (APP.ORDERS = ORDERS).
-    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
+    expect(screen.getByText('(gốc: 2)')).toBeTruthy();
   });
 
   it('searches, filters and selects programs', async () => {
@@ -705,7 +705,7 @@ describe('Assessment overview (F03)', () => {
     const tables = document.querySelector('[data-kpi="tables"]');
     if (!(tables instanceof HTMLElement)) throw new Error('kpi');
     expect(within(tables).getByText('1')).toBeTruthy();
-    expect(screen.getByText('(sau ánh xạ: 1)')).toBeTruthy();
+    expect(screen.getByText('(gốc: 2)')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Order' }));
     const detail = screen.getByRole('region', {
       name: 'Chi tiết program Order',
@@ -713,5 +713,31 @@ describe('Assessment overview (F03)', () => {
     expect(within(detail).queryByText('Độ phức tạp sau ánh xạ')).toBeNull();
     fireEvent.click(within(detail).getByRole('tab', { name: /^CRUD/ }));
     expect(within(detail).getAllByRole('rowheader')).toHaveLength(1);
+  });
+
+  it('UI02 opens the detail from anywhere on the row and counts the mapped CRUD first', async () => {
+    const server = serve({
+      ...mappedInventoryArtifactFixture,
+      payload: inferredCorpus(),
+    });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    const toggle = await screen.findByRole('button', { name: 'Order' });
+    const row = toggle.closest('tr');
+    if (!row) throw new Error('row');
+    // A click on another cell of the row opens it too.
+    fireEvent.click(within(row).getByText('(gốc: 2)'));
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const detail = screen.getByRole('region', {
+      name: 'Chi tiết program Order',
+    });
+    expect(within(detail).getByRole('tab', { name: /^CRUD/ }).textContent).toBe(
+      'CRUD1',
+    );
   });
 });

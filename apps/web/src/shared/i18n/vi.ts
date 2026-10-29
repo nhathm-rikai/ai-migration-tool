@@ -368,6 +368,7 @@ export const viMessages = {
         top: 'Program truy cập nhiều nhất',
       },
       createDocs: 'Tạo tài liệu cho program này',
+      detailColumn: 'Mở chi tiết',
       expand: (program: string) => `Mở chi tiết ${program}`,
       kinds: {
         form: 'Form',
@@ -437,7 +438,7 @@ export const viMessages = {
       noMatch: 'Không có program khớp bộ lọc.',
       none: 'Kiểm kê không có program nào.',
       notAnalyzed: 'Chưa phân tích',
-      mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
+      rawTables: (count: string) => `(gốc: ${count})`,
       draft: 'Nháp',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,

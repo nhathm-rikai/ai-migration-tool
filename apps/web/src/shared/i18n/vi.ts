@@ -326,7 +326,8 @@ export const viMessages = {
         physical: 'Physical LoC',
         physicalSub: 'Code',
         procedures: 'Procedure',
-        proceduresSub: (files: string) => `trong ${files} file đã phân tích`,
+        proceduresSub: 'File code đã phân tích',
+        perProgram: 'Cộng theo program (tính trùng file dùng chung)',
         sql: 'Vị trí truy cập SQL',
         sqlSub: (count: string) => `${count} chuỗi SQL ghép giá trị runtime`,
         sqlSubOld: 'Dòng có truy cập bảng, mỗi file một lần',
@@ -337,6 +338,9 @@ export const viMessages = {
         highSub: (analyzed: string) =>
           `trên ${analyzed} program đã phân tích · tham khảo`,
       },
+      analysedAt: (time: string) => `Phân tích xong lúc ${time}`,
+      files: (count: string) => `${count} file`,
+      sharedFiles: (count: string) => `${count} file dùng chung`,
       locTitle: 'Phân bổ dòng code',
       locTotal: 'Physical LoC',
       loc: {
@@ -385,8 +389,6 @@ export const viMessages = {
       'Lượt chạy này không có kết quả kiểm kê (lượt chạy mã nguồn trên máy tạo bởi bản trước chỉ chụp nguồn). Chạy lại để có kiểm kê.',
     demoData: 'Kết quả mẫu đi kèm ứng dụng, không phải mã nguồn thật',
     localData: 'Kiểm kê từ bản chụp mã nguồn trên máy này',
-    draftNotice:
-      'Số liệu do phân tích tĩnh tạo ra và là bản nháp cho đến khi được rà soát. Độ phức tạp chỉ để tham khảo, không dùng để tự tính công sức hay báo giá.',
     partialTitle: 'Kiểm kê chưa đầy đủ.',
     partialHelp:
       'Một số file hoặc program chưa phân tích được; các số liệu bên dưới không bao gồm phần đó.',
@@ -406,23 +408,8 @@ export const viMessages = {
       absent: 'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
     } satisfies Record<TableNameMapping['status'] | 'absent', string>,
     totals: {
-      uniqueTitle: 'Tổng toàn bộ mã nguồn (không trùng)',
-      uniqueHelp: 'Mỗi file chỉ tính một lần, kể cả file dùng chung.',
-      perProgramTitle: 'Tổng theo program',
-      perProgramHelp:
-        'Cộng LoC của từng program: file dùng chung được tính ở mỗi program khai báo nó, nên không phải quy mô mã nguồn.',
-      codeLines: 'Dòng code (LoC)',
-      coverage: 'File code đã phân tích',
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
-      files: 'Tổng số file',
-      sharedFiles: 'File dùng chung',
-      problemFiles: 'Lỗi / không hỗ trợ / bỏ qua',
-      problemValue: (errors: string, unsupported: string, skipped: string) =>
-        `${errors} / ${unsupported} / ${skipped}`,
-      unknown: 'không rõ',
-      programs: 'Số program',
-      perProgramCodeLines: 'LoC cộng theo program (tính trùng file dùng chung)',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',
@@ -507,9 +494,9 @@ export const viMessages = {
         crud: 'CRUD',
         calls: 'Lời gọi',
       },
-      showingFirst: (shown: string, total: string) =>
-        `Đang hiện ${shown} / ${total} dòng.`,
-      showAll: 'Xem tất cả',
+      rowRange: (from: string, to: string, total: string) =>
+        `Dòng ${from}–${to} / ${total}`,
+      rowsPagination: 'Phân trang bảng',
       issue: 'Lý do không phân tích được:',
       incomplete:
         'Program chưa đầy đủ: có file thiếu, không hỗ trợ hoặc dòng chưa phân loại. Số liệu chỉ gồm phần đã phân tích.',

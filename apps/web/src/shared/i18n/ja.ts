@@ -310,7 +310,8 @@ export const jaMessages = {
         physical: '物理行数',
         physicalSub: 'コード',
         procedures: 'プロシージャ',
-        proceduresSub: (files: string) => `解析済み ${files} ファイル`,
+        proceduresSub: '解析済みコードファイル',
+        perProgram: 'プログラム別合計（共有ファイル重複あり）',
         sql: 'SQLアクセス箇所',
         sqlSub: (count: string) => `実行時の値を連結したSQL ${count} 件`,
         sqlSubOld: 'テーブルアクセスのある行（ファイルごとに1回）',
@@ -320,6 +321,9 @@ export const jaMessages = {
         high: '高・非常に高のプログラム',
         highSub: (analyzed: string) => `解析済み ${analyzed} 本中 · 参考`,
       },
+      analysedAt: (time: string) => `解析完了 ${time}`,
+      files: (count: string) => `${count} ファイル`,
+      sharedFiles: (count: string) => `共有 ${count} ファイル`,
       locTitle: 'コード行の内訳',
       locTotal: '物理行数',
       loc: {
@@ -368,8 +372,6 @@ export const jaMessages = {
       'この実行にはインベントリ結果がありません（以前のバージョンで作成したこのPC上のソースの実行はスナップショットのみです）。再実行するとインベントリを作成します。',
     demoData: 'アプリ同梱のサンプル結果です（実ソースではありません）',
     localData: 'このPC上のソースのスナップショットから作成したインベントリ',
-    draftNotice:
-      '数値は静的解析によるもので、レビューされるまではドラフトです。複雑度は参考値であり、工数や見積の自動算出には使用しません。',
     partialTitle: 'インベントリは不完全です。',
     partialHelp:
       '解析できなかったファイルまたはプログラムがあります。以下の数値にはその部分が含まれていません。',
@@ -389,24 +391,8 @@ export const jaMessages = {
       absent: 'なし（旧インベントリ、ソース上の名前のみ）',
     },
     totals: {
-      uniqueTitle: 'ソース全体の合計（重複なし）',
-      uniqueHelp: '共通ファイルも含め、各ファイルを1回だけ数えます。',
-      perProgramTitle: 'プログラム別の合計',
-      perProgramHelp:
-        '各プログラムのLoCを合算します。共通ファイルは宣言した各プログラムで数えられるため、ソース規模ではありません。',
-      codeLines: 'コード行数（LoC）',
-      coverage: '解析済みコードファイル',
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
-      files: 'ファイル総数',
-      sharedFiles: '共通ファイル',
-      problemFiles: 'エラー / 未対応 / スキップ',
-      problemValue: (errors: string, unsupported: string, skipped: string) =>
-        `${errors} / ${unsupported} / ${skipped}`,
-      unknown: '不明',
-      programs: 'プログラム数',
-      perProgramCodeLines:
-        'プログラム別LoCの合算（共通ファイルを重複して計上）',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: '解析できないプログラムがあります。',
@@ -487,9 +473,9 @@ export const jaMessages = {
         crud: 'CRUD',
         calls: '呼び出し',
       },
-      showingFirst: (shown: string, total: string) =>
-        `${total} 行中 ${shown} 行を表示しています。`,
-      showAll: 'すべて表示',
+      rowRange: (from: string, to: string, total: string) =>
+        `${total} 行中 ${from}–${to} 行`,
+      rowsPagination: '表のページ',
       issue: '解析できない理由:',
       incomplete:
         'このプログラムは不完全です（ファイル不足、未対応、または未分類の行があります）。数値は解析できた部分のみです。',

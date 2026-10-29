@@ -193,7 +193,7 @@ function ArtifactView({
   };
   return (
     <div className="dashboard">
-      <p className="muted">{copy.draftNotice}</p>
+      <AnalysedLine artifact={artifact} summary={summary} />
       {summary.partial && (
         <p className="notice" role="note">
           <strong>{copy.partialTitle}</strong> {copy.partialHelp}
@@ -208,7 +208,6 @@ function ArtifactView({
           onShowPrograms={showPrograms}
         />
       </div>
-      <Totals summary={summary} />
       <Warnings summary={summary} onShowPrograms={showPrograms} />
       <section
         className="panel analysis-tabs"
@@ -277,6 +276,27 @@ function ArtifactView({
   );
 }
 
+// "Analysed at … · N files · M shared": the run the numbers come from, as
+// in the demo02 header.
+function AnalysedLine({
+  artifact,
+  summary,
+}: {
+  artifact: ArtifactEnvelope;
+  summary: AssessmentSummary;
+}) {
+  const { messages, formatDateTime } = useLocale();
+  const copy = messages.assessment.dashboard;
+  const number = useNumber();
+  return (
+    <p className="analysed-line">
+      {copy.analysedAt(formatDateTime(artifact.createdAt))} ·{' '}
+      {copy.files(number(summary.unique.files))} ·{' '}
+      {copy.sharedFiles(number(summary.unique.sharedFiles))}
+    </p>
+  );
+}
+
 function Kpis({
   artifact,
   summary,
@@ -286,6 +306,7 @@ function Kpis({
 }) {
   const { messages } = useLocale();
   const copy = messages.assessment.dashboard.kpis;
+  const totals = messages.assessment.totals;
   const number = useNumber();
   const kpis = useMemo(
     () => dashboardKpis(artifact.payload, summary),
@@ -312,6 +333,11 @@ function Kpis({
         <>
           {copy.physicalSub}{' '}
           <span data-testid="unique-code-lines">{number(kpis.codeLines)}</span>
+          <br />
+          {copy.perProgram}{' '}
+          <span data-testid="per-program-code-lines">
+            {number(summary.perProgramCodeLines)}
+          </span>
         </>
       ),
     },
@@ -319,7 +345,17 @@ function Kpis({
       key: 'procedures',
       label: copy.procedures,
       value: kpis.procedures,
-      sub: copy.proceduresSub(number(kpis.analyzedFiles)),
+      sub: (
+        <>
+          {copy.proceduresSub}{' '}
+          <span data-testid="coverage">
+            {totals.coverageValue(
+              number(summary.unique.analyzedCodeFiles),
+              number(summary.unique.codeFiles),
+            )}
+          </span>
+        </>
+      ),
     },
     {
       key: 'sql',
@@ -468,72 +504,6 @@ function Histogram({
         {notAnalyzed > 0 && <> · {copy.notAnalyzed(number(notAnalyzed))}</>}
       </p>
     </section>
-  );
-}
-
-function Totals({ summary }: { summary: AssessmentSummary }) {
-  const { messages } = useLocale();
-  const copy = messages.assessment.totals;
-  const { unique } = summary;
-  const number = useNumber();
-  return (
-    <div className="assessment-totals panel">
-      <section aria-labelledby="unique-totals">
-        <h4 id="unique-totals">{copy.uniqueTitle}</h4>
-        <p className="muted">{copy.uniqueHelp}</p>
-        <dl className="stat-grid">
-          <div>
-            <dt>{copy.codeLines}</dt>
-            <dd>{number(unique.codeLines)}</dd>
-          </div>
-          <div>
-            <dt>{copy.coverage}</dt>
-            <dd data-testid="coverage">
-              {copy.coverageValue(
-                number(unique.analyzedCodeFiles),
-                number(unique.codeFiles),
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>{copy.files}</dt>
-            <dd>{number(unique.files)}</dd>
-          </div>
-          <div>
-            <dt>{copy.sharedFiles}</dt>
-            <dd>{number(unique.sharedFiles)}</dd>
-          </div>
-          <div>
-            <dt>{copy.problemFiles}</dt>
-            <dd>
-              {copy.problemValue(
-                number(unique.errorFiles),
-                number(unique.unsupportedFiles),
-                unique.skippedFiles === null
-                  ? copy.unknown
-                  : number(unique.skippedFiles),
-              )}
-            </dd>
-          </div>
-        </dl>
-      </section>
-      <section aria-labelledby="program-totals">
-        <h4 id="program-totals">{copy.perProgramTitle}</h4>
-        <p className="muted">{copy.perProgramHelp}</p>
-        <dl className="stat-grid">
-          <div>
-            <dt>{copy.programs}</dt>
-            <dd>{number(summary.programs.length)}</dd>
-          </div>
-          <div>
-            <dt>{copy.perProgramCodeLines}</dt>
-            <dd data-testid="per-program-code-lines">
-              {number(summary.perProgramCodeLines)}
-            </dd>
-          </div>
-        </dl>
-      </section>
-    </div>
   );
 }
 
@@ -884,7 +854,9 @@ function ProgramList({
                               {copy.declaredName(row.name)}
                             </span>
                           )}
-                          <span className="mono muted">{row.projectPath}</span>
+                          <span className="mono muted" title={row.projectPath}>
+                            {row.projectPath}
+                          </span>
                         </th>
                         <td>
                           <span className="kind-list">

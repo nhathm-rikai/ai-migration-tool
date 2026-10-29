@@ -404,7 +404,7 @@ describe('Assessment overview (F03)', () => {
     await screen.findByText('Danh sách program');
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     expect(screen.getByText('プログラム一覧')).toBeTruthy();
-    expect(screen.getByText('ソース全体の合計（重複なし）')).toBeTruthy();
+    expect(screen.getByText('コード行の内訳')).toBeTruthy();
     expect(server.calls).toHaveLength(2);
   });
 

@@ -288,7 +288,7 @@ describe('Program detail (F04)', () => {
     expect(screen.getByText('プロシージャとLoC')).toBeTruthy();
   });
 
-  it('shows the first rows of a long table and the rest on request', () => {
+  it('pages a long table 10 rows at a time', () => {
     const inventory = clone(mappedInventoryFixture);
     const analysis = firstProgram(inventory).analysis;
     if (!analysis) throw new Error('fixture is analyzed');
@@ -302,14 +302,17 @@ describe('Program detail (F04)', () => {
     }));
     render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
     fireEvent.click(screen.getByRole('tab', { name: /^Lời gọi/ }));
-    expect(screen.getByText('Đang hiện 50 / 60 dòng.')).toBeTruthy();
-    expect(screen.queryByText('Callee55')).toBeNull();
+    expect(screen.getByText('Dòng 1–10 / 60')).toBeTruthy();
+    expect(screen.getByText('Trang 1 / 6')).toBeTruthy();
+    expect(screen.queryByText('Callee10')).toBeNull();
     // The caller shows its procedure and file; the full ID stays as title.
     const caller = screen.getByText('Caller0').closest('th');
     expect(caller?.getAttribute('title')).toBe(
       'cmn/OrderRules.bas#Function:Caller0',
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
-    expect(screen.getByText('Callee55')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }));
+    expect(screen.getByText('Dòng 11–20 / 60')).toBeTruthy();
+    expect(screen.getByText('Callee10')).toBeTruthy();
+    expect(screen.queryByText('Callee0')).toBeNull();
   });
 });

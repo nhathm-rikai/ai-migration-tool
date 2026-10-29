@@ -342,8 +342,6 @@ export const jaMessages = {
       sectionLabel: '解析の詳細',
       graphSoon:
         'プロジェクト全体のコールグラフは次のステップで提供します。各プログラムの呼び出しはプログラム詳細の「呼び出し」タブで確認できます。',
-      tablesHelp:
-        'テーブルごとに1行。プログラム数は重複なし、アクセス箇所はファイルごとに1回（共有ファイルを二重に数えない）。',
       tablesNone: 'テーブルアクセスは検出されませんでした。',
       tablesPagination: 'DBテーブルのページ',
       columns: {
@@ -496,17 +494,12 @@ export const jaMessages = {
         'プロシージャごとのLoCはインベントリの計測バージョンによります。共通ファイルのプロシージャは他のプログラムにも属します。',
       noProcedures: '解析済みファイルにプロシージャはありません。',
       crudTitle: 'テーブル別CRUD',
-      crudView: 'テーブル名の表示',
+      showRaw: '元の名前を表示',
+      showMapped: 'マッピング後を表示',
       crudViews: {
         raw: 'ソース上の名前',
         mapped: 'テーブル名マッピング後',
       },
-      crudRawHelp: 'ソースに書かれたとおりのテーブル名です。',
-      crudMappedHelp:
-        '同じテーブルと仮定した名前を統合しています。「ソース上の名前」列に元の名前を残しています。',
-      mappingStatus: 'マッピング:',
-      mappedAbsent:
-        'このインベントリにはマッピング後のデータがないため、ソース上の名前で表示しています。',
       noCrud: 'テーブルへのアクセスは検出されませんでした。',
       viaShared: '共通ファイル経由のみ',
       callsTitle: '呼び出し',

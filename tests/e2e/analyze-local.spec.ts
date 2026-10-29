@@ -130,7 +130,10 @@ test(
     await detail.getByRole('tab', { name: /^Lời gọi/ }).click();
     await expect(detail.getByText('Lời gọi', { exact: true })).toBeVisible();
     await detail.getByRole('tab', { name: /^CRUD/ }).click();
-    await detail.getByLabel('Sau ánh xạ tên bảng').check();
+    // The mapped view opens first; its line names the assumed schema.
+    await expect(
+      detail.getByText(/Giả định, cần người quản lý DB xác nhận/),
+    ).toBeVisible();
     await expect(
       detail.getByText('Không phát hiện truy cập bảng.'),
     ).toBeVisible();

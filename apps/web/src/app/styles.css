@@ -1161,19 +1161,6 @@ dd {
 .detail-table .badge {
   margin-left: 4px;
 }
-.crud-view {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 0;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.crud-view legend {
-  padding: 0 4px;
-  color: var(--fg-3);
-}
 .detail-list {
   margin: 0;
   padding-left: 18px;
@@ -1743,4 +1730,8 @@ details.technical[open] > summary {
   to {
     transform: scaleY(1);
   }
+}
+.table-name-view {
+  margin: 4px 0 8px;
+  font-size: 12px;
 }

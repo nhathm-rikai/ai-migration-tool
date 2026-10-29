@@ -79,3 +79,52 @@ export function MappingStatus({
     </>
   );
 }
+
+// One line above a CRUD table: which names are shown and a link to the
+// other view (F04-AC01). The mapped view says which mapping it assumes;
+// without a mapped view only the names as written exist.
+export function TableNameView({
+  view,
+  mappedAvailable,
+  mapping,
+  stored,
+  onChange,
+}: {
+  view: 'raw' | 'mapped';
+  mappedAvailable: boolean;
+  mapping: EffectiveMapping;
+  stored: boolean;
+  onChange: (view: 'raw' | 'mapped') => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.detail;
+  const shown = view === 'mapped' && mappedAvailable ? 'mapped' : 'raw';
+  return (
+    <p className="muted table-name-view" role="note">
+      {shown === 'mapped' ? (
+        <MappingStatus mapping={mapping} stored={stored} />
+      ) : (
+        <>
+          {copy.crudViews.raw}
+          {!mappedAvailable && (
+            <>
+              {' · '}
+              <MappingStatus mapping={mapping} stored={stored} />
+            </>
+          )}
+        </>
+      )}
+      {mappedAvailable && (
+        <>
+          {' · '}
+          <button
+            className="link-button"
+            onClick={() => onChange(shown === 'mapped' ? 'raw' : 'mapped')}
+          >
+            {shown === 'mapped' ? copy.showRaw : copy.showMapped}
+          </button>
+        </>
+      )}
+    </p>
+  );
+}

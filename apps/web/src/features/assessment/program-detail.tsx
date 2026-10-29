@@ -2,7 +2,7 @@ import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { pageOf, programLabel } from './assessment-summary';
-import { ComplexityTag, MappingStatus } from './tags';
+import { ComplexityTag, TableNameView } from './tags';
 import {
   crudRows,
   programDetail,
@@ -375,42 +375,21 @@ function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
     analysis.mappedCrud ? 'mapped' : 'raw',
   );
   const id = useId();
-  const { rows, shown, fallback } = crudRows(analysis, view);
+  const { rows, shown } = crudRows(analysis, view);
   const limited = useRowLimit(rows);
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.crudTitle}</h6>
-      <fieldset className="crud-view">
-        <legend>{copy.crudView}</legend>
-        {(['raw', 'mapped'] as const).map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name={`${id}-view`}
-              value={option}
-              checked={view === option}
-              onChange={() => {
-                setView(option);
-                limited.reset();
-              }}
-            />{' '}
-            {copy.crudViews[option]}
-          </label>
-        ))}
-      </fieldset>
-      <p className="muted" role="note">
-        {shown === 'raw' ? copy.crudRawHelp : copy.crudMappedHelp}{' '}
-        {copy.mappingStatus}{' '}
-        <MappingStatus
-          mapping={detail.mapping}
-          stored={detail.tableNames !== null}
-        />
-      </p>
-      {fallback && (
-        <p className="notice" role="status">
-          {copy.mappedAbsent}
-        </p>
-      )}
+      <TableNameView
+        view={view}
+        mappedAvailable={analysis.mappedCrud !== null}
+        mapping={detail.mapping}
+        stored={detail.tableNames !== null}
+        onChange={(next) => {
+          setView(next);
+          limited.reset();
+        }}
+      />
       {rows.length === 0 ? (
         <p className="empty-state">{copy.noCrud}</p>
       ) : (

@@ -46,18 +46,21 @@ describe('Program detail (F04)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
     // The mapped view opens first when the inventory has one.
     expect(screen.getByTestId('crud-mapped')).toBeTruthy();
-    fireEvent.click(screen.getByLabelText('Tên như trong mã nguồn'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tên gốc' }));
     const raw = screen.getByTestId('crud-raw');
     expect(within(raw).getByText('APP.ORDERS')).toBeTruthy();
     expect(within(raw).getByText('ORDERS')).toBeTruthy();
     expect(screen.getByTestId('detail-raw-complexity').textContent).toContain(
       'Thấp · 12',
     );
-    expect(screen.getByRole('note').textContent).toContain(
-      'Giả định, cần người quản lý DB xác nhận (APP)',
+    expect(screen.getByRole('note').textContent).toBe(
+      'Tên như trong mã nguồn · Xem sau ánh xạ',
     );
 
-    fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem sau ánh xạ' }));
+    expect(screen.getByRole('note').textContent).toBe(
+      'Giả định, cần người quản lý DB xác nhận (APP) · Xem tên gốc',
+    );
     const mapped = screen.getByTestId('crud-mapped');
     const row = within(mapped).getByText('ORDERS').closest('tr');
     expect(row?.textContent).toContain('APP.ORDERS, ORDERS');
@@ -70,7 +73,7 @@ describe('Program detail (F04)', () => {
     expect(screen.getByText('Độ phức tạp sau ánh xạ')).toBeTruthy();
     expect(screen.getByTestId('detail-own-code-lines').textContent).toBe('6');
 
-    fireEvent.click(screen.getByLabelText('Tên như trong mã nguồn'));
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tên gốc' }));
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
   });
 
@@ -83,10 +86,10 @@ describe('Program detail (F04)', () => {
           access.table = access.table.replace('APP.', '');
     render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
-    fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
+    // No mapped view: only the names as written, and no link to switch.
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
     expect(screen.queryByTestId('crud-mapped')).toBeNull();
-    expect(screen.getByText(/không có góc nhìn sau ánh xạ/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Xem sau ánh xạ' })).toBeNull();
     expect(screen.getByRole('note').textContent).toContain(
       'Không có (kiểm kê cũ',
     );
@@ -285,13 +288,12 @@ describe('Program detail (F04)', () => {
     expect(document.activeElement).toBe(crudTab);
     fireEvent.click(crudTab);
     expect(crudTab.getAttribute('aria-selected')).toBe('true');
-    const mapped = screen.getByRole('radio', {
-      name: 'テーブル名マッピング後',
-    });
-    mapped.focus();
-    expect(document.activeElement).toBe(mapped);
-    fireEvent.click(mapped);
     expect(screen.getByTestId('crud-mapped')).toBeTruthy();
+    const raw = screen.getByRole('button', { name: '元の名前を表示' });
+    raw.focus();
+    expect(document.activeElement).toBe(raw);
+    fireEvent.click(raw);
+    expect(screen.getByTestId('crud-raw')).toBeTruthy();
     expect(screen.getByText('プロシージャとLoC')).toBeTruthy();
   });
 

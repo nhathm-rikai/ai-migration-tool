@@ -681,7 +681,9 @@ describe('Assessment overview (F03)', () => {
     const matrix = screen.getByRole('region', { name: 'Bảng DB' });
     expect(within(matrix).getAllByRole('row')).toHaveLength(2);
     expect(within(matrix).getByRole('rowheader').textContent).toBe('ORDERS');
-    fireEvent.click(within(matrix).getByLabelText('Tên như trong mã nguồn'));
+    fireEvent.click(
+      within(matrix).getByRole('button', { name: 'Xem tên gốc' }),
+    );
     expect(
       within(matrix)
         .getAllByRole('rowheader')

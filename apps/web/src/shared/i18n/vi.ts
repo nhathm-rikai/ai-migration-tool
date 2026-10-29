@@ -359,8 +359,6 @@ export const viMessages = {
       sectionLabel: 'Chi tiết phân tích',
       graphSoon:
         'Call graph toàn dự án sẽ có ở bước tiếp theo. Lời gọi của từng program xem ở tab Lời gọi trong chi tiết program.',
-      tablesHelp:
-        'Mỗi bảng một dòng; số program không trùng, vị trí truy cập đếm mỗi file một lần (file dùng chung không cộng hai lần).',
       tablesNone: 'Không phát hiện truy cập bảng.',
       tablesPagination: 'Phân trang bảng DB',
       columns: {
@@ -517,17 +515,12 @@ export const viMessages = {
         'LoC từng procedure theo phiên bản đếm của kiểm kê. Procedure trong file dùng chung cũng thuộc các program khác.',
       noProcedures: 'Không có procedure trong các file đã phân tích.',
       crudTitle: 'CRUD theo bảng',
-      crudView: 'Cách hiển thị tên bảng',
+      showRaw: 'Xem tên gốc',
+      showMapped: 'Xem sau ánh xạ',
       crudViews: {
         raw: 'Tên như trong mã nguồn',
         mapped: 'Sau ánh xạ tên bảng',
       } satisfies Record<CrudView, string>,
-      crudRawHelp: 'Tên bảng đúng như viết trong mã nguồn.',
-      crudMappedHelp:
-        'Các tên được giả định là cùng một bảng đã được gộp; cột “Tên trong mã nguồn” giữ tên gốc.',
-      mappingStatus: 'Ánh xạ:',
-      mappedAbsent:
-        'Kiểm kê này không có góc nhìn sau ánh xạ; đang hiển thị tên như trong mã nguồn.',
       noCrud: 'Không phát hiện truy cập bảng.',
       viaShared: 'Chỉ qua file dùng chung',
       callsTitle: 'Lời gọi',

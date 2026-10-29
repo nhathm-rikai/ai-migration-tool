@@ -38,7 +38,12 @@ import {
 } from './analysis-dashboard';
 import type { CrudView } from './program-detail-model';
 import { ProgramDetail } from './program-detail';
-import { ComplexityCell, MappingStatus, ProgramStateTag } from './tags';
+import {
+  ComplexityCell,
+  MappingStatus,
+  ProgramStateTag,
+  TableNameView,
+} from './tags';
 import { effectiveMapping } from './table-mapping';
 import { useRunAssessment } from './use-run-assessment';
 
@@ -968,7 +973,6 @@ function ProgramList({
 function TableMatrix({ artifact }: { artifact: ArtifactEnvelope }) {
   const { messages } = useLocale();
   const copy = messages.assessment.dashboard;
-  const detail = messages.assessment.detail;
   const number = useNumber();
   const mappedAvailable = hasMappedCrud(artifact.payload);
   const [view, setView] = useState<CrudView>(
@@ -981,42 +985,21 @@ function TableMatrix({ artifact }: { artifact: ArtifactEnvelope }) {
   );
   const [page, setPage] = useState(1);
   const current = pageOf(rows, page, TABLE_PAGE_SIZE);
-  const id = useId();
   return (
     <section
       aria-label={messages.assessment.tabs.tables}
       className="table-matrix"
     >
-      <fieldset className="crud-view">
-        <legend>{detail.crudView}</legend>
-        {(['raw', 'mapped'] as const).map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name={`${id}-view`}
-              value={option}
-              checked={view === option}
-              onChange={() => {
-                setView(option);
-                setPage(1);
-              }}
-            />{' '}
-            {detail.crudViews[option]}
-          </label>
-        ))}
-      </fieldset>
-      <p className="muted" role="note">
-        {shown === 'raw' ? detail.crudRawHelp : detail.crudMappedHelp}{' '}
-        {detail.mappingStatus}{' '}
-        <MappingStatus
-          mapping={effectiveMapping(artifact.payload)}
-          stored={artifact.payload.tableNames !== undefined}
-        />{' '}
-        {copy.tablesHelp}
-      </p>
-      {view === 'mapped' && !mappedAvailable && (
-        <p className="notice">{detail.mappedAbsent}</p>
-      )}
+      <TableNameView
+        view={view}
+        mappedAvailable={mappedAvailable}
+        mapping={effectiveMapping(artifact.payload)}
+        stored={artifact.payload.tableNames !== undefined}
+        onChange={(next) => {
+          setView(next);
+          setPage(1);
+        }}
+      />
       {rows.length === 0 ? (
         <p className="empty-state">{copy.tablesNone}</p>
       ) : (

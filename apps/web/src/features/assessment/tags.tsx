@@ -41,9 +41,6 @@ export function ComplexityCell({
     <span className="tag-group">
       <ComplexityTag level={complexity.level} score={complexity.score} />
       {complexity.draft && <span className="badge">{copy.draft}</span>}
-      {complexity.needsReview && (
-        <span className="badge review">{copy.needsReview}</span>
-      )}
     </span>
   );
 }

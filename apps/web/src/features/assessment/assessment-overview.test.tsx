@@ -265,6 +265,37 @@ describe('Assessment overview (F03)', () => {
     expect(screen.getByText('File của Invoice')).toBeTruthy();
   });
 
+  it('shows and filters the Very High level', async () => {
+    const inventory = sharedInventory();
+    const invoice = inventory.programs[1];
+    if (!invoice?.analysis) throw new Error('fixture has an analysis');
+    invoice.analysis.complexity = {
+      ...invoice.analysis.complexity,
+      version: 'complexity-v1',
+      score: 78,
+      level: 'very-high',
+    };
+    const server = serve({
+      ...mappedInventoryArtifactFixture,
+      payload: inventory,
+    });
+    render(
+      <AssessmentOverview
+        api={server.api}
+        projectId={projectId}
+        runId={runId}
+      />,
+    );
+    await screen.findByText('Đang hiển thị 2 / 2 program');
+    expect(screen.getByRole('button', { name: /Rất cao/ })).toBeTruthy();
+    openPrograms();
+    fireEvent.change(screen.getByLabelText('Độ phức tạp'), {
+      target: { value: 'very-high' },
+    });
+    expect(screen.getByText('Đang hiển thị 1 / 2 program')).toBeTruthy();
+    expect(screen.getByText('Rất cao · 78')).toBeTruthy();
+  });
+
   it('shows an empty state when the run has no published inventory', async () => {
     const server = createServer({
       [listUrl(runId)]: () => json({ items: [] }),

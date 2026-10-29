@@ -41,7 +41,7 @@ const FILES = [
   ]),
   text('b/B.BAS', [
     'Sub Main()',
-    '    s = "DELETE FROM " & t',
+    '    s = "DELETE FROM " & t & " WHERE A = " & k',
     '    LogIt',
     'End Sub',
   ]),
@@ -156,6 +156,15 @@ describe('buildInventoryReport', () => {
         usedBy: ['PB'],
       },
     ]);
+    expect(report.concatenatedSql).toEqual([
+      {
+        relativePath: 'b/B.BAS',
+        procedureId: 'b/B.BAS#sub:Main',
+        operation: 'D',
+        line: 2,
+        usedBy: ['PB'],
+      },
+    ]);
   });
 
   it('lists every warning of the selection', () => {
@@ -171,25 +180,33 @@ describe('buildInventoryReport', () => {
     ]);
   });
 
-  it('flags known mismatches given to the report and keeps the full list', () => {
-    const known = [
-      { program: 'pb', note: 'label Medium, model Low' },
-      { program: 'OTHER', note: 'not selected' },
-    ];
-    const flagged = buildInventoryReport(inventory(), ['PA', 'PB'], known);
-    expect(flagged.programs.map((p) => p.complexityReviewFlags)).toEqual([
-      [],
-      ['known-mismatch'],
-    ]);
-    expect(
-      flagged.warnings
-        .filter((w) => w.code.startsWith('COMPLEXITY_KNOWN'))
-        .map((w) => [w.programId, w.detail]),
-    ).toEqual([['PB', 'label Medium, model Low']]);
-    expect(flagged.complexityKnownMismatches).toEqual(known);
+  it('leaves review flags of an old inventory out of the JSON report', () => {
+    const doc = inventory();
+    doc.complexityVersion = 'complexity-v0';
+    for (const program of doc.programs)
+      if (program.analysis) {
+        program.analysis.complexity.reviewFlags = ['high', 'near-threshold'];
+        if (program.analysis.normalizedComplexity)
+          program.analysis.normalizedComplexity.reviewFlags = ['high'];
+      }
+    const before = JSON.stringify(doc);
+    const report = buildInventoryReport(doc, ['PA', 'PB']);
+    const exported = JSON.stringify(report);
+    expect(exported).not.toContain('reviewFlags');
+    expect(exported).not.toContain('near-threshold');
+    const [first] = report.programs;
+    const source = doc.programs.find((p) => p.projectPath === 'a/PA.VBP');
+    expect(first?.complexity).toEqual({
+      version: source?.analysis?.complexity.version,
+      score: source?.analysis?.complexity.score,
+      level: source?.analysis?.complexity.level,
+      parts: source?.analysis?.complexity.parts,
+    });
+    expect(first?.normalizedComplexity).not.toHaveProperty('reviewFlags');
+    expect(JSON.stringify(doc)).toBe(before);
   });
 
-  it('warns about a draft model and about each model flag', () => {
+  it('warns about a draft model, not about review flags of old inventories', () => {
     const doc = inventory();
     doc.complexityVersion = 'complexity-v0-draft';
     const program = doc.programs.find((p) => p.projectPath === 'a/PA.VBP');
@@ -199,11 +216,7 @@ describe('buildInventoryReport', () => {
       buildInventoryReport(doc, ['PA'])
         .warnings.filter((w) => w.code.startsWith('COMPLEXITY'))
         .map((w) => [w.code, w.programId]),
-    ).toEqual([
-      ['COMPLEXITY_DRAFT', null],
-      ['COMPLEXITY_HIGH', 'PA'],
-      ['COMPLEXITY_NEAR_THRESHOLD', 'PA'],
-    ]);
+    ).toEqual([['COMPLEXITY_DRAFT', null]]);
   });
 
   it('names a program after its project file', () => {
@@ -302,6 +315,7 @@ describe('inventory report workbook', () => {
       'Calls',
       'CRUD',
       'DynamicSQL',
+      'ConcatenatedSQL',
       'ExternalRefs',
       'ExternalAPIs',
       'Totals',
@@ -313,7 +327,7 @@ describe('inventory report workbook', () => {
     const rowCount = (xml: string) => [...xml.matchAll(/<row /g)].length;
     expect(rowCount(sheetXml(2))).toBe(1 + report.programs.length);
     expect(rowCount(sheetXml(5))).toBe(1 + report.procedures.length);
-    expect(rowCount(sheetXml(12))).toBe(1 + report.warnings.length);
+    expect(rowCount(sheetXml(13))).toBe(1 + report.warnings.length);
   });
 
   it('keeps a formula-like program name as quoted text', () => {

@@ -350,8 +350,6 @@ export const viMessages = {
       UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
-      COMPLEXITY_REVIEW:
-        'Có program cần người xem lại mức độ phức tạp (mức cao hoặc gần ngưỡng).',
     } satisfies Record<AssessmentWarning, string>,
     programs: {
       title: 'Danh sách program',
@@ -366,7 +364,6 @@ export const viMessages = {
       notAnalyzed: 'Chưa phân tích',
       mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
       draft: 'Nháp',
-      needsReview: 'Cần xem lại',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,
       pageSize: 'Số dòng mỗi trang',
@@ -392,6 +389,7 @@ export const viMessages = {
         low: 'Thấp',
         medium: 'Trung bình',
         high: 'Cao',
+        'very-high': 'Rất cao',
       } satisfies Record<ComplexityLevel, string>,
     },
     members: {

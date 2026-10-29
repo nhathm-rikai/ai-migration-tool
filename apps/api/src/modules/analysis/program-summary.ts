@@ -21,6 +21,8 @@ const COLUMNS = [
   'normalizedTables',
   'normalizedCrud',
   'dynamicSql',
+  'concatenatedSql',
+  'parameterizedSql',
   'components',
   'externalApis',
   'ambiguousCalls',
@@ -76,6 +78,8 @@ export function programSummaryCsv(inventory: SourceInventory): string {
       normalizedTables: metrics?.normalizedTables ?? null,
       normalizedCrud: analysis ? crudCell(analysis.normalizedCrud) : null,
       dynamicSql: metrics?.dynamicSql ?? null,
+      concatenatedSql: metrics?.concatenatedSql ?? null,
+      parameterizedSql: metrics?.parameterizedSql ?? null,
       components: metrics?.components ?? null,
       externalApis: metrics?.externalApis ?? null,
       ambiguousCalls:

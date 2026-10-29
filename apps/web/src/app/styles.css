@@ -1135,6 +1135,11 @@ dd {
   background: #fde9d7;
   border-color: #f6c49a;
 }
+.tag-very-high {
+  color: var(--high);
+  background: var(--high-bg);
+  border-color: #efb3ae;
+}
 .tag-group {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1143,11 +1148,6 @@ dd {
 }
 .program-table .tag-group .badge {
   margin-left: 0;
-}
-.badge.review {
-  background: var(--surface);
-  border: 1px dashed var(--line-2);
-  color: var(--fg-2);
 }
 .declared-name {
   display: block;
@@ -1226,6 +1226,9 @@ dd {
 }
 .tone-high {
   background: #e8823a;
+}
+.tone-very-high {
+  background: var(--high);
 }
 .legend {
   list-style: none;

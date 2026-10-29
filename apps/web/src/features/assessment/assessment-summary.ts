@@ -25,14 +25,12 @@ export type AssessmentWarning =
   | 'FILES_SKIPPED'
   | 'UNCLASSIFIED_LINES'
   | 'TABLE_NAMES_NOT_CONFIRMED'
-  | 'COMPLEXITY_DRAFT'
-  | 'COMPLEXITY_REVIEW';
+  | 'COMPLEXITY_DRAFT';
 
 export type ComplexityView = {
   score: number;
   level: ComplexityLevel;
   draft: boolean;
-  needsReview: boolean;
 };
 
 export type ProgramRow = {
@@ -97,7 +95,6 @@ function complexityView(complexity: Complexity): ComplexityView {
     score: complexity.score,
     level: complexity.level,
     draft: isDraft(complexity.version),
-    needsReview: (complexity.reviewFlags?.length ?? 0) > 0,
   };
 }
 
@@ -190,10 +187,6 @@ export function summarizeInventory(
     'COMPLEXITY_DRAFT',
     isDraft(inventory.complexityVersion) ||
       programs.some((row) => row.complexity?.draft),
-  );
-  warn(
-    'COMPLEXITY_REVIEW',
-    programs.some((row) => row.complexity?.needsReview),
   );
 
   const missing = new Map<string, MissingMember>();

@@ -1,4 +1,4 @@
-import type { DynamicSqlUse, SqlTableAccess } from './sql-access.js';
+import type { DynamicSqlUse, SqlTableAccess, SqlUse } from './sql-access.js';
 
 // Boundary between the language-neutral pipeline (decode, lines, manifest,
 // inventory) and one legacy language. Adding a language means adding one
@@ -52,6 +52,7 @@ export type ProcedureMetrics = {
 // Facts are attributed to a procedure ID, or null at file level.
 export type SqlTableFact = SqlTableAccess & { procedureId: string | null };
 export type DynamicSqlFact = DynamicSqlUse & { procedureId: string | null };
+export type SqlUseFact = SqlUse & { procedureId: string | null };
 
 // A procedure imported from a native library (e.g. a Win32 API Declare).
 export type ExternalDeclaration = {
@@ -77,6 +78,10 @@ export type CodeFileAnalysis =
       fileLevelCodeLines: number;
       sqlTables: SqlTableFact[];
       dynamicSql: DynamicSqlFact[];
+      // One per SQL text with runtime values concatenated outside the table
+      // name, and one per SQL text using bind parameters.
+      concatenatedSql: SqlUseFact[];
+      parameterizedSql: SqlUseFact[];
       externalDeclarations: ExternalDeclaration[];
       labels: SourceLabel[];
     }

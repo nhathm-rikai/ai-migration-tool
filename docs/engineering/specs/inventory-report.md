@@ -12,13 +12,14 @@
 | Bảng (sheet) | Nội dung | Truy vết |
 |---|---|---|
 | `source` (Summary) | `snapshotHash`, profile, mọi version của inventory (`metricVersion`, `procedureLinesVersion`, decoder, normalization, `sqlAccessVersion`, call graph, complexity, table name) và mapping tên bảng. | Snapshot |
-| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics, complexity raw/normalized, `complexityReviewFlags` (`high`, `near-threshold`, `known-mismatch`). | `projectPath` |
+| `programs` | Trạng thái, `complete`, counters theo program, số procedure, tổng Executable/SQL, metrics (gồm `concatenatedSql`, `parameterizedSql`; trống với inventory cũ), complexity raw/normalized (chỉ `version`, `score`, `level`, `parts`; `reviewFlags` của inventory v0 không được xuất). | `projectPath` |
 | `members` | Member khai báo trong project, path thật, `resolution`, `fileStatus`, `shared` (trong toàn corpus). | `declaredPath`, `relativePath` |
 | `files` | File riêng biệt của các program đã chọn, `rawSha256`, encoding, counters, `usedBy`. | `relativePath`, hash |
 | `procedures` | LoC theo function: Physical/Code/Executable/Comment/Blank/Metadata/Unclassified/SQL theo [source-analysis](source-analysis.md) §4.1, decision points, `usedBy`. | file, procedure ID, `startLine..endLine` |
 | `calls` | Lời gọi theo program, `resolution` `local/program/external/ambiguous`, mọi đích. | `from` (procedure hoặc `#file`), dòng đầu |
 | `crud` | View `raw` (tên như trong source) và `normalized` (sau mapping, kèm `names` đã gộp), `viaSharedOnly`. | evidence path + dòng |
 | `dynamicSql` | SQL có tên bảng runtime. | file, procedure, dòng |
+| `concatenatedSql` (ConcatenatedSQL) | SQL ghép giá trị runtime ngoài tên bảng (`sql-access-v5`); rỗng với inventory cũ. Không sinh cảnh báo từng dòng. | file, procedure, dòng |
 | `externalReferences`, `externalApis` | Reference/OCX của project, API native được gọi. | program |
 | `totals` | `perProgramSum` và `unique` (mục 3). | — |
 | `warnings` | Mục 4. | program/file/dòng nếu có |
@@ -33,7 +34,7 @@ XLSX: một sheet mỗi bảng theo thứ tự trên, header in đậm, freeze d
 
 ## 4. Cảnh báo
 
-Mọi cảnh báo của tập đã chọn được giữ, không lọc: `TABLE_NAMES_NOT_CONFIRMED` (mapping `assumed`/`unconfigured`), `COMPLEXITY_DRAFT` (version `*-draft`) hoặc `COMPLEXITY_REFERENCE_ONLY` (không tính effort/báo giá từ điểm; review riêng xử lý file, ghi DB, transaction), `COMPLEXITY_HIGH`, `COMPLEXITY_NEAR_THRESHOLD`, `COMPLEXITY_KNOWN_MISMATCH`, `PROCEDURE_LINES_MISSING`, `FILES_SKIPPED` (cấp corpus), `PROGRAM_UNSUPPORTED`, `PROGRAM_INCOMPLETE`, `MEMBER_<resolution>` (missing, case-mismatch, ambiguous, outside-root, absolute-path), `FILE_ERROR`, `FILE_UNSUPPORTED`, `UNCLASSIFIED_LINES`, `CALL_AMBIGUOUS`, `DYNAMIC_SQL`.
+Mọi cảnh báo của tập đã chọn được giữ, không lọc: `TABLE_NAMES_NOT_CONFIRMED` (mapping `assumed`/`unconfigured`), `COMPLEXITY_DRAFT` (version `*-draft`) hoặc `COMPLEXITY_REFERENCE_ONLY` (không tính effort/báo giá từ điểm; review riêng xử lý file, ghi DB, transaction), `PROCEDURE_LINES_MISSING`, `FILES_SKIPPED` (cấp corpus), `PROGRAM_UNSUPPORTED`, `PROGRAM_INCOMPLETE`, `MEMBER_<resolution>` (missing, case-mismatch, ambiguous, outside-root, absolute-path), `FILE_ERROR`, `FILE_UNSUPPORTED`, `UNCLASSIFIED_LINES`, `CALL_AMBIGUOUS`, `DYNAMIC_SQL`.
 
 ## 5. An toàn
 
@@ -46,9 +47,7 @@ Mọi cảnh báo của tập đã chọn được giữ, không lọc: `TABLE_N
 
 ```text
 npm run build -w @portal/contracts && npm run build -w @portal/api
-node apps/api/dist/cli/export-inventory-report.js --inventory <inventory.json> --source-root <thư mục source> --programs <ID,ID,...> --out-json <report.json> --out-xlsx <report.xlsx> [--complexity-review <review.json>]
+node apps/api/dist/cli/export-inventory-report.js --inventory <inventory.json> --source-root <thư mục source> --programs <ID,ID,...> --out-json <report.json> --out-xlsx <report.xlsx>
 ```
-
-`--complexity-review` là JSON `{"knownMismatches":[{"program":"ID","note":"..."}]}` các ca phân loại sai đã được review (dữ liệu corpus, để ngoài repo). Report giữ toàn bộ danh sách trong `complexityKnownMismatches`, kể cả program ngoài tập chọn, và gắn cờ `known-mismatch` cho program được chọn.
 
 Inventory và hai output phải là ba file khác nhau; output ghi qua file tạm rồi rename. Chưa có: route/job/UI, HTML, chọn version qua API (B14).

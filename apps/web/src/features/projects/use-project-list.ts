@@ -46,3 +46,5 @@ export function useProjectList(api: ProjectsApi) {
       setQuery((previous) => ({ cursor, revision: previous.revision + 1 })),
   };
 }
+
+export type ProjectListControl = ReturnType<typeof useProjectList>;

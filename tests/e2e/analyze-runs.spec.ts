@@ -21,8 +21,9 @@ test(
     });
 
     await page.goto('/');
-    const projects = page.getByRole('navigation', { name: 'Cây dự án' });
-    await projects.getByRole('button', { name: seedName }).click();
+    const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
+    await projects.getByRole('link', { name: seedName }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
     await expect(panel.getByText('Chưa có lượt chạy nào')).toBeVisible();
     expect(runMutations).toEqual([]);
@@ -37,8 +38,8 @@ test(
     expect(runMutations[0]?.status).toBe(202);
     expect(runMutations[0]?.key).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
 
+    // Reload stays on the project's source step and reads the run back.
     await page.reload();
-    await projects.getByRole('button', { name: seedName }).click();
     await expect(
       panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
     ).toBeVisible();

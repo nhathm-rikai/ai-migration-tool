@@ -283,6 +283,7 @@ export function programLabel(projectPath: string): string {
 
 export type ProgramSortKey =
   | 'program'
+  | 'kind'
   | 'state'
   | 'ownCodeLines'
   | 'codeLines'
@@ -301,6 +302,12 @@ function sortValue(row: ProgramRow, key: ProgramSortKey): number | string {
   switch (key) {
     case 'program':
       return programLabel(row.projectPath).toLowerCase();
+    case 'kind':
+      // Member kinds, sorted: programs of the same make-up sort together.
+      return row.members
+        .map((member) => member.kind.toLowerCase())
+        .sort()
+        .join(',');
     case 'state':
       return STATE_ORDER[row.state];
     case 'complexity':

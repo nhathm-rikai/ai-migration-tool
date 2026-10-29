@@ -1,8 +1,8 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
-import { programLabel } from './assessment-summary';
-import { ComplexityTag } from './tags';
+import { pageOf, programLabel } from './assessment-summary';
+import { ComplexityTag, TableNameView } from './tags';
 import {
   crudRows,
   programDetail,
@@ -140,24 +140,48 @@ function TabPanel({
   );
 }
 
-// Long tables show their first rows; the rest stays one click away.
-const ROW_LIMIT = 50;
+// Detail tables show 10 rows per page, so an open program stays short in
+// the list it was opened from.
+export const DETAIL_PAGE_SIZE = 10;
 function useRowLimit<T>(rows: readonly T[]) {
   const { messages } = useLocale();
   const copy = messages.assessment.detail;
-  const [all, setAll] = useState(false);
+  const pages = messages.assessment.programs;
+  const [page, setPage] = useState(1);
   const number = useNumber();
-  const shown = all ? rows : rows.slice(0, ROW_LIMIT);
+  const current = pageOf(rows, page, DETAIL_PAGE_SIZE);
+  const from = (current.page - 1) * DETAIL_PAGE_SIZE + 1;
   const more =
-    shown.length < rows.length ? (
-      <p className="muted row-limit">
-        {copy.showingFirst(number(shown.length), number(rows.length))}{' '}
-        <button className="link-button" onClick={() => setAll(true)}>
-          {copy.showAll}
+    rows.length > DETAIL_PAGE_SIZE ? (
+      <nav
+        className="pagination detail-pagination"
+        aria-label={copy.rowsPagination}
+      >
+        <span className="muted">
+          {copy.rowRange(
+            number(from),
+            number(from + current.items.length - 1),
+            number(rows.length),
+          )}
+        </span>
+        <button
+          className="button small"
+          disabled={current.page <= 1}
+          onClick={() => setPage(current.page - 1)}
+        >
+          {pages.previous}
         </button>
-      </p>
+        <span>{pages.page(current.page, current.pages)}</span>
+        <button
+          className="button small"
+          disabled={current.page >= current.pages}
+          onClick={() => setPage(current.page + 1)}
+        >
+          {pages.next}
+        </button>
+      </nav>
     ) : null;
-  return { shown, more };
+  return { shown: current.items, more, reset: () => setPage(1) };
 }
 
 // "path/File.frm#sub:Name" → "Name" and "File.frm"; the full ID stays in
@@ -236,7 +260,7 @@ function Members({ rows, label }: { rows: MemberRow[]; label: string }) {
         <p className="empty-state">{members.none}</p>
       ) : (
         <div className="table-scroll">
-          <table className="detail-table">
+          <table className="detail-table detail-files">
             <thead>
               <tr>
                 <th scope="col">{copy.columns.file}</th>
@@ -248,7 +272,7 @@ function Members({ rows, label }: { rows: MemberRow[]; label: string }) {
             <tbody>
               {shown.map((row) => (
                 <tr key={row.key}>
-                  <th scope="row">
+                  <th scope="row" title={row.relativePath ?? row.declaredPath}>
                     <span className="mono">
                       {row.relativePath ?? row.declaredPath}
                     </span>{' '}
@@ -300,7 +324,7 @@ function Procedures({ analysis }: { analysis: Analysis }) {
         <p className="empty-state">{copy.noProcedures}</p>
       ) : (
         <div className="table-scroll">
-          <table className="detail-table">
+          <table className="detail-table detail-procedures">
             <thead>
               <tr>
                 <th scope="col">{copy.columns.procedure}</th>
@@ -319,7 +343,7 @@ function Procedures({ analysis }: { analysis: Analysis }) {
                       {row.kind} · {row.visibility}
                     </span>
                   </th>
-                  <td>
+                  <td title={row.relativePath}>
                     <span className="mono">{row.relativePath}</span>{' '}
                     {row.shared && (
                       <span className="badge">
@@ -346,49 +370,34 @@ function Procedures({ analysis }: { analysis: Analysis }) {
 function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
   const { messages } = useLocale();
   const copy = messages.assessment.detail;
-  const [view, setView] = useState<CrudView>('raw');
+  // The mapped view opens first when there is one (configured or inferred).
+  const [view, setView] = useState<CrudView>(
+    analysis.mappedCrud ? 'mapped' : 'raw',
+  );
   const id = useId();
-  const { rows, shown, fallback } = crudRows(analysis, view);
+  const { rows, shown } = crudRows(analysis, view);
   const limited = useRowLimit(rows);
-  const mapping = detail.tableNames;
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.crudTitle}</h6>
-      <fieldset className="crud-view">
-        <legend>{copy.crudView}</legend>
-        {(['raw', 'mapped'] as const).map((option) => (
-          <label key={option}>
-            <input
-              type="radio"
-              name={`${id}-view`}
-              value={option}
-              checked={view === option}
-              onChange={() => setView(option)}
-            />{' '}
-            {copy.crudViews[option]}
-          </label>
-        ))}
-      </fieldset>
-      <p className="muted" role="note">
-        {shown === 'raw' ? copy.crudRawHelp : copy.crudMappedHelp}{' '}
-        {copy.mappingStatus}{' '}
-        {mapping
-          ? messages.assessment.mapping[mapping.status]
-          : messages.assessment.mapping.absent}
-        {mapping?.defaultSchema && (
-          <span className="mono"> ({mapping.defaultSchema})</span>
-        )}
-      </p>
-      {fallback && (
-        <p className="notice" role="status">
-          {copy.mappedAbsent}
-        </p>
-      )}
+      <TableNameView
+        view={view}
+        mappedAvailable={analysis.mappedCrud !== null}
+        mapping={detail.mapping}
+        stored={detail.tableNames !== null}
+        onChange={(next) => {
+          setView(next);
+          limited.reset();
+        }}
+      />
       {rows.length === 0 ? (
         <p className="empty-state">{copy.noCrud}</p>
       ) : (
         <div className="table-scroll">
-          <table className="detail-table" data-testid={`crud-${shown}`}>
+          <table
+            className={`detail-table detail-crud${shown === 'mapped' ? ' with-names' : ''}`}
+            data-testid={`crud-${shown}`}
+          >
             <thead>
               <tr>
                 <th scope="col">{copy.columns.table}</th>
@@ -465,7 +474,7 @@ function Calls({ rows }: { rows: CallRow[] }) {
         <p className="empty-state">{copy.noCalls}</p>
       ) : (
         <div className="table-scroll">
-          <table className="detail-table">
+          <table className="detail-table detail-calls">
             <thead>
               <tr>
                 <th scope="col">{copy.columns.caller}</th>
@@ -492,7 +501,7 @@ function Calls({ rows }: { rows: CallRow[] }) {
                         {copy.resolution[row.resolution]}
                       </span>
                     </td>
-                    <td>
+                    <td title={row.targets.join(', ')}>
                       <CallTargets row={row} />
                     </td>
                     <td>{number(row.count)}</td>

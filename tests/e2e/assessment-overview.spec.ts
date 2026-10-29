@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { ArtifactListSchema, type ArtifactRef } from '@portal/contracts';
 import { Check } from 'typebox/value';
 
@@ -10,17 +10,9 @@ const required = (name: string) => {
   return value;
 };
 
-async function openProject(page: Page, name: string) {
-  await page
-    .getByRole('navigation')
-    .filter({ has: page.getByRole('button', { name, exact: true }) })
-    .getByRole('button', { name, exact: true })
-    .click();
-}
-
 // PF06: a demo run publishes the bundled inventory artifact; the Assessment
 // overview reads that exact version, keeps unique and per-program totals
-// apart, flags the partial program and survives reload/locale/mobile.
+// apart, flags the partial program and survives reload and locale switch.
 test(
   'demo run publishes an inventory and shows the assessment overview',
   { tag: '@smoke' },
@@ -58,7 +50,7 @@ test(
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(
-      assessment.getByRole('tab', { name: 'Danh sách program' }),
+      assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
     await assessment.getByText('Thông tin kỹ thuật').click();
     expect(listed).toBeDefined();
@@ -89,7 +81,7 @@ test(
     ).toBeVisible();
 
     const programsTab = assessment.getByRole('tab', {
-      name: 'Danh sách program',
+      name: /^Danh sách program/,
     });
     await programsTab.click();
     await assessment.getByLabel('Tìm program').fill('rep');
@@ -113,25 +105,20 @@ test(
       fullPage: true,
     });
 
-    await page.getByRole('combobox', { name: 'Ngôn ngữ' }).selectOption('ja');
+    await page.getByRole('radio', { name: '日本語' }).check();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
-      path: testInfo.outputPath('pf06-mobile-ja.png'),
-      fullPage: true,
-    });
 
-    // Reload reads the same version back and starts nothing.
+    // Reload stays on this run's analysis URL, reads the same version back
+    // and starts nothing.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/);
     await page.reload();
-    await openProject(page, projectName);
-    await page.getByRole('button', { name: '解析結果を表示' }).click();
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
     await expect(ja.getByTestId('unique-code-lines')).toHaveText('655');
     expect(new Set(artifactReads)).toEqual(

@@ -64,7 +64,7 @@ export function CreateProjectForm({
   return (
     <section className="panel create-panel" aria-labelledby="create-title">
       <span className="eyebrow">{copy.eyebrow}</span>
-      <h1 id="create-title">{messages.projects.createNew}</h1>
+      <h2 id="create-title">{messages.projects.createNew}</h2>
       <p className="muted">{copy.description}</p>
       <form
         noValidate

@@ -1,4 +1,9 @@
 import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  effectiveMapping,
+  mappedCrud,
+  type EffectiveMapping,
+} from './table-mapping';
 
 // View model of one program's detail (F04): its member files, procedures
 // with their LoC, CRUD as written and after table name mapping, calls and
@@ -94,6 +99,8 @@ export type ProgramDetail = {
   } | null;
   externalReferences: Program['externalReferences'];
   tableNames: Inventory['tableNames'] | null;
+  // Mapping of the mapped view: configured, or inferred from the source.
+  mapping: EffectiveMapping;
 };
 
 function analyzedFile(file: InventoryFile | undefined) {
@@ -149,6 +156,7 @@ export function programDetail(
     (candidate) => candidate.projectPath === projectPath,
   );
   if (!program) return null;
+  const mapping = effectiveMapping(inventory);
   const files = new Map(
     inventory.files.map((file) => [file.manifest.relativePath, file]),
   );
@@ -195,11 +203,10 @@ export function programDetail(
           ownProcedures: analysis.metrics.ownProcedures,
           procedures,
           rawCrud: analysis.crud.map((entry) => crudRow(entry, null)),
-          mappedCrud: analysis.normalizedCrud
-            ? analysis.normalizedCrud.map((entry) =>
-                crudRow(entry, entry.names),
-              )
-            : null,
+          mappedCrud:
+            mappedCrud(analysis, mapping)?.map((entry) =>
+              crudRow(entry, entry.names),
+            ) ?? null,
           calls: analysis.calls.map((call, index) => ({
             key: `${index}:${call.from}:${call.name}`,
             from: call.from,
@@ -211,13 +218,17 @@ export function programDetail(
           })),
           externalApis: analysis.externalApis,
           complexity: complexityValue(analysis.complexity),
-          mappedComplexity: analysis.normalizedComplexity
-            ? complexityValue(analysis.normalizedComplexity)
-            : null,
+          // The stored mapped score was computed with the stored mapping; an
+          // inferred schema has no score of its own, so none is shown.
+          mappedComplexity:
+            !mapping.inferred && analysis.normalizedComplexity
+              ? complexityValue(analysis.normalizedComplexity)
+              : null,
         }
       : null,
     externalReferences: program.externalReferences,
     tableNames: inventory.tableNames ?? null,
+    mapping,
   };
 }
 

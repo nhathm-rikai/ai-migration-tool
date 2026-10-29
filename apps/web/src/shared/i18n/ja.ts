@@ -7,8 +7,6 @@ import type { Messages } from './vi';
 export const jaMessages = {
   app: {
     skipToContent: 'メインコンテンツへ移動',
-    subtitle: 'レガシーシステムのアセスメント',
-    demo: '試験版',
     language: '言語',
     session: {
       pending: 'ローカルバックエンドに接続しています…',
@@ -19,53 +17,89 @@ export const jaMessages = {
       retry: '再接続',
     },
   },
+  shell: {
+    project: 'プロジェクト',
+    allProjects: 'すべてのプロジェクト',
+    chooseProject: 'プロジェクトを選択してください',
+    projectDetail: {
+      demo: 'VB6 · サンプルデータ',
+      local: 'VB6 · このPC上のソース',
+      noSource: 'ソース未選択',
+    },
+    pageTitles: {
+      source: '顧客ソースコードの取込',
+      analysis: 'ソースコード解析',
+      documents: 'ドキュメント生成',
+      review: 'ドキュメントのレビュー・承認',
+      quote: '見積',
+    },
+    stepsTitle: 'ワークフロー',
+    steps: {
+      source: 'ソース取込',
+      analysis: '解析',
+      documents: 'ドキュメント生成',
+      review: 'レビュー・承認',
+      quote: '見積',
+    },
+    stepState: {
+      done: '完了済み',
+      todo: '未実施',
+      unavailable: '利用不可',
+    },
+    selectProjectFirst: 'プロジェクトを選択または作成すると各手順を開けます。',
+    projectLoading: 'プロジェクトを開いています…',
+    retry: '再試行',
+    stepEyebrow: (index: number) => `ステップ ${index} / 5`,
+    unavailable: {
+      title: 'まだ利用できません',
+      reasons: {
+        documents:
+          'AIによるドキュメント生成はこの版では未提供です。提供後は手順2の解析結果を使い、プログラムごとにドキュメントを生成します。',
+        review:
+          'レビュー・承認にはドキュメント生成の成果物が必要ですが、この版では未提供です。',
+        quote:
+          '解析結果に基づく見積はこの版では未提供です。見積モデルがまだ設定・承認されていません。',
+      },
+      back: '解析に戻る',
+    },
+    analysis: {
+      loading: '解析結果を探しています…',
+      loadFailed: 'プロジェクトの解析状況を読み込めませんでした。',
+      empty: '解析結果はまだありません',
+      emptyHelp:
+        'ソース取り込みの手順で解析を開始してください。実行が完了し棚卸しが作成されると、ここに表示されます。',
+      goSource: 'ソース取り込みへ',
+      olderRun: '特定の実行の結果を表示しています。',
+      latest: '最新の結果を表示',
+    },
+    notFound: {
+      title: 'ページが見つかりません',
+      help: 'このアドレスはアプリにありません。',
+      projectTitle: 'プロジェクトが見つかりません',
+      projectHelp: 'アドレスのプロジェクトは存在しないか、削除されています。',
+      back: 'プロジェクト一覧へ',
+    },
+  },
   projects: {
     workspace: 'ワークスペース',
     title: 'プロジェクト一覧',
     refresh: 'プロジェクトを再読み込み',
     createNew: '新規プロジェクト',
-    tree: 'プロジェクトツリー',
+    listTitle: 'プロジェクト一覧',
     loading: 'プロジェクトを読み込み中…',
     retryList: '一覧を再読み込み',
     noMore: 'このページにプロジェクトはありません',
     empty: 'プロジェクトはまだありません',
     emptyHelp: 'プロジェクトを作成して、作業を開始してください。',
-    overview: 'プロジェクト概要',
-    unavailable: '今後対応',
-    notAvailableYet: '今後対応',
     results: '解析結果',
     pageCount: (count: number) => `このページのプロジェクト数：${count}件`,
     firstPage: '最初のページ',
     nextPage: '次のページ',
-    localWorkspace: 'ローカル環境',
-    breadcrumb: 'プロジェクト',
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
     localData: 'このPC上のソースコード',
     assessmentSteps: 'アセスメントの手順',
-    stages: {
-      analysis: {
-        title: '解析',
-        description: '静的解析 + AIエージェント',
-        status: '静的解析は対応済み · AIは今後対応',
-      },
-      report: {
-        title: '評価レポート',
-        description: '解析結果',
-        status: '今後対応',
-      },
-      review: {
-        title: 'レビュー',
-        description: 'SA/PMによる承認',
-        status: '今後対応',
-      },
-      proposal: {
-        title: '提案書',
-        description: '提案書のドラフト',
-        status: '今後対応',
-      },
-    },
     created: 'プロジェクトを作成しました。',
     footer:
       'プロジェクトと結果はこのPCに保存されます。対応済み：ソース登録と静的解析。今後対応：AIによる業務理解、レビュー、レポート出力。',
@@ -263,16 +297,72 @@ export const jaMessages = {
   },
   assessment: {
     title: 'アセスメント概要',
-    back: '← プロジェクト概要',
     tabsLabel: '解析結果の項目',
     tabs: {
-      overview: '概要',
       programs: 'プログラム一覧',
-      detail: 'プログラム詳細',
+      graph: 'コールグラフ',
+      tables: 'DBテーブル',
+    },
+    dashboard: {
+      kpis: {
+        programs: 'プログラム',
+        programsSub: (complete: string) => `完全 ${complete}`,
+        physical: '物理行数',
+        physicalSub: 'コード',
+        procedures: 'プロシージャ',
+        proceduresSub: '解析済みコードファイル',
+        perProgram: 'プログラム別合計（共有ファイル重複あり）',
+        sql: 'SQLアクセス箇所',
+        sqlSub: (count: string) => `実行時の値を連結したSQL ${count} 件`,
+        sqlSubOld: 'テーブルアクセスのある行（ファイルごとに1回）',
+        tables: 'アクセスされるテーブル',
+        tablesMapped: 'テーブル名マッピング後',
+        tablesInferred: (schema: string) =>
+          `マッピング後 · スキーマ ${schema} と仮定`,
+        tablesRaw: 'ソース記載の名前',
+        high: '高・非常に高のプログラム',
+        highSub: (analyzed: string) => `解析済み ${analyzed} 本中 · 参考`,
+      },
+      analysedAt: (time: string) => `解析完了 ${time}`,
+      files: (count: string) => `${count} ファイル`,
+      sharedFiles: (count: string) => `共有 ${count} ファイル`,
+      locTitle: 'コード行の内訳',
+      locTotal: '物理行数',
+      loc: {
+        code: 'コード',
+        comment: 'コメント',
+        blank: '空行',
+        designer: 'デザイナー + メタデータ',
+        unclassified: '未分類',
+      },
+      histogramTitle: '複雑度の分布',
+      histogramPrograms: (count: string) => `${count} プログラム`,
+      histogramNote: (version: string) => `参考 · ${version}`,
+      notAnalyzed: (count: string) => `未解析 ${count} プログラム`,
+      sectionLabel: '解析の詳細',
+      graphSoon:
+        'プロジェクト全体のコールグラフは次のステップで提供します。各プログラムの呼び出しはプログラム詳細の「呼び出し」タブで確認できます。',
+      tablesNone: 'テーブルアクセスは検出されませんでした。',
+      tablesPagination: 'DBテーブルのページ',
+      columns: {
+        table: 'テーブル',
+        programs: 'プログラム',
+        locations: 'アクセス箇所',
+        top: '最も多くアクセスするプログラム',
+      },
+      createDocs: 'このプログラムのドキュメントを生成',
+      expand: (program: string) => `${program} の詳細を開く`,
+      kinds: {
+        form: 'Form',
+        module: 'Module',
+        class: 'Class',
+        'user-control': 'UserControl',
+        'property-page': 'PropertyPage',
+        'user-document': 'UserDocument',
+        designer: 'Designer',
+      },
     },
     technical: '技術情報',
-    distributionTitle: '複雑度の分布（参考）',
-    stateTitle: 'プログラムの解析状況',
     programCount: (count: string) => `${count} プログラム`,
     showPrograms: '一覧を表示',
     moreMissing: (count: string) => `ほか ${count} ファイル`,
@@ -282,8 +372,6 @@ export const jaMessages = {
       'この実行にはインベントリ結果がありません（以前のバージョンで作成したこのPC上のソースの実行はスナップショットのみです）。再実行するとインベントリを作成します。',
     demoData: 'アプリ同梱のサンプル結果です（実ソースではありません）',
     localData: 'このPC上のソースのスナップショットから作成したインベントリ',
-    draftNotice:
-      '数値は静的解析によるもので、レビューされるまではドラフトです。複雑度は参考値であり、工数や見積の自動算出には使用しません。',
     partialTitle: 'インベントリは不完全です。',
     partialHelp:
       '解析できなかったファイルまたはプログラムがあります。以下の数値にはその部分が含まれていません。',
@@ -302,26 +390,11 @@ export const jaMessages = {
       confirmed: '確認済み',
       absent: 'なし（旧インベントリ、ソース上の名前のみ）',
     },
+    mappingInferred: (schema: string) =>
+      `スキーマ ${schema} と仮定（ソースで最も多い接頭辞、未確認）`,
     totals: {
-      uniqueTitle: 'ソース全体の合計（重複なし）',
-      uniqueHelp: '共通ファイルも含め、各ファイルを1回だけ数えます。',
-      perProgramTitle: 'プログラム別の合計',
-      perProgramHelp:
-        '各プログラムのLoCを合算します。共通ファイルは宣言した各プログラムで数えられるため、ソース規模ではありません。',
-      codeLines: 'コード行数（LoC）',
-      physicalLines: '物理行数',
-      coverage: '解析済みコードファイル',
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
-      files: 'ファイル総数',
-      sharedFiles: '共通ファイル',
-      problemFiles: 'エラー / 未対応 / スキップ',
-      problemValue: (errors: string, unsupported: string, skipped: string) =>
-        `${errors} / ${unsupported} / ${skipped}`,
-      unknown: '不明',
-      programs: 'プログラム数',
-      perProgramCodeLines:
-        'プログラム別LoCの合算（共通ファイルを重複して計上）',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: '解析できないプログラムがあります。',
@@ -359,6 +432,7 @@ export const jaMessages = {
       pagination: 'プログラム一覧のページ',
       columns: {
         program: 'プログラム',
+        kind: '種類',
         state: '状態',
         ownCodeLines: '固有LoC',
         codeLines: '共通ファイル込みLoC',
@@ -393,7 +467,6 @@ export const jaMessages = {
     },
     detail: {
       title: (program: string) => `プログラム ${program} の詳細`,
-      back: '← 一覧に戻る',
       tabsLabel: 'プログラム詳細の項目',
       tabs: {
         summary: '概要',
@@ -402,9 +475,9 @@ export const jaMessages = {
         crud: 'CRUD',
         calls: '呼び出し',
       },
-      showingFirst: (shown: string, total: string) =>
-        `${total} 行中 ${shown} 行を表示しています。`,
-      showAll: 'すべて表示',
+      rowRange: (from: string, to: string, total: string) =>
+        `${total} 行中 ${from}–${to} 行`,
+      rowsPagination: '表のページ',
       issue: '解析できない理由:',
       incomplete:
         'このプログラムは不完全です（ファイル不足、未対応、または未分類の行があります）。数値は解析できた部分のみです。',
@@ -421,17 +494,12 @@ export const jaMessages = {
         'プロシージャごとのLoCはインベントリの計測バージョンによります。共通ファイルのプロシージャは他のプログラムにも属します。',
       noProcedures: '解析済みファイルにプロシージャはありません。',
       crudTitle: 'テーブル別CRUD',
-      crudView: 'テーブル名の表示',
+      showRaw: '元の名前を表示',
+      showMapped: 'マッピング後を表示',
       crudViews: {
         raw: 'ソース上の名前',
         mapped: 'テーブル名マッピング後',
       },
-      crudRawHelp: 'ソースに書かれたとおりのテーブル名です。',
-      crudMappedHelp:
-        '同じテーブルと仮定した名前を統合しています。「ソース上の名前」列に元の名前を残しています。',
-      mappingStatus: 'マッピング:',
-      mappedAbsent:
-        'このインベントリにはマッピング後のデータがないため、ソース上の名前で表示しています。',
       noCrud: 'テーブルへのアクセスは検出されませんでした。',
       viaShared: '共通ファイル経由のみ',
       callsTitle: '呼び出し',

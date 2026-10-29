@@ -452,10 +452,15 @@ export const viMessages = {
         kind: 'Loại',
         state: 'Trạng thái',
         ownCodeLines: 'LoC riêng',
-        codeLines: 'LoC gồm file dùng chung',
+        codeLines: 'LoC + dùng chung',
         procedures: 'Procedure riêng',
         tables: 'Số bảng',
-        complexity: 'Độ phức tạp (tham khảo)',
+        complexity: 'Độ phức tạp',
+      },
+      columnHints: {
+        codeLines:
+          'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+        complexity: 'Độ phức tạp tham khảo, không dùng để tính công sức',
       },
       state: {
         complete: 'Đầy đủ',

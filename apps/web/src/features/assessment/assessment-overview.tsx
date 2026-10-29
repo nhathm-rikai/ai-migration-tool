@@ -748,10 +748,15 @@ function ProgramList({
     onFilter(next);
     setPage(1);
   };
-  const header = (key: ProgramSortKey, label: string): ReactNode => {
+  const header = (
+    key: ProgramSortKey,
+    label: string,
+    hint?: string,
+  ): ReactNode => {
     const active = sort.key === key;
     return (
       <th
+        title={hint}
         scope="col"
         aria-sort={
           active
@@ -861,10 +866,18 @@ function ProgramList({
                   {header('kind', copy.columns.kind)}
                   {header('state', copy.columns.state)}
                   {header('ownCodeLines', copy.columns.ownCodeLines)}
-                  {header('codeLines', copy.columns.codeLines)}
+                  {header(
+                    'codeLines',
+                    copy.columns.codeLines,
+                    copy.columnHints.codeLines,
+                  )}
                   {header('procedures', copy.columns.procedures)}
                   {header('tables', copy.columns.tables)}
-                  {header('complexity', copy.columns.complexity)}
+                  {header(
+                    'complexity',
+                    copy.columns.complexity,
+                    copy.columnHints.complexity,
+                  )}
                   <th scope="col" className="chevron-col">
                     <span className="sr-only">{dashboard.detailColumn}</span>
                   </th>

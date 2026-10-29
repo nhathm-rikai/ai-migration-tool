@@ -1664,13 +1664,13 @@ details.technical[open] > summary {
   text-align: left;
 }
 .program-list .program-table thead th:nth-child(1) {
-  width: 22%;
+  width: 19%;
 }
 .program-list .program-table thead th:nth-child(2) {
   width: 12%;
 }
 .program-list .program-table thead th:nth-child(3) {
-  width: 12%;
+  width: 11%;
 }
 .program-list .program-table thead th:nth-child(8) {
   width: 15%;
@@ -1920,4 +1920,33 @@ details.technical[open] > summary {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Headers stay on one line (short labels, full meaning in the tooltip). */
+.program-list .program-table thead th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.program-list .sort-button {
+  white-space: nowrap;
+}
+.dashboard-tabs .tab {
+  white-space: nowrap;
+}
+/* Complexity colours: bar, histogram and tag use the same tone per level. */
+.cx-bar .tone-low,
+.histogram .tone-low {
+  background: var(--low);
+}
+.cx-bar .tone-medium,
+.histogram .tone-medium {
+  background: #d9a514;
+}
+.cx-bar .tone-high,
+.histogram .tone-high {
+  background: #e0712b;
+}
+.cx-bar .tone-very-high,
+.histogram .tone-very-high {
+  background: var(--high);
 }

@@ -436,10 +436,15 @@ export const jaMessages = {
         kind: '種類',
         state: '状態',
         ownCodeLines: '固有LoC',
-        codeLines: '共通ファイル込みLoC',
+        codeLines: 'LoC（共通込み）',
         procedures: '固有プロシージャ',
         tables: 'テーブル数',
-        complexity: '複雑度（参考）',
+        complexity: '複雑度',
+      },
+      columnHints: {
+        codeLines:
+          '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
+        complexity: '参考の複雑度。工数の算出には使いません',
       },
       state: {
         complete: '完全',

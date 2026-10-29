@@ -12,7 +12,7 @@ const required = (name: string) => {
 
 // PF06: a demo run publishes the bundled inventory artifact; the Assessment
 // overview reads that exact version, keeps unique and per-program totals
-// apart, flags the partial program and survives reload/locale/mobile.
+// apart, flags the partial program and survives reload and locale switch.
 test(
   'demo run publishes an inventory and shows the assessment overview',
   { tag: '@smoke' },
@@ -108,17 +108,12 @@ test(
     await page.getByRole('radio', { name: '日本語' }).check();
     const ja = page.getByRole('region', { name: 'アセスメント概要' });
     await expect(ja.getByText('プログラム一覧')).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
-      path: testInfo.outputPath('pf06-mobile-ja.png'),
-      fullPage: true,
-    });
 
     // Reload stays on this run's analysis URL, reads the same version back
     // and starts nothing.

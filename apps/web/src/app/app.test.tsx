@@ -143,7 +143,10 @@ it('preserves a pending create, then selection, success notice and dates when sw
   });
   await screen.findByText(project.id);
   expect(screen.getByText('プロジェクトを作成しました。')).toBeTruthy();
-  expect(screen.getByRole('heading', { name: project.name })).toBeTruthy();
+  expect(screen.getByText(`ステップ 1 / 5 · ${project.name}`)).toBeTruthy();
+  expect(
+    screen.getByRole('heading', { level: 1, name: '顧客ソースコードの取込' }),
+  ).toBeTruthy();
   const formatted = new Intl.DateTimeFormat('ja-JP', {
     dateStyle: 'medium',
     timeStyle: 'medium',

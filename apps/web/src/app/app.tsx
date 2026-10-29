@@ -210,6 +210,16 @@ function AppShell({
   );
 }
 
+// Two-letter badge of the project card, as in demo02.
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters =
+    words.length > 1
+      ? (words[0]?.[0] ?? '') + (words[1]?.[0] ?? '')
+      : name.trim().slice(0, 2);
+  return letters.toUpperCase();
+}
+
 // A malformed or unknown project id in the URL.
 function isMissingProject(error: unknown): boolean {
   return (
@@ -251,10 +261,6 @@ function Sidebar({
       <div className="sidebar-brand">
         <img src={branding.logoUrl} alt={branding.logoAlt} />
         <span className="brand-name">{branding.displayName}</span>
-        <span className="brand-subtitle">
-          {messages.app.subtitle}{' '}
-          <span className="chip">{messages.app.demo}</span>
-        </span>
       </div>
       <fieldset className="language-switch">
         <legend className="sr-only">{messages.app.language}</legend>
@@ -271,9 +277,42 @@ function Sidebar({
           </label>
         ))}
       </fieldset>
+      {/* Card of the open project as in demo02; the native select laid over
+          it keeps keyboard and screen reader behaviour. */}
       <div className="project-picker">
-        <label htmlFor="project-picker">{copy.project}</label>
-        <div className="picker-row">
+        <label htmlFor="project-picker" className="sr-only">
+          {copy.project}
+        </label>
+        <div className="picker-card">
+          <span className="picker-avatar" aria-hidden="true">
+            {initials(project?.name ?? copy.allProjects)}
+          </span>
+          <span className="picker-text" aria-hidden="true">
+            <span className="picker-name">
+              {project?.name ?? copy.allProjects}
+            </span>
+            <span className="picker-detail">
+              {!project
+                ? copy.chooseProject
+                : project.mode === 'demo'
+                  ? copy.projectDetail.demo
+                  : progress.status === 'ready' && progress.sourceSaved
+                    ? copy.projectDetail.local
+                    : copy.projectDetail.noSource}
+            </span>
+          </span>
+          {project?.mode === 'demo' && (
+            <span className="chip demo" aria-hidden="true">
+              {messages.projects.demoBadge}
+            </span>
+          )}
+          <svg
+            className="picker-chevrons"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M7 10l5-5 5 5M7 14l5 5 5-5" />
+          </svg>
           <select
             id="project-picker"
             value={projectId ?? ''}
@@ -294,9 +333,6 @@ function Sidebar({
               </option>
             ))}
           </select>
-          {project?.mode === 'demo' && (
-            <span className="chip demo">{messages.projects.demoBadge}</span>
-          )}
         </div>
       </div>
       <nav aria-label={messages.projects.assessmentSteps} className="steps-nav">
@@ -313,14 +349,7 @@ function Sidebar({
                 </span>
                 <span className="step-label">
                   {copy.steps[step]}
-                  <span
-                    className={
-                      state === 'unavailable' ? 'step-state' : 'sr-only'
-                    }
-                  >
-                    <span className="sr-only">, </span>
-                    {copy.stepState[state]}
-                  </span>
+                  <span className="sr-only">, {copy.stepState[state]}</span>
                 </span>
                 {currentStep === step && (
                   <span className="step-pulse" aria-hidden="true" />
@@ -351,9 +380,6 @@ function Sidebar({
         </ol>
         {!projectId && <p className="steps-hint">{copy.selectProjectFirst}</p>}
       </nav>
-      <div className="sidebar-footer">
-        <span className="status-dot" /> {messages.projects.localWorkspace}
-      </div>
     </aside>
   );
 }
@@ -384,14 +410,15 @@ function StepPage({
     <div className="page">
       <header className="page-header">
         <span className="eyebrow">
-          {copy.stepEyebrow(index)} · {copy.steps[step]}
-        </span>
-        <div className="page-title-row">
-          <h1 id="page-title">{project.name}</h1>
+          {copy.stepEyebrow(index)} · {project.name}
           {project.mode === 'demo' && (
-            <span className="chip demo">{messages.projects.fixture}</span>
+            <>
+              {' '}
+              <span className="chip demo">{messages.projects.fixture}</span>
+            </>
           )}
-        </div>
+        </span>
+        <h1 id="page-title">{copy.pageTitles[step]}</h1>
       </header>
       {created && (
         <p role="status" className="success">

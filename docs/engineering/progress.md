@@ -8,6 +8,15 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 29/10/2026 — UI01: sửa 2 finding P2 review `c57326c`, bỏ mobile (D7), sidebar sát demo02
+
+- Finding 1 (P2, xác minh đúng): rời bước Nạp source khi run đang chạy thì callback của run panel mất, bước Phân tích vẫn “Chưa có kết quả”. Sửa: `use-project-progress.ts` đọc thêm run hiện tại và tự theo dõi run active ở cấp app (GET, backoff như F02), run kết thúc thì đọc lại dấu bước; run panel báo cả lúc run bắt đầu (`onRunChange`) để app bắt đầu theo dõi. Không Start/mutation nào mới.
+- Finding 2 (P2, xác minh đúng): giới hạn 5 trang lịch sử làm inventory ở trang 6 bị báo không có. Sửa: quét hết lịch sử tới khi gặp run `succeeded` có inventory.
+- Regression (`app-routing.test.tsx`): inventory ở trang 6 (6 lần GET list); rời bước 1 khi run đang chạy rồi run hoàn tất → kết quả và dấu bước 2 xuất hiện không cần reload, không mutation. Cả hai fail trên hook cũ, pass sau sửa.
+- D7 (người dùng chốt: chỉ desktop): bỏ CSS breakpoint 900/760px vừa thêm và các bước E2E 390px + ảnh mobile (thay bằng kiểm không tràn ngang ở 1280px tiếng Nhật). Breakpoint cũ của bảng assessment/run history giữ nguyên.
+- Sát demo02 hơn theo phản hồi người dùng: sidebar rộng cố định 260px; logo + tên mono; nút ngôn ngữ chọn = nền trắng chữ xanh; ô chọn dự án thành thẻ (chữ viết tắt, tên, “VB6 · …”/“Chưa chọn source”, chevron) với select native phủ lên; bỏ chip “Bản thử nghiệm”, footer và chữ “Chưa khả dụng” hiển thị dưới bước (vẫn có cho trình đọc màn hình, lý do nằm ở trang bước). Header trang như demo: dòng “Bước N / 5 · tên dự án”, h1 là tiêu đề bước (“Nạp source code của khách hàng”, “Phân tích source code”…).
+- Nội dung bước 1/2 vẫn là component cũ: layout demo của bước 1 (vùng chọn thư mục, form thông tin dự án, dự án gần đây) là UI04 (cần API chọn thư mục UI05 và trường khách hàng), bước 2 là UI02.
+
 ## 29/10/2026 — UI01: khung app demo02 và routing có URL
 
 - Dùng `portal-implement`; nhánh `feat/ui01-demo02-shell` từ `master` `9b07734` (đã merge PR #8 `feat/sql-concatenated-values`). Chỉ FE + e2e, không đổi API/contract, không thêm dependency (router tự viết trên History API).

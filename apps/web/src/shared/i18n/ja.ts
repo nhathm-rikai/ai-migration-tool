@@ -7,8 +7,6 @@ import type { Messages } from './vi';
 export const jaMessages = {
   app: {
     skipToContent: 'メインコンテンツへ移動',
-    subtitle: 'レガシーシステムのアセスメント',
-    demo: '試験版',
     language: '言語',
     session: {
       pending: 'ローカルバックエンドに接続しています…',
@@ -22,9 +20,22 @@ export const jaMessages = {
   shell: {
     project: 'プロジェクト',
     allProjects: 'すべてのプロジェクト',
+    chooseProject: 'プロジェクトを選択してください',
+    projectDetail: {
+      demo: 'VB6 · サンプルデータ',
+      local: 'VB6 · このPC上のソース',
+      noSource: 'ソース未選択',
+    },
+    pageTitles: {
+      source: '顧客ソースコードの取込',
+      analysis: 'ソースコード解析',
+      documents: 'ドキュメント生成',
+      review: 'ドキュメントのレビュー・承認',
+      quote: '見積',
+    },
     stepsTitle: 'ワークフロー',
     steps: {
-      source: 'ソース取り込み',
+      source: 'ソース取込',
       analysis: '解析',
       documents: 'ドキュメント生成',
       review: 'レビュー・承認',
@@ -84,7 +95,6 @@ export const jaMessages = {
     pageCount: (count: number) => `このページのプロジェクト数：${count}件`,
     firstPage: '最初のページ',
     nextPage: '次のページ',
-    localWorkspace: 'ローカル環境',
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',

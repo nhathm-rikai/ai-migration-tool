@@ -161,15 +161,13 @@ p {
   vertical-align: middle;
 }
 /* App shell (demo02): sidebar with brand, language, project and steps; the
-   content column on the right. The sidebar stacks on top below 900px. */
+   content column on the right. Desktop only (D7). */
 .shell {
   display: flex;
-  flex-wrap: wrap;
   min-height: 100vh;
 }
 .sidebar {
-  flex: 1 1 260px;
-  max-width: 100%;
+  flex: 0 0 260px;
   padding: 24px 16px;
   background: var(--surface);
   border-right: 1px solid var(--line);
@@ -178,7 +176,7 @@ p {
   gap: 22px;
 }
 .content {
-  flex: 999 1 560px;
+  flex: 1 1 auto;
   min-width: 0;
   padding: 28px 40px 56px;
 }
@@ -192,20 +190,11 @@ p {
   padding: 4px 8px 0;
 }
 .sidebar-brand img {
-  height: 34px;
+  height: 30px;
   width: auto;
   align-self: flex-start;
 }
 .brand-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--brand);
-}
-.brand-subtitle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
   font-size: 11px;
   color: var(--fg-3);
   font-family: var(--f-mono);
@@ -245,46 +234,85 @@ p {
     color var(--dur-fast);
 }
 .language-switch input:checked + span {
-  background: var(--brand);
-  color: var(--on-brand);
+  background: var(--surface);
+  color: var(--brand);
 }
 .language-switch input:focus-visible + span {
   outline: 2px solid var(--brand-2);
   outline-offset: 2px;
 }
-.project-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0 8px;
-}
-.project-picker label,
 .nav-title {
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-3);
 }
-.picker-row {
+.picker-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid #dce4ee;
+  background: var(--surface-2);
+  transition:
+    background var(--dur-fast),
+    border-color var(--dur-fast);
 }
-.picker-row select {
+.picker-card:hover {
+  background: #eef4fa;
+  border-color: var(--line-hover);
+}
+.picker-card:focus-within {
+  outline: 2px solid var(--brand-2);
+  outline-offset: 2px;
+}
+.picker-avatar {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--tint);
+  color: var(--info);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.picker-text {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--surface-2);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color var(--dur-fast);
 }
-.picker-row select:hover {
-  border-color: var(--line-hover);
+.picker-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker-detail {
+  font-size: 11px;
+  color: var(--fg-3);
+}
+.picker-chevrons {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: var(--fg-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.picker-card select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 .steps-nav {
   display: flex;
@@ -356,21 +384,10 @@ a.step-link:hover {
   color: var(--on-brand);
   font-weight: 700;
 }
-.state-unavailable {
-  color: var(--fg-3);
-}
-.state-unavailable .step-mark {
-  border-style: dashed;
-}
 .step-label {
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-.step-state {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--fg-3);
 }
 .step-pulse {
   margin-left: auto;
@@ -385,21 +402,6 @@ a.step-link:hover {
   padding: 4px 10px 0;
   font-size: 12px;
   color: var(--fg-3);
-}
-.sidebar-footer {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  color: var(--fg-2);
-  font-size: 11px;
-}
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--low);
 }
 .sr-only {
   position: absolute;
@@ -438,6 +440,10 @@ a.step-link:hover {
   gap: 6px;
 }
 .page-header .eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-family: var(--f-mono);
   font-size: 12px;
@@ -449,12 +455,6 @@ a.step-link:hover {
 .page-header h1 {
   font-size: 30px;
   letter-spacing: -0.02em;
-}
-.page-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
 }
 .projects-grid {
   display: grid;
@@ -837,44 +837,6 @@ dd {
 @media (max-width: 1100px) {
   .projects-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-}
-@media (max-width: 900px) {
-  .sidebar {
-    flex-basis: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    padding: 16px;
-    gap: 14px;
-  }
-  .sidebar-footer {
-    display: none;
-  }
-  .steps {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .steps > li {
-    flex: 1 1 140px;
-    min-width: 0;
-  }
-  .content {
-    padding: 20px 16px 40px;
-  }
-}
-@media (max-width: 760px) {
-  .page-header h1 {
-    font-size: 24px;
-    overflow-wrap: anywhere;
-  }
-  .panel {
-    padding: 20px;
-  }
-  .project-metadata {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .section-heading {
-    align-items: flex-start;
   }
 }
 /* Decorative motion is off for people who ask for less. */
@@ -1406,10 +1368,6 @@ details.technical[open] > summary {
 .results-link {
   justify-content: flex-start;
   margin-top: 12px;
-}
-.project-node .chip {
-  margin-left: auto;
-  font-size: 10px;
 }
 @media (max-width: 760px) {
   .assessment-totals,

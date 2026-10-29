@@ -159,17 +159,12 @@ test(
 
     await page.getByRole('radio', { name: '日本語' }).check();
     await expect(page.getByText('プログラム SAMPLE の詳細')).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
-      path: testInfo.outputPath('pf07-mobile-ja.png'),
-      fullPage: true,
-    });
 
     // Reload: same version and bytes, nothing started again.
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/);

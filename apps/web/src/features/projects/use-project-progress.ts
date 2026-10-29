@@ -3,15 +3,18 @@ import type { Project } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import type { SourcesApi } from '../../shared/api/sources-api';
+import {
+  isActiveRun,
+  RUN_POLL_INTERVAL_MS,
+  RUN_POLL_MAX_INTERVAL_MS,
+} from '../jobs/use-analyze-runs';
 
 // What the stepper may mark as done, read from stored data only:
 // - source: a demo project has its bundled fixture; a local one needs a saved
 //   source registration.
 // - analysis: the newest succeeded run that published an inventory.
-// Reads only (GET); never starts or changes anything.
-
-// Run history pages scanned for a succeeded run before giving up.
-export const PROGRESS_RUN_PAGES = 5;
+// Lives in the app shell, so an active run is followed to its end whichever
+// step is open. Reads only (GET); never starts or changes anything.
 
 export type ProjectProgress =
   | { status: 'loading' }
@@ -21,8 +24,12 @@ export type ProjectProgress =
       sourceSaved: boolean;
       // Run whose inventory the analysis step shows; null = none yet.
       analysisRunId: string | null;
+      // Queued/running run being followed; null = none.
+      activeRunId: string | null;
     };
 
+// Walks the whole history, newest first, until a succeeded run with an
+// inventory or the last page.
 async function latestInventoryRun(
   runsApi: RunsApi,
   artifactsApi: ArtifactsApi,
@@ -30,7 +37,7 @@ async function latestInventoryRun(
   signal: AbortSignal,
 ): Promise<string | null> {
   let cursor: string | null = null;
-  for (let page = 0; page < PROGRESS_RUN_PAGES; page++) {
+  for (;;) {
     const runs = await runsApi.list(projectId, cursor, signal);
     for (const run of runs.items) {
       if (run.status !== 'succeeded') continue;
@@ -45,7 +52,6 @@ async function latestInventoryRun(
     if (!runs.nextCursor) return null;
     cursor = runs.nextCursor;
   }
-  return null;
 }
 
 export function useProjectProgress(
@@ -65,6 +71,7 @@ export function useProjectProgress(
   const [reload, setReload] = useState(0);
   const projectId = project?.id ?? null;
   const demo = project?.mode === 'demo';
+  const refresh = useCallback(() => setReload((value) => value + 1), []);
 
   useEffect(() => {
     if (projectId === null) return;
@@ -91,12 +98,22 @@ export function useProjectProgress(
             controller.signal,
           )
         : Promise.resolve(null);
-    void Promise.all([source, analysis]).then(
-      ([sourceSaved, analysisRunId]) => {
+    const active = runsApi
+      ? runsApi
+          .current(projectId, controller.signal)
+          .then(({ run }) => (run && isActiveRun(run.status) ? run.id : null))
+      : Promise.resolve(null);
+    void Promise.all([source, analysis, active]).then(
+      ([sourceSaved, analysisRunId, activeRunId]) => {
         if (!controller.signal.aborted)
           setTagged({
             projectId,
-            progress: { status: 'ready', sourceSaved, analysisRunId },
+            progress: {
+              status: 'ready',
+              sourceSaved,
+              analysisRunId,
+              activeRunId,
+            },
           });
       },
       (error: unknown) => {
@@ -107,7 +124,41 @@ export function useProjectProgress(
     return () => controller.abort();
   }, [projectId, demo, runsApi, sourcesApi, artifactsApi, reload]);
 
-  const refresh = useCallback(() => setReload((value) => value + 1), []);
+  // Follow the active run (GET with backoff) and read the marks again once
+  // it ends, even after the run panel has been closed.
+  const followed =
+    tagged.projectId === projectId && tagged.progress.status === 'ready'
+      ? tagged.progress.activeRunId
+      : null;
+  useEffect(() => {
+    if (!runsApi || projectId === null || followed === null) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = RUN_POLL_INTERVAL_MS;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        runsApi.get(projectId, followed, controller.signal).then(
+          (run) => {
+            if (controller.signal.aborted) return;
+            delay = RUN_POLL_INTERVAL_MS;
+            if (isActiveRun(run.status)) schedule();
+            else refresh();
+          },
+          () => {
+            if (controller.signal.aborted) return;
+            delay = Math.min(delay * 2, RUN_POLL_MAX_INTERVAL_MS);
+            schedule();
+          },
+        );
+      }, delay);
+    };
+    schedule();
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [runsApi, projectId, followed, refresh]);
+
   const state: ProjectProgress =
     tagged.projectId === projectId ? tagged.progress : { status: 'loading' };
   return { state, refresh };

@@ -11,6 +11,7 @@ import {
   artifactListFixture,
   emptyArtifactListFixture,
   failedRunFixture,
+  runningRunFixture,
   localSourceResponseFixture,
   mappedInventoryArtifactFixture,
   succeededRunFixture,
@@ -50,19 +51,20 @@ const notFound = json(
   404,
 );
 
-type Routes = Record<string, () => Response>;
+type Routes = Record<string, (url: string) => Response>;
 
-// Routes `METHOD /path` (query ignored) and records every call.
+// Routes `METHOD /path` (query passed to the handler) and records every call.
 function renderAt(path: string, routes: Routes) {
   window.history.replaceState(null, '', path);
   const calls: string[] = [];
   const fetcher = vi.fn<typeof fetch>((input, init) => {
     const method = init?.method ?? 'GET';
-    const url = requestUrl(input).split('?')[0] ?? '';
+    const full = requestUrl(input);
+    const url = full.split('?')[0] ?? '';
     calls.push(`${method} ${url}`);
     const handler = routes[`${method} ${url}`];
     return Promise.resolve(
-      handler ? handler() : json({ error: 'no route' }, 500),
+      handler ? handler(full) : json({ error: 'no route' }, 500),
     );
   });
   render(
@@ -154,7 +156,10 @@ describe('routes', () => {
 describe('reload at a step URL (UI01-AC01)', () => {
   it('opens the latest analysis of the project on reload and starts nothing', async () => {
     const server = renderAt(`${page}/analysis`, baseRoutes());
-    await screen.findByRole('heading', { level: 1, name: local.name });
+    await screen.findByText(`Bước 2 / 5 · ${local.name}`);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Phân tích source code' }),
+    ).toBeTruthy();
     expect(
       await screen.findByRole('region', { name: 'Đánh giá tổng quan' }),
     ).toBeTruthy();
@@ -180,7 +185,7 @@ describe('reload at a step URL (UI01-AC01)', () => {
 
   it('shows the source step of the project named in the URL', async () => {
     const server = renderAt(`${page}/source`, baseRoutes());
-    await screen.findByRole('heading', { level: 1, name: local.name });
+    await screen.findByText(`Bước 1 / 5 · ${local.name}`);
     expect(
       await screen.findByRole('region', { name: 'Mã nguồn LOCAL' }),
     ).toBeTruthy();
@@ -213,7 +218,7 @@ describe('reload at a step URL (UI01-AC01)', () => {
 
   it('follows browser back and forward between steps', async () => {
     renderAt(`${page}/source`, baseRoutes());
-    await screen.findByRole('heading', { level: 1, name: local.name });
+    await screen.findByText(`Bước 1 / 5 · ${local.name}`);
     fireEvent.click(step(/Báo giá/));
     expect(window.location.pathname).toBe(`${page}/quote`);
     expect(document.activeElement?.id).toBe('main-content');
@@ -294,6 +299,70 @@ describe('step marks (UI01-AC02)', () => {
     await within(picker).findByRole('option', { name: /Dự án mẫu/ });
     fireEvent.change(picker, { target: { value: project.id } });
     expect(window.location.pathname).toBe(`/projects/${project.id}/analysis`);
-    await screen.findByRole('heading', { level: 1, name: project.name });
+    await screen.findByText(`Bước 2 / 5 · ${project.name}`);
+  });
+});
+
+describe('analysis progress (review fixes)', () => {
+  it('finds an inventory beyond the first pages of run history', async () => {
+    const failedPage = (page: number) =>
+      Array.from({ length: 20 }, (_, index) => ({
+        ...failedRunFixture,
+        id: `0a1b2c3d-0005-4000-8${String(page).padStart(3, '0')}-${String(index).padStart(12, '0')}`,
+      }));
+    const server = renderAt(
+      `${page}/analysis`,
+      baseRoutes({
+        [`GET ${api}/runs`]: (url) => {
+          const cursor = new URL(url, 'http://local').searchParams.get(
+            'cursor',
+          );
+          const index = cursor === null ? 0 : Number(cursor.slice(1));
+          return index < 5
+            ? json({ items: failedPage(index), nextCursor: `p${index + 1}` })
+            : json({ items: [succeededRunFixture], nextCursor: null });
+        },
+      }),
+    );
+    expect(
+      await screen.findByRole('region', { name: 'Đánh giá tổng quan' }),
+    ).toBeTruthy();
+    expect(
+      server.calls.filter((call) => call === `GET ${api}/runs`),
+    ).toHaveLength(6);
+  });
+
+  it('shows the result when a run finishes after leaving the source step', async () => {
+    let finished = false;
+    const running = { ...runningRunFixture, id: FIXTURE_IDS.runs.succeeded };
+    const server = renderAt(
+      `${page}/source`,
+      baseRoutes({
+        [`GET ${api}/runs/current`]: () =>
+          json({ run: finished ? succeededRunFixture : running }),
+        [`GET ${api}/runs/${running.id}`]: () =>
+          json(finished ? succeededRunFixture : running),
+        [`GET ${api}/runs`]: () =>
+          json({
+            items: [finished ? succeededRunFixture : running],
+            nextCursor: null,
+          }),
+      }),
+    );
+    await screen.findByRole('region', { name: 'Mã nguồn LOCAL' });
+    fireEvent.click(step(/Phân tích/));
+    expect(
+      await screen.findByRole('heading', { name: 'Chưa có kết quả phân tích' }),
+    ).toBeTruthy();
+    finished = true;
+    expect(
+      await screen.findByRole(
+        'region',
+        { name: 'Đánh giá tổng quan' },
+        { timeout: 4000 },
+      ),
+    ).toBeTruthy();
+    expect(within(step(/Phân tích/)).queryByText(/Đã xong/)).not.toBeNull();
+    expect(server.mutations()).toEqual([]);
   });
 });

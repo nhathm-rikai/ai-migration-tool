@@ -248,17 +248,12 @@ test(
     await expect(
       page.getByRole('status').filter({ hasText: '完了' }),
     ).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({
-      path: testInfo.outputPath('pf05-mobile-ja.png'),
-      fullPage: true,
-    });
     // Reload stays on the project's source step.
     await page.reload();
     await expect(

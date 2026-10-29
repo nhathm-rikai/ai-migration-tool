@@ -40,20 +40,26 @@ test(
     await page.getByLabel('Tên dự án').fill(name);
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     await expect(page.getByText('Đã tạo dự án.')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: 'Nạp source code của khách hàng',
+      }),
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const projectUrl = page.url();
 
     // Reload opens the same project and step.
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
     expect(page.url()).toBe(projectUrl);
 
     await page.getByLabel('Dự án', { exact: true }).selectOption('');
     await expect(page).toHaveURL(/\/projects$/);
     await expect(projects.getByRole('link', { name: seedName })).toBeVisible();
     await projects.getByRole('link', { name }).click();
-    await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
 
     expect(tokens.size).toBe(1);
     const [token] = [...tokens];
@@ -68,7 +74,7 @@ test(
 
 // UI01: every step has a URL, steps 3–5 say why they are unavailable, an
 // unknown project gets a not-found page, keyboard opens steps and reduced
-// motion turns the entrance animation off.
+// motion turns the entrance animation off. Desktop only (D7).
 test(
   'step URLs, unavailable steps, not-found and reduced motion',
   { tag: '@smoke' },
@@ -115,14 +121,13 @@ test(
     await expect(
       page.getByRole('heading', { name: 'まだ利用できません' }),
     ).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
     await page.getByRole('radio', { name: 'Tiếng Việt' }).check();
-    await page.setViewportSize({ width: 1280, height: 720 });
 
     await page.goto('/projects/00000000-0000-4000-8000-00000000dead/analysis');
     await expect(

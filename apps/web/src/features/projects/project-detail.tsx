@@ -32,7 +32,8 @@ export function ProjectDetail({
   // Already loaded by the caller: shown without reading it again.
   project?: Project | undefined;
   api: ProjectsApi;
-  // Called after a source save or a finished run, so step marks re-read.
+  // Called after a source save or when a run starts or ends, so step marks
+  // re-read.
   onProgress?: (() => void) | undefined;
   // Opens a succeeded run's results page; without it they show inline.
   onOpenResults?: ((runId: string) => void) | undefined;
@@ -140,7 +141,7 @@ export function ProjectDetail({
                 api={runsApi}
                 artifactsApi={artifactsApi}
                 onOpenResults={onOpenResults}
-                onRunSettled={onProgress}
+                onRunChange={onProgress}
                 projectId={state.project.id}
                 demo
                 sourceRevision={FIXTURE_SOURCE_REVISION}
@@ -161,7 +162,7 @@ export function ProjectDetail({
                 api={runsApi}
                 artifactsApi={artifactsApi}
                 onOpenResults={onOpenResults}
-                onRunSettled={onProgress}
+                onRunChange={onProgress}
                 projectId={state.project.id}
                 demo={false}
                 sourceRevision={null}
@@ -204,7 +205,7 @@ function SourceAndRuns({
           api={runsApi}
           artifactsApi={artifactsApi}
           onOpenResults={onOpenResults}
-          onRunSettled={onProgress}
+          onRunChange={onProgress}
           projectId={projectId}
           demo={false}
           sourceRevision={startableRevision(source.state)}

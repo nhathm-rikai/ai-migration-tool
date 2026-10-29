@@ -27,8 +27,6 @@ import type {
 export const viMessages = {
   app: {
     skipToContent: 'Đến nội dung chính',
-    subtitle: 'Đánh giá hệ thống cũ',
-    demo: 'Bản thử nghiệm',
     language: 'Ngôn ngữ',
     session: {
       pending: 'Đang kết nối backend cục bộ…',
@@ -42,6 +40,19 @@ export const viMessages = {
   shell: {
     project: 'Dự án',
     allProjects: 'Tất cả dự án',
+    chooseProject: 'Chọn dự án để bắt đầu',
+    projectDetail: {
+      demo: 'VB6 · dữ liệu mẫu',
+      local: 'VB6 · mã nguồn trên máy này',
+      noSource: 'Chưa chọn source',
+    },
+    pageTitles: {
+      source: 'Nạp source code của khách hàng',
+      analysis: 'Phân tích source code',
+      documents: 'Tạo tài liệu',
+      review: 'Review & duyệt tài liệu',
+      quote: 'Báo giá',
+    },
     stepsTitle: 'Quy trình',
     steps: {
       source: 'Nạp source',
@@ -104,7 +115,6 @@ export const viMessages = {
     pageCount: (count: number) => `${count} dự án trong trang`,
     firstPage: 'Về trang đầu',
     nextPage: 'Trang tiếp',
-    localWorkspace: 'Trên máy này',
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',

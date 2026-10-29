@@ -22,7 +22,7 @@ export function AnalyzeRunPanel({
   demo,
   sourceRevision,
   onOpenResults,
-  onRunSettled,
+  onRunChange,
 }: {
   api: RunsApi;
   // Without it a succeeded run shows no assessment (run-only tests).
@@ -35,8 +35,9 @@ export function AnalyzeRunPanel({
   demo: boolean;
   // Revision a new run locks; null blocks Start (no readable source).
   sourceRevision: number | null;
-  // Called when a run seen active here reaches a terminal state.
-  onRunSettled?: (() => void) | undefined;
+  // Called when the active run changes (a run starts or ends) after the
+  // first read, so the shell can follow it.
+  onRunChange?: (() => void) | undefined;
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.runs;
@@ -55,12 +56,14 @@ export function AnalyzeRunPanel({
   const current = state.status === 'ready' ? state.current : null;
   const activeRunId =
     current && isActiveRun(current.status) ? current.id : null;
-  const wasActive = useRef<string | null>(null);
+  // Undefined until the first read, so loading the panel reports nothing.
+  const lastActive = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (wasActive.current !== null && activeRunId !== wasActive.current)
-      onRunSettled?.();
-    wasActive.current = activeRunId;
-  }, [activeRunId, onRunSettled]);
+    if (state.status !== 'ready') return;
+    if (lastActive.current !== undefined && lastActive.current !== activeRunId)
+      onRunChange?.();
+    lastActive.current = activeRunId;
+  }, [state.status, activeRunId, onRunChange]);
 
   if (state.status === 'loading')
     return (

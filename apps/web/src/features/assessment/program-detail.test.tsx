@@ -44,6 +44,9 @@ describe('Program detail (F04)', () => {
       <ProgramDetail inventory={mappedInventoryFixture} projectPath={PATH} />,
     );
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
+    // The mapped view opens first when the inventory has one.
+    expect(screen.getByTestId('crud-mapped')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Tên như trong mã nguồn'));
     const raw = screen.getByTestId('crud-raw');
     expect(within(raw).getByText('APP.ORDERS')).toBeTruthy();
     expect(within(raw).getByText('ORDERS')).toBeTruthy();
@@ -72,9 +75,13 @@ describe('Program detail (F04)', () => {
   });
 
   it('falls back to the names as written, labelled, when the mapped view is absent', () => {
-    render(
-      <ProgramDetail inventory={unmappedInventoryFixture} projectPath={PATH} />,
-    );
+    // An old inventory whose names carry no schema prefix to infer from.
+    const inventory = clone(unmappedInventoryFixture);
+    for (const file of inventory.files)
+      if (file.analysis?.status === 'analyzed')
+        for (const access of file.analysis.sqlTables)
+          access.table = access.table.replace('APP.', '');
+    render(<ProgramDetail inventory={inventory} projectPath={PATH} />);
     fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
     fireEvent.click(screen.getByLabelText('Sau ánh xạ tên bảng'));
     expect(screen.getByTestId('crud-raw')).toBeTruthy();
@@ -314,5 +321,18 @@ describe('Program detail (F04)', () => {
     expect(screen.getByText('Dòng 11–20 / 60')).toBeTruthy();
     expect(screen.getByText('Callee10')).toBeTruthy();
     expect(screen.queryByText('Callee0')).toBeNull();
+  });
+
+  it('opens the mapped view with the schema prefix written most often, labelled as assumed', () => {
+    render(
+      <ProgramDetail inventory={unmappedInventoryFixture} projectPath={PATH} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: /^CRUD/ }));
+    const mapped = screen.getByTestId('crud-mapped');
+    const row = within(mapped).getByText('ORDERS').closest('tr');
+    expect(row?.textContent).toContain('APP.ORDERS, ORDERS');
+    expect(screen.getByRole('note').textContent).toContain(
+      'Giả định schema APP (tiền tố xuất hiện nhiều nhất trong mã nguồn)',
+    );
   });
 });

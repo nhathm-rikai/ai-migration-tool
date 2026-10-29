@@ -333,6 +333,8 @@ export const viMessages = {
         sqlSubOld: 'Dòng có truy cập bảng, mỗi file một lần',
         tables: 'Bảng được truy cập',
         tablesMapped: 'Sau ánh xạ tên bảng',
+        tablesInferred: (schema: string) =>
+          `Sau ánh xạ · giả định schema ${schema}`,
         tablesRaw: 'Tên như trong source',
         high: 'Program High + Very High',
         highSub: (analyzed: string) =>
@@ -407,6 +409,8 @@ export const viMessages = {
       confirmed: 'Đã xác nhận',
       absent: 'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
     } satisfies Record<TableNameMapping['status'] | 'absent', string>,
+    mappingInferred: (schema: string) =>
+      `Giả định schema ${schema} (tiền tố xuất hiện nhiều nhất trong mã nguồn), chưa được xác nhận`,
     totals: {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,

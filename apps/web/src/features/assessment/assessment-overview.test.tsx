@@ -213,7 +213,7 @@ describe('Assessment overview (F03)', () => {
     expect(screen.getByText('Không tìm thấy')).toBeTruthy();
   });
 
-  it('reads an inventory written before table name mapping', async () => {
+  it('assumes the most common schema prefix for an inventory without a configured schema', async () => {
     const server = serve(unmappedInventoryArtifactFixture);
     render(
       <AssessmentOverview
@@ -223,11 +223,14 @@ describe('Assessment overview (F03)', () => {
       />,
     );
     expect(
-      await screen.findByText(
-        'Không có (kiểm kê cũ, chỉ có tên như trong mã nguồn)',
-      ),
+      await screen.findByText('Sau ánh xạ · giả định schema APP'),
     ).toBeTruthy();
-    expect(screen.queryByText(/sau ánh xạ/)).toBeNull();
+    expect(
+      screen.getAllByText(/Giả định schema APP \(tiền tố xuất hiện nhiều nhất/)
+        .length,
+    ).toBeGreaterThan(0);
+    // The analyzer's own per-program mapped count does not exist here.
+    expect(screen.queryByText(/\(sau ánh xạ:/)).toBeNull();
   });
 
   it('searches, filters and selects programs', async () => {

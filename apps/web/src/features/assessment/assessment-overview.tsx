@@ -37,7 +37,8 @@ import {
 } from './analysis-dashboard';
 import type { CrudView } from './program-detail-model';
 import { ProgramDetail } from './program-detail';
-import { ComplexityCell, ProgramStateTag } from './tags';
+import { ComplexityCell, MappingStatus, ProgramStateTag } from './tags';
+import { effectiveMapping } from './table-mapping';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -308,6 +309,7 @@ function Kpis({
   const copy = messages.assessment.dashboard.kpis;
   const totals = messages.assessment.totals;
   const number = useNumber();
+  const inferred = effectiveMapping(artifact.payload);
   const kpis = useMemo(
     () => dashboardKpis(artifact.payload, summary),
     [artifact.payload, summary],
@@ -370,7 +372,11 @@ function Kpis({
       key: 'tables',
       label: copy.tables,
       value: kpis.tables,
-      sub: kpis.tablesMapped ? copy.tablesMapped : copy.tablesRaw,
+      sub: !kpis.tablesMapped
+        ? copy.tablesRaw
+        : inferred.inferred && inferred.defaultSchema
+          ? copy.tablesInferred(inferred.defaultSchema)
+          : copy.tablesMapped,
     },
     {
       key: 'high',
@@ -653,10 +659,10 @@ function TechnicalInfo({
         <div>
           <dt>{copy.fields.tableMapping}</dt>
           <dd>
-            {mapping ? copy.mapping[mapping.status] : copy.mapping.absent}
-            {mapping?.defaultSchema && (
-              <span className="mono"> ({mapping.defaultSchema})</span>
-            )}
+            <MappingStatus
+              mapping={effectiveMapping(artifact.payload)}
+              stored={mapping !== null}
+            />
           </dd>
         </div>
         {summary.warnings.length > 0 && (
@@ -996,6 +1002,11 @@ function TableMatrix({ artifact }: { artifact: ArtifactEnvelope }) {
       </fieldset>
       <p className="muted" role="note">
         {shown === 'raw' ? detail.crudRawHelp : detail.crudMappedHelp}{' '}
+        {detail.mappingStatus}{' '}
+        <MappingStatus
+          mapping={effectiveMapping(artifact.payload)}
+          stored={artifact.payload.tableNames !== undefined}
+        />{' '}
         {copy.tablesHelp}
       </p>
       {view === 'mapped' && !mappedAvailable && (

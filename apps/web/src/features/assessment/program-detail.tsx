@@ -2,7 +2,7 @@ import { useId, useMemo, useState, type ReactNode } from 'react';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { pageOf, programLabel } from './assessment-summary';
-import { ComplexityTag } from './tags';
+import { ComplexityTag, MappingStatus } from './tags';
 import {
   crudRows,
   programDetail,
@@ -370,11 +370,13 @@ function Procedures({ analysis }: { analysis: Analysis }) {
 function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
   const { messages } = useLocale();
   const copy = messages.assessment.detail;
-  const [view, setView] = useState<CrudView>('raw');
+  // The mapped view opens first when there is one (configured or inferred).
+  const [view, setView] = useState<CrudView>(
+    analysis.mappedCrud ? 'mapped' : 'raw',
+  );
   const id = useId();
   const { rows, shown, fallback } = crudRows(analysis, view);
   const limited = useRowLimit(rows);
-  const mapping = detail.tableNames;
   return (
     <section aria-labelledby={id}>
       <h6 id={id}>{copy.crudTitle}</h6>
@@ -399,12 +401,10 @@ function Crud({ detail, analysis }: { detail: Detail; analysis: Analysis }) {
       <p className="muted" role="note">
         {shown === 'raw' ? copy.crudRawHelp : copy.crudMappedHelp}{' '}
         {copy.mappingStatus}{' '}
-        {mapping
-          ? messages.assessment.mapping[mapping.status]
-          : messages.assessment.mapping.absent}
-        {mapping?.defaultSchema && (
-          <span className="mono"> ({mapping.defaultSchema})</span>
-        )}
+        <MappingStatus
+          mapping={detail.mapping}
+          stored={detail.tableNames !== null}
+        />
       </p>
       {fallback && (
         <p className="notice" role="status">

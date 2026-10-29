@@ -6,6 +6,11 @@ import type {
 } from './assessment-summary';
 import { programLabel } from './assessment-summary';
 import type { CrudView, SqlOperation } from './program-detail-model';
+import {
+  effectiveMapping,
+  mappedCrud,
+  type EffectiveMapping,
+} from './table-mapping';
 
 // View model of the analysis dashboard (UI02): KPI cards, line split,
 // complexity histogram and the project-wide CRUD matrix. Counts only what
@@ -73,12 +78,17 @@ function analyzedFiles(inventory: Inventory): Map<string, AnalyzedFile> {
   return files;
 }
 
-// Mapped names exist only when every analyzed program carries them.
+// A mapped view exists when the schema is inferred from the source or every
+// analyzed program carries the analyzer's mapped CRUD.
 export function hasMappedCrud(inventory: Inventory): boolean {
+  const mapping = effectiveMapping(inventory);
   const analyzed = inventory.programs.filter((program) => program.analysis);
   return (
     analyzed.length > 0 &&
-    analyzed.every((program) => program.analysis?.normalizedCrud)
+    analyzed.every(
+      (program) =>
+        program.analysis && mappedCrud(program.analysis, mapping) !== null,
+    )
   );
 }
 
@@ -153,28 +163,34 @@ export function complexityHistogram(rows: readonly ProgramRow[]): {
 
 const lower = (value: string) => value.toLowerCase();
 
-// The program's CRUD of the chosen view, one entry per table (a table can
-// appear more than once, e.g. read in one file and updated in another).
-function crudEntries(program: Program, view: CrudView) {
+// The program's CRUD of the chosen view, one entry per table identifier as
+// the inventory writes it (never case-folded here: quoted names that differ
+// only in case are different tables; the mapped view already merges what
+// the table name mapping merges).
+function crudEntries(
+  program: Program,
+  view: CrudView,
+  mapping: EffectiveMapping,
+) {
   const analysis = program.analysis;
   if (!analysis) return [];
+  const mapped = view === 'mapped' ? mappedCrud(analysis, mapping) : null;
   const entries =
-    view === 'mapped' && analysis.normalizedCrud
-      ? analysis.normalizedCrud
-      : analysis.crud.map((entry) => ({ ...entry, names: [entry.table] }));
+    mapped ??
+    analysis.crud.map((entry) => ({ ...entry, names: [entry.table] }));
   const merged = new Map<
     string,
     { table: string; operations: Set<SqlOperation>; names: Set<string> }
   >();
   for (const entry of entries) {
-    const key = lower(entry.table);
+    const key = entry.table;
     const row = merged.get(key) ?? {
       table: entry.table,
       operations: new Set<SqlOperation>(),
       names: new Set<string>(),
     };
     for (const operation of entry.operations) row.operations.add(operation);
-    for (const name of entry.names) row.names.add(lower(name));
+    for (const name of entry.names) row.names.add(name);
     merged.set(key, row);
   }
   return [...merged.values()];
@@ -184,6 +200,38 @@ function crudEntries(program: Program, view: CrudView) {
 // distinct programs; access counts are distinct (file, line) pairs, so a
 // shared file is counted once for the table and once for each program that
 // declares it.
+const fileOwner = (relativePath: string) => `${relativePath}#file`;
+
+// Procedures (and `#file` owners) a program reaches from its own files
+// through resolved calls: the same rule the analyzer uses for the program's
+// CRUD, so a shared module counts only for the procedures this program
+// calls.
+function reachedProcedures(
+  program: Program,
+  files: Map<string, AnalyzedFile>,
+): Set<string> {
+  const edges = new Map<string, string[]>();
+  for (const call of program.analysis?.calls ?? [])
+    if (call.resolution !== 'ambiguous')
+      for (const target of call.targets)
+        edges.set(call.from, [...(edges.get(call.from) ?? []), target]);
+  const queue: string[] = [];
+  for (const member of program.members) {
+    if (member.shared || !member.relativePath) continue;
+    queue.push(fileOwner(member.relativePath));
+    for (const procedure of files.get(member.relativePath)?.procedures ?? [])
+      queue.push(procedure.id);
+  }
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const next = queue.pop();
+    if (next === undefined || seen.has(next)) continue;
+    seen.add(next);
+    queue.push(...(edges.get(next) ?? []));
+  }
+  return seen;
+}
+
 export function crudMatrix(
   inventory: Inventory,
   view: CrudView,
@@ -196,13 +244,15 @@ export function crudMatrix(
     locations: Set<string>;
   };
   const tables = new Map<string, Entry>();
+  const mapping = effectiveMapping(inventory);
   for (const program of inventory.programs) {
     const memberFiles = program.members
       .map((member) => member.relativePath)
       .filter((path): path is string => path !== null)
       .map((path) => [path, files.get(path)] as const);
-    for (const entry of crudEntries(program, view)) {
-      const key = lower(entry.table);
+    const reached = reachedProcedures(program, files);
+    for (const entry of crudEntries(program, view, mapping)) {
+      const key = entry.table;
       let row = tables.get(key);
       if (!row) {
         row = {
@@ -220,7 +270,11 @@ export function crudMatrix(
         if (!file) continue;
         const lines = new Set<number>();
         for (const use of file.sqlTables)
-          if (names.has(lower(use.table))) lines.add(use.line);
+          if (
+            names.has(use.table) &&
+            reached.has(use.procedureId ?? fileOwner(path))
+          )
+            lines.add(use.line);
         uses += lines.size;
         for (const line of lines) row.locations.add(`${path}\u0000${line}`);
       }

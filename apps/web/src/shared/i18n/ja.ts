@@ -317,6 +317,8 @@ export const jaMessages = {
         sqlSubOld: 'テーブルアクセスのある行（ファイルごとに1回）',
         tables: 'アクセスされるテーブル',
         tablesMapped: 'テーブル名マッピング後',
+        tablesInferred: (schema: string) =>
+          `マッピング後 · スキーマ ${schema} と仮定`,
         tablesRaw: 'ソース記載の名前',
         high: '高・非常に高のプログラム',
         highSub: (analyzed: string) => `解析済み ${analyzed} 本中 · 参考`,
@@ -390,6 +392,8 @@ export const jaMessages = {
       confirmed: '確認済み',
       absent: 'なし（旧インベントリ、ソース上の名前のみ）',
     },
+    mappingInferred: (schema: string) =>
+      `スキーマ ${schema} と仮定（ソースで最も多い接頭辞、未確認）`,
     totals: {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,

@@ -1,4 +1,5 @@
 import { useLocale } from '../../shared/i18n/locale-context';
+import type { EffectiveMapping } from './table-mapping';
 import type {
   ComplexityLevel,
   ComplexityView,
@@ -51,5 +52,30 @@ export function ProgramStateTag({ state }: { state: ProgramState }) {
     <span className={`tag tag-${STATE_TONE[state]}`}>
       {messages.assessment.programs.state[state]}
     </span>
+  );
+}
+
+// Status of the table name mapping behind the "after mapping" views; an
+// inferred schema is always named as an assumption.
+export function MappingStatus({
+  mapping,
+  stored,
+}: {
+  mapping: EffectiveMapping;
+  // False for an inventory written before table name mapping existed.
+  stored: boolean;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment;
+  if (mapping.inferred && mapping.defaultSchema)
+    return <>{copy.mappingInferred(mapping.defaultSchema)}</>;
+  if (!stored && !mapping.defaultSchema) return <>{copy.mapping.absent}</>;
+  return (
+    <>
+      {copy.mapping[mapping.status]}
+      {mapping.defaultSchema && (
+        <span className="mono"> ({mapping.defaultSchema})</span>
+      )}
+    </>
   );
 }

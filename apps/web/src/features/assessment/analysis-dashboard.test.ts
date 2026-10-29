@@ -14,9 +14,10 @@ type Inventory = SourceInventoryDocument;
 type Program = Inventory['programs'][number];
 type Analysis = NonNullable<Program['analysis']>;
 
-// Hand-labelled corpus: Order and Customer share cmn/OrderRules.bas
-// (SQL on lines 6 and 8); Customer also owns Cust.bas (SQL on lines 3–5);
-// Broken could not be analyzed. Expected numbers are counted by hand.
+// Hand-labelled corpus: Order (own Order.frm, no SQL) and Customer both
+// call LoadOrders of the shared cmn/OrderRules.bas (SQL on lines 6 and 8);
+// Customer also owns Cust.bas (SQL on lines 3–5); Broken could not be
+// analyzed. Expected numbers are counted by hand.
 function corpus(): Inventory {
   const base: Inventory = structuredClone(mappedInventoryFixture);
   const [projectFile, sharedFile] = base.files;
@@ -48,9 +49,31 @@ function corpus(): Inventory {
       ],
     },
   };
+  const orderFile: Inventory['files'][number] = {
+    manifest: { ...sharedFile.manifest, relativePath: 'order/Order.frm' },
+    analysis: {
+      ...shared,
+      procedures: [],
+      sqlTables: [],
+      dynamicSql: [],
+      concatenatedSql: [],
+    },
+  };
+  const loadOrders = shared.procedures[0]!.id;
+  const callsFrom = (path: string): Analysis['calls'] => [
+    {
+      from: `${path}#file`,
+      name: 'LoadOrders',
+      resolution: 'program',
+      targets: [loadOrders],
+      line: 1,
+      count: 1,
+    },
+  ];
   const sharedMember = { ...order.members[0]!, shared: true };
   const customerAnalysis: Analysis = {
     ...order.analysis,
+    calls: callsFrom('cust/Cust.bas'),
     crud: [
       ...order.analysis.crud,
       {
@@ -109,12 +132,22 @@ function corpus(): Inventory {
     complete: false,
     analysis: null,
   };
-  order.members = [sharedMember];
+  order.members = [
+    {
+      ...order.members[0]!,
+      kind: 'form',
+      name: 'Order',
+      declaredPath: '..\\..\\order\\Order.frm',
+      relativePath: 'order/Order.frm',
+    },
+    sharedMember,
+  ];
+  order.analysis.calls = callsFrom('order/Order.frm');
   order.analysis.complexity = {
     ...order.analysis.complexity,
     version: 'complexity-v1',
   };
-  base.files = [projectFile, sharedFile, custFile];
+  base.files = [projectFile, sharedFile, custFile, orderFile];
   base.programs = [order, customer, broken];
   base.complexityVersion = 'complexity-v1';
   base.totals = {
@@ -144,9 +177,9 @@ describe('analysis dashboard (UI02)', () => {
       completePrograms: 2,
       physicalLines: 30,
       codeLines: 20,
-      // OrderRules.bas once (1) + Cust.bas (2).
+      // OrderRules.bas once (1) + Cust.bas (2); Order.frm has none.
       procedures: 3,
-      analyzedFiles: 2,
+      analyzedFiles: 3,
       // OrderRules 6, 8 + Cust 3, 4, 5 (line 3 has both a table and a
       // runtime table name).
       sqlLocations: 5,
@@ -261,5 +294,116 @@ describe('analysis dashboard (UI02)', () => {
       { kind: 'form', count: 1 },
       { kind: 'module', count: 1 },
     ]);
+  });
+
+  it('UI02-AC03 counts a program only for shared procedures it reaches (review fix)', () => {
+    // A calls P1 (1 access), B calls P2 (5 accesses) of the same shared
+    // module: B is the top program with 5, not A with everything.
+    const inventory = corpus();
+    const [projectFile, sharedFile] = inventory.files;
+    const order = inventory.programs[0];
+    if (!projectFile || !sharedFile || !order?.analysis)
+      throw new Error('corpus changed');
+    const analysis = sharedFile.analysis;
+    if (analysis?.status !== 'analyzed') throw new Error('corpus changed');
+    const procedure = analysis.procedures[0]!;
+    analysis.procedures = [
+      { ...procedure, id: 'lib#P1', name: 'P1' },
+      { ...procedure, id: 'lib#P2', name: 'P2' },
+    ];
+    analysis.sqlTables = [
+      { table: 'T', operation: 'R', line: 10, procedureId: 'lib#P1' },
+      ...[20, 21, 22, 23, 24].map((line) => ({
+        table: 'T',
+        operation: 'U' as const,
+        line,
+        procedureId: 'lib#P2',
+      })),
+    ];
+    // Raw names only: the mapped view of the fixture names other tables.
+    const withoutMapped: Analysis = { ...order.analysis };
+    delete withoutMapped.normalizedCrud;
+    const program = (name: string, target: string): Program => ({
+      ...order,
+      projectPath: `programs/${name}/${name}.vbp`,
+      name,
+      members: [
+        { ...order.members[0]!, relativePath: `own/${name}.frm` },
+        order.members[1]!,
+      ],
+      analysis: {
+        ...withoutMapped,
+        calls: [
+          {
+            from: `own/${name}.frm#file`,
+            name: target,
+            resolution: 'program' as const,
+            targets: [`lib#${target}`],
+            line: 1,
+            count: 1,
+          },
+        ],
+        crud: [
+          {
+            table: 'T',
+            operations: ['R' as const],
+            evidence: { relativePath: 'cmn/OrderRules.bas', line: 10 },
+            viaSharedOnly: true,
+          },
+        ],
+      },
+    });
+    const ownFile = (name: string) => ({
+      manifest: { ...sharedFile.manifest, relativePath: `own/${name}.frm` },
+      analysis: { ...analysis, procedures: [], sqlTables: [], dynamicSql: [] },
+    });
+    inventory.files = [projectFile, sharedFile, ownFile('A'), ownFile('B')];
+    inventory.programs = [program('A', 'P1'), program('B', 'P2')];
+    expect(crudMatrix(inventory, 'raw')).toEqual([
+      {
+        table: 'T',
+        operations: { C: false, R: true, U: false, D: false },
+        programs: 2,
+        locations: 6,
+        top: { program: 'B', locations: 5 },
+      },
+    ]);
+  });
+
+  it('UI02-AC03 keeps quoted names that differ only in case apart (review fix)', () => {
+    const inventory = structuredClone(mappedInventoryFixture) as Inventory;
+    const file = inventory.files[1]?.analysis;
+    const analysis = inventory.programs[0]?.analysis;
+    if (file?.status !== 'analyzed' || !analysis) throw new Error('fixture');
+    file.sqlTables = [
+      { table: '"Orders"', operation: 'R', line: 6, procedureId: null },
+      { table: '"ORDERS"', operation: 'D', line: 8, procedureId: null },
+    ];
+    const evidence = { relativePath: 'cmn/OrderRules.bas', line: 6 };
+    analysis.crud = [
+      { table: '"Orders"', operations: ['R'], evidence, viaSharedOnly: false },
+      { table: '"ORDERS"', operations: ['D'], evidence, viaSharedOnly: false },
+    ];
+    analysis.normalizedCrud = [
+      { ...analysis.crud[0]!, names: ['"Orders"'] },
+      { ...analysis.crud[1]!, names: ['"ORDERS"'] },
+    ];
+    for (const view of ['raw', 'mapped'] as const)
+      expect(
+        crudMatrix(inventory, view).map((row) => [
+          row.table,
+          row.operations.R,
+          row.operations.D,
+        ]),
+      ).toEqual(
+        expect.arrayContaining([
+          ['"ORDERS"', false, true],
+          ['"Orders"', true, false],
+        ]),
+      );
+    expect(crudMatrix(inventory, 'raw')).toHaveLength(2);
+    expect(dashboardKpis(inventory, summarizeInventory(inventory)).tables).toBe(
+      2,
+    );
   });
 });

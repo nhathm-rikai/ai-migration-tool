@@ -11,6 +11,7 @@ import {
   layoutBoxes,
   layoutRequest,
   readLayout,
+  TABLE_BOX,
   type LayoutRequest,
   type Point,
 } from './dependency-graph-layout';
@@ -111,5 +112,31 @@ describe('UI03 layout request', () => {
       children: request.children.map((child) => ({ id: child.id, x: 1, y: 2 })),
     };
     expect(readLayout(full, request)?.size).toBe(request.children.length);
+  });
+});
+
+describe('UI03 closed boxes in the layout', () => {
+  it('sends one small node per closed box and keeps open ones boxed', async () => {
+    const folders = graph.groups.map((group) => groupNodeId(group.id));
+    const closed = new Set([...folders.slice(1), TABLE_BOX]);
+    const input = layoutRequest(graph, drawn.nodes, drawn.edges, closed);
+    const boxes = layoutBoxes(graph, drawn.nodes, closed);
+    const shut = boxes.filter((box) => box.collapsed);
+    expect(shut.map((box) => box.id).sort()).toEqual([...closed].sort());
+    expect(
+      boxes.filter((box) => box.kind === 'programs' && !box.collapsed),
+    ).toHaveLength(1);
+    // A closed folder stands for its programs and own files.
+    expect(
+      shut
+        .find((box) => box.id === folders[1])
+        ?.members.some((node) => node.kind === 'own-module'),
+    ).toBe(true);
+    for (const id of closed)
+      expect(input.children.find((child) => child.id === id)).toMatchObject({
+        width: NODE_WIDTH,
+      });
+    const result = await new ELK().layout(input);
+    expect(readLayout(result, input)?.size).toBe(input.children.length);
   });
 });

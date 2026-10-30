@@ -119,8 +119,85 @@ describe('UI03 call graph tab', () => {
     expect(screen.getByText('共通モジュール（ファンイン）')).toBeTruthy();
   });
 
+  it('starts with one node per folder and opens a folder on click', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    // 50 programs in 3 folders: collapsed by default, no program drawn.
+    expect(
+      within(canvas).queryAllByRole('button', {
+        name: /^Làm nổi bật Program /,
+      }),
+    ).toHaveLength(0);
+    const folder = within(canvas).getByRole('button', {
+      name: 'Mở thư mục F00 (17 program)',
+    });
+    fireEvent.click(folder);
+    expect(
+      within(canvas).getByRole('button', {
+        name: 'Làm nổi bật Program F000000',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(canvas).queryByRole('button', { name: /^Mở thư mục F00 / }),
+    ).toBeNull();
+    fireEvent.click(
+      within(canvas).getByRole('button', { name: 'Thu gọn thư mục F00' }),
+    );
+    expect(
+      within(canvas).getByRole('button', { name: /^Mở thư mục F00 / }),
+    ).toBeTruthy();
+  });
+
+  it('draws many tables as one node until it is opened', () => {
+    const many = syntheticCorpusFixture({
+      programs: 35,
+      sharedModules: 3,
+      tables: 200,
+    });
+    render(<DependencyGraphView inventory={many} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    expect(
+      within(canvas).queryAllByRole('button', {
+        name: /^Làm nổi bật Bảng DB /,
+      }),
+    ).toHaveLength(0);
+    fireEvent.click(
+      within(canvas).getByRole('button', { name: /^Mở Bảng DB \(\d+ node\)$/ }),
+    );
+    expect(
+      within(canvas).getAllByRole('button', { name: /^Làm nổi bật Bảng DB / })
+        .length,
+    ).toBeGreaterThan(40);
+    fireEvent.click(
+      within(canvas).getByRole('button', { name: 'Thu gọn Bảng DB' }),
+    );
+    expect(
+      within(canvas).queryAllByRole('button', {
+        name: /^Làm nổi bật Bảng DB /,
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('finds a program with the search and opens its folder', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    fireEvent.change(screen.getByLabelText('Tìm program, module, bảng'), {
+      target: { value: 'F010004' },
+    });
+    const results = screen.getByRole('list', { name: 'Kết quả tìm' });
+    fireEvent.click(within(results).getAllByRole('button')[0] as HTMLElement);
+    const card = screen.getByRole('region', { name: 'Node đang chọn' });
+    expect(within(card).getByText('F010004')).toBeTruthy();
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    expect(
+      within(canvas)
+        .getByRole('button', { name: 'Làm nổi bật Program F010004' })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
   it('draws program states on the canvas and focuses a clicked node', () => {
     render(<DependencyGraphView inventory={corpus} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mở tất cả thư mục' }));
     const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
     expect(
       within(canvas).getAllByText('Chưa phân tích nên chưa biết phụ thuộc')

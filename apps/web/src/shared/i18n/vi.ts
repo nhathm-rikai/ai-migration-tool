@@ -389,6 +389,18 @@ export const viMessages = {
         rootGroup: '(thư mục gốc)',
         groupCount: (count: string) => `${count} program`,
         boxCount: (count: string) => `${count} node`,
+        folderType: 'Thư mục',
+        expandFolder: (folder: string, count: string) =>
+          `Mở thư mục ${folder} (${count})`,
+        collapseFolder: (folder: string) => `Thu gọn thư mục ${folder}`,
+        expandBox: (box: string, count: string) => `Mở ${box} (${count})`,
+        collapseBox: (box: string) => `Thu gọn ${box}`,
+        collapse: 'Thu gọn',
+        expandAll: 'Mở tất cả thư mục',
+        collapseAll: 'Thu gọn tất cả',
+        search: 'Tìm program, module, bảng',
+        searchResults: 'Kết quả tìm',
+        searchNone: 'Không tìm thấy node nào.',
         state: {
           complete: 'Đầy đủ',
           partial: 'Chưa đầy đủ',

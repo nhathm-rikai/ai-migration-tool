@@ -70,6 +70,7 @@ test(
       name: 'Làm nổi bật Dùng chung Cmn05.bas',
     });
     await expect(node).toBeVisible();
+    await canvas.screenshot({ path: testInfo.outputPath('ui03-overview.png') });
     expect(workers.some((url) => /worker/i.test(url))).toBe(true);
     const longTasks = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'portalLongTasks');

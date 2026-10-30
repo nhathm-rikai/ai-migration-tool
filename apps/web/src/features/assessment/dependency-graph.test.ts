@@ -439,3 +439,55 @@ describe('UI03 grouping, common modules and focus', () => {
     expect(shown).toHaveLength(2 + 5 + 1);
   });
 });
+
+describe('UI03 collapsed folders and labels', () => {
+  it('names same-name files in different folders apart', () => {
+    const graph = buildDependencyGraph(
+      inventory([
+        program('a/A/A.vbp', [
+          member('a/A/A.frm', false),
+          member('a/GLOBAL.BAS', true),
+        ]),
+        program('a/B/B.vbp', [
+          member('a/B/B.frm', false),
+          member('a/GLOBAL.BAS', true),
+          member('b/GLOBAL.BAS', true),
+        ]),
+        program('b/C/C.vbp', [member('b/GLOBAL.BAS', true)]),
+      ]),
+    );
+    expect(
+      graph.nodes
+        .filter((node) => node.kind === 'shared-module')
+        .map((node) => node.label)
+        .sort(),
+    ).toEqual(['a/GLOBAL.BAS', 'b/GLOBAL.BAS']);
+  });
+
+  it('draws a collapsed folder as one node and merges its edges', () => {
+    const graph = buildDependencyGraph(handWritten);
+    const collapsed = (node: {
+      kind: string;
+      group: string | null;
+      id: string;
+    }) =>
+      (node.kind === 'program' || node.kind === 'own-module') &&
+      node.group === 'apps'
+        ? 'folder:apps'
+        : node.id;
+    const shown = restingEdges(
+      graph.nodes,
+      graph.edges,
+      (program) => `folder:${program.group ?? ''}`,
+      collapsed,
+    );
+    // Program → own file edges vanish inside the folder node.
+    expect(shown.some((edge) => edge.target.endsWith('.frm'))).toBe(false);
+    expect(
+      shown.find(
+        (edge) => edge.id === `folder|folder:apps|${tableNodeId('ORDERS')}`,
+      )?.programs,
+    ).toBe(2);
+    for (const edge of shown) expect(edge.source).not.toBe(edge.target);
+  });
+});

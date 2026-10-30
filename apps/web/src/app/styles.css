@@ -2267,3 +2267,66 @@ details.technical[open] > summary {
     stroke-dashoffset: -24;
   }
 }
+.dep-graph-actions {
+  display: inline-flex;
+  gap: 12px;
+}
+.dep-node-folder {
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+.dep-node-folder .dep-node-type {
+  color: var(--navy);
+}
+.dep-folder-close {
+  margin-left: auto;
+  font-size: 12px;
+}
+.dep-graph-search {
+  position: relative;
+  max-width: 420px;
+}
+.dep-graph-search label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.dep-search-results {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(15, 34, 54, 0.12);
+}
+.dep-search-results li.muted {
+  padding: 8px;
+  font-size: 12px;
+}
+.dep-search-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.dep-search-item:hover,
+.dep-search-item:focus-visible {
+  background: var(--brand-soft);
+}

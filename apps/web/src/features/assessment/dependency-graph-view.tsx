@@ -1,7 +1,11 @@
 import {
+  createContext,
   memo,
   useCallback,
+  useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
 } from 'react';
@@ -40,6 +44,9 @@ import {
   groupSlot,
   layoutBoxes,
   type LayoutBox,
+  type LayoutRequest,
+  COMPONENT_BOX,
+  TABLE_BOX,
   layoutRequest,
   type Point,
 } from './dependency-graph-layout';
@@ -58,11 +65,28 @@ type FlowNodeData = {
   // null for boxes.
   node: GraphNode | null;
   focused: boolean;
-  box?: { label: string; count: number; programs: boolean };
+  box?: {
+    id: string;
+    label: string;
+    count: number;
+    // Folder boxes: the folder.
+    folder: string | null;
+    // Drawn as one node; `toggle`: can be opened and closed.
+    collapsed: boolean;
+    toggle: boolean;
+  };
 };
 type FlowNode = Node<FlowNodeData>;
 
 const TABLE_PAGE_SIZE = 50;
+// Boxes with more members than this start closed (one node per folder, one
+// node for all tables, one for COM) so the whole project reads at a glance;
+// small corpora open with everything drawn.
+export const AUTO_OPEN_MEMBERS = 40;
+const SEARCH_RESULTS = 8;
+
+// Opens or closes a box (folder, tables, COM) from inside its node.
+const BoxToggle = createContext<(box: string) => void>(() => undefined);
 const KINDS: GraphNodeKind[] = [
   'program',
   'own-module',
@@ -104,7 +128,61 @@ export function DependencyGraphView({
   );
 }
 
-type Drawn = { nodes: GraphNode[]; edges: GraphEdge[] };
+// What one layout draws: the visible graph, the boxes drawn closed and
+// whether common modules are shown.
+type Drawn = {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  closed: ReadonlySet<string>;
+  common: boolean;
+};
+
+// The box a node belongs to and can be drawn in: its folder for programs
+// and own files, the table or COM box; null for shared files.
+function boxOf(node: GraphNode): string | null {
+  if (
+    (node.kind === 'program' || node.kind === 'own-module') &&
+    node.group !== null
+  )
+    return groupNodeId(node.group);
+  if (node.kind === 'table') return TABLE_BOX;
+  if (node.kind === 'component') return COMPONENT_BOX;
+  return null;
+}
+
+// The node a graph node is drawn in: its box when the box is closed.
+function drawnAs(drawn: Drawn) {
+  return (node: GraphNode) => {
+    const box = boxOf(node);
+    return box !== null && drawn.closed.has(box) ? box : node.id;
+  };
+}
+
+// Boxes open at first: those with few enough members.
+function initiallyOpen(graph: DependencyGraph): Set<string> {
+  const sizes = new Map<string, number>();
+  for (const node of graph.nodes) {
+    const box = boxOf(node);
+    if (box !== null && node.kind !== 'own-module')
+      sizes.set(box, (sizes.get(box) ?? 0) + 1);
+  }
+  const small = graph.programs <= AUTO_OPEN_MEMBERS;
+  return new Set(
+    [...sizes]
+      .filter(([box, size]) =>
+        box.startsWith('folder:') ? small : size <= AUTO_OPEN_MEMBERS,
+      )
+      .map(([box]) => box),
+  );
+}
+
+function allBoxes(graph: DependencyGraph): string[] {
+  return [
+    ...graph.groups.map((group) => groupNodeId(group.id)),
+    TABLE_BOX,
+    COMPONENT_BOX,
+  ];
+}
 
 function GraphTab({ graph }: { graph: DependencyGraph }) {
   const { messages } = useLocale();
@@ -113,26 +191,28 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   const flow = useReactFlow();
   const [showCommon, setShowCommon] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
+  const [open, setOpen] = useState<ReadonlySet<string>>(() =>
+    initiallyOpen(graph),
+  );
+  const [pendingReveal, setPendingReveal] = useState<string | null>(null);
 
-  // Both variants are cheap to prepare; the one on screen is the one whose
+  // Each request remembers what it draws; the canvas shows the one whose
   // layout finished last, so nodes and positions always match.
-  const variants = useMemo(() => {
-    const make = (common: boolean) => {
-      const drawn = visibleGraph(graph, common);
-      return {
-        drawn,
-        request: layoutRequest(graph, drawn.nodes, drawn.edges),
-      };
-    };
-    return { hidden: make(false), all: make(true) };
-  }, [graph]);
-  const wanted = showCommon ? variants.all : variants.hidden;
-  const layoutState = useGraphLayout(wanted.request);
+  const displays = useRef(new Map<LayoutRequest, Drawn>());
+  const request = useMemo(() => {
+    const visible = visibleGraph(graph, showCommon);
+    const closed = new Set(allBoxes(graph).filter((box) => !open.has(box)));
+    const next = layoutRequest(graph, visible.nodes, visible.edges, closed);
+    displays.current.set(next, { ...visible, closed, common: showCommon });
+    // Keep the last few only.
+    for (const old of [...displays.current.keys()].slice(0, -4))
+      displays.current.delete(old);
+    return next;
+  }, [graph, showCommon, open]);
+  const layoutState = useGraphLayout(request);
   const layout = layoutState.layout;
   const drawn: Drawn | null = layout
-    ? layout.request === variants.all.request
-      ? variants.all.drawn
-      : variants.hidden.drawn
+    ? (displays.current.get(layout.request) ?? null)
     : null;
   const commonCount = graph.nodes.filter((node) => node.common).length;
 
@@ -141,30 +221,65 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     [graph],
   );
   const focusedNode = focus ? (byId.get(focus) ?? null) : null;
-  const linked = useMemo(
-    () => (focus && drawn ? neighbourhood(drawn.edges, focus) : null),
-    [drawn, focus],
+  const linked = useMemo(() => {
+    if (!focus || !drawn) return null;
+    const draw = drawnAs(drawn);
+    return new Set(
+      [...neighbourhood(drawn.edges, focus)].map((id) => {
+        const node = byId.get(id);
+        return node ? draw(node) : id;
+      }),
+    );
+  }, [drawn, focus, byId]);
+
+  const toggleBox = useCallback(
+    (box: string) =>
+      setOpen((current) => {
+        const next = new Set(current);
+        if (next.has(box)) next.delete(box);
+        else next.add(box);
+        return next;
+      }),
+    [],
   );
+  const setAllBoxes = (value: boolean) =>
+    setOpen(new Set(value ? allBoxes(graph) : []));
+
+  // Brings a revealed node into view once the layout that draws it is on
+  // screen (React Flow takes new nodes on its next frame).
+  useEffect(() => {
+    if (!pendingReveal || !drawn) return;
+    const frame = requestAnimationFrame(() => {
+      if (!flow.getNode(pendingReveal)) return;
+      void flow.fitView({
+        nodes: [{ id: pendingReveal }],
+        maxZoom: 1,
+        duration: reducedMotion() ? 0 : 250,
+      });
+      setPendingReveal(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingReveal, drawn, flow]);
 
   const toggleFocus = useCallback(
     (id: string) => setFocus((current) => (current === id ? null : id)),
     [],
   );
-  // From the panel or the table: also brings the node into view, and shows
-  // common modules first when the node is one of them.
+  // From the search, the panel or the table: focuses the node, shows it
+  // (opening its folder, showing common modules) and brings it into view.
   const reveal = useCallback(
     (id: string) => {
+      const node = byId.get(id);
       setFocus(id);
-      if (byId.get(id)?.common) setShowCommon(true);
-      const node = flow.getNode(id);
-      if (node)
-        void flow.fitView({
-          nodes: [{ id }],
-          maxZoom: 1,
-          duration: reducedMotion() ? 0 : 250,
-        });
+      if (node?.common) setShowCommon(true);
+      const box = node ? boxOf(node) : null;
+      if (box !== null)
+        setOpen((current) =>
+          current.has(box) ? current : new Set([...current, box]),
+        );
+      setPendingReveal(id);
     },
-    [byId, flow],
+    [byId],
   );
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -192,6 +307,14 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
             )}{' '}
             · {copy.tableView[graph.tableView]}
           </span>
+          <span className="dep-graph-actions">
+            <button className="link-button" onClick={() => setAllBoxes(true)}>
+              {copy.expandAll}
+            </button>
+            <button className="link-button" onClick={() => setAllBoxes(false)}>
+              {copy.collapseAll}
+            </button>
+          </span>
           {commonCount > 0 && (
             <label className="dep-graph-toggle">
               <input
@@ -203,20 +326,21 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
             </label>
           )}
         </div>
-        <GraphCanvas
-          graph={graph}
-          drawn={drawn}
-          positions={layout?.positions ?? null}
-          layoutKey={
-            layout?.request === variants.all.request ? 'all' : 'hidden'
-          }
-          focus={focus}
-          linked={linked}
-          pending={layoutState.pending}
-          failed={layoutState.failed}
-          onFocus={toggleFocus}
-          onClear={() => setFocus(null)}
-        />
+        <GraphSearch graph={graph} copy={copy} onPick={reveal} />
+        <BoxToggle.Provider value={toggleBox}>
+          <GraphCanvas
+            graph={graph}
+            drawn={drawn}
+            positions={layout?.positions ?? null}
+            byId={byId}
+            focus={focus}
+            linked={linked}
+            pending={layoutState.pending}
+            failed={layoutState.failed}
+            onFocus={toggleFocus}
+            onClear={() => setFocus(null)}
+          />
+        </BoxToggle.Provider>
       </div>
       <aside className="dep-graph-side" aria-label={copy.commonTitle}>
         {focusedNode && (
@@ -240,6 +364,23 @@ function boxLabel(box: LayoutBox, copy: Copy): string {
   return box.kind === 'own' ? `${folder} · ${copy.lanes.own}` : folder;
 }
 
+function toFlowBox(
+  box: LayoutBox,
+  copy: Copy,
+): NonNullable<FlowNodeData['box']> {
+  const folderBox = box.kind === 'programs';
+  return {
+    label: boxLabel(box, copy),
+    count: folderBox
+      ? box.members.filter((node) => node.kind === 'program').length
+      : box.members.length,
+    id: box.id,
+    folder: folderBox ? box.folder : null,
+    collapsed: box.collapsed,
+    toggle: box.kind !== 'own',
+  };
+}
+
 // React Flow nodes for one finished layout: each box at its ELK position
 // with its nodes in a grid inside, then the unboxed (shared) files.
 function flowNodes(
@@ -250,7 +391,7 @@ function flowNodes(
 ): FlowNode[] {
   const nodes: FlowNode[] = [];
   const boxed = new Set<string>();
-  for (const box of layoutBoxes(graph, drawn.nodes)) {
+  for (const box of layoutBoxes(graph, drawn.nodes, drawn.closed)) {
     nodes.push({
       id: box.id,
       type: 'box',
@@ -260,16 +401,16 @@ function flowNodes(
       data: {
         node: null,
         focused: false,
-        box: {
-          label: boxLabel(box, copy),
-          count: box.members.length,
-          programs: box.kind === 'programs',
-        },
+        box: toFlowBox(box, copy),
       },
       selectable: false,
       draggable: false,
       focusable: false,
     });
+    if (box.collapsed) {
+      for (const node of box.members) boxed.add(node.id);
+      continue;
+    }
     box.members.forEach((node, index) => {
       boxed.add(node.id);
       nodes.push({
@@ -302,12 +443,18 @@ function flowEdge(edge: {
   kind: GraphEdge['kind'];
   source: string;
   target: string;
+  programs?: number;
 }): Edge {
+  const merged = edge.programs ?? 1;
   return {
     id: edge.id,
     source: edge.source,
     target: edge.target,
     className: `dep-edge dep-edge-${edge.kind}`,
+    // Merged edges get thicker with the number of edges they stand for.
+    ...(merged > 1
+      ? { style: { strokeWidth: Math.min(6, 1 + Math.log2(merged)) } }
+      : {}),
     focusable: false,
     selectable: false,
     // Hundreds of edges would flood screen readers; the node table carries
@@ -328,7 +475,7 @@ function GraphCanvas({
   graph,
   drawn,
   positions,
-  layoutKey,
+  byId,
   focus,
   linked,
   pending,
@@ -339,7 +486,7 @@ function GraphCanvas({
   graph: DependencyGraph;
   drawn: Drawn | null;
   positions: Map<string, Point> | null;
-  layoutKey: string;
+  byId: Map<string, GraphNode>;
   focus: string | null;
   linked: Set<string> | null;
   pending: boolean;
@@ -359,7 +506,9 @@ function GraphCanvas({
   const baseEdges = useMemo(
     () =>
       drawn
-        ? restingEdges(drawn.nodes, drawn.edges, folderOf).map(flowEdge)
+        ? restingEdges(drawn.nodes, drawn.edges, folderOf, drawnAs(drawn)).map(
+            flowEdge,
+          )
         : [],
     [drawn],
   );
@@ -379,25 +528,39 @@ function GraphCanvas({
     [baseNodes, linked, focus],
   );
   // Focus draws the node's own edges over the resting ones (which dim).
+  // A node inside a collapsed folder is drawn as the folder: its edges
+  // start or end there.
   const edges = useMemo(() => {
     if (!focus || !drawn) return baseEdges;
-    const related = drawn.edges.filter(
-      (edge) => edge.source === focus || edge.target === focus,
-    );
-    const ids = new Set(related.map((edge) => edge.id));
+    const draw = drawnAs(drawn);
+    const related = new Map<string, Edge>();
+    for (const edge of drawn.edges) {
+      if (edge.source !== focus && edge.target !== focus) continue;
+      const source = byId.get(edge.source);
+      const target = byId.get(edge.target);
+      if (!source || !target) continue;
+      const from = draw(source);
+      const to = draw(target);
+      if (from === to) continue;
+      const id =
+        from === edge.source && to === edge.target
+          ? edge.id
+          : `${edge.kind}|${from}|${to}`;
+      if (related.has(id)) continue;
+      const base = flowEdge({ ...edge, id, source: from, target: to });
+      related.set(id, {
+        ...base,
+        className: `${base.className ?? ''} linked`,
+        label: edgeLabel(edge, copy, number),
+        zIndex: 1,
+      });
+    }
     return [
-      ...baseEdges.filter((edge) => !ids.has(edge.id)),
-      ...related.map((edge) => {
-        const base = flowEdge(edge);
-        return {
-          ...base,
-          className: `${base.className ?? ''} linked`,
-          label: edgeLabel(edge, copy, number),
-          zIndex: 1,
-        };
-      }),
+      ...baseEdges.filter((edge) => !related.has(edge.id)),
+      ...related.values(),
     ];
-  }, [baseEdges, drawn, focus, copy, number]);
+  }, [baseEdges, drawn, focus, byId, copy, number]);
+  const toggleBox = useContext(BoxToggle);
   const nodeTypes = useMemo(() => ({ dep: DepNode, box: BoxNode }), []);
 
   return (
@@ -419,9 +582,9 @@ function GraphCanvas({
       )}
       {drawn && positions && (
         <ReactFlow
-          // A new layout (common modules shown or hidden) fits the view
-          // again.
-          key={layoutKey}
+          // Showing or hiding common modules fits the view again; opening a
+          // folder keeps it.
+          key={drawn.common ? 'all' : 'hidden'}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -438,6 +601,7 @@ function GraphCanvas({
           // the click reaches the node like a mouse click.
           onNodeClick={(_event, node) => {
             if (node.type !== 'box') onFocus(node.id);
+            else if (node.data.box?.collapsed) toggleBox(node.data.box.id);
           }}
           onPaneClick={onClear}
           proOptions={{ hideAttribution: true }}
@@ -510,22 +674,136 @@ const BoxNode = memo(function BoxNode({ data }: NodeProps<FlowNode>) {
   const { messages } = useLocale();
   const copy = messages.assessment.dashboard.graph;
   const number = useNumber();
-  if (!data.box) return null;
-  // Merged edges of a folder's programs leave from its right side.
+  const toggleBox = useContext(BoxToggle);
+  const box = data.box;
+  if (!box) return null;
+  const count =
+    box.folder !== null
+      ? copy.groupCount(number(box.count))
+      : copy.boxCount(number(box.count));
+  // A collapsed folder is one button (its click reaches the node, which
+  // opens it); an open folder has a button to close it again. Merged edges
+  // of a folder leave from its right side.
+  if (box.collapsed)
+    return (
+      <div className="dep-node dep-node-folder">
+        <Handle type="target" position={Position.Left} isConnectable={false} />
+        <button
+          type="button"
+          className="dep-node-button"
+          aria-label={
+            box.folder !== null
+              ? copy.expandFolder(box.label, count)
+              : copy.expandBox(box.label, count)
+          }
+        >
+          <span className="dep-node-type">
+            {box.folder !== null ? copy.folderType : box.label} · {count}
+          </span>
+          <span className="dep-node-label mono">{box.label}</span>
+        </button>
+        <Handle type="source" position={Position.Right} isConnectable={false} />
+      </div>
+    );
   return (
     <div className="dep-folder">
-      <span className="dep-folder-label mono">{data.box.label}</span>
-      <span className="muted">
-        {data.box.programs
-          ? copy.groupCount(number(data.box.count))
-          : copy.boxCount(number(data.box.count))}
-      </span>
-      {data.box.programs && (
+      <span className="dep-folder-label mono">{box.label}</span>
+      <span className="muted">{count}</span>
+      {box.toggle && (
+        <button
+          type="button"
+          className="link-button dep-folder-close"
+          aria-label={
+            box.folder !== null
+              ? copy.collapseFolder(box.label)
+              : copy.collapseBox(box.label)
+          }
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleBox(box.id);
+          }}
+        >
+          {copy.collapse}
+        </button>
+      )}
+      {box.folder !== null && (
         <Handle type="source" position={Position.Right} isConnectable={false} />
       )}
     </div>
   );
 });
+
+// Exact name first, then names starting with the text, then the rest.
+function searchRank(node: GraphNode, text: string): number {
+  const label = node.label.toLowerCase();
+  return label === text ? 0 : label.startsWith(text) ? 1 : 2;
+}
+
+// Finds a program, file, table or COM reference by name or path and
+// reveals it.
+function GraphSearch({
+  graph,
+  copy,
+  onPick,
+}: {
+  graph: DependencyGraph;
+  copy: Copy;
+  onPick: (id: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const text = query.trim().toLowerCase();
+  const matches = useMemo(
+    () =>
+      text === ''
+        ? []
+        : graph.nodes
+            .filter(
+              (node) =>
+                node.label.toLowerCase().includes(text) ||
+                node.detail.toLowerCase().includes(text),
+            )
+            .sort(
+              (a, b) =>
+                searchRank(a, text) - searchRank(b, text) ||
+                b.fanIn - a.fanIn ||
+                a.label.localeCompare(b.label),
+            )
+            .slice(0, SEARCH_RESULTS),
+    [graph, text],
+  );
+  return (
+    <div className="dep-graph-search">
+      <label>
+        <span>{copy.search}</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
+      </label>
+      {text !== '' && (
+        <ul className="dep-search-results" aria-label={copy.searchResults}>
+          {matches.length === 0 && <li className="muted">{copy.searchNone}</li>}
+          {matches.map((node) => (
+            <li key={node.id}>
+              <button
+                className="dep-search-item"
+                onClick={() => {
+                  onPick(node.id);
+                  setQuery('');
+                }}
+              >
+                <span className="dep-node-type">{copy.kinds[node.kind]}</span>{' '}
+                <span className="mono">{node.label}</span>{' '}
+                <span className="muted mono">{node.detail}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function FocusCard({
   node,

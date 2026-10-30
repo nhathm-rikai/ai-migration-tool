@@ -294,6 +294,8 @@ export function buildDependencyGraph(inventory: Inventory): DependencyGraph {
       programCount >= COMMON_MIN_PROGRAMS &&
       value.fanIn > programCount * COMMON_FAN_IN_RATIO;
 
+  disambiguateLabels([...nodes.values()]);
+
   const groupList = new Map<string, GraphGroup>();
   for (const program of inventory.programs) {
     const id = groups.get(program.projectPath) ?? '';
@@ -311,6 +313,36 @@ export function buildDependencyGraph(inventory: Inventory): DependencyGraph {
     calls,
     tableView,
   };
+}
+
+// Files with the same name in different folders (two GLOBAL.BAS) get as
+// many parent folders in their label as it takes to tell them apart.
+function disambiguateLabels(nodes: GraphNode[]) {
+  const files = nodes.filter(
+    (node) => node.kind === 'own-module' || node.kind === 'shared-module',
+  );
+  const byName = new Map<string, GraphNode[]>();
+  for (const node of files) {
+    const key = node.label.toLowerCase();
+    byName.set(key, [...(byName.get(key) ?? []), node]);
+  }
+  for (const same of byName.values()) {
+    if (same.length < 2) continue;
+    const parts = same.map((node) => node.detail.split('/'));
+    const longest = Math.max(...parts.map((value) => value.length));
+    for (let depth = 2; depth <= longest; depth++) {
+      const labels = parts.map((value) => value.slice(-depth).join('/'));
+      if (
+        new Set(labels.map((label) => label.toLowerCase())).size ===
+        labels.length
+      ) {
+        same.forEach((node, index) => {
+          node.label = labels[index] ?? node.detail;
+        });
+        break;
+      }
+    }
+  }
 }
 
 // Nodes and edges drawn with the current toggles: common files and COM
@@ -367,10 +399,14 @@ export type ShownEdge = {
 // hundred programs would otherwise draw thousands of lines), and a call
 // from an own file into a shared file is left out (its program's member
 // edge already joins the two). Focusing a node draws its own edges again.
+// `drawnAs` maps a node to the node it is drawn in (a collapsed folder
+// draws its programs and own files); edges inside one drawn node vanish and
+// the rest merge, counting what they merge.
 export function restingEdges(
   nodes: readonly GraphNode[],
   edges: readonly GraphEdge[],
   folderOf: (program: GraphNode) => string,
+  drawnAs: (node: GraphNode) => string = (node) => node.id,
 ): ShownEdge[] {
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const shown = new Map<string, ShownEdge>();
@@ -386,12 +422,13 @@ export function restingEdges(
       continue;
     if (source.kind === 'program' && target.kind !== 'own-module') {
       const folder = folderOf(source);
-      const id = `folder|${folder}|${target.id}`;
+      const to = drawnAs(target);
+      const id = `folder|${folder}|${to}`;
       const merged = shown.get(id) ?? {
         id,
         kind: edge.kind,
         source: folder,
-        target: target.id,
+        target: to,
         edge: null,
         programs: 0,
       };
@@ -399,11 +436,24 @@ export function restingEdges(
       shown.set(id, merged);
       continue;
     }
-    shown.set(edge.id, {
-      id: edge.id,
+    const from = drawnAs(source);
+    const to = drawnAs(target);
+    if (from === to) continue;
+    const id =
+      from === edge.source && to === edge.target
+        ? edge.id
+        : `${edge.kind}|${from}|${to}`;
+    const existing = shown.get(id);
+    if (existing) {
+      existing.programs += 1;
+      existing.edge = null;
+      continue;
+    }
+    shown.set(id, {
+      id,
       kind: edge.kind,
-      source: edge.source,
-      target: edge.target,
+      source: from,
+      target: to,
       edge,
       programs: 1,
     });

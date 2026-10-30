@@ -30,8 +30,8 @@ export type Point = { x: number; y: number };
 
 export const groupNodeId = (group: string) => `folder:${group}`;
 const ownBoxId = (group: string) => `own:${group}`;
-const TABLE_BOX = 'box:tables';
-const COMPONENT_BOX = 'box:components';
+export const TABLE_BOX = 'box:tables';
+export const COMPONENT_BOX = 'box:components';
 
 export type LayoutBoxKind = 'programs' | 'own' | 'tables' | 'components';
 export type LayoutBox = {
@@ -41,6 +41,9 @@ export type LayoutBox = {
   // Folder of program/own boxes (`''` = top of the corpus).
   folder: string;
   members: GraphNode[];
+  // Closed: drawn as one node standing for its members (a closed folder
+  // stands for its programs and own files), members not drawn.
+  collapsed: boolean;
   columns: number;
   width: number;
   height: number;
@@ -76,8 +79,29 @@ export function groupSlot(index: number, columns: number): Point {
 export function layoutBoxes(
   graph: DependencyGraph,
   nodes: readonly GraphNode[],
+  closed: ReadonlySet<string> = new Set(),
 ): LayoutBox[] {
   const boxes: LayoutBox[] = [];
+  const shut = (
+    id: string,
+    kind: LayoutBoxKind,
+    lane: GraphLane,
+    folder: string,
+    members: GraphNode[],
+  ) => {
+    if (members.length > 0)
+      boxes.push({
+        id,
+        kind,
+        lane,
+        folder,
+        members,
+        collapsed: true,
+        columns: 0,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      });
+  };
   const add = (
     id: string,
     kind: LayoutBoxKind,
@@ -87,12 +111,17 @@ export function layoutBoxes(
     columns?: number,
   ) => {
     if (members.length === 0) return;
+    if (closed.has(id)) {
+      shut(id, kind, lane, folder, members);
+      return;
+    }
     boxes.push({
       id,
       kind,
       lane,
       folder,
       members,
+      collapsed: false,
       ...groupGrid(members.length, columns),
     });
   };
@@ -101,6 +130,16 @@ export function layoutBoxes(
   const programs = byKind('program');
   const own = byKind('own-module');
   for (const group of graph.groups) {
+    if (closed.has(groupNodeId(group.id))) {
+      shut(
+        groupNodeId(group.id),
+        'programs',
+        0,
+        group.id,
+        [...programs, ...own].filter((node) => node.group === group.id),
+      );
+      continue;
+    }
     add(
       groupNodeId(group.id),
       'programs',
@@ -144,6 +183,7 @@ export function layoutRequest(
   graph: DependencyGraph,
   nodes: readonly GraphNode[],
   edges: readonly GraphEdge[],
+  closed: ReadonlySet<string> = new Set(),
 ): LayoutRequest {
   const boxOf = new Map<string, string>();
   const lane = new Map<string, number>();
@@ -157,7 +197,7 @@ export function layoutRequest(
       layoutOptions: { 'elk.partitioning.partition': String(value) },
     });
   };
-  for (const box of layoutBoxes(graph, nodes)) {
+  for (const box of layoutBoxes(graph, nodes, closed)) {
     for (const member of box.members) boxOf.set(member.id, box.id);
     child(box.id, box.lane, box.width, box.height);
   }

@@ -373,6 +373,18 @@ export const jaMessages = {
         rootGroup: '（ルートフォルダ）',
         groupCount: (count: string) => `${count} プログラム`,
         boxCount: (count: string) => `${count} ノード`,
+        folderType: 'フォルダ',
+        expandFolder: (folder: string, count: string) =>
+          `フォルダ ${folder} を開く（${count}）`,
+        collapseFolder: (folder: string) => `フォルダ ${folder} を閉じる`,
+        expandBox: (box: string, count: string) => `${box} を開く（${count}）`,
+        collapseBox: (box: string) => `${box} を閉じる`,
+        collapse: '閉じる',
+        expandAll: 'すべてのフォルダを開く',
+        collapseAll: 'すべて閉じる',
+        search: 'プログラム・モジュール・テーブルを検索',
+        searchResults: '検索結果',
+        searchNone: '該当するノードはありません。',
         state: {
           complete: '完全',
           partial: '不完全',

@@ -212,4 +212,51 @@ describe('UI03 call graph tab', () => {
     fireEvent.click(node);
     expect(canvas.className).not.toContain('has-focus');
   });
+
+  it('lists open folders, outlines the last one and closes from the list', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    expect(
+      screen.queryByRole('button', { name: 'Đưa F01 vào khung nhìn' }),
+    ).toBeNull();
+    fireEvent.click(
+      within(canvas).getByRole('button', { name: /^Mở thư mục F01 / }),
+    );
+    const open = screen.getByRole('list', { name: 'Đang mở' });
+    const chip = within(open).getByRole('button', {
+      name: 'Đưa F01 vào khung nhìn',
+    });
+    expect(chip.closest('li')?.className).toContain('recent');
+    expect(
+      canvas.querySelector('.react-flow__node.recent .dep-folder'),
+    ).not.toBeNull();
+    fireEvent.click(within(open).getByRole('button', { name: 'Thu gọn F01' }));
+    expect(
+      screen.queryByRole('button', { name: 'Đưa F01 vào khung nhìn' }),
+    ).toBeNull();
+    expect(
+      within(canvas).getByRole('button', { name: /^Mở thư mục F01 / }),
+    ).toBeTruthy();
+  });
+
+  it('opens full screen over the page and leaves it with Escape', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem toàn màn hình' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Call graph toàn dự án',
+    });
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+    expect(document.body.style.overflow).toBe('hidden');
+    // The same canvas, still drawn: nothing was remounted away.
+    expect(
+      within(dialog).getByRole('group', { name: 'Call graph toàn dự án' }),
+    ).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+    expect(
+      screen.getByRole('button', { name: 'Xem toàn màn hình' }),
+    ).toBeTruthy();
+  });
 });

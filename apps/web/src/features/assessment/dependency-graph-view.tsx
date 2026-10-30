@@ -4,11 +4,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Controls,
   Handle,
@@ -195,6 +197,10 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     initiallyOpen(graph),
   );
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
+  // The box opened or closed last: brought into view and outlined so the
+  // reader sees what changed without searching for it.
+  const [recent, setRecent] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   // Each request remembers what it draws; the canvas shows the one whose
   // layout finished last, so nodes and positions always match.
@@ -232,34 +238,79 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     );
   }, [drawn, focus, byId]);
 
-  const toggleBox = useCallback(
-    (box: string) =>
-      setOpen((current) => {
-        const next = new Set(current);
-        if (next.has(box)) next.delete(box);
-        else next.add(box);
-        return next;
-      }),
-    [],
-  );
-  const setAllBoxes = (value: boolean) =>
+  const toggleBox = useCallback((box: string) => {
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(box)) next.delete(box);
+      else next.add(box);
+      return next;
+    });
+    setRecent(box);
+    setPendingReveal(box);
+  }, []);
+  const setAllBoxes = (value: boolean) => {
     setOpen(new Set(value ? allBoxes(graph) : []));
+    setRecent(null);
+  };
+  const boxes = useMemo(() => presentBoxes(graph), [graph]);
+  const openBoxes = boxes.filter((box) => open.has(box));
 
   // Brings a revealed node into view once the layout that draws it is on
-  // screen (React Flow takes new nodes on its next frame).
+  // screen (React Flow takes new nodes on its next frame). A box exists
+  // open and closed: wait for the layout that draws it as asked.
   useEffect(() => {
     if (!pendingReveal || !drawn) return;
+    if (
+      boxes.includes(pendingReveal) &&
+      drawn.closed.has(pendingReveal) === open.has(pendingReveal)
+    )
+      return;
     const frame = requestAnimationFrame(() => {
       if (!flow.getNode(pendingReveal)) return;
       void flow.fitView({
         nodes: [{ id: pendingReveal }],
         maxZoom: 1,
+        padding: 0.15,
         duration: reducedMotion() ? 0 : 250,
       });
       setPendingReveal(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [pendingReveal, drawn, flow]);
+  }, [pendingReveal, drawn, flow, boxes, open]);
+
+  // Full screen: the same tab drawn over the page (nothing remounts), page
+  // scroll locked, the graph fitted to the new size.
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [expanded]);
+  // Esc also works once the focused element is gone (a folder that opened
+  // replaces the button that was clicked).
+  useEffect(() => {
+    if (!expanded) return;
+    const onEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (focus) setFocus(null);
+      else setExpanded(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [expanded, focus]);
+  const firstSize = useRef(true);
+  useEffect(() => {
+    if (firstSize.current) {
+      firstSize.current = false;
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      void flow.fitView({ duration: reducedMotion() ? 0 : 250 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, flow]);
 
   const toggleFocus = useCallback(
     (id: string) => setFocus((current) => (current === id ? null : id)),
@@ -282,79 +333,186 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     [byId],
   );
 
+  // Esc clears the focus first, then leaves full screen (handled on the
+  // window while full screen).
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') setFocus(null);
+    if (event.key !== 'Escape' || expanded) return;
+    setFocus(null);
   };
 
-  return (
-    <div className="dep-graph-tab" onKeyDown={onKeyDown}>
-      <div className="dep-graph-main">
-        <div className="dep-graph-toolbar">
-          <span className="muted">{copy.hint}</span>
-          <ol className="dep-graph-lanes" aria-label={copy.canvasLabel}>
-            <li>{copy.lanes.program}</li>
-            <li>→ {copy.lanes.own}</li>
-            <li>→ {copy.lanes.shared}</li>
-            <li>→ {copy.lanes.tables}</li>
-          </ol>
-        </div>
-        <div className="dep-graph-toolbar">
-          <span className="muted" data-testid="graph-summary">
-            {copy.summary(
-              number(graph.nodes.length),
-              number(graph.edges.length),
-              number(graph.calls),
-            )}{' '}
-            · {copy.tableView[graph.tableView]}
-          </span>
-          <span className="dep-graph-actions">
-            <button className="link-button" onClick={() => setAllBoxes(true)}>
-              {copy.expandAll}
-            </button>
-            <button className="link-button" onClick={() => setAllBoxes(false)}>
-              {copy.collapseAll}
-            </button>
-          </span>
-          {commonCount > 0 && (
-            <label className="dep-graph-toggle">
-              <input
-                type="checkbox"
-                checked={showCommon}
-                onChange={(event) => setShowCommon(event.currentTarget.checked)}
-              />
-              {copy.showCommon(number(commonCount))}
-            </label>
+  const { slot, host } = useFloatingHost(expanded);
+  const content = (
+    <>
+      {expanded && (
+        <div
+          className="dep-graph-backdrop"
+          aria-hidden="true"
+          onClick={() => setExpanded(false)}
+        />
+      )}
+      <div
+        className={`dep-graph-tab${expanded ? ' dep-graph-expanded' : ''}`}
+        onKeyDown={onKeyDown}
+        {...(expanded
+          ? {
+              role: 'dialog',
+              'aria-modal': true,
+              'aria-label': copy.canvasLabel,
+            }
+          : {})}
+      >
+        <div className="dep-graph-main">
+          <div className="dep-graph-toolbar">
+            <span className="muted">{copy.hint}</span>
+            <ol className="dep-graph-lanes" aria-label={copy.canvasLabel}>
+              <li>{copy.lanes.program}</li>
+              <li>→ {copy.lanes.own}</li>
+              <li>→ {copy.lanes.shared}</li>
+              <li>→ {copy.lanes.tables}</li>
+            </ol>
+          </div>
+          <div className="dep-graph-toolbar">
+            <span className="muted" data-testid="graph-summary">
+              {copy.summary(
+                number(graph.nodes.length),
+                number(graph.edges.length),
+                number(graph.calls),
+              )}{' '}
+              · {copy.tableView[graph.tableView]}
+            </span>
+            <span className="dep-graph-actions">
+              <button
+                type="button"
+                className="button small"
+                aria-pressed={expanded}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded ? copy.exitFullScreen : copy.fullScreen}
+              </button>
+              <button className="link-button" onClick={() => setAllBoxes(true)}>
+                {copy.expandAll}
+              </button>
+              <button
+                className="link-button"
+                onClick={() => setAllBoxes(false)}
+              >
+                {copy.collapseAll}
+              </button>
+            </span>
+            {commonCount > 0 && (
+              <label className="dep-graph-toggle">
+                <input
+                  type="checkbox"
+                  checked={showCommon}
+                  onChange={(event) =>
+                    setShowCommon(event.currentTarget.checked)
+                  }
+                />
+                {copy.showCommon(number(commonCount))}
+              </label>
+            )}
+          </div>
+          <GraphSearch graph={graph} copy={copy} onPick={reveal} />
+          {openBoxes.length > 0 && (
+            <ul className="dep-open-boxes" aria-label={copy.openBoxes}>
+              <li className="muted">{copy.openBoxes}:</li>
+              {openBoxes.map((box) => (
+                <li
+                  key={box}
+                  className={`dep-open-box${box === recent ? ' recent' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="dep-open-box-name mono"
+                    aria-label={copy.showBox(boxName(box, copy))}
+                    onClick={() => {
+                      setRecent(box);
+                      setPendingReveal(box);
+                    }}
+                  >
+                    {boxName(box, copy)}
+                  </button>
+                  <button
+                    type="button"
+                    className="dep-open-box-close"
+                    aria-label={copy.collapseBox(boxName(box, copy))}
+                    onClick={() => toggleBox(box)}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
+          <BoxToggle.Provider value={toggleBox}>
+            <GraphCanvas
+              graph={graph}
+              drawn={drawn}
+              positions={layout?.positions ?? null}
+              byId={byId}
+              focus={focus}
+              linked={linked}
+              recent={recent}
+              pending={layoutState.pending}
+              failed={layoutState.failed}
+              onFocus={toggleFocus}
+              onClear={() => setFocus(null)}
+            />
+          </BoxToggle.Provider>
         </div>
-        <GraphSearch graph={graph} copy={copy} onPick={reveal} />
-        <BoxToggle.Provider value={toggleBox}>
-          <GraphCanvas
-            graph={graph}
-            drawn={drawn}
-            positions={layout?.positions ?? null}
-            byId={byId}
-            focus={focus}
-            linked={linked}
-            pending={layoutState.pending}
-            failed={layoutState.failed}
-            onFocus={toggleFocus}
-            onClear={() => setFocus(null)}
-          />
-        </BoxToggle.Provider>
+        <aside className="dep-graph-side" aria-label={copy.commonTitle}>
+          {focusedNode && (
+            <FocusCard
+              node={focusedNode}
+              copy={copy}
+              onClear={() => setFocus(null)}
+            />
+          )}
+          <CommonPanel graph={graph} copy={copy} onFocus={reveal} />
+        </aside>
+        <GraphTable graph={graph} focus={focus} onFocus={reveal} />
       </div>
-      <aside className="dep-graph-side" aria-label={copy.commonTitle}>
-        {focusedNode && (
-          <FocusCard
-            node={focusedNode}
-            copy={copy}
-            onClear={() => setFocus(null)}
-          />
-        )}
-        <CommonPanel graph={graph} copy={copy} onFocus={reveal} />
-      </aside>
-      <GraphTable graph={graph} focus={focus} onFocus={reveal} />
-    </div>
+    </>
   );
+  return (
+    <>
+      <div ref={slot} />
+      {createPortal(content, host)}
+    </>
+  );
+}
+
+// The graph is rendered into one element that stays in the page, or moves
+// to <body> for full screen (a fixed overlay inside the page would be
+// clipped by the panels around it). Moving the element, not the React
+// tree, keeps the canvas and its layout mounted.
+function useFloatingHost(floating: boolean) {
+  const slot = useRef<HTMLDivElement>(null);
+  const [host] = useState(() => document.createElement('div'));
+  useLayoutEffect(() => {
+    const parent = floating ? document.body : slot.current;
+    parent?.appendChild(host);
+  }, [floating, host]);
+  useLayoutEffect(() => () => host.remove(), [host]);
+  return { slot, host };
+}
+
+// Boxes that have members in this graph (no table box without tables).
+function presentBoxes(graph: DependencyGraph): string[] {
+  const present = new Set<string>();
+  for (const node of graph.nodes) {
+    const box = boxOf(node);
+    if (box !== null) present.add(box);
+  }
+  return allBoxes(graph).filter((box) => present.has(box));
+}
+
+// Name of a box in the "open" list: its folder, or the tables/COM box.
+function boxName(box: string, copy: Copy): string {
+  if (box === TABLE_BOX) return copy.kinds.table;
+  if (box === COMPONENT_BOX) return copy.kinds.component;
+  const folder = box.slice(groupNodeId('').length);
+  return folder === '' ? copy.rootGroup : folder;
 }
 
 function boxLabel(box: LayoutBox, copy: Copy): string {
@@ -478,6 +636,7 @@ function GraphCanvas({
   byId,
   focus,
   linked,
+  recent,
   pending,
   failed,
   onFocus,
@@ -489,6 +648,7 @@ function GraphCanvas({
   byId: Map<string, GraphNode>;
   focus: string | null;
   linked: Set<string> | null;
+  recent: string | null;
   pending: boolean;
   failed: boolean;
   onFocus: (id: string) => void;
@@ -514,18 +674,16 @@ function GraphCanvas({
   );
   const nodes = useMemo(
     () =>
-      linked
-        ? baseNodes.map((node) =>
-            node.type === 'box' || !linked.has(node.id)
-              ? node
-              : {
-                  ...node,
-                  className: node.id === focus ? 'focused linked' : 'linked',
-                  data: { ...node.data, focused: node.id === focus },
-                },
-          )
-        : baseNodes,
-    [baseNodes, linked, focus],
+      baseNodes.map((node) => {
+        if (node.id === recent) return { ...node, className: 'recent' };
+        if (!linked || node.type === 'box' || !linked.has(node.id)) return node;
+        return {
+          ...node,
+          className: node.id === focus ? 'focused linked' : 'linked',
+          data: { ...node.data, focused: node.id === focus },
+        };
+      }),
+    [baseNodes, linked, focus, recent],
   );
   // Focus draws the node's own edges over the resting ones (which dim).
   // A node inside a collapsed folder is drawn as the folder: its edges

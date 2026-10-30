@@ -2267,6 +2267,88 @@ details.technical[open] > summary {
     stroke-dashoffset: -24;
   }
 }
+/* Open boxes: one chip per open folder/box, the last one toggled outlined;
+   the chip brings its box into view, x closes it. */
+.dep-open-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.dep-open-box {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--brand-edge);
+  border-radius: 999px;
+  background: var(--brand-soft);
+}
+.dep-open-box.recent {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(0, 137, 210, 0.18);
+}
+.dep-open-box-name,
+.dep-open-box-close {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--navy);
+  font-size: 12px;
+  cursor: pointer;
+}
+.dep-open-box-close {
+  padding: 2px 8px 2px 2px;
+  color: var(--fg-2);
+}
+.dep-open-box-name:focus-visible,
+.dep-open-box-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.react-flow__node.recent .dep-folder,
+.react-flow__node.recent .dep-node-folder {
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 4px rgba(0, 137, 210, 0.15);
+  animation: recentBox 1.2s ease-out 2;
+}
+@keyframes recentBox {
+  50% {
+    box-shadow: 0 0 0 10px rgba(0, 137, 210, 0.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.recent .dep-folder,
+  .react-flow__node.recent .dep-node-folder {
+    animation: none;
+  }
+}
+/* Full screen: the tab over the page, the canvas taking the height left. */
+.dep-graph-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(15, 34, 54, 0.45);
+}
+.dep-graph-expanded {
+  position: fixed;
+  inset: 16px;
+  z-index: 901;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 18px;
+  overflow: auto;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px rgba(15, 34, 54, 0.3);
+  animation: none;
+}
+.dep-graph-expanded .dep-graph-canvas {
+  height: calc(100vh - 290px);
+  min-height: 420px;
+}
 .dep-graph-actions {
   display: inline-flex;
   gap: 12px;

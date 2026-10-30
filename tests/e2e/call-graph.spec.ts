@@ -184,6 +184,82 @@ test(
   },
 );
 
+// Feedback 30/10: an opened folder is brought into view and outlined, the
+// open folders are listed, and the graph opens full screen over the page
+// (not clipped by the panels around it); Escape leaves full screen.
+test(
+  'call graph opens a folder in view and goes full screen',
+  { tag: '@smoke' },
+  async ({ page }, testInfo) => {
+    const corpus = syntheticCorpusFixture({
+      programs: 120,
+      sharedModules: 12,
+      tables: 60,
+      folders: 6,
+    });
+    await page.route(/\/artifacts\/[^/]+\/versions\/\d+$/, async (route) => {
+      const response = await route.fetch();
+      const body: unknown = await response.json();
+      if (typeof body !== 'object' || body === null) throw new Error('body');
+      await route.fulfill({ response, json: { ...body, payload: corpus } });
+    });
+    await page.goto('/');
+    await page.getByLabel('Tên dự án').fill(`UI03 full ${Date.now()}`);
+    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
+    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
+    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(
+      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+    ).toBeVisible();
+    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
+    await assessment.getByRole('tab', { name: /^Call graph/ }).click();
+    await assessment.getByRole('button', { name: 'Xem toàn màn hình' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Call graph toàn dự án' });
+    await expect(dialog).toBeVisible();
+    const viewport = page.viewportSize();
+    const box = await dialog.boundingBox();
+    if (!viewport || !box) throw new Error('no box');
+    expect(box.width).toBeGreaterThan(viewport.width - 40);
+    expect(box.height).toBeGreaterThan(viewport.height - 40);
+    const canvas = dialog.getByRole('group', { name: 'Call graph toàn dự án' });
+    await expect(canvas.getByText('Đang sắp xếp graph…')).toBeHidden({
+      timeout: 20_000,
+    });
+    await canvas.getByRole('button', { name: /^Mở thư mục F03 / }).click();
+    await expect(
+      dialog
+        .getByRole('list', { name: 'Đang mở' })
+        .getByRole('button', { name: 'Đưa F03 vào khung nhìn' }),
+    ).toBeVisible();
+    // The opened folder ends up inside the canvas, outlined.
+    const opened = canvas.locator('.react-flow__node.recent');
+    await expect(opened).toBeVisible();
+    await expect
+      .poll(async () => {
+        const area = await canvas.boundingBox();
+        const folder = await opened.boundingBox();
+        if (!area || !folder) return false;
+        return (
+          folder.x >= area.x - 1 &&
+          folder.y >= area.y - 1 &&
+          folder.x + folder.width <= area.x + area.width + 1 &&
+          folder.y + folder.height <= area.y + area.height + 1
+        );
+      })
+      .toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath('ui03-full-screen.png'),
+    });
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(
+      assessment.getByRole('group', { name: 'Call graph toàn dự án' }),
+    ).toBeVisible();
+  },
+);
+
 // elkjs EPL-2.0 decision: the served build carries the notices and the
 // license text.
 test(

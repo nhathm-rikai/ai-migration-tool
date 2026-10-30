@@ -178,38 +178,23 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
   return (
     <div className="dep-graph-tab proc-graph-tab" onKeyDown={onKeyDown}>
       <div className="dep-graph-main">
-        <div className="dep-graph-toolbar">
-          <span className="muted">{copy.hint}</span>
-          <ol className="dep-graph-lanes" aria-label={copy.canvasLabel}>
-            <li>{copy.lanes.own}</li>
-            <li>→ {copy.lanes.shared}</li>
-            <li>→ {copy.lanes.api}</li>
-            <li>→ {copy.lanes.tables}</li>
-          </ol>
-        </div>
-        <div className="dep-graph-toolbar">
-          <span className="muted" data-testid="procedure-graph-summary">
-            {copy.summary(
-              number(graph.ownProcedures),
-              number(graph.sharedProcedures),
-              number(graph.edges.length),
-            )}{' '}
-            · {copy.tableView[graph.tableView]}
-          </span>
+        <div className="dep-graph-bar">
+          <ProcedureSearch graph={graph} copy={copy} onPick={reveal} />
           {isolatedCount > 0 && (
-            <label className="dep-graph-toggle">
-              <input
-                type="checkbox"
-                checked={showIsolated}
-                onChange={(event) =>
-                  setShowIsolated(event.currentTarget.checked)
-                }
-              />
-              {copy.showIsolated(number(isolatedCount))}
-            </label>
+            <span className="dep-graph-actions">
+              <label className="dep-graph-toggle">
+                <input
+                  type="checkbox"
+                  checked={showIsolated}
+                  onChange={(event) =>
+                    setShowIsolated(event.currentTarget.checked)
+                  }
+                />
+                {copy.showIsolated(number(isolatedCount))}
+              </label>
+            </span>
           )}
         </div>
-        <ProcedureSearch graph={graph} copy={copy} onPick={reveal} />
         <GraphCanvas
           drawn={drawn}
           positions={layout?.positions ?? null}
@@ -220,6 +205,20 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
           onFocus={toggleFocus}
           onClear={() => setFocus(null)}
         />
+        <p className="dep-graph-caption muted">
+          <span data-testid="procedure-graph-summary">
+            {copy.summary(
+              number(graph.ownProcedures),
+              number(graph.sharedProcedures),
+              number(graph.edges.length),
+            )}{' '}
+            · {copy.tableView[graph.tableView]}
+          </span>
+          <span>
+            {copy.lanes.own} → {copy.lanes.shared} → {copy.lanes.api} →{' '}
+            {copy.lanes.tables}
+          </span>
+        </p>
       </div>
       <aside className="dep-graph-side" aria-label={copy.sideLabel}>
         {focusedNode ? (
@@ -481,14 +480,13 @@ function ProcedureSearch({
     : [];
   return (
     <div className="dep-graph-search">
-      <label>
-        {copy.search}
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
-      </label>
+      <input
+        type="search"
+        aria-label={copy.search}
+        placeholder={copy.search}
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+      />
       {text && (
         <ul className="dep-search-results" aria-label={copy.searchResults}>
           {results.length === 0 && <li className="muted">{copy.searchNone}</li>}

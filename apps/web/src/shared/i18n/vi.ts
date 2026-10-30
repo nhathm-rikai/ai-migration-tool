@@ -662,7 +662,6 @@ export const viMessages = {
         loading: 'Đang tải sơ đồ gọi…',
         empty:
           'Program này không có procedure nào trong các file đã phân tích.',
-        hint: 'Bấm vào một procedure để làm nổi bật nơi gọi nó và những gì nó gọi; Esc để bỏ chọn.',
         lanes: {
           own: 'Procedure riêng',
           shared: 'Procedure dùng chung',

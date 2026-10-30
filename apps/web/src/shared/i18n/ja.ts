@@ -382,6 +382,9 @@ export const jaMessages = {
         expandBox: (box: string, count: string) => `${box} を開く（${count}）`,
         collapseBox: (box: string) => `${box} を閉じる`,
         collapse: '閉じる',
+        focusBox: (box: string, count: string) =>
+          `${box}（${count}）の接続を強調表示`,
+        openBox: '展開',
         fullScreen: '全画面で表示',
         exitFullScreen: '全画面を終了',
         openBoxes: '展開中',

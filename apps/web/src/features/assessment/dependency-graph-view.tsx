@@ -220,6 +220,20 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   const linked = useMemo(() => {
     if (!focus || !drawn) return null;
     const draw = drawnAs(drawn);
+    if (!byId.has(focus)) {
+      // A closed box: everything its drawn edges reach.
+      const reached = new Set([focus]);
+      for (const edge of drawn.edges) {
+        const source = byId.get(edge.source);
+        const target = byId.get(edge.target);
+        if (!source || !target) continue;
+        const from = draw(source);
+        const to = draw(target);
+        if (from === focus) reached.add(to);
+        if (to === focus) reached.add(from);
+      }
+      return reached;
+    }
     return new Set(
       [...neighbourhood(drawn.edges, focus)].map((id) => {
         const node = byId.get(id);
@@ -385,37 +399,6 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
         <div className="dep-graph-main">
           <div className="dep-graph-bar">
             <GraphSearch graph={graph} copy={copy} onPick={reveal} />
-            {openBoxes.length > 0 && (
-              <ul className="dep-open-boxes" aria-label={copy.openBoxes}>
-                <li className="muted">{copy.openBoxes}:</li>
-                {openBoxes.map((box) => (
-                  <li
-                    key={box}
-                    className={`dep-open-box${box === recent ? ' recent' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="dep-open-box-name mono"
-                      aria-label={copy.showBox(boxName(box, copy))}
-                      onClick={() => {
-                        setRecent(box);
-                        setPendingReveal(box);
-                      }}
-                    >
-                      {boxName(box, copy)}
-                    </button>
-                    <button
-                      type="button"
-                      className="dep-open-box-close"
-                      aria-label={copy.collapseBox(boxName(box, copy))}
-                      onClick={() => toggleBox(box)}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
             <span className="dep-graph-actions">
               {commonCount > 0 && (
                 <label
@@ -454,21 +437,60 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
               />
             </span>
           </div>
-          <BoxToggle.Provider value={toggleBox}>
-            <GraphCanvas
-              graph={graph}
-              drawn={drawn}
-              positions={layout?.positions ?? null}
-              byId={byId}
-              focus={focus}
-              linked={linked}
-              recent={recent}
-              pending={layoutState.pending}
-              failed={layoutState.failed}
-              onFocus={toggleFocus}
-              onClear={() => setFocus(null)}
-            />
-          </BoxToggle.Provider>
+          {/* The open boxes float over the canvas corner so the toolbar
+              stays one row. */}
+          <div className="dep-graph-stage">
+            {openBoxes.length > 0 && (
+              <ul className="dep-open-boxes" aria-label={copy.openBoxes}>
+                <li className="muted">{copy.openBoxes}:</li>
+                {openBoxes.map((box) => (
+                  <li
+                    key={box}
+                    className={`dep-open-box${box === recent ? ' recent' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="dep-open-box-name mono"
+                      title={copy.showBox(boxName(box, copy))}
+                      aria-label={copy.showBox(boxName(box, copy))}
+                      onClick={() => {
+                        setRecent(box);
+                        setPendingReveal(box);
+                      }}
+                    >
+                      {boxName(box, copy)}
+                    </button>
+                    <button
+                      type="button"
+                      className="dep-open-box-close"
+                      title={copy.collapseBox(boxName(box, copy))}
+                      aria-label={copy.collapseBox(boxName(box, copy))}
+                      onClick={() => toggleBox(box)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M7 7l10 10M17 7L7 17" />
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <BoxToggle.Provider value={toggleBox}>
+              <GraphCanvas
+                graph={graph}
+                drawn={drawn}
+                positions={layout?.positions ?? null}
+                byId={byId}
+                focus={focus}
+                linked={linked}
+                recent={recent}
+                pending={layoutState.pending}
+                failed={layoutState.failed}
+                onFocus={toggleFocus}
+                onClear={() => setFocus(null)}
+              />
+            </BoxToggle.Provider>
+          </div>
           <p className="dep-graph-caption muted">
             <span data-testid="graph-summary">
               {copy.summary(
@@ -492,6 +514,16 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
               onClear={() => setFocus(null)}
             />
           )}
+          {focus !== null && !focusedNode && boxes.includes(focus) && (
+            <BoxCard
+              box={focus}
+              graph={graph}
+              copy={copy}
+              open={open.has(focus)}
+              onOpen={() => toggleBox(focus)}
+              onClear={() => setFocus(null)}
+            />
+          )}
           <CommonPanel graph={graph} copy={copy} onFocus={reveal} />
         </aside>
       </div>
@@ -502,6 +534,48 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
       <div ref={slot} />
       {createPortal(content, host)}
     </>
+  );
+}
+
+// Side card of a focused closed box: what it holds and a way to open it.
+function BoxCard({
+  box,
+  graph,
+  copy,
+  open,
+  onOpen,
+  onClear,
+}: {
+  box: string;
+  graph: DependencyGraph;
+  copy: Copy;
+  open: boolean;
+  onOpen: () => void;
+  onClear: () => void;
+}) {
+  const number = useNumber();
+  const members = graph.nodes.filter((node) => boxOf(node) === box);
+  const programs = members.filter((node) => node.kind === 'program').length;
+  return (
+    <section className="dep-focus-card" aria-labelledby="dep-focus-title">
+      <div className="dep-focus-heading">
+        <h4 id="dep-focus-title">{copy.focusedTitle}</h4>
+        <button className="link-button" onClick={onClear}>
+          {copy.clearFocus}
+        </button>
+      </div>
+      <p className="mono dep-focus-label">{boxName(box, copy)}</p>
+      <p className="muted">
+        {box.startsWith('folder:')
+          ? copy.groupCount(number(programs))
+          : copy.boxCount(number(members.length))}
+      </p>
+      {!open && (
+        <button type="button" className="button small" onClick={onOpen}>
+          {copy.openBox}
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -734,11 +808,17 @@ function GraphCanvas({
   const nodes = useMemo(
     () =>
       baseNodes.map((node) => {
-        if (node.id === recent) return { ...node, className: 'recent' };
-        if (!linked || node.type === 'box' || !linked.has(node.id)) return node;
+        const openBox = node.type === 'box' && !node.data.box?.collapsed;
+        const classes = [
+          openBox ? 'box-open' : '',
+          node.id === recent ? 'recent' : '',
+          !openBox && linked?.has(node.id) ? 'linked' : '',
+          node.id === focus ? 'focused' : '',
+        ].filter(Boolean);
+        if (classes.length === 0) return node;
         return {
           ...node,
-          className: node.id === focus ? 'focused linked' : 'linked',
+          className: classes.join(' '),
           data: { ...node.data, focused: node.id === focus },
         };
       }),
@@ -751,24 +831,29 @@ function GraphCanvas({
     if (!focus || !drawn) return baseEdges;
     const draw = drawnAs(drawn);
     const related = new Map<string, Edge>();
+    const boxFocus = !byId.has(focus);
     for (const edge of drawn.edges) {
-      if (edge.source !== focus && edge.target !== focus) continue;
       const source = byId.get(edge.source);
       const target = byId.get(edge.target);
       if (!source || !target) continue;
       const from = draw(source);
       const to = draw(target);
       if (from === to) continue;
-      const id =
-        from === edge.source && to === edge.target
-          ? edge.id
-          : `${edge.kind}|${from}|${to}`;
+      if (
+        boxFocus
+          ? from !== focus && to !== focus
+          : edge.source !== focus && edge.target !== focus
+      )
+        continue;
+      const own = from === edge.source && to === edge.target;
+      const id = own ? edge.id : `${edge.kind}|${from}|${to}`;
       if (related.has(id)) continue;
       const base = flowEdge({ ...edge, id, source: from, target: to });
       related.set(id, {
         ...base,
         className: `${base.className ?? ''} linked`,
-        label: edgeLabel(edge, copy, number),
+        // A merged edge stands for many: no single count to show.
+        ...(own ? { label: edgeLabel(edge, copy, number) } : {}),
         zIndex: 1,
       });
     }
@@ -777,7 +862,6 @@ function GraphCanvas({
       ...related.values(),
     ];
   }, [baseEdges, drawn, focus, byId, copy, number]);
-  const toggleBox = useContext(BoxToggle);
   const nodeTypes = useMemo(() => ({ dep: DepNode, box: BoxNode }), []);
 
   return (
@@ -817,8 +901,8 @@ function GraphCanvas({
           // The node's button gets keyboard focus; Enter/Space click it and
           // the click reaches the node like a mouse click.
           onNodeClick={(_event, node) => {
-            if (node.type !== 'box') onFocus(node.id);
-            else if (node.data.box?.collapsed) toggleBox(node.data.box.id);
+            if (node.type !== 'box' || node.data.box?.collapsed)
+              onFocus(node.id);
           }}
           onPaneClick={onClear}
           proOptions={{ hideAttribution: true }}
@@ -898,9 +982,10 @@ const BoxNode = memo(function BoxNode({ data }: NodeProps<FlowNode>) {
     box.folder !== null
       ? copy.groupCount(number(box.count))
       : copy.boxCount(number(box.count));
-  // A collapsed folder is one button (its click reaches the node, which
-  // opens it); an open folder has a button to close it again. Merged edges
-  // of a folder leave from its right side.
+  // A collapsed box: clicking it highlights its edges (the click reaches
+  // the node); its + button opens it. An open folder has a header with a
+  // button to close it again. Merged edges of a folder leave from its
+  // right side.
   if (box.collapsed)
     return (
       <div className="dep-node dep-node-folder">
@@ -908,16 +993,31 @@ const BoxNode = memo(function BoxNode({ data }: NodeProps<FlowNode>) {
         <button
           type="button"
           className="dep-node-button"
-          aria-label={
-            box.folder !== null
-              ? copy.expandFolder(box.label, count)
-              : copy.expandBox(box.label, count)
-          }
+          aria-pressed={data.focused}
+          aria-label={copy.focusBox(box.label, count)}
         >
           <span className="dep-node-type">
             {box.folder !== null ? copy.folderType : box.label} · {count}
           </span>
           <span className="dep-node-label mono">{box.label}</span>
+        </button>
+        <button
+          type="button"
+          className="dep-box-open"
+          title={copy.openBox}
+          aria-label={
+            box.folder !== null
+              ? copy.expandFolder(box.label, count)
+              : copy.expandBox(box.label, count)
+          }
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleBox(box.id);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 6v12M6 12h12" />
+          </svg>
         </button>
         <Handle type="source" position={Position.Right} isConnectable={false} />
       </div>
@@ -929,7 +1029,7 @@ const BoxNode = memo(function BoxNode({ data }: NodeProps<FlowNode>) {
       {box.toggle && (
         <button
           type="button"
-          className="link-button dep-folder-close"
+          className="dep-folder-close"
           aria-label={
             box.folder !== null
               ? copy.collapseFolder(box.label)

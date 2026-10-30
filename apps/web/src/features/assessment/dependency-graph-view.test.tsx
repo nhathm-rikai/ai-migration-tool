@@ -108,7 +108,9 @@ describe('UI03 call graph tab', () => {
     const items = within(panel).getAllByRole('listitem');
     expect(items[0]?.textContent).toContain('Cmn00.bas');
     expect(items[0]?.textContent).toContain('đang ẩn');
-    expect(screen.getByLabelText('Hiện module hầu hết program đều dùng (2)')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Hiện module hầu hết program đều dùng (2)'),
+    ).toBeTruthy();
   });
 
   it('switches to Japanese without losing the focused node', () => {
@@ -258,6 +260,31 @@ describe('UI03 call graph tab', () => {
     expect(document.body.style.overflow).toBe('');
     expect(
       screen.getByRole('button', { name: 'Xem toàn màn hình' }),
+    ).toBeTruthy();
+  });
+
+  it('highlights a closed folder on click and opens it from its own button', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    const folder = within(canvas).getByRole('button', {
+      name: 'Làm nổi bật đường nối của F01 (17 program)',
+    });
+    fireEvent.click(folder);
+    expect(canvas.className).toContain('has-focus');
+    expect(folder.getAttribute('aria-pressed')).toBe('true');
+    // Still closed: no program of F01 drawn.
+    expect(
+      within(canvas).queryByRole('button', {
+        name: 'Làm nổi bật Program F010004',
+      }),
+    ).toBeNull();
+    const card = screen.getByRole('region', { name: 'Node đang chọn' });
+    expect(within(card).getByText('F01')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Mở ra' }));
+    expect(
+      within(canvas).getByRole('button', {
+        name: 'Làm nổi bật Program F010004',
+      }),
     ).toBeTruthy();
   });
 });

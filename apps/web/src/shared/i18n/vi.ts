@@ -398,6 +398,9 @@ export const viMessages = {
         expandBox: (box: string, count: string) => `Mở ${box} (${count})`,
         collapseBox: (box: string) => `Thu gọn ${box}`,
         collapse: 'Thu gọn',
+        focusBox: (box: string, count: string) =>
+          `Làm nổi bật đường nối của ${box} (${count})`,
+        openBox: 'Mở ra',
         fullScreen: 'Xem toàn màn hình',
         exitFullScreen: 'Thoát toàn màn hình',
         openBoxes: 'Đang mở',

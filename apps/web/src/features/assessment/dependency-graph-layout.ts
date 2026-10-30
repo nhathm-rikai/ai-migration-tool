@@ -254,9 +254,11 @@ export function layoutRequest(
       'elk.layered.spacing.nodeNodeBetweenLayers': String(LANE_SPACING),
       'elk.edgeRouting': 'POLYLINE',
       // Keep the order of the request top to bottom: opening or closing a
-      // folder makes room but does not reshuffle the other boxes.
-      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-      'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
+      // folder makes room but does not reshuffle the other boxes. The order
+      // is already chosen (folders, shared files by their folders), so ELK's
+      // crossing minimisation, most of its run time on large corpora, is
+      // skipped and each layer keeps the request order.
+      'elk.layered.crossingMinimization.strategy': 'NONE',
     },
     children,
     edges: [...layoutEdges.values()],

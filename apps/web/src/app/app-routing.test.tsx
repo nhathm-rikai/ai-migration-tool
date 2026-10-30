@@ -1,3 +1,4 @@
+import { createDocumentsApi } from '../shared/api/documents-api';
 import {
   fireEvent,
   render,
@@ -73,6 +74,7 @@ function renderAt(path: string, routes: Routes) {
       runsApi={createRunsApi(fetcher, testCredentials)}
       sourcesApi={createSourcesApi(fetcher, testCredentials)}
       artifactsApi={createArtifactsApi(fetcher, testCredentials)}
+      documentsApi={createDocumentsApi(fetcher, testCredentials)}
       session={testCredentials}
     />,
   );
@@ -237,11 +239,15 @@ describe('step marks (UI01-AC02)', () => {
     renderAt(`${page}/quote`, baseRoutes());
     await waitFor(() => expect(done(/Phân tích/)).toBe(true));
     expect(done(/Nạp source/)).toBe(true);
-    for (const name of [/Tạo tài liệu/, /Review & duyệt/, /Báo giá/]) {
+    expect(done(/Tạo tài liệu/)).toBe(false);
+    expect(within(step(/Tạo tài liệu/)).queryByText(/Chưa khả dụng/)).toBe(
+      null,
+    );
+    for (const name of [/Review & duyệt/, /Báo giá/]) {
       expect(done(name)).toBe(false);
       expect(within(step(name)).getByText(/Chưa khả dụng/)).toBeTruthy();
     }
-    // Steps 3–5 say why they are not available.
+    // Steps 4–5 say why they are not available.
     expect(screen.getByRole('heading', { name: 'Chưa khả dụng' })).toBeTruthy();
     expect(
       screen.getByText(/mô hình ước tính chưa được cấu hình/),

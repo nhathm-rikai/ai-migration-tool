@@ -857,6 +857,9 @@ function GraphCanvas({
         className: `${base.className ?? ''} linked`,
         // A merged edge stands for many: no single count to show.
         ...(own ? { label: edgeLabel(edge, copy, number) } : {}),
+        // The focused node's edges are drawn over every box so they can be
+        // followed to their ends; resting edges stay under the nodes.
+        zIndex: 1000,
       });
     }
     return [

@@ -297,6 +297,25 @@ test(
     await page.screenshot({
       path: testInfo.outputPath('ui03-full-screen.png'),
     });
+    // A program inside the open folder: its edges are drawn over the boxes
+    // (resting edges stay under them), so they can be followed.
+    await canvas
+      .getByRole('button', { name: 'Làm nổi bật Program F030003' })
+      .click();
+    const layers = await canvas.evaluate((element) => ({
+      linked: [...element.querySelectorAll('.react-flow__edge.linked')].map(
+        (edge) => getComputedStyle(edge.closest('svg') ?? edge).zIndex,
+      ),
+      resting: getComputedStyle(
+        element
+          .querySelector('.react-flow__edge:not(.linked)')
+          ?.closest('svg') ?? element,
+      ).zIndex,
+    }));
+    expect(layers.linked.length).toBeGreaterThan(0);
+    expect(new Set(layers.linked)).toEqual(new Set(['1000']));
+    expect(layers.resting).not.toBe('1000');
+    await page.keyboard.press('Escape');
     // Closing it from its header keeps it in the same place too, and the
     // folders stay evenly spaced.
     const openTop = await inCanvas(await folderNode.boundingBox());

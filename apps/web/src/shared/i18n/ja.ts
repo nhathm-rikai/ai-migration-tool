@@ -363,9 +363,10 @@ export const jaMessages = {
           mapped: 'マッピング後のテーブル名',
           raw: 'ソース上のテーブル名',
         },
-        showCommon: (count: string) => `共通モジュール ${count} 件を表示`,
+        showCommon: (count: string) =>
+          `ほぼ全プログラムが使うモジュールを表示（${count}）`,
         showCommonTitle:
-          '80% を超えるプログラムが使うモジュール/COM（定数・共通処理）。既定では非表示です。',
+          '80% を超えるプログラムが宣言するモジュール/COM（主に定数・共通処理）。ほぼすべてのプログラムにつながりグラフが煩雑になるため非表示にしています。共通モジュールのパネルには「非表示」付きで表示されます。',
         lanesLabel: '左から右へのレーン順',
         layoutPending: 'グラフを配置中…',
         layoutFailed:
@@ -473,6 +474,13 @@ export const jaMessages = {
     totals: {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
+    },
+    tableSchema: {
+      assumed: (schema: string, inferred: boolean) =>
+        inferred
+          ? `テーブル名はスキーマ ${schema} を仮定してまとめています（ソースで最も多い接頭辞）。`
+          : `テーブル名はスキーマ ${schema} を仮定してまとめています。`,
+      none: '既定スキーマがないため、テーブル名はソースのままです。',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: '解析できないプログラムがあります。',

@@ -46,7 +46,7 @@ import {
   ProgramStateTag,
   TableNameView,
 } from './tags';
-import { effectiveMapping } from './table-mapping';
+import { effectiveMapping, type EffectiveMapping } from './table-mapping';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -232,7 +232,11 @@ function ArtifactView({
           onShowPrograms={showPrograms}
         />
       </div>
-      <Warnings summary={summary} onShowPrograms={showPrograms} />
+      <Warnings
+        summary={summary}
+        mapping={effectiveMapping(artifact.payload)}
+        onShowPrograms={showPrograms}
+      />
       <section
         className="panel analysis-tabs"
         aria-label={copy.dashboard.sectionLabel}
@@ -562,9 +566,11 @@ function warningTarget(code: AssessmentWarning): Partial<ProgramFilter> | null {
 
 function Warnings({
   summary,
+  mapping,
   onShowPrograms,
 }: {
   summary: AssessmentSummary;
+  mapping: EffectiveMapping;
   onShowPrograms: (filter: Partial<ProgramFilter>) => void;
 }) {
   const { messages } = useLocale();
@@ -593,7 +599,16 @@ function Warnings({
           const target = warningTarget(code);
           return (
             <li key={code}>
-              {copy.warnings[code]}
+              {/* Says which schema the table names are merged under,
+                  rather than only that the mapping is unconfirmed. */}
+              {code === 'TABLE_NAMES_NOT_CONFIRMED'
+                ? mapping.defaultSchema !== null
+                  ? copy.tableSchema.assumed(
+                      mapping.defaultSchema,
+                      mapping.inferred,
+                    )
+                  : copy.tableSchema.none
+                : copy.warnings[code]}
               {count !== null && (
                 <strong> {copy.programCount(number(count))}</strong>
               )}

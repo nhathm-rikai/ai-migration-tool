@@ -379,9 +379,10 @@ export const viMessages = {
           mapped: 'Bảng theo tên sau ánh xạ',
           raw: 'Bảng theo tên trong source',
         },
-        showCommon: (count: string) => `Hiện ${count} module chung`,
+        showCommon: (count: string) =>
+          `Hiện module hầu hết program đều dùng (${count})`,
         showCommonTitle:
-          'Module/COM được hơn 80% program dùng (hằng số, tiện ích chung); ẩn mặc định để graph gọn.',
+          'Module/COM được hơn 80% program khai báo, thường là hằng số hoặc hàm tiện ích. Chúng nối tới gần như mọi program nên được ẩn để graph gọn; panel Common module vẫn liệt kê và ghi "đang ẩn".',
         lanesLabel: 'Thứ tự làn từ trái sang phải',
         layoutPending: 'Đang sắp xếp graph…',
         layoutFailed:
@@ -489,6 +490,13 @@ export const viMessages = {
     totals: {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
+    },
+    tableSchema: {
+      assumed: (schema: string, inferred: boolean) =>
+        inferred
+          ? `Tên bảng được gộp theo schema giả định ${schema} (tiền tố xuất hiện nhiều nhất trong mã nguồn).`
+          : `Tên bảng được gộp theo schema giả định ${schema}.`,
+      none: 'Chưa có schema mặc định: tên bảng giữ như trong mã nguồn.',
     },
     warnings: {
       PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',

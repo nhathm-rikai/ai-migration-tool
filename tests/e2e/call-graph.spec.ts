@@ -232,28 +232,53 @@ test(
     await expect(canvas.getByText('Đang sắp xếp graph…')).toBeHidden({
       timeout: 20_000,
     });
-    await canvas.getByRole('button', { name: /^Mở thư mục F03 / }).click();
+    // Opening a folder keeps it where it was on screen: its top-left corner
+    // stays put and the view keeps its zoom.
+    const closedFolder = canvas.getByRole('button', {
+      name: /^Mở thư mục F03 /,
+    });
+    // Measured inside the canvas (the toolbar above may wrap).
+    const inCanvas = async (box: { x: number; y: number } | null) => {
+      const area = await canvas.boundingBox();
+      if (!box || !area) throw new Error('no box');
+      return { x: box.x - area.x, y: box.y - area.y };
+    };
+    const folderNode = canvas.locator(
+      '.react-flow__node[data-id="folder:F03"]',
+    );
+    // Let the full-screen fit animation (250 ms) finish first.
+    await page.waitForTimeout(600);
+    const before = await inCanvas(await folderNode.boundingBox());
+    await closedFolder.click();
     await expect(
       dialog
         .getByRole('list', { name: 'Đang mở' })
         .getByRole('button', { name: 'Đưa F03 vào khung nhìn' }),
     ).toBeVisible();
-    // The opened folder ends up inside the canvas, outlined.
     const opened = canvas.locator('.react-flow__node.recent');
     await expect(opened).toBeVisible();
     await expect
       .poll(async () => {
-        const area = await canvas.boundingBox();
-        const folder = await opened.boundingBox();
-        if (!area || !folder) return false;
-        return (
-          folder.x >= area.x - 1 &&
-          folder.y >= area.y - 1 &&
-          folder.x + folder.width <= area.x + area.width + 1 &&
-          folder.y + folder.height <= area.y + area.height + 1
+        const after = await inCanvas(await folderNode.boundingBox());
+        return Math.max(
+          Math.abs(after.x - before.x),
+          Math.abs(after.y - before.y),
         );
       })
-      .toBe(true);
+      .toBeLessThan(3);
+    // A program that was not analysed shows its type, state, name and note
+    // inside the node (nothing clipped).
+    const unanalysed = canvas.getByRole('button', {
+      name: 'Làm nổi bật Program F030099',
+    });
+    const fits = await unanalysed.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      return [...button.children].every((child) => {
+        const inner = child.getBoundingClientRect();
+        return inner.top >= box.top - 0.5 && inner.bottom <= box.bottom + 0.5;
+      });
+    });
+    expect(fits).toBe(true);
     // Resting edges stay thin; the opened folder's edges have their own style.
     const restingWidth = await canvas
       .locator(

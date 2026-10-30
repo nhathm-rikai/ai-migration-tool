@@ -2036,6 +2036,11 @@ details.technical[open] > summary {
   cursor: pointer;
   overflow: hidden;
 }
+/* Type, name and a note line fit the node height: tight lines, centred. */
+.dep-graph-canvas .dep-node-button {
+  justify-content: center;
+  line-height: 1.25;
+}
 .dep-node-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -2166,6 +2171,42 @@ details.technical[open] > summary {
 .react-flow__edge.linked .react-flow__edge-text {
   font-family: var(--f-mono);
   font-size: 11px;
+}
+/* Zoom controls and minimap in the portal's style (the library's base
+   stylesheet leaves them bare). */
+.dep-graph-canvas .react-flow__controls {
+  gap: 6px;
+}
+.dep-graph-canvas .react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: 0 2px 6px rgba(15, 34, 54, 0.08);
+  cursor: pointer;
+}
+.dep-graph-canvas .react-flow__controls-button svg {
+  max-width: 13px;
+  max-height: 13px;
+}
+.dep-graph-canvas .react-flow__controls-button:hover {
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+.dep-graph-canvas .react-flow__controls-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-graph-canvas .react-flow__minimap {
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(15, 34, 54, 0.1);
+}
+.dep-graph-canvas .react-flow__minimap-mask {
+  fill: rgba(227, 241, 251, 0.6);
 }
 .dep-graph-canvas .react-flow__minimap {
   border: 1px solid var(--line);

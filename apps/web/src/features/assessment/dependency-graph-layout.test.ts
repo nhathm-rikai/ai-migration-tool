@@ -139,4 +139,34 @@ describe('UI03 closed boxes in the layout', () => {
     const result = await new ELK().layout(input);
     expect(readLayout(result, input)?.size).toBe(input.children.length);
   });
+
+  // Feedback 30/10: opening a folder makes room but keeps the top-to-bottom
+  // order of the other boxes and of the shared files.
+  it('keeps the vertical order when a folder opens', async () => {
+    const folders = graph.groups.map((group) => groupNodeId(group.id));
+    const allClosed = new Set([...folders, TABLE_BOX]);
+    const oneOpen = new Set([...folders.filter((_, i) => i !== 1), TABLE_BOX]);
+    const order = async (closed: Set<string>) => {
+      const input = layoutRequest(graph, drawn.nodes, drawn.edges, closed);
+      const positions = readLayout(await new ELK().layout(input), input);
+      if (!positions) throw new Error('layout');
+      const lane = (value: number) =>
+        input.children
+          .filter(
+            (child) =>
+              child.layoutOptions?.['elk.partitioning.partition'] ===
+              String(value),
+          )
+          .map((child) => child.id)
+          .filter((id) => id !== folders[1])
+          .sort(
+            (a, b) => (positions.get(a)?.y ?? 0) - (positions.get(b)?.y ?? 0),
+          );
+      return { folders: lane(0), shared: lane(2) };
+    };
+    const before = await order(allClosed);
+    const after = await order(oneOpen);
+    expect(after.folders).toEqual(before.folders);
+    expect(after.shared).toEqual(before.shared);
+  });
 });

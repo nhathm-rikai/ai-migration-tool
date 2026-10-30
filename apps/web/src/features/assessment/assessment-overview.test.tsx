@@ -232,6 +232,15 @@ describe('Assessment overview (F03)', () => {
     ).toBeGreaterThan(0);
     // The list counts tables on the inferred view (APP.ORDERS = ORDERS).
     expect(screen.getByText('(gốc: 2)')).toBeTruthy();
+    // The warnings name the assumed schema instead of only "not confirmed".
+    expect(
+      screen.getByText(
+        'Tên bảng được gộp theo schema giả định APP (tiền tố xuất hiện nhiều nhất trong mã nguồn).',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('Ánh xạ tên bảng chưa được xác nhận.'),
+    ).toBeNull();
   });
 
   it('searches, filters and selects programs', async () => {

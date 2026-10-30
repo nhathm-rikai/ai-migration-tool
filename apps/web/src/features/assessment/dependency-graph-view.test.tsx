@@ -108,7 +108,7 @@ describe('UI03 call graph tab', () => {
     const items = within(panel).getAllByRole('listitem');
     expect(items[0]?.textContent).toContain('Cmn00.bas');
     expect(items[0]?.textContent).toContain('đang ẩn');
-    expect(screen.getByLabelText('Hiện 2 module chung')).toBeTruthy();
+    expect(screen.getByLabelText('Hiện module hầu hết program đều dùng (2)')).toBeTruthy();
   });
 
   it('switches to Japanese without losing the focused node', () => {

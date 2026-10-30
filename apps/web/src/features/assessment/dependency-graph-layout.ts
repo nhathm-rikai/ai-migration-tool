@@ -201,8 +201,34 @@ export function layoutRequest(
     for (const member of box.members) boxOf.set(member.id, box.id);
     child(box.id, box.lane, box.width, box.height);
   }
-  for (const node of nodes) {
-    if (boxOf.has(node.id)) continue;
+  // Shared files, ordered by the folders of the programs declaring them
+  // (mean folder position), so they sit across from their users whatever
+  // is open.
+  const folderIndex = new Map(
+    graph.groups.map((group, index) => [group.id, index]),
+  );
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const users = new Map<string, number[]>();
+  for (const edge of edges) {
+    if (edge.kind !== 'member') continue;
+    const program = byId.get(edge.source);
+    const index = folderIndex.get(program?.group ?? '');
+    if (index === undefined) continue;
+    users.set(edge.target, [...(users.get(edge.target) ?? []), index]);
+  }
+  const position = (id: string) => {
+    const values = users.get(id) ?? [];
+    return values.length === 0
+      ? Number.MAX_SAFE_INTEGER
+      : values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+  const unboxed = nodes
+    .filter((node) => !boxOf.has(node.id))
+    .sort(
+      (a, b) =>
+        position(a.id) - position(b.id) || a.label.localeCompare(b.label),
+    );
+  for (const node of unboxed) {
     boxOf.set(node.id, node.id);
     child(node.id, LANE[node.kind], NODE_WIDTH, NODE_HEIGHT);
   }
@@ -227,6 +253,10 @@ export function layoutRequest(
       'elk.spacing.nodeNode': String(GAP + 4),
       'elk.layered.spacing.nodeNodeBetweenLayers': String(LANE_SPACING),
       'elk.edgeRouting': 'POLYLINE',
+      // Keep the order of the request top to bottom: opening or closing a
+      // folder makes room but does not reshuffle the other boxes.
+      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
     },
     children,
     edges: [...layoutEdges.values()],

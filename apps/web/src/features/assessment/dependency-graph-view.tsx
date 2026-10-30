@@ -228,16 +228,31 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     );
   }, [drawn, focus, byId]);
 
-  const toggleBox = useCallback((box: string) => {
-    setOpen((current) => {
-      const next = new Set(current);
-      if (next.has(box)) next.delete(box);
-      else next.add(box);
-      return next;
-    });
-    setRecent(box);
-    setPendingReveal(box);
-  }, []);
+  // Where the toggled box sat on screen: after the new layout the view is
+  // moved so it sits there again (same zoom), instead of jumping to fit it.
+  const anchor = useRef<{ box: string; x: number; y: number } | null>(null);
+  const toggleBox = useCallback(
+    (box: string) => {
+      const node = flow.getNode(box);
+      const view = flow.getViewport();
+      anchor.current = node
+        ? {
+            box,
+            x: node.position.x * view.zoom + view.x,
+            y: node.position.y * view.zoom + view.y,
+          }
+        : null;
+      setOpen((current) => {
+        const next = new Set(current);
+        if (next.has(box)) next.delete(box);
+        else next.add(box);
+        return next;
+      });
+      setRecent(box);
+      setPendingReveal(box);
+    },
+    [flow],
+  );
   const setAllBoxes = (value: boolean) => {
     setOpen(new Set(value ? allBoxes(graph) : []));
     setRecent(null);
@@ -256,7 +271,23 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     )
       return;
     const frame = requestAnimationFrame(() => {
-      if (!flow.getNode(pendingReveal)) return;
+      const node = flow.getNode(pendingReveal);
+      if (!node) return;
+      const kept = anchor.current;
+      anchor.current = null;
+      if (kept?.box === pendingReveal) {
+        const { zoom } = flow.getViewport();
+        void flow.setViewport(
+          {
+            x: kept.x - node.position.x * zoom,
+            y: kept.y - node.position.y * zoom,
+            zoom,
+          },
+          { duration: reducedMotion() ? 0 : 250 },
+        );
+        setPendingReveal(null);
+        return;
+      }
       void flow.fitView({
         nodes: [{ id: pendingReveal }],
         maxZoom: 1,

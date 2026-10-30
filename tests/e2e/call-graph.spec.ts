@@ -150,3 +150,35 @@ test(
     });
   },
 );
+
+// Review regression: when the ELK worker script cannot load, the graph
+// leaves "laying out", says so and is drawn in simple lanes.
+test(
+  'call graph falls back to simple lanes when the layout worker fails to load',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await page
+      .context()
+      .route(/elk-worker[^/]*\.js/, (route) => route.abort('failed'));
+    await page.goto('/');
+    await page.getByLabel('Tên dự án').fill(`UI03 fallback ${Date.now()}`);
+    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
+    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
+    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(
+      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+    ).toBeVisible();
+    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
+    await assessment.getByRole('tab', { name: /^Call graph/ }).click();
+    const canvas = assessment.getByRole('group', {
+      name: 'Call graph toàn dự án',
+    });
+    await expect(canvas.getByText(/Không sắp xếp được graph/)).toBeVisible();
+    await expect(canvas.getByText('Đang sắp xếp graph…')).toHaveCount(0);
+    const node = canvas.getByRole('button', { name: /^Làm nổi bật Program / });
+    await node.first().click();
+    await expect(node.first()).toHaveAttribute('aria-pressed', 'true');
+  },
+);

@@ -357,8 +357,83 @@ export const viMessages = {
       histogramNote: (version: string) => `Tham khảo · ${version}`,
       notAnalyzed: (count: string) => `${count} program chưa phân tích`,
       sectionLabel: 'Chi tiết phân tích',
-      graphSoon:
-        'Call graph toàn dự án sẽ có ở bước tiếp theo. Lời gọi của từng program xem ở tab Lời gọi trong chi tiết program.',
+      graph: {
+        loading: 'Đang tải call graph…',
+        empty: 'Kết quả kiểm kê không có program nào để vẽ graph.',
+        hint: 'Bấm vào một node để làm nổi bật các phụ thuộc trực tiếp; Esc để bỏ chọn.',
+        lanes: {
+          program: 'Program',
+          own: 'Module riêng',
+          shared: 'Module dùng chung',
+          tables: 'Bảng DB · COM',
+        },
+        kinds: {
+          program: 'Program',
+          'own-module': 'Module riêng',
+          'shared-module': 'Dùng chung',
+          table: 'Bảng DB',
+          component: 'COM',
+        },
+        summary: (nodes: string, edges: string, calls: string) =>
+          `${nodes} node · ${edges} cạnh · ${calls} lượt gọi giữa các file`,
+        tableView: {
+          mapped: 'Bảng theo tên sau ánh xạ',
+          raw: 'Bảng theo tên trong source',
+        },
+        showCommon: (count: string) =>
+          `Hiện ${count} module/COM được hơn 80% program dùng`,
+        layoutPending: 'Đang sắp xếp graph…',
+        layoutFailed:
+          'Không sắp xếp được graph tự động; đang hiển thị theo làn đơn giản.',
+        canvasLabel: 'Call graph toàn dự án',
+        rootGroup: '(thư mục gốc)',
+        groupCount: (count: string) => `${count} program`,
+        boxCount: (count: string) => `${count} node`,
+        state: {
+          complete: 'Đầy đủ',
+          partial: 'Chưa đầy đủ',
+          unsupported: 'Chưa phân tích',
+        } satisfies Record<ProgramState, string>,
+        unknownDependencies: 'Chưa phân tích nên chưa biết phụ thuộc',
+        missingMembers: (count: string) =>
+          `${count} file khai báo không tìm thấy`,
+        focusNode: (kind: string, label: string) =>
+          `Làm nổi bật ${kind} ${label}`,
+        calls: (count: string) => `${count} lượt gọi`,
+        commonTitle: 'Common module (fan-in)',
+        commonNote:
+          'Fan-in = số program khai báo file. Module fan-in cao ảnh hưởng nhiều program nhất khi sửa, nên tài liệu hoá trước.',
+        commonHidden: 'đang ẩn',
+        commonNone: 'Không có module dùng chung.',
+        focusedTitle: 'Node đang chọn',
+        clearFocus: 'Bỏ chọn',
+        fanIn: 'Fan-in',
+        fanOut: 'Fan-out',
+        callers: 'File gọi tới',
+        tableTitle: 'Bảng node (thay cho graph)',
+        tableFilter: 'Tìm node',
+        tableKind: 'Loại node',
+        all: 'Tất cả',
+        columns: {
+          node: 'Node',
+          kind: 'Loại',
+          state: 'Trạng thái',
+          fanIn: 'Fan-in',
+          fanOut: 'Fan-out',
+          action: 'Thao tác',
+        },
+        focusAction: 'Làm nổi bật',
+        tableCount: (shown: number, total: number) =>
+          `${shown} / ${total} node`,
+        tablePagination: 'Phân trang bảng node',
+        flow: {
+          controls: 'Điều khiển zoom',
+          zoomIn: 'Phóng to',
+          zoomOut: 'Thu nhỏ',
+          fitView: 'Vừa khung',
+          minimap: 'Bản đồ thu nhỏ',
+        },
+      },
       tablesNone: 'Không phát hiện truy cập bảng.',
       tablesPagination: 'Phân trang bảng DB',
       columns: {

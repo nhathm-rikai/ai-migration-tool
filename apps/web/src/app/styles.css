@@ -1950,3 +1950,320 @@ details.technical[open] > summary {
 .histogram .tone-very-high {
   background: var(--high);
 }
+/* Call graph tab (UI03): canvas + right panel like demo02, table below. */
+.dep-graph-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  animation: fadeUp 350ms ease both;
+}
+.dep-graph-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.dep-graph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.dep-graph-lanes {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dep-graph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-body);
+  cursor: pointer;
+}
+.dep-graph-canvas {
+  position: relative;
+  height: 560px;
+  border: 1px solid #e6ecf3;
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--surface-3);
+  background-image: radial-gradient(#e6ecf3 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.dep-graph-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.dep-node {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(15, 34, 54, 0.1);
+  transition:
+    border-color var(--dur-base),
+    box-shadow var(--dur-base);
+}
+.dep-node-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.dep-node-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-node-type {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.dep-node-own-module .dep-node-type {
+  color: var(--navy);
+}
+.dep-node-shared-module .dep-node-type {
+  color: var(--info);
+}
+.dep-node-table .dep-node-type {
+  color: var(--low);
+}
+.dep-node-component .dep-node-type {
+  color: var(--ai);
+}
+.dep-node-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dep-node-note {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--warn-fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dep-node-state {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  text-transform: none;
+}
+/* Not analysed: dashed outline, never drawn like a program without
+   dependencies. */
+.dep-node-unsupported {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: var(--surface-3);
+}
+.dep-node-partial {
+  border-color: var(--mid);
+}
+.dep-node .react-flow__handle,
+.dep-folder .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+}
+.dep-folder {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 8px 12px;
+  border: 1px dashed var(--brand-edge);
+  border-radius: 14px;
+  background: rgba(227, 241, 251, 0.45);
+  font-size: 12px;
+}
+.dep-folder-label {
+  font-weight: 600;
+  color: var(--navy);
+}
+.dep-edge path.react-flow__edge-path {
+  stroke: var(--line-hover);
+  stroke-width: 1.2;
+}
+.dep-edge-call path.react-flow__edge-path {
+  stroke: var(--info);
+  stroke-opacity: 0.6;
+}
+.has-focus .react-flow__node:not(.linked):not(.react-flow__node-folder) {
+  opacity: 0.35;
+}
+.has-focus .react-flow__edge:not(.linked) {
+  opacity: 0.12;
+}
+.react-flow__node.focused .dep-node {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow:
+    0 0 0 4px rgba(0, 137, 210, 0.15),
+    0 8px 24px rgba(15, 34, 54, 0.12);
+}
+.react-flow__node.linked:not(.focused) .dep-node {
+  border-color: var(--brand-edge);
+}
+.react-flow__edge.linked path.react-flow__edge-path {
+  stroke: var(--brand);
+  stroke-width: 2;
+  stroke-opacity: 1;
+  stroke-dasharray: 6 6;
+  animation: dash 800ms linear infinite;
+}
+.react-flow__edge.linked .react-flow__edge-textbg {
+  fill: var(--surface);
+}
+.react-flow__edge.linked .react-flow__edge-text {
+  font-family: var(--f-mono);
+  font-size: 11px;
+}
+.dep-graph-canvas .react-flow__minimap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.dep-graph-canvas .minimap-folder {
+  fill: var(--brand-soft);
+}
+.dep-graph-canvas .minimap-node {
+  fill: var(--line-hover);
+}
+.dep-graph-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-3);
+}
+.dep-graph-side h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.dep-focus-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dep-focus-label {
+  margin: 8px 0 2px;
+  overflow-wrap: anywhere;
+}
+.dep-focus-card p {
+  font-size: 12px;
+}
+.dep-focus-numbers {
+  display: flex;
+  gap: 18px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.dep-focus-numbers dt {
+  color: var(--fg-2);
+}
+.dep-focus-numbers dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dep-common-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dep-common-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.dep-common-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.dep-common-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e3eaf2;
+  overflow: hidden;
+}
+.dep-common-bar i {
+  display: block;
+  height: 100%;
+  background: var(--info);
+  transform-origin: left;
+  animation: barGrow 800ms var(--ease-out) both;
+}
+.dep-common-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dep-graph-table {
+  grid-column: 1 / -1;
+}
+.dep-graph-table summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.dep-graph-table .program-filters {
+  margin-top: 12px;
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}

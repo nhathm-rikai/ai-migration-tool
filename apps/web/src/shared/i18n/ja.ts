@@ -2,6 +2,7 @@ import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
 } from '@portal/contracts';
+import type { ProgramState } from '../../features/assessment/assessment-summary';
 import type { Messages } from './vi';
 
 export const jaMessages = {
@@ -340,8 +341,83 @@ export const jaMessages = {
       histogramNote: (version: string) => `参考 · ${version}`,
       notAnalyzed: (count: string) => `未解析 ${count} プログラム`,
       sectionLabel: '解析の詳細',
-      graphSoon:
-        'プロジェクト全体のコールグラフは次のステップで提供します。各プログラムの呼び出しはプログラム詳細の「呼び出し」タブで確認できます。',
+      graph: {
+        loading: 'コールグラフを読み込み中…',
+        empty: 'インベントリにグラフを描画するプログラムがありません。',
+        hint: 'ノードをクリックすると直接の依存関係を強調表示します。Esc で解除します。',
+        lanes: {
+          program: 'プログラム',
+          own: '専用モジュール',
+          shared: '共通モジュール',
+          tables: 'DBテーブル · COM',
+        },
+        kinds: {
+          program: 'プログラム',
+          'own-module': '専用モジュール',
+          'shared-module': '共通',
+          table: 'DBテーブル',
+          component: 'COM',
+        },
+        summary: (nodes: string, edges: string, calls: string) =>
+          `${nodes} ノード · ${edges} エッジ · ファイル間呼び出し ${calls} 回`,
+        tableView: {
+          mapped: 'マッピング後のテーブル名',
+          raw: 'ソース上のテーブル名',
+        },
+        showCommon: (count: string) =>
+          `80% を超えるプログラムが使うモジュール/COM（${count} 件）を表示`,
+        layoutPending: 'グラフを配置中…',
+        layoutFailed:
+          '自動配置できなかったため、簡易レーン配置で表示しています。',
+        canvasLabel: 'プロジェクト全体のコールグラフ',
+        rootGroup: '（ルートフォルダ）',
+        groupCount: (count: string) => `${count} プログラム`,
+        boxCount: (count: string) => `${count} ノード`,
+        state: {
+          complete: '完全',
+          partial: '不完全',
+          unsupported: '未解析',
+        } satisfies Record<ProgramState, string>,
+        unknownDependencies: '未解析のため依存関係は不明です',
+        missingMembers: (count: string) =>
+          `宣言されたファイル ${count} 件が見つかりません`,
+        focusNode: (kind: string, label: string) =>
+          `${kind} ${label} を強調表示`,
+        calls: (count: string) => `呼び出し ${count} 回`,
+        commonTitle: '共通モジュール（ファンイン）',
+        commonNote:
+          'ファンイン = ファイルを宣言するプログラム数。ファンインが高いモジュールは変更の影響が大きいため、先にドキュメント化することを推奨します。',
+        commonHidden: '非表示中',
+        commonNone: '共通モジュールはありません。',
+        focusedTitle: '選択中のノード',
+        clearFocus: '選択解除',
+        fanIn: 'ファンイン',
+        fanOut: 'ファンアウト',
+        callers: '呼び出し元ファイル',
+        tableTitle: 'ノード一覧（グラフの代替表）',
+        tableFilter: 'ノードを検索',
+        tableKind: 'ノード種別',
+        all: 'すべて',
+        columns: {
+          node: 'ノード',
+          kind: '種別',
+          state: '状態',
+          fanIn: 'ファンイン',
+          fanOut: 'ファンアウト',
+          action: '操作',
+        },
+        focusAction: '強調表示',
+        tableCount: (shown: number, total: number) =>
+          `${shown} / ${total} ノード`,
+        tablePagination: 'ノード一覧のページ',
+        flow: {
+          controls: 'ズーム操作',
+          zoomIn: '拡大',
+          zoomOut: '縮小',
+          fitView: '全体を表示',
+          minimap: 'ミニマップ',
+        },
+      },
       tablesNone: 'テーブルアクセスは検出されませんでした。',
       tablesPagination: 'DBテーブルのページ',
       columns: {

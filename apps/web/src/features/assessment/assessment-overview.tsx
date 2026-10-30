@@ -1,5 +1,7 @@
 import {
   Fragment,
+  Suspense,
+  lazy,
   useEffect,
   useId,
   useMemo,
@@ -50,7 +52,7 @@ import { useRunAssessment } from './use-run-assessment';
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
 // KPI cards, line split and complexity histogram, the corpus totals apart
 // from per-program totals, warnings, then tabs for the program list (detail
-// opens inline under its row), the call graph (UI03) and the project-wide
+// opens inline under its row), the call graph (UI03, loaded lazily) and the project-wide
 // CRUD matrix. Version/snapshot metadata stays under "technical
 // information". Parent keys it by run.
 
@@ -104,6 +106,14 @@ export function AssessmentOverview({
 
 type Tab = 'programs' | 'graph' | 'tables';
 const TABS: Tab[] = ['programs', 'graph', 'tables'];
+
+// The call graph and its libraries (React Flow, ELK) load only when the
+// tab is first opened.
+const DependencyGraphView = lazy(() =>
+  import('./dependency-graph-view').then((module) => ({
+    default: module.DependencyGraphView,
+  })),
+);
 
 const EMPTY_FILTER: ProgramFilter = { query: '', state: 'all', level: 'all' };
 const DEFAULT_SORT: ProgramSort = { key: 'complexity', direction: 'desc' };
@@ -179,6 +189,9 @@ function ArtifactView({
     [artifact.payload, summary.programs],
   );
   const [tab, setTab] = useState<Tab>('programs');
+  // Kept mounted once opened, so its layout is not computed again.
+  const [graphOpened, setGraphOpened] = useState(false);
+  if (tab === 'graph' && !graphOpened) setGraphOpened(true);
   const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const baseId = useId();
@@ -277,7 +290,13 @@ function ArtifactView({
           aria-labelledby={`${panelId('graph')}-tab`}
           hidden={tab !== 'graph'}
         >
-          <p className="notice">{copy.dashboard.graphSoon}</p>
+          {graphOpened && (
+            <Suspense
+              fallback={<p role="status">{copy.dashboard.graph.loading}</p>}
+            >
+              <DependencyGraphView inventory={artifact.payload} />
+            </Suspense>
+          )}
         </div>
         <div
           role="tabpanel"

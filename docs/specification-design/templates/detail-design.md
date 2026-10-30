@@ -1,6 +1,6 @@
 # Detail Design — <PROGRAM> — <Tên chức năng>
 
-**DRAFT TEMPLATE — spec-design-templates-0.7.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
+**DRAFT TEMPLATE — spec-design-templates-0.8.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
 
 Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ procedure. Một xử lý có thể gồm nhiều procedure, một procedure có thể phục vụ nhiều xử lý. ID xử lý là tham chiếu Markdown, không thêm field vào understanding-v1. Mọi mục có nội dung hoặc “không áp dụng” kèm lý do/phạm vi đã kiểm hoặc “chưa xác định” kèm Q-ID. E-ref trỏ evidence registry mục 7.
 
@@ -8,7 +8,7 @@ Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ proc
 
 ### 1.1 Thông tin và danh sách xử lý
 
-<unit/program, project/entrypoint path và alias, ngôn ngữ/runtime phát hiện (dẫn coverage), snapshot/version được cung cấp, mục đích, loại màn hình/báo cáo/xử lý chung, phạm vi và giới hạn>
+<unit/program, project/entrypoint path và alias, ngôn ngữ/runtime phát hiện, snapshot/version được cung cấp, mục đích, loại màn hình/báo cáo/xử lý chung, phạm vi và giới hạn>
 
 | ID xử lý | Tên/mục đích | Trigger/entry point | Procedure chính | Mục chi tiết | BR/Q-ID | E-ref |
 | -------- | ------------ | ------------------- | --------------- | ------------ | ------- | ----- |
@@ -134,12 +134,12 @@ Reference Markdown phải tồn tại, rõ version/snapshot. JSON v1 theo [mappi
 
 Xét theo [checklist semantics chung](../analysis-method.md#4-checklist-semantics-chung) cho ngôn ngữ thực: kiểu/null, số học/rounding, chuỗi/ngày/locale, scope/state, lỗi/cleanup, transaction/đồng thời, biên dịch có điều kiện/macro/include, gọi động và hành vi ngầm. Không tự chọn build config, không mượn semantics của ngôn ngữ khác hoặc của mẫu tham khảo.
 
-## 7. Coverage, questions và evidence registry
+## 7. Phạm vi phân tích và evidence registry
 
 | File/inventory symbol ID/file-level code | ID xử lý/mục mô tả | Đã/chưa phân tích | Phần thiếu/chunk | Coverage/Q-ID |
 | ------------------------------------ | ------------------ | ----------------- | ---------------- | ------------- |
 
-Đối chiếu [coverage](coverage.md) và [questions](open-questions.md). Mọi đơn vị logic mục 2 phải ánh xạ hoặc có lý do chưa phân tích. Số đo do công cụ cung cấp, không AI tự đếm.
+Đối chiếu phạm vi đã đọc trong phần đầu chung và mục Câu hỏi mở. Mọi đơn vị logic mục 2 phải ánh xạ hoặc có lý do chưa phân tích. Số đo do công cụ cung cấp, không AI tự đếm.
 
 | E-ref | Relative POSIX path | Symbol nếu biết | startLine/endLine gốc | Claim/mục sử dụng |
 | ----- | ------------------- | --------------- | --------------------- | ----------------- |

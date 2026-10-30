@@ -1,6 +1,6 @@
 # Specification design — yêu cầu nội dung đầu ra
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.8.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.9.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -51,7 +51,7 @@ SD-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm l
 4. DB access theo call site: SQL nguyên dạng hoặc biểu thức xây SQL, biến tham gia, operation/table nhận diện được, connection, transaction boundary, handling kết quả/lỗi.
 5. File/library/native API/network/message queue/print/CSV/integration: interface thấy trong source, trạng thái dependency, giới hạn phân tích.
 6. Rủi ro hiểu sai: type conversion, null/missing values, precision/overflow, locale/date, state/lifecycle, error propagation, concurrency/async và conditional compilation theo [checklist semantics chung](../analysis-method.md#4-checklist-semantics-chung). Chỉ ghi hiện tượng có bằng chứng; không khẳng định semantics chưa được xác minh.
-7. Coverage đối chiếu inventory symbol của công cụ được chọn và open questions.
+7. Phạm vi đã đọc (phần đầu chung) đối chiếu inventory symbol của công cụ được chọn; câu hỏi mở ở mục Câu hỏi mở cuối tài liệu.
 
 SD-DD-01: không chỉ paraphrase source từng dòng. Mô tả nhánh, trạng thái và tác động đủ để người review kiểm tra tính tương đương.
 

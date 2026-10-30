@@ -30,8 +30,8 @@ Template, ID, cách đóng gói, adapter, calibration và bổ sung checklist l�
 | 9 DB              | [deliverables](rules/deliverables.md), [DB template](templates/db-design.md)         | Usage không bịa DDL; giữ unresolved/X                                                     |
 | 10 Contract       | [artifacts](rules/artifacts.md), [mapping](contract-mapping.md)                      | Không đổi schema; metadata đề xuất tách riêng                                             |
 | 11 Chỉ dẫn tác vụ | [README](README.md), [phiếu input](templates/input-context.md)                       | Theo yêu cầu tinh gọn: bỏ file prompt riêng; dùng rule + template + context chung hai CLI |
-| 12 Review         | [checklist](review-checklist.md), [questions](templates/open-questions.md)           | Ba lớp, append-only, không giả reviewer                                                   |
-| 13 KPI            | [checklist](review-checklist.md), [coverage](templates/coverage.md)                  | Mẫu số 15/BR reviewed, zero chưa đo                                                       |
+| 12 Review         | [checklist](review-checklist.md), câu hỏi mở trong từng tài liệu                    | Ba lớp, append-only, không giả reviewer                                                   |
+| 13 KPI            | [checklist](review-checklist.md), phạm vi đã đọc trong từng tài liệu                | Mẫu số 15/BR reviewed, zero chưa đo                                                       |
 | 14 KB             | [KB](knowledge-base.md)                                                              | Approval/version/trace/retrieval                                                          |
 | 15 Provider       | [runbook](runbook.md)                                                                | Cùng baseline, calibration lại                                                            |
 | 16 Áp dụng        | [runbook](runbook.md)                                                                | Tách direct CLI calibration khỏi Portal LIVE; cả hai có preflight riêng                   |

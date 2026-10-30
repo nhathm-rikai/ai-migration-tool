@@ -24,7 +24,7 @@ DDL/ảnh/report có provenance riêng nhưng evidence v1 vẫn là text path/ra
 
 ## Khoảng trống đa ngôn ngữ cần review
 
-Language/dialect/runtime/framework/build config và cross-language dependency do agent nhận diện và ghi trong coverage Markdown; encoding theo file và unit-to-entrypoint mapping ghi trong phiếu input. Không tự thêm field hoặc enum language/profile vào payload, envelope hay source-inventory-v1. Đổi rule không làm P1/parser trở thành đa ngôn ngữ.
+Language/dialect/runtime/framework/build config và cross-language dependency do agent nhận diện và ghi trong phần đầu chung của tài liệu Markdown; encoding theo file và unit-to-entrypoint mapping ghi trong phiếu input. Không tự thêm field hoặc enum language/profile vào payload, envelope hay source-inventory-v1. Đổi rule không làm P1/parser trở thành đa ngôn ngữ.
 
 Trước tích hợp cần đối chiếu schema/profile registry và validator thực tế cho từng ngôn ngữ; đề xuất version hóa metadata/capability, inventory symbol, generated-source provenance/source map và metric coverage nếu contract chưa đủ. Binary/AST/generated locations không được giả thành text line evidence. Chưa đủ decoder/manifest/evidence thì không chạy understanding-v1 cho source đó; document-draft chỉ ghi phần có evidence hợp lệ và giới hạn theo [quy trình phân tích](analysis-method.md).
 
@@ -32,7 +32,7 @@ Trước tích hợp cần đối chiếu schema/profile registry và validator 
 
 Report templates hiện chỉ là section Markdown: report/mode/field/region/query IDs, mapping cell/CSV, dynamic block, formula owner, serialization và provenance layout chưa có bảng máy đọc riêng trong v1. Ghi phần tổng quát trong designs đúng schema khi dùng JSON; không thêm các field này. Nếu cần per-report artifact/layout xlsx, review packaging và metadata trước tích hợp; xem [hướng dẫn report](report-templates.md).
 
-1. Chọn review sáu Markdown thủ công hay bổ sung payload specification-design có version riêng.
+1. Chọn review bốn Markdown thủ công hay bổ sung payload specification-design có version riêng.
 2. Nếu mở rộng, thiết kế schema screen/item/event, procedure/call site, DB usage, coverage/chunk, external provenance, shared references; review mapping không mất dữ liệu và giới hạn trước tích hợp.
 3. Duyệt bổ sung metadata envelope; tách khỏi AI payload. Không chỉ sửa prompt.
 4. Có reader v1 tương thích, contract parity và fixture success/failure cho references/unknown/metadata giả/quote.

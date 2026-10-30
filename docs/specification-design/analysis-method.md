@@ -1,16 +1,16 @@
 # Quy trình phân tích source đa ngôn ngữ
 
-**DRAFT — spec-design-rules-0.8.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
+**DRAFT — spec-design-rules-0.9.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
 
 ## 1. Nguyên tắc: không dùng profile theo ngôn ngữ
 
-Source thuộc ngôn ngữ nào trong allowlist thì phân tích theo đúng ngôn ngữ đó. Pack không có file profile riêng cho từng ngôn ngữ; người vận hành không bắt buộc khai báo ngôn ngữ/runtime trong [phiếu input](templates/input-context.md). Agent tự nhận diện ở bước 0, ghi kết quả có căn cứ vào [coverage](templates/coverage.md), rồi áp cùng một quy trình và cùng bộ template trung lập cho mọi ngôn ngữ, kể cả dự án trộn nhiều ngôn ngữ.
+Source thuộc ngôn ngữ nào trong allowlist thì phân tích theo đúng ngôn ngữ đó. Pack không có file profile riêng cho từng ngôn ngữ; người vận hành không bắt buộc khai báo ngôn ngữ/runtime trong [phiếu input](templates/input-context.md). Agent tự nhận diện ở bước 0, ghi kết quả có căn cứ vào phần đầu chung của tài liệu ([README](README.md#phần-đầu-và-phần-cuối-chung)), rồi áp cùng một quy trình và cùng bộ template trung lập cho mọi ngôn ngữ, kể cả dự án trộn nhiều ngôn ngữ.
 
 Ví dụ ngôn ngữ trong pack (VB6, Java, COBOL…) chỉ để minh họa, không phải danh sách hỗ trợ. Không mượn semantics, thang complexity, ngưỡng KPI hoặc kết quả calibration của ngôn ngữ này cho ngôn ngữ khác.
 
 ## 2. Bước 0 — tự nhận diện ngôn ngữ và thành phần
 
-Thực hiện trước khi viết BR/design. Ghi vào mục "Ngôn ngữ và thành phần phát hiện" của coverage.
+Thực hiện trước khi viết BR/design. Ghi vào dòng ngôn ngữ/runtime và phạm vi đã đọc trong phần đầu chung của tài liệu.
 
 | Cần nhận diện                 | Căn cứ và cách ghi                                                                                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -32,7 +32,7 @@ Agent không tự làm các việc thuộc công cụ: decode encoding, tính ha
 3. Theo luồng dữ liệu và trạng thái: input → validation/quyền → nhánh/vòng lặp → phép tính → DB/file/network side effect → output; xét cả lỗi, hủy, retry và cleanup nếu source có.
 4. Theo dependency xuyên file/ngôn ngữ qua interface có evidence, ví dụ route → service → SQL, template → handler, mapper XML/annotation → SQL, job step → program, queue producer → consumer, native/FFI. Wiring qua config/DI chỉ được resolve khi có evidence ở cả config và code; có tên API không chứng minh implementation phía bên kia; thiếu body ghi unresolved/Q-ID.
 5. Trả lời checklist semantics ở mục 4 cho từng claim liên quan, theo ngôn ngữ thực.
-6. Điền template theo mục 5; đối chiếu BR/design/DB/questions/coverage bằng ID. Áp [evidence rules](rules/context-evidence.md) và [review checklist](review-checklist.md).
+6. Điền template theo mục 5; đối chiếu BR/design/DB/Q-ID bằng ID. Áp [evidence rules](rules/context-evidence.md) và [review checklist](review-checklist.md).
 
 ## 4. Checklist semantics chung
 
@@ -92,8 +92,8 @@ Nguyên tắc **sửa quy trình, không vá output**: finding TL ghi cho từng
 | Phase | Mục tiêu | Đầu ra | Điều kiện qua phase |
 | ----- | -------- | ------ | ------------------- |
 | 0. Feasibility | Program có đủ điều kiện phân tích không: source legacy, output P1 (1.1 bắt buộc), program thuộc Source Inventory, quyền, CLI | Go/no-go trước khi gọi agent | Go; no-go ghi lý do, không gọi model |
-| 1. Map và chuẩn hóa | Agent đọc thứ tự/phụ thuộc từ output P1 1.3 (chung trước riêng), ghi cycle nếu P1 báo; lập bảng điểm ngầm định | Mục "Điểm ngầm định" và boundary trong [coverage](templates/coverage.md) | Mọi file allowlist có vai trò; câu hỏi diễn giải chưa rõ đã có Q-ID |
-| 2. Sinh | Agent sinh các tài liệu ở mục 3 phiếu input (TL chọn + sinh kèm theo [SD-CT-07](rules/artifacts.md)) kèm coverage/open-questions, ghi dần từng đơn vị và chạy tiếp được khi bị dừng ([SD-CT-08](rules/artifacts.md)), tự kiểm theo [checklist](review-checklist.md) | Markdown trong output program | Đủ tài liệu ở mục 3; coverage `hoàn tất`; self-check không phải approval |
+| 1. Map và chuẩn hóa | Agent đọc thứ tự/phụ thuộc từ output P1 1.3 (chung trước riêng), ghi cycle nếu P1 báo; lập bảng điểm ngầm định | Điểm ngầm định và boundary ghi ngay trong section tương ứng của tài liệu (kèm E-ref/Q-ID) | Mọi file allowlist có vai trò; câu hỏi diễn giải chưa rõ đã có Q-ID |
+| 2. Sinh | Agent sinh các tài liệu ở mục 3 phiếu input (TL chọn + sinh kèm theo [SD-CT-07](rules/artifacts.md)), ghi dần từng đơn vị và chạy tiếp được khi bị dừng ([SD-CT-08](rules/artifacts.md)), tự kiểm theo [checklist](review-checklist.md) | Markdown trong output program | Đủ tài liệu ở mục 3; mọi tài liệu `hoàn tất`; self-check không phải approval |
 | 3. TL review | Output trả về Portal; TL review 3 lớp theo [checklist](review-checklist.md) | Quyết định approve/reject và finding của TL | TL duyệt; reject thì chạy lại program hoặc sửa pack |
 
 Không áp dụng từ kit: rulebook, stress-test, reviewer/fixer agent, run manifest, dịch/compile/build survey, smoke test, parity harness chạy source cũ (cấm chạy source khách hàng), script dependency map (thứ tự lấy từ P1 1.3).

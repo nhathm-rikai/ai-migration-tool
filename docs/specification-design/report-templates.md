@@ -1,12 +1,12 @@
 # Cách dùng template Report/Export
 
-**DRAFT — spec-design-templates-0.7.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
+**DRAFT — spec-design-templates-0.8.0-draft** (thay p2-report-templates-0.1.0-draft), 22/10/2026. [README](README.md).
 
 ## Ghép vào bộ specification-design
 
 1. Basic Design mục 6 liệt kê report + mode. Với mỗi đầu ra khác biệt, điền [Basic report](templates/basic-design-report.md) thành phần con của mục 6 trong basic-design.md.
 2. Detail Design mục 4.1 dẫn cùng Report ID/mode tới [Detail report](templates/detail-design-report.md), điền thành phần con tại mục đó trong detail-design.md. Tái sử dụng inventory/common/evidence của program; khối report sở hữu logic export, không lặp lại cả khối xử lý chung.
-3. Giữ sáu Markdown hiện có. Hai file template mới là đầu vào để ghép section, không mặc định thêm hai artifact đầu ra. Khi cần tách per-report file hoặc layout xlsx/preview riêng, ghi đề xuất packaging/version/manifest để review trước tích hợp máy đọc.
+3. Giữ bốn Markdown hiện có. Hai file template mới là đầu vào để ghép section, không mặc định thêm hai artifact đầu ra. Khi cần tách per-report file hoặc layout xlsx/preview riêng, ghi đề xuất packaging/version/manifest để review trước tích hợp máy đọc.
 4. Không có report sau khi kiểm đủ phạm vi → không áp dụng + lý do. Chưa đọc đủ → chưa xác định + Q-ID. Không bỏ mục chỉ vì không có template layout; mô tả phần có chứng cứ và ghi thiếu.
 5. Input ghi revision template set, danh sách report/mode, resource/config/layout được phép dùng và provenance. Cùng rule + template + context dùng cho cả hai CLI. JSON v1 chỉ biểu diễn phần tổng quát, không thêm report/layout/schema fields.
 

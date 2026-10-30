@@ -8,7 +8,11 @@ export const HealthSchema = Type.Object(
   {
     status: Type.Literal('ok'),
     mode: Type.Literal('fixture'),
-    runner: Type.Literal('fake'),
+    runner: Type.Union([
+      Type.Literal('fake'),
+      Type.Literal('claude-cli'),
+      Type.Literal('codex-cli'),
+    ]),
   },
   { additionalProperties: false },
 );

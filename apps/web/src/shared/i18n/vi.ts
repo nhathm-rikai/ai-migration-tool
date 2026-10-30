@@ -1,6 +1,7 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  type DocumentRunErrorCode,
 } from '@portal/contracts';
 import type {
   AnalyzeApiErrorCode,
@@ -49,7 +50,7 @@ export const viMessages = {
     pageTitles: {
       source: 'Nạp source code của khách hàng',
       analysis: 'Phân tích source code',
-      documents: 'Tạo tài liệu',
+      documents: 'Generate tài liệu với Agent CLI',
       review: 'Review & duyệt tài liệu',
       quote: 'Báo giá',
     },
@@ -570,6 +571,164 @@ export const viMessages = {
         'Không tìm thấy phiên bản kết quả này trong dự án. Tải lại lượt chạy.',
       mismatch:
         'Kết quả nhận được không khớp phiên bản đã yêu cầu. Tải lại kết quả.',
+    },
+  },
+  documents: {
+    lead: 'Tạo tài liệu theo bộ specification-design cho program đã chọn ở bước Phân tích: chọn tài liệu cần tạo, Agent CLI viết gói tài liệu cho program đó.',
+    configLabel: 'Cấu hình',
+    runLabel: 'Tiến trình generate',
+    programTitle: 'Program',
+    changeProgram: 'Đổi program',
+    chooseProgram: 'Chọn program',
+    noProgram:
+      'Chưa chọn program. Ở bước Phân tích, mở một program rồi bấm "Tạo tài liệu cho program này".',
+    programMissing: (key: string) =>
+      `Program ${key} không có trong lượt phân tích mới nhất. Chọn lại ở bước Phân tích.`,
+    programFacts: (files: number, forms: number, shared: number) =>
+      `${files} file riêng · ${forms} form · ${shared} module dùng chung`,
+    programsLoading: 'Đang đọc thông tin program…',
+    programsFailed: 'Không đọc được kết quả phân tích của program.',
+    documentsTitle: 'Tài liệu cần tạo',
+    documentsCount: (selected: number, total: number) =>
+      `Đã chọn ${selected} / ${total}`,
+    specDocs: {
+      'business-rules': {
+        name: 'Business rules',
+        detail: 'Quy tắc nghiệp vụ hiện trạng, có evidence',
+      },
+      'basic-design': {
+        name: 'Thiết kế cơ bản',
+        detail: 'Màn hình, item, chức năng (kèm BR)',
+      },
+      'detail-design': {
+        name: 'Thiết kế chi tiết',
+        detail: 'Xử lý theo function (kèm BR, Basic, DB)',
+      },
+      'db-design': {
+        name: 'Thiết kế CSDL',
+        detail: 'Bảng, CRUD, SQL theo call site',
+      },
+    },
+    companion: 'sinh kèm',
+    always:
+      'Tài liệu tham chiếu được sinh kèm theo SD-CT-07. Trạng thái sinh, phạm vi đã đọc và câu hỏi mở nằm ngay trong từng tài liệu.',
+    agentTitle: 'Cấu hình Agent',
+    model: 'Model',
+    outputLanguage: 'Ngôn ngữ đầu ra',
+    languages: { vi: 'Tiếng Việt', ja: '日本語', en: 'English' },
+    defaultModel: 'Mặc định của CLI',
+    fakeRunner:
+      'Backend đang dùng runner giả: không gọi AI, gói tài liệu tạo ra là bản DEMO.',
+    codexRunner:
+      'Backend đang dùng Codex CLI: chỉ dành cho dev/test với dữ liệu demo hoặc fixture sạch. Môi trường thật dùng Claude Code CLI.',
+    draftPack: (pack: string) =>
+      `Bộ specification-design ${pack} đang DRAFT, chưa duyệt: output chỉ là bản nháp calibration.`,
+    ready: 'sẵn sàng',
+    ringLabel: (done: number, total: number) =>
+      `Đã xong ${done} / ${total} tài liệu`,
+    readyTitle: (name: string) => `Sẵn sàng tạo tài liệu cho ${name}`,
+    plan: (files: number) =>
+      `Agent viết một gói ${files} file Markdown cho program này.`,
+    runTitles: {
+      queued: (_done: number, total: number) =>
+        `Đang chờ tạo ${total} tài liệu`,
+      running: (done: number, total: number) =>
+        `Đang tạo tài liệu · ${done} / ${total}`,
+      cancelling: () => 'Đang dừng Agent…',
+      succeeded: (done: number) => `Đã tạo xong ${done} tài liệu`,
+      failed: (done: number, total: number) =>
+        `Chưa tạo xong tài liệu · ${done} / ${total}`,
+      cancelled: () => 'Đã hủy generate',
+      interrupted: () => 'Generate bị gián đoạn',
+    },
+    runState: {
+      queued: 'đang chờ',
+      running: 'đang chạy',
+      cancelling: 'đang dừng',
+      succeeded: 'hoàn tất',
+      failed: 'có lỗi',
+      cancelled: 'đã hủy',
+      interrupted: 'gián đoạn',
+    },
+    itemStatus: {
+      pending: 'Chờ',
+      running: 'Đang phân tích…',
+      succeeded: 'Xong',
+      failed: 'Lỗi',
+      skipped: 'Bỏ qua',
+      stopped: 'Đã dừng',
+    },
+    elapsed: 'Thời gian',
+    tokens: 'Token',
+    filesWritten: 'File đã ghi',
+    start: 'Bắt đầu generate',
+    rerun: 'Chạy lại',
+    goReview: 'Sang review',
+    starting: 'Đang gửi…',
+    cancel: 'Dừng',
+    cancelling: 'Đang dừng…',
+    queueTitle: 'Program trong lượt chạy',
+    noneSelected: 'Chọn program ở bước Phân tích và ít nhất một tài liệu.',
+    otherActive: (name: string) =>
+      `Dự án đang có lượt tạo tài liệu cho ${name}; chờ lượt đó xong rồi mới bắt đầu.`,
+    openOther: 'Mở lượt đó',
+    reading: 'Agent đang đọc phiếu input, bộ spec và source…',
+    docStatus: {
+      pending: 'Chờ',
+      writing: 'Đang viết…',
+      written: 'Đã viết · chờ kiểm',
+      done: 'Xong',
+      notWritten: 'Không tạo',
+    },
+    view: 'Xem',
+    demoNoSource:
+      'Dự án demo không có file source, mà bộ specification-design yêu cầu đọc source: Agent CLI sẽ không tạo được tài liệu hoàn tất. Hãy dùng dự án có source (mã nguồn trên máy này).',
+    working: 'Agent đang đọc và viết tài liệu…',
+    codexProgress:
+      'Codex trả cả gói tài liệu một lần ở cuối, nên trạng thái từng tài liệu chỉ cập nhật khi Codex trả lời xong.',
+    downloadMd: 'Tải .md',
+    close: 'Đóng',
+    draftNotice:
+      'Bản nháp do AI viết theo bộ specification-design DRAFT, chưa review: cần TL kiểm tra trước khi dùng.',
+    documentLoading: 'Đang mở file…',
+    loading: 'Đang đọc trạng thái tạo tài liệu…',
+    loadFailed: 'Không đọc được trạng thái tạo tài liệu.',
+    connectionLost:
+      'Mất kết nối với backend; đang thử lại. Lượt chạy không bị hủy.',
+    startUnknown:
+      'Chưa rõ yêu cầu generate đã được nhận chưa. Bấm lại để gửi lại đúng yêu cầu đó.',
+    recovery:
+      'Có tiến trình Agent của lần chạy trước có thể vẫn đang sống. Hãy tắt tiến trình đó rồi khởi động lại backend.',
+    needAnalysis: {
+      title: 'Chưa có kết quả phân tích',
+      help: 'Danh sách program lấy từ kết quả phân tích ở bước 2. Chạy phân tích thành công trước.',
+      action: 'Đến bước Phân tích',
+    },
+    runErrors: {
+      AGENT_UNAVAILABLE:
+        'Không tìm thấy Agent CLI trên máy này (cần file thực thi, ví dụ claude.exe trên PATH hoặc PORTAL_AGENT_CLI).',
+      AGENT_AUTH_FAILED:
+        'Agent CLI chưa đăng nhập hoặc phiên đăng nhập đã hết hạn. Mở terminal, đăng nhập lại CLI đang dùng (claude, hoặc codex login) rồi thử lại.',
+      AGENT_QUOTA_EXCEEDED:
+        'Agent CLI đã hết hạn mức sử dụng. Thử lại sau khi hạn mức được làm mới.',
+      AGENT_FAILED: 'Agent CLI dừng với lỗi. Xem log bên dưới.',
+      AGENT_OUTPUT_INVALID:
+        'Agent không trả về đúng gói file theo yêu cầu. Xem log rồi thử lại.',
+      PACKAGE_INCOMPLETE:
+        'Có tài liệu chưa "hoàn tất": gói chưa được gửi review. Chạy lại program này.',
+      INPUT_UNAVAILABLE:
+        'Không đọc được kết quả phân tích hoặc snapshot source của program.',
+      ARTIFACT_WRITE_FAILED:
+        'Không ghi được file tài liệu vào thư mục dữ liệu.',
+      TIMEOUT: 'Generate quá thời gian cho phép và đã bị dừng.',
+      STOP_UNCONFIRMED:
+        'Không xác nhận được tiến trình Agent đã dừng. Khởi động lại backend sau khi kiểm tra.',
+      INTERNAL_ERROR: 'Backend gặp lỗi khi tạo tài liệu.',
+    } satisfies Record<DocumentRunErrorCode, string>,
+    requestErrors: {
+      ANALYSIS_REQUIRED:
+        'Lượt phân tích này chưa có kết quả kiểm kê. Chạy phân tích lại rồi thử.',
+      DOCUMENT_NOT_FOUND: 'File này không có hoặc gói chưa hoàn tất.',
     },
   },
   errors: {

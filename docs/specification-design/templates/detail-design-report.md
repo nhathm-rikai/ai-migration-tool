@@ -1,6 +1,6 @@
 # Detail Design Report/Export — <PROGRAM> / <REPORT-ID> / <MODE>
 
-**DRAFT TEMPLATE — spec-design-templates-0.7.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
+**DRAFT TEMPLATE — spec-design-templates-0.8.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
 
 REPORT-ID/MODE và query/region/field IDs là tham chiếu Markdown, không thêm schema. Mọi mục có nội dung hoặc lý do không áp dụng hoặc chưa xác định + Q-ID. Không kế thừa session/web/DB/rounding từ mẫu tham khảo.
 

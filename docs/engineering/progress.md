@@ -1,5 +1,97 @@
 # Tiến độ kỹ thuật Portal
 
+## 2026-10-29 - Remove prototype screen selector
+
+Removed the floating screen-selector markup, unused CSS and JavaScript listeners from the standalone design HTML. Hash and sidebar navigation remain available. Scope: prototype UI only; no app/API changes.
+
+## 30/10/2026 — Bước 3: nút theo design (Dừng / Sang review / Chạy lại)
+
+- Theo prototype: đang chạy là "Dừng" (thay "Hủy"); xong thành công là "Chạy lại" (phụ, icon refresh) + "Sang review" (chính, link `/projects/<id>/review?program=<projectPath>`); thất bại/hủy/gián đoạn chỉ "Chạy lại" (chính). "Chạy lại" tạo run mới với lựa chọn tài liệu/model/ngôn ngữ hiện tại (key idempotency mới). Bước 4 Review vẫn là trang "Chưa khả dụng" cho tới khi được làm.
+- Kiểm chứng: web (thêm 2 test: link review + chạy lại sau thành công; chỉ chạy lại sau thất bại), tsc/eslint sạch; trình duyệt: gói Claude đã xong của SampleProject hiện "Chạy lại" + "Sang review" đúng href.
+
+## 30/10/2026 — Bước 3: hiển thị tài liệu dạng Markdown đã render
+
+- Thêm `react-markdown@10.1.0` + `remark-gfm@4.0.1` (web, ghim version, thuần JS, không install script). `MarkdownView` render heading/bảng GFM/code/blockquote, `skipHtml` (HTML thô trong tài liệu bị bỏ, không parse), bộ lọc URL mặc định bỏ `javascript:`/`data:`, link ngoài `target=_blank rel=noopener noreferrer`, bảng rộng cuộn ngang (FE-06). Viewer thêm nút "Tải .md" (Blob tại trình duyệt). `MarkdownView` tải lười (`React.lazy`): bundle chính 361 kB (trước 526 kB, hết cảnh báo >500 kB), chunk Markdown 166 kB chỉ tải khi bấm Xem. Mermaid và xuất .docx chưa làm (export thuộc bước sau, FE-05).
+- `npm audit` báo `fast-uri` (moderate) qua fastify/ajv của API — có từ trước, không do gói mới.
+- Kiểm chứng: web 153/153 (thêm render bảng/heading; bỏ `<script>`, `<img onerror>`, link `javascript:`), tsc/eslint sạch; trình duyệt: tài liệu Claude thật của SampleProject hiện 4 bảng, heading, khối code, cột nhãn không ngắt chữ.
+
+## 30/10/2026 — Bước 3: thanh tiến độ trái→phải và vòng % tăng dần theo bước thật
+
+- Phản hồi khi chạy Claude: thanh chạy qua lại (indeterminate) và vòng % chỉ nhảy khi xong tài liệu, khác design (thanh lấp dần, % tăng dần).
+- Giữ FE-02 (không % giả theo thời gian): đếm bước biết trước. Contract `StepCount`; item `reading` = file nhiệm vụ yêu cầu đã được mở (khớp đường dẫn trong log Read/lệnh shell) / tổng; tài liệu `sections` = heading + dòng "Trạng thái sinh" đã stream / số đó trong template (BR 3, Basic 10, DB 7, Detail 21), giữ dưới tổng tới `END FILE`. UI: thanh program và thanh tài liệu có `width` theo tỉ lệ + `transition`, vòng % = tổng bước xong / tổng bước với tween 0,9 s (tôn trọng reduced-motion); thanh indeterminate chỉ còn cho run cũ không có số đếm.
+- Smoke Claude thật (BR + Basic, `vb6-sample`): đọc — thanh program 21%→100%, vòng 11%→51% trong ~21 s; viết — BR 33%→100%, Basic 40%→50%→…→90%→100%, vòng 53%→75%→96%→100%.
+- Kiểm chứng: API (templateSections, đếm section live, `reading`/`sections` đầy khi thành công, total Basic = 10) pass; web 151/151; tsc/eslint sạch.
+
+## 30/10/2026 — Bước 3: thanh trượt khi agent làm việc, timeline ngay từ đầu
+
+- Phản hồi: chỉ thấy timeline khi generate xong, không có animation. Run đó dùng `codex-cli` (log: đọc file 04:35–04:37:59, im lặng ~1 phút 40 giây, gói về 04:39:38): Codex trả cả gói một message ở cuối nên không có tiến độ từng tài liệu; ngoài ra khi run `queued`/vừa claim, item chưa có `documents` và chưa có file → khung tiến độ trống.
+- Sửa (UI): dòng tài liệu lấy từ `config.generated` khi item chưa có `documents`; khi agent đang chạy mà không có tài liệu `writing` → thanh trượt không xác định dưới dòng program + "Agent đang đọc…"/"Agent đang đọc và viết tài liệu…" (FE-02: không % giả); runner Codex hiện ghi chú trạng thái tài liệu chỉ cập nhật khi Codex trả lời xong. Claude vẫn có tiến độ từng tài liệu qua stream.
+- Kiểm chứng: web 151/151 (thêm test thanh trượt + ghi chú Codex), tsc/eslint sạch; trình duyệt (runner giả): 0 s đủ dòng "Chờ" → 1,2 s thanh trượt + "Agent đang đọc…" → 2,4 s "Xong" + Xem.
+
+## 30/10/2026 — Bước 3: chặn dự án demo với agent thật, bỏ nội dung tài liệu khỏi log
+
+- Từ log Codex của người dùng: run trên dự án Demo (không có source) trả hai tài liệu `đang sinh` (agent chỉ đọc được P1, mọi BR `hypothesis`, Q-ID blocking xin source) → `PACKAGE_INCOMPLETE` đúng quy tắc nhưng tốn vài phút/token; và toàn bộ nội dung gói (Codex trả một message) bị đổ vào log.
+- Sửa: service trả 409 `PROJECT_MODE_CONFLICT` khi dự án demo + runner khác `fake` (kiểm sau model/program, trước admission); UI nhận `projectMode`, khóa Generate và hiện lý do; executor bỏ các dòng chữ trong khối FILE…END FILE khỏi log.
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): API documents 18 test (thêm demo + agent thật bị từ chối, nội dung FILE không vào log), web 150/150 (thêm demo bị khóa, fake vẫn chạy trên demo), tsc/eslint sạch; trình duyệt với `claude-cli`: dự án demo hiện lý do, nút Generate disabled.
+
+## 30/10/2026 — Bước 3: trạng thái khi run dừng và tiến độ realtime theo tài liệu
+
+- Lỗi: run `interrupted` (backend khởi động lại giữa chừng) nhưng program vẫn `running` → UI hiện "Đang phân tích…" và thanh chạy dù không có gì chạy. Sửa: `transition` sang trạng thái kết thúc (trừ succeeded) đóng items trong cùng transaction (`running`→`stopped` mới, `pending`→`skipped`, tài liệu `writing`→`pending`); `recover()` dọn run cũ.
+- Tiến độ theo tài liệu như design: contract thêm `items[].documents` (`pending`/`writing`/`written`) và item `stopped`; Claude `--include-partial-messages`, `AgentEvent` `delta` (không log), `createPackageTracker` theo mốc FILE/END trong stream; UI hiện mỗi tài liệu một dòng (Chờ / Đang viết… / Đã viết · chờ kiểm / Xong + Xem / Không tạo), dòng program "Agent đang đọc…" khi chưa viết, vòng % = tài liệu đã viết / tổng, tiêu đề đếm tài liệu. Log rút gọn đường dẫn workspace.
+- Smoke Claude thật (BR + DB, fixture `vb6-sample`): lần 1 thấy "Thiết kế CSDL" chuyển "Đang viết…" nhưng "Business rules" kẹt "Chờ" vì mốc FILE dính vào chữ của content block trước (stream không có newline giữa block) → thêm newline ở `message_start`/`content_block_start`, có test. Kết quả lần 1: 2 tài liệu, 3 phút 38 giây, 198.085 token. Lần 2 (sau sửa): 0–30 s "Agent đang đọc…" (cả hai Chờ) → 30 s Business rules "Đang viết…" → ~55 s 50%, BR "Đã viết · chờ kiểm", DB "Đang viết…" → 2 phút 48 giây 100%, cả hai "Xong" + Xem; 136.859 token.
+- Kiểm chứng: API documents/adapter pass (tracker cắt mốc giữa chunk, item `stopped` khi hủy, dọn run cũ lúc khởi động, documents `written` khi thành công, delta giữ ranh giới block), web 148/148, tsc/eslint sạch.
+
+## 30/10/2026 — specification-design 0.9.0: bỏ coverage.md và open-questions.md
+
+- Yêu cầu: phân tích source hiện trạng không cần hai file `coverage.md`/`open-questions.md` riêng; không generate chúng.
+- Pack `spec-design-rules-0.9.0-draft`, template set `spec-design-templates-0.8.0-draft` (vẫn Draft/chờ duyệt): xoá `templates/coverage.md`, `templates/open-questions.md`; README thêm mục "Phần đầu và phần cuối chung" — bảng đầu mỗi tài liệu có ngôn ngữ/runtime phát hiện, phạm vi đã đọc, **Trạng thái sinh** (`đang sinh`/`hoàn tất`); câu hỏi mở nằm trong section questions sẵn có (Basic §8, DB §6, Detail §7) hoặc mục "Câu hỏi mở" mới của Business rules; Q-ID đánh số trong cả gói; số đo coverage/LoC/KPI do công cụ/hồ sơ review. Cập nhật SD-CT-04/07/08, runbook 2.2/2.2b/2.3, review-checklist, analysis-method (bước 0, phase 1–2), deliverables, phiếu input, template Basic/Detail, requirements-map, decisions/contract-mapping/report-templates ("bốn Markdown").
+- Code: `packageFileNames` chỉ còn tài liệu được sinh; `parsePackage` đòi mọi tài liệu có dòng `| Trạng thái sinh | hoàn tất |` (thiếu hoặc `đang sinh` → `PACKAGE_INCOMPLETE`); task `spec-design-task-v2`; phiếu input bỏ "luôn kèm coverage, open-questions"; fake runner, UI (thông báo PACKAGE_INCOMPLETE, số file) và test cập nhật. Dòng nhãn DRAFT pack và ghi chú sinh kèm đã được gỡ khỏi màn hình ngoài phiên này; test không còn đòi dòng đó.
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): API documents 16 + spec-context 5 test, web 146/146, tsc/eslint sạch. Smoke Claude thật (`claude-sonnet-5-5`, effort medium, fixture `vb6-sample`, SampleProject, business-rules): gói chỉ còn `business-rules.md`, 1 phút 50 giây, 102.960 token; phần đầu chung ghi pack 0.9.0/template 0.8.0, vai trò tài liệu, ngôn ngữ/runtime bước 0, `Trạng thái sinh` `hoàn tất`; mục "Câu hỏi mở" cuối tài liệu có Q-ID; log hiện từng lần `Read`.
+
+## 30/10/2026 — Bước 3: một program chọn từ màn Phân tích
+
+- Yêu cầu: phase này chỉ tạo tài liệu cho 1 program; flow là bấm program ở màn Phân tích → "Tạo tài liệu cho program này" → màn tạo tài liệu của program đó. Bỏ danh sách chọn nhiều program.
+- Phạm vi: router thêm `useQueryParam` (đọc `?program=`, so `navigate` theo cả path + query); `DocumentsStep` nhận `program` từ URL, thẻ Program hiện tên/đường dẫn/số file-form-module dùng chung + link "Đổi program" về bước Phân tích; không có `?program=` thì hiện program của lượt gần nhất hoặc nhắc chọn ở bước Phân tích; program không có trong lượt phân tích mới nhất báo lỗi; lượt đang chạy của program khác chặn Start và có link mở lượt đó. Contract `MAX_PROGRAMS_PER_RUN = 1` (API trả 400 khi gửi 2 program). Nút ở màn Phân tích đã có sẵn (`createDocs` → `/documents?program=<projectPath>`).
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): API documents 16 test, web 146/146 (thêm: program từ màn Phân tích, chưa chọn program, program không có trong phân tích, lượt của program khác đang chạy), tsc/eslint sạch. Trình duyệt: bước Phân tích → mở SAMPLE → "Tạo tài liệu cho program này" → `/documents?program=programs%2FSAMPLE%2FSAMPLE.VBP`, thẻ Program đúng, hiện gói của lượt Claude trước.
+
+## 30/10/2026 — Bước 3: smoke Claude Code CLI thành công, effort cố định medium
+
+- Mục tiêu: live (dev, fixture sạch) · Phạm vi: effort cố định `medium` (`DEFAULT_AGENT_EFFORT` trong contracts, `config.effort` tuỳ chọn để run cũ vẫn đọc được, Claude `--effort medium`, Codex `-c model_reasoning_effort="medium"`); adapter Claude ghi log từng `tool_use` (Read/Glob/Grep + đường dẫn) và dừng phiên nếu có `tool_use` ngoài ba tool đọc.
+- Smoke Portal với `PORTAL_RUNNER=claude-cli` (Windows 11 x64, Node 24.16.0, Claude Code 2.1.311): dự án local trên bản sao `tests/fixtures/vb6-sample` ngoài repo, program SampleProject, chọn business-rules, model `sonnet` → `init model=claude-sonnet-5-5 tools=Glob,Grep,Read mcp=0`; gói `business-rules.md` (11,7 KB, DRAFT, pack/template version, mode `document-draft`, BR có basis/E-ref, các trường đặc quyền "chưa được cung cấp"), `coverage.md` (`hoàn tất`, 10/10 procedure, 4/4 file code, 1/1 project, `MISSING.BAS` ngoài mẫu số), `open-questions.md` trong 2 phút 41 giây, 118.477 token. Cùng việc với Codex: 3 phút 52 giây, 358.308 token. Smoke này chạy trước khi thêm effort/log tool_use; argv có `--effort medium` + ba tool đã kiểm riêng bằng `claude.exe` thật (`init` đúng, kết quả `ok`).
+- Kiểm chứng: API adapter Claude 17 test (thêm log tool_use và chặn tool ngoài danh sách), Codex, documents pass; tsc/eslint sạch. Test đỏ có sẵn không đổi.
+- Còn lại: smoke trên dữ liệu được phép ở môi trường thật (gói lớn: detail-design nhiều program) để chốt giới hạn JOB-07; macOS/Linux; chạy tiếp SD-CT-08; lưu tên model thật từ `init` vào run (AI-05).
+
+## 29/10/2026 — Bước 3 làm lại theo specification-design
+
+- Lý do: bản trước dùng 5 template của prototype và prompt tóm tắt inventory, lệch [flow Portal](../specification-design/README.md#flow-nghiệp-vụ-trên-portal): chọn program → chọn BR/Basic/Detail/DB (+ sinh kèm SD-CT-07, coverage, open-questions) → mỗi program một phiên CLI đọc phiếu input, pack, P1 và source → gói Markdown, chỉ `hoàn tất` mới sang review. Prompt chia phần `documents-prompt-v2` và 5 template cũ đã bỏ.
+- Mục tiêu: feature + live (dev) · Phạm vi: contracts `documents.schema` (program/tài liệu/gói), migration 0006 (tạo lại bảng document run; dữ liệu run 0005 chỉ là dev), `spec-context.ts` (phiếu input, P1 theo program, task theo runbook 2.2, đọc gói), `spec-workspace.ts`, executor theo program, service/routes đọc file gói, Claude chỉ `Read/Glob/Grep`, Codex `read-only`, UI chọn program (lọc, tối đa 50) + 4 tài liệu (hiện sinh kèm) + tiến độ/gói/xem file theo program, nhãn DRAFT pack.
+- Spike quyền (codex-cli 0.164.0, Windows): `workspace-write` không chặn ghi ngoài workspace; `read-only` chặn mọi ghi và web request qua shell; tắt `code_mode_host` làm shell không đọc được (lần chạy đầu trả gói "không thể đọc", Portal từ chối `PACKAGE_INCOMPLETE`). Thiết kế chốt: agent chỉ đọc trên bản sao, trả gói trong câu trả lời, Portal kiểm và ghi; hash workspace trước/sau.
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): contracts/API/web tsc + eslint sạch; API test documents (10 integration: gói theo program + sinh kèm, workspace có pack/P1/phiếu, agent ghi workspace bị từ chối, model/program sai, idempotency, cancel, auth dừng các program sau, gói sai/chưa hoàn tất theo từng program, recovery PID) + spec-context (5) + adapter (Claude 16, Codex 5) pass; web 144/144. Test đỏ có sẵn: `local-source-root`. Codex thật trên fixture sạch `vb6-sample` (bản sao ngoài repo, dự án local, phân tích → bước 3 chọn program SAMPLE + business-rules): gói `business-rules.md`, `coverage.md` (`hoàn tất`, 5/5 file, 10 procedure), `open-questions.md` trong 3 phút 52 giây, 358.308 token; agent chỉ chạy lệnh đọc, tự ghi giới hạn `MISSING.BAS` ngoài allowlist + Q-ID. Một lượt bị tsx watch khởi động lại giữa chừng → `interrupted`, process đã dừng, runtime `ready`.
+- Chưa đến mốc: smoke `claude-cli` thành công (cần đăng nhập) trên môi trường thật; chạy tiếp phiên dở SD-CT-08; mục 4 phiếu input (bản đã duyệt) cần bước review; giới hạn JOB-07 chốt bằng spike dữ liệu được phép; macOS/Linux.
+
+## 29/10/2026 — Bước 3: chia prompt theo phần cho dự án lớn
+
+- Vấn đề: dự án thật 284 program (inventory 7 MB, riêng call 1,87 MB) làm mọi run fail `INPUT_UNAVAILABLE` ("Input exceeds the prompt limit"): prompt v1 gửi cả inventory, bỏ chi tiết file vẫn > 400 KiB.
+- Sửa (`documents-prompt-v2`): digest theo template và theo đơn vị (program/bảng/file), id rút gọn, CRUD gộp theo bảng, module dùng chung chỉ còn tên; gom đơn vị thành phần ≤ 120 KiB, mỗi phần trả section `##`, app ghép dưới tiêu đề `#`. Trên dự án đó: màn hình 2 phần, chức năng 5 phần, CSDL/kiến trúc/security 1 phần (24–61 KB). Timeout tạm lên 2 giờ/run.
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): test plan (gộp nhỏ, chia 300 program không trùng/không sót, đơn vị quá lớn, digest CSDL, nhận/ghép section), test executor chia phần end-to-end với fake runner, documents/adapter 14 + 64 test pass, tsc/eslint sạch. Chưa chạy lại trên dự án thật với Codex sau thay đổi.
+
+## 29/10/2026 — Bước 3: runner Codex CLI cho dev/test
+
+- Mục tiêu: feature (dev/test) · Phạm vi: tách lõi `cli-agent.runner.ts` khỏi adapter Claude, thêm `codex-cli.runner.ts`, `PORTAL_RUNNER=codex-cli`, model `default` + `RUNNER_MODELS` theo runner, UI chọn model theo runner và nhãn "chỉ dev/test" · Dữ liệu/runtime: dự án demo, codex-cli 0.164.0 thật.
+- Spike Codex: `--sandbox read-only` một mình vẫn chạy được shell (đọc thư mục) và một tool `node_repl` gọi được mạng; thêm `--disable shell_tool unified_exec code_mode_host …`, `web_search="disabled"`, `mcp_servers={}` thì host tool fail closed, không có item tool nào. Adapter dừng ngay nếu gặp item tool. Lý do giữ Codex ở dev/test: không có cờ tắt hẳn tool như Claude (AI-03).
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): API test adapter/documents/config pass (5 test Codex mới, 1 test model theo runner), web 143/143, tsc/eslint sạch. Trình duyệt với `codex-cli` thật: tạo "Thiết kế CSDL & ERD" tiếng Việt trong 29 s, 11.881 token, xem được tài liệu.
+- Sửa kèm: bước 3 không còn hiện thoáng "Chưa có kết quả phân tích" khi tiến độ dự án đang tải; thông báo AGENT_AUTH_FAILED không còn ghi cứng `claude`.
+- Còn lại: smoke `claude-cli` thành công (cần đăng nhập) trên môi trường thật trước nghiệm thu LIVE.
+
+## 29/10/2026 — Bước 3 Tạo tài liệu: UI theo prototype + Agent CLI thật
+
+- Mục tiêu: feature + live (phần document run) · Phạm vi: contracts `documents.schema`/`documents-api`, API module `documents` (migration 0005, repository, dispatcher, executor, prompt, routes), adapter `claude-cli.runner`, `platform/process-tree` + `agent-executable`, config `PORTAL_RUNNER=fake|claude-cli` + `PORTAL_AGENT_CLI`, UI `features/documents` + `shared/api/documents-api` · Dữ liệu/runtime: fixture demo; CLI thật chỉ smoke lỗi đăng nhập.
+- UI theo `docs/design/rikai-code-analyzer-prototype.html`: chọn template/model/ngôn ngữ, ring % = số tài liệu đã ghi / tổng (số thật), thời gian/token/file đã ghi lấy từ run, mỗi tài liệu có trạng thái và thanh tiến độ không xác định khi đang viết, log `agent.log` đọc theo sequence, Hủy, xem tài liệu dạng text thuần với nhãn bản nháp AI chưa review (FE-06). Cần analyze run `succeeded`; sidebar không còn đánh dấu bước 3 "Chưa khả dụng".
+- Gate đã làm: JOB-01..03 (unique index, idempotency, 202 + dispatcher), JOB-04 (cancel/timeout dừng cây process, chờ xác nhận, STOP_UNCONFIRMED → recovery_required), JOB-05 tối thiểu (ledger PID, interrupted khi restart, không tự kill PID chưa chứng minh sở hữu), JOB-07 (parser theo dòng, UTF-8 cắt giữa chunk, giới hạn dòng/output/prompt), JOB-08 (không shell, chỉ `.exe` trên Windows, phân loại spawn/auth/quota/exit/output), AI-02/03 (không tool/setting/MCP/session, cwd rỗng do app quản lý, dừng nếu `init` báo có tool), AI-05 (config, promptVersion, runner lưu trong run).
+- Kiểm chứng (Windows 11 x64, Node 24.16.0): tsc/eslint sạch cho api/web/contracts; API 512–513/514 test pass, web 143/143; test mới: 16 process test của adapter (gồm cancel cây có process cháu giữ stdout), 7 integration test HTTP→SQLite (thành công, ANALYSIS_REQUIRED, idempotency/RUN_ACTIVE_CONFLICT, cancel, lỗi auth, output không hợp lệ, recovery theo ledger), 5 test UI. Trình duyệt: luồng runner giả chạy hết 4 tài liệu và mở được tài liệu; với `PORTAL_RUNNER=claude-cli` đã spawn `claude.exe` 2.1.311 thật, `init` báo `tools=0 mcp=0`, lỗi đăng nhập hiện thành `AGENT_AUTH_FAILED`, runtime vẫn `ready`.
+- Test đỏ có sẵn/không ổn định: `local-source-root` "relative and drive-relative paths" fail cả trước thay đổi; `B08-AC03` (analyze cancel) lúc pass lúc fail khi chạy cả bộ, chạy riêng pass 3/3.
+- Chưa đến mốc/việc tiếp theo: smoke thành công với CLI đã đăng nhập trên dữ liệu được phép và chốt giới hạn JOB-07; smoke macOS/Linux (process group); SSE (hiện polling có backoff); retention/xóa file tài liệu; review/duyệt tài liệu (bước 4); step mark "đã xong" cho bước 3.
+
 ## 27/10/2026 — specification-design: tài liệu liên quan sinh cùng lúc
 
 - Scope docs-only theo yêu cầu người dùng; pack `spec-design-rules-0.8.0-draft`, template set `spec-design-templates-0.7.0-draft`, vẫn Draft/unapproved.

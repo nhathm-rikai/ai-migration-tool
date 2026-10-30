@@ -182,3 +182,20 @@ test(
     await expect(node.first()).toHaveAttribute('aria-pressed', 'true');
   },
 );
+
+// elkjs EPL-2.0 decision: the served build carries the notices and the
+// license text.
+test(
+  'the web build serves the third-party notices with the EPL-2.0 text',
+  { tag: '@smoke' },
+  async ({ request }) => {
+    const notice = await request.get('/licenses/THIRD-PARTY-NOTICES.txt');
+    expect(notice.ok()).toBe(true);
+    const text = await notice.text();
+    expect(text).toContain('elkjs 0.11.1');
+    expect(text).toContain('https://github.com/kieler/elkjs/tree/0.11.1');
+    const license = await request.get('/licenses/EPL-2.0.md');
+    expect(license.ok()).toBe(true);
+    expect(await license.text()).toContain('Eclipse Public License - v 2.0');
+  },
+);

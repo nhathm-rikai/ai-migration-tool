@@ -1,0 +1,63 @@
+THIRD-PARTY NOTICES — web UI (apps/web)
+
+This file and the license texts next to it are copied into every web build
+(dist/licenses/). They cover the third-party code bundled for the call graph
+of the analysis step. Other bundled packages and the fonts keep their own
+notices (fonts: dist/fonts/*-OFL.txt).
+
+======================================================================
+elkjs 0.11.1 (Eclipse Layout Kernel for JavaScript)
+======================================================================
+
+Copyright (c) 2017, 2021 Kiel University and others.
+Contains the Eclipse Layout Kernel (ELK), compiled to JavaScript by the
+elkjs project: Copyright (c) Kiel University and others, Eclipse
+Foundation ELK project contributors.
+
+License: Eclipse Public License 2.0 (EPL-2.0).
+Full license text: EPL-2.0.md (in this folder), as shipped in the elkjs
+0.11.1 package. Also published at
+https://www.eclipse.org/legal/epl-2.0/
+
+Files of this build that contain elkjs: assets/elk-worker.min-*.js (ELK
+layout worker) and the elkjs API code inside
+assets/dependency-graph-view-*.js. They are used unmodified, as published.
+
+The Program is provided "AS IS", without warranties or conditions of any
+kind (EPL-2.0 section 5), and the Contributors have no liability for it
+(EPL-2.0 section 6). Any provisions in the terms of this product that differ
+from the EPL-2.0 are offered by the distributor alone and not by any
+Contributor.
+
+Source code of the exact version used:
+  - elkjs source, tag 0.11.1 (commit 572e73323791d05f09b0815ff639af2b67f202ab):
+      https://github.com/kieler/elkjs/tree/0.11.1
+  - The published package this build was made from (npm):
+      https://registry.npmjs.org/elkjs/-/elkjs-0.11.1.tgz
+      sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==
+  - Eclipse Layout Kernel sources compiled by elkjs:
+      https://github.com/eclipse-elk/elk
+
+======================================================================
+@xyflow/react 12.12.0 and @xyflow/system 0.0.83 (React Flow)
+======================================================================
+
+Copyright (c) 2019-2025 webkid GmbH
+License: MIT — full text: xyflow-react-MIT.txt, xyflow-system-MIT.txt
+Source: https://github.com/xyflow/xyflow
+
+======================================================================
+zustand 4.5.7
+======================================================================
+
+Copyright (c) 2019 Paul Henschel
+License: MIT — full text: zustand-MIT.txt
+Source: https://github.com/pmndrs/zustand
+
+======================================================================
+classcat 5.0.5
+======================================================================
+
+Copyright (c) Jorge Bucaran
+License: MIT — full text: classcat-MIT.md
+Source: https://github.com/jorgebucaran/classcat

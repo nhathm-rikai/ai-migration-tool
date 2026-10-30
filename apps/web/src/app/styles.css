@@ -2631,13 +2631,30 @@ details.technical[open] > summary {
 .proc-node-table .dep-node-type {
   color: var(--low);
 }
-.proc-node-file {
+/* Two lines per node (kind and file, then name) so nothing is clipped at
+   the node height shared with the project graph. */
+.proc-graph-tab .dep-node-button {
+  justify-content: center;
+  line-height: 1.3;
+}
+.proc-graph-tab .dep-node-type {
   max-width: 100%;
   overflow: hidden;
-  font-size: 10px;
-  color: var(--fg-3);
   white-space: nowrap;
+}
+.proc-node-file {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-3);
   text-overflow: ellipsis;
+}
+/* A form with many handlers draws many long edges: resting edges stay
+   faint so the nodes read first. */
+.proc-graph-tab .react-flow__edge:not(.linked) path.react-flow__edge-path {
+  stroke-opacity: 0.3;
 }
 .proc-edge-call path.react-flow__edge-path {
   stroke: var(--info);

@@ -79,5 +79,26 @@ test(
       card.getByRole('button', { name: /Cmn00Run/ }).first(),
     ).toBeVisible();
     await detail.screenshot({ path: testInfo.outputPath('ui04-detail.png') });
+
+    // Picked from the search, the node is shown at full size: its kind,
+    // file and name all fit inside it (nothing clipped).
+    await detail.getByLabel('Tìm procedure, API, bảng').fill('Cmn00Run');
+    await detail
+      .getByRole('list', { name: 'Kết quả tìm' })
+      .getByRole('button', { name: /Cmn00Run/ })
+      .click();
+    const shared = canvas.getByRole('button', {
+      name: 'Làm nổi bật Function Cmn00Run',
+    });
+    await page.waitForTimeout(400);
+    const fits = await shared.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      return [...button.querySelectorAll('span')].every((span) => {
+        const inner = span.getBoundingClientRect();
+        return inner.top >= box.top - 0.5 && inner.bottom <= box.bottom + 0.5;
+      });
+    });
+    expect(fits).toBe(true);
+    await shared.screenshot({ path: testInfo.outputPath('ui04-node.png') });
   },
 );

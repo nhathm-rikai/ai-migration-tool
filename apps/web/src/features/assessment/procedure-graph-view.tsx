@@ -426,25 +426,22 @@ const ProcedureFlowNode = memo(function ProcedureFlowNode({
         aria-pressed={data.focused}
         aria-label={copy.focusNode(nodeType(node, copy), node.label)}
       >
+        {/* Two lines fit the node: kind and file, then the name. */}
         <span className="dep-node-type">
           {nodeType(node, copy)}
           {shared && <span className="dep-node-state">{copy.shared}</span>}
+          {(node.file ?? (node.kind === 'api' ? node.detail : '')) && (
+            <span className="proc-node-file mono">
+              {node.file ?? node.detail}
+            </span>
+          )}
+          {node.dynamicSql > 0 && (
+            <span className="dep-node-state">
+              {copy.dynamicSql(number(node.dynamicSql))}
+            </span>
+          )}
         </span>
         <span className="dep-node-label mono">{node.label}</span>
-        {node.file !== null && (
-          <span className="proc-node-file mono">
-            {node.file}
-            {node.dynamicSql > 0 && (
-              <span className="dep-node-note">
-                {' '}
-                · {copy.dynamicSql(number(node.dynamicSql))}
-              </span>
-            )}
-          </span>
-        )}
-        {node.kind === 'api' && node.detail && (
-          <span className="proc-node-file mono">{node.detail}</span>
-        )}
       </button>
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>

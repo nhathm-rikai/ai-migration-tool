@@ -344,7 +344,6 @@ export const jaMessages = {
       graph: {
         loading: 'コールグラフを読み込み中…',
         empty: 'インベントリにグラフを描画するプログラムがありません。',
-        hint: 'ノードをクリックすると直接の依存関係を強調表示します。Esc で解除します。',
         lanes: {
           program: 'プログラム',
           own: '専用モジュール',
@@ -364,8 +363,10 @@ export const jaMessages = {
           mapped: 'マッピング後のテーブル名',
           raw: 'ソース上のテーブル名',
         },
-        showCommon: (count: string) =>
-          `80% を超えるプログラムが使うモジュール/COM（${count} 件）を表示`,
+        showCommon: (count: string) => `共通モジュール ${count} 件を表示`,
+        showCommonTitle:
+          '80% を超えるプログラムが使うモジュール/COM（定数・共通処理）。既定では非表示です。',
+        lanesLabel: '左から右へのレーン順',
         layoutPending: 'グラフを配置中…',
         layoutFailed:
           '自動配置できなかったため、簡易レーン配置で表示しています。',
@@ -410,22 +411,6 @@ export const jaMessages = {
         fanIn: 'ファンイン',
         fanOut: 'ファンアウト',
         callers: '呼び出し元ファイル',
-        tableTitle: 'ノード一覧（グラフの代替表）',
-        tableFilter: 'ノードを検索',
-        tableKind: 'ノード種別',
-        all: 'すべて',
-        columns: {
-          node: 'ノード',
-          kind: '種別',
-          state: '状態',
-          fanIn: 'ファンイン',
-          fanOut: 'ファンアウト',
-          action: '操作',
-        },
-        focusAction: '強調表示',
-        tableCount: (shown: number, total: number) =>
-          `${shown} / ${total} ノード`,
-        tablePagination: 'ノード一覧のページ',
         flow: {
           controls: 'ズーム操作',
           zoomIn: '拡大',

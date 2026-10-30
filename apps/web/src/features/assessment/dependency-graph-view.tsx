@@ -27,7 +27,6 @@ import '@xyflow/react/dist/base.css';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import type { Messages } from '../../shared/i18n/vi';
-import { pageOf } from './assessment-summary';
 import {
   buildDependencyGraph,
   commonModules,
@@ -37,7 +36,6 @@ import {
   type DependencyGraph,
   type GraphEdge,
   type GraphNode,
-  type GraphNodeKind,
 } from './dependency-graph';
 import {
   NODE_HEIGHT,
@@ -80,7 +78,6 @@ type FlowNodeData = {
 };
 type FlowNode = Node<FlowNodeData>;
 
-const TABLE_PAGE_SIZE = 50;
 // Boxes with more members than this start closed (one node per folder, one
 // node for all tables, one for COM) so the whole project reads at a glance;
 // small corpora open with everything drawn.
@@ -89,13 +86,6 @@ const SEARCH_RESULTS = 8;
 
 // Opens or closes a box (folder, tables, COM) from inside its node.
 const BoxToggle = createContext<(box: string) => void>(() => undefined);
-const KINDS: GraphNodeKind[] = [
-  'program',
-  'own-module',
-  'shared-module',
-  'table',
-  'component',
-];
 
 function reducedMotion(): boolean {
   return (
@@ -362,88 +352,77 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
           : {})}
       >
         <div className="dep-graph-main">
-          <div className="dep-graph-toolbar">
-            <span className="muted">{copy.hint}</span>
-            <ol className="dep-graph-lanes" aria-label={copy.canvasLabel}>
-              <li>{copy.lanes.program}</li>
-              <li>→ {copy.lanes.own}</li>
-              <li>→ {copy.lanes.shared}</li>
-              <li>→ {copy.lanes.tables}</li>
-            </ol>
-          </div>
-          <div className="dep-graph-toolbar">
-            <span className="muted" data-testid="graph-summary">
-              {copy.summary(
-                number(graph.nodes.length),
-                number(graph.edges.length),
-                number(graph.calls),
-              )}{' '}
-              · {copy.tableView[graph.tableView]}
-            </span>
-            <span className="dep-graph-actions">
-              <button
-                type="button"
-                className="button small"
-                aria-pressed={expanded}
-                onClick={() => setExpanded((value) => !value)}
-              >
-                {expanded ? copy.exitFullScreen : copy.fullScreen}
-              </button>
-              <button className="link-button" onClick={() => setAllBoxes(true)}>
-                {copy.expandAll}
-              </button>
-              <button
-                className="link-button"
-                onClick={() => setAllBoxes(false)}
-              >
-                {copy.collapseAll}
-              </button>
-            </span>
-            {commonCount > 0 && (
-              <label className="dep-graph-toggle">
-                <input
-                  type="checkbox"
-                  checked={showCommon}
-                  onChange={(event) =>
-                    setShowCommon(event.currentTarget.checked)
-                  }
-                />
-                {copy.showCommon(number(commonCount))}
-              </label>
+          <div className="dep-graph-bar">
+            <GraphSearch graph={graph} copy={copy} onPick={reveal} />
+            {openBoxes.length > 0 && (
+              <ul className="dep-open-boxes" aria-label={copy.openBoxes}>
+                <li className="muted">{copy.openBoxes}:</li>
+                {openBoxes.map((box) => (
+                  <li
+                    key={box}
+                    className={`dep-open-box${box === recent ? ' recent' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className="dep-open-box-name mono"
+                      aria-label={copy.showBox(boxName(box, copy))}
+                      onClick={() => {
+                        setRecent(box);
+                        setPendingReveal(box);
+                      }}
+                    >
+                      {boxName(box, copy)}
+                    </button>
+                    <button
+                      type="button"
+                      className="dep-open-box-close"
+                      aria-label={copy.collapseBox(boxName(box, copy))}
+                      onClick={() => toggleBox(box)}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
-          <GraphSearch graph={graph} copy={copy} onPick={reveal} />
-          {openBoxes.length > 0 && (
-            <ul className="dep-open-boxes" aria-label={copy.openBoxes}>
-              <li className="muted">{copy.openBoxes}:</li>
-              {openBoxes.map((box) => (
-                <li
-                  key={box}
-                  className={`dep-open-box${box === recent ? ' recent' : ''}`}
+            <span className="dep-graph-actions">
+              {commonCount > 0 && (
+                <label
+                  className="dep-graph-toggle"
+                  title={copy.showCommonTitle}
                 >
-                  <button
-                    type="button"
-                    className="dep-open-box-name mono"
-                    aria-label={copy.showBox(boxName(box, copy))}
-                    onClick={() => {
-                      setRecent(box);
-                      setPendingReveal(box);
-                    }}
-                  >
-                    {boxName(box, copy)}
-                  </button>
-                  <button
-                    type="button"
-                    className="dep-open-box-close"
-                    aria-label={copy.collapseBox(boxName(box, copy))}
-                    onClick={() => toggleBox(box)}
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+                  <input
+                    type="checkbox"
+                    checked={showCommon}
+                    onChange={(event) =>
+                      setShowCommon(event.currentTarget.checked)
+                    }
+                  />
+                  {copy.showCommon(number(commonCount))}
+                </label>
+              )}
+              <IconButton
+                label={copy.expandAll}
+                onClick={() => setAllBoxes(true)}
+                path="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 12h6M12 9v6"
+              />
+              <IconButton
+                label={copy.collapseAll}
+                onClick={() => setAllBoxes(false)}
+                path="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5M9 12h6"
+              />
+              <IconButton
+                label={expanded ? copy.exitFullScreen : copy.fullScreen}
+                pressed={expanded}
+                onClick={() => setExpanded((value) => !value)}
+                path={
+                  expanded
+                    ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5'
+                    : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'
+                }
+              />
+            </span>
+          </div>
           <BoxToggle.Provider value={toggleBox}>
             <GraphCanvas
               graph={graph}
@@ -459,6 +438,20 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
               onClear={() => setFocus(null)}
             />
           </BoxToggle.Provider>
+          <p className="dep-graph-caption muted">
+            <span data-testid="graph-summary">
+              {copy.summary(
+                number(graph.nodes.length),
+                number(graph.edges.length),
+                number(graph.calls),
+              )}{' '}
+              · {copy.tableView[graph.tableView]}
+            </span>
+            <span aria-label={copy.lanesLabel}>
+              {copy.lanes.program} → {copy.lanes.own} → {copy.lanes.shared} →{' '}
+              {copy.lanes.tables}
+            </span>
+          </p>
         </div>
         <aside className="dep-graph-side" aria-label={copy.commonTitle}>
           {focusedNode && (
@@ -470,7 +463,6 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
           )}
           <CommonPanel graph={graph} copy={copy} onFocus={reveal} />
         </aside>
-        <GraphTable graph={graph} focus={focus} onFocus={reveal} />
       </div>
     </>
   );
@@ -479,6 +471,34 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
       <div ref={slot} />
       {createPortal(content, host)}
     </>
+  );
+}
+
+// A square toolbar button: an icon, its name as label and tooltip.
+function IconButton({
+  label,
+  path,
+  pressed,
+  onClick,
+}: {
+  label: string;
+  path: string;
+  pressed?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="dep-icon-button"
+      aria-label={label}
+      title={label}
+      {...(pressed === undefined ? {} : { 'aria-pressed': pressed })}
+      onClick={onClick}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d={path} />
+      </svg>
+    </button>
   );
 }
 
@@ -596,28 +616,38 @@ function flowNodes(
   return nodes;
 }
 
-function flowEdge(edge: {
-  id: string;
-  kind: GraphEdge['kind'];
-  source: string;
-  target: string;
-  programs?: number;
-}): Edge {
-  const merged = edge.programs ?? 1;
+function flowEdge(
+  edge: {
+    id: string;
+    kind: GraphEdge['kind'];
+    source: string;
+    target: string;
+  },
+  opened = false,
+): Edge {
   return {
     id: edge.id,
     source: edge.source,
     target: edge.target,
-    className: `dep-edge dep-edge-${edge.kind}`,
-    // Merged edges get thicker with the number of edges they stand for.
-    ...(merged > 1
-      ? { style: { strokeWidth: Math.min(6, 1 + Math.log2(merged)) } }
-      : {}),
+    // Resting edges are thin and faint whatever they merge; an edge that
+    // starts or ends in an open folder is drawn as "opened".
+    className: `dep-edge dep-edge-${edge.kind}${opened ? ' dep-edge-opened' : ''}`,
     focusable: false,
     selectable: false,
-    // Hundreds of edges would flood screen readers; the node table carries
-    // the same relations.
+    // Hundreds of edges would flood screen readers; the search and the
+    // focus card carry the relations.
     domAttributes: { 'aria-hidden': true },
+  };
+}
+
+// Whether a drawn node is an open folder or sits in one. Only folders
+// count: the table and COM boxes are targets that open on their own when
+// small, and their edges would read as "opened" with every folder closed.
+function inOpenFolder(drawn: Drawn, byId: Map<string, GraphNode>) {
+  return (id: string) => {
+    const node = byId.get(id);
+    const box = node ? boxOf(node) : id;
+    return box !== null && box.startsWith('folder:') && !drawn.closed.has(box);
   };
 }
 
@@ -663,15 +693,13 @@ function GraphCanvas({
     () => (drawn && positions ? flowNodes(graph, drawn, positions, copy) : []),
     [graph, drawn, positions, copy],
   );
-  const baseEdges = useMemo(
-    () =>
-      drawn
-        ? restingEdges(drawn.nodes, drawn.edges, folderOf, drawnAs(drawn)).map(
-            flowEdge,
-          )
-        : [],
-    [drawn],
-  );
+  const baseEdges = useMemo(() => {
+    if (!drawn) return [];
+    const opened = inOpenFolder(drawn, byId);
+    return restingEdges(drawn.nodes, drawn.edges, folderOf, drawnAs(drawn)).map(
+      (edge) => flowEdge(edge, opened(edge.source) || opened(edge.target)),
+    );
+  }, [drawn, byId]);
   const nodes = useMemo(
     () =>
       baseNodes.map((node) => {
@@ -931,14 +959,13 @@ function GraphSearch({
   );
   return (
     <div className="dep-graph-search">
-      <label>
-        <span>{copy.search}</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-        />
-      </label>
+      <input
+        type="search"
+        aria-label={copy.search}
+        placeholder={copy.search}
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+      />
       {text !== '' && (
         <ul className="dep-search-results" aria-label={copy.searchResults}>
           {matches.length === 0 && <li className="muted">{copy.searchNone}</li>}
@@ -1061,172 +1088,5 @@ function CommonPanel({
       )}
       <p className="muted dep-common-note">{copy.commonNote}</p>
     </section>
-  );
-}
-
-// The same nodes and numbers as the canvas, as a table: the graph for
-// keyboard and screen reader users.
-function GraphTable({
-  graph,
-  focus,
-  onFocus,
-}: {
-  graph: DependencyGraph;
-  focus: string | null;
-  onFocus: (id: string) => void;
-}) {
-  const { messages } = useLocale();
-  const copy = messages.assessment.dashboard.graph;
-  const programCopy = messages.assessment.programs;
-  const number = useNumber();
-  const [query, setQuery] = useState('');
-  const [kind, setKind] = useState<GraphNodeKind | 'all'>('all');
-  const [page, setPage] = useState(1);
-  const rows = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    return graph.nodes
-      .filter(
-        (node) =>
-          (kind === 'all' || node.kind === kind) &&
-          (text === '' ||
-            node.label.toLowerCase().includes(text) ||
-            node.detail.toLowerCase().includes(text)),
-      )
-      .sort(
-        (a, b) =>
-          b.fanIn - a.fanIn ||
-          b.fanOut - a.fanOut ||
-          a.label.localeCompare(b.label),
-      );
-  }, [graph, query, kind]);
-  const current = pageOf(rows, page, TABLE_PAGE_SIZE);
-  return (
-    <details className="dep-graph-table">
-      <summary>{copy.tableTitle}</summary>
-      <div className="program-filters">
-        <label>
-          <span>{copy.tableFilter}</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.currentTarget.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        <label>
-          <span>{copy.tableKind}</span>
-          <select
-            value={kind}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              const next = KINDS.find((item) => item === value);
-              setKind(next ?? 'all');
-              setPage(1);
-            }}
-          >
-            <option value="all">{copy.all}</option>
-            {KINDS.map((item) => (
-              <option key={item} value={item}>
-                {copy.kinds[item]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <p className="muted" role="status">
-        {copy.tableCount(rows.length, graph.nodes.length)}
-      </p>
-      <div className="table-scroll">
-        <table className="program-table">
-          <thead>
-            <tr>
-              <th scope="col">{copy.columns.node}</th>
-              <th scope="col">{copy.columns.kind}</th>
-              <th scope="col">{copy.columns.state}</th>
-              <th scope="col" className="num">
-                {copy.columns.fanIn}
-              </th>
-              <th scope="col" className="num">
-                {copy.columns.fanOut}
-              </th>
-              <th scope="col">{copy.columns.action}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {current.items.map((node) => (
-              <tr
-                key={node.id}
-                className={node.id === focus ? 'selected' : undefined}
-                data-node={node.id}
-              >
-                <th scope="row">
-                  <span className="mono">{node.label}</span>
-                  {node.detail !== node.label && (
-                    <span className="mono muted" title={node.detail}>
-                      {node.detail}
-                    </span>
-                  )}
-                </th>
-                <td>{copy.kinds[node.kind]}</td>
-                <td>
-                  {node.state ? (
-                    <>
-                      {copy.state[node.state]}
-                      {node.unresolvedMembers > 0 && (
-                        <span className="muted">
-                          {' '}
-                          ·{' '}
-                          {copy.missingMembers(number(node.unresolvedMembers))}
-                        </span>
-                      )}
-                    </>
-                  ) : node.common ? (
-                    copy.commonHidden
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td className="num">{number(node.fanIn)}</td>
-                <td className="num">{number(node.fanOut)}</td>
-                <td>
-                  <button
-                    className="button small"
-                    aria-pressed={node.id === focus}
-                    aria-label={copy.focusNode(
-                      copy.kinds[node.kind],
-                      node.label,
-                    )}
-                    onClick={() => onFocus(node.id)}
-                  >
-                    {copy.focusAction}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {current.pages > 1 && (
-        <nav className="pagination" aria-label={copy.tablePagination}>
-          <button
-            className="button small"
-            disabled={current.page <= 1}
-            onClick={() => setPage(current.page - 1)}
-          >
-            {programCopy.previous}
-          </button>
-          <span>{programCopy.page(current.page, current.pages)}</span>
-          <button
-            className="button small"
-            disabled={current.page >= current.pages}
-            onClick={() => setPage(current.page + 1)}
-          >
-            {programCopy.next}
-          </button>
-        </nav>
-      )}
-    </details>
   );
 }

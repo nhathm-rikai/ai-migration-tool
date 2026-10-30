@@ -37,59 +37,67 @@ function render(ui: ReactElement) {
   );
 }
 
-const nodeTable = () => {
-  fireEvent.click(screen.getByText('Bảng node (thay cho graph)'));
-  return screen.getByRole('table');
+// Picks a node through the search above the canvas (the only list of
+// nodes since the node table was dropped).
+const pick = (text: string, name: RegExp) => {
+  fireEvent.change(screen.getByLabelText('Tìm program, module, bảng'), {
+    target: { value: text },
+  });
+  const results = screen.getByRole('list', { name: 'Kết quả tìm' });
+  const button = within(results).getByRole('button', { name });
+  button.focus();
+  fireEvent.click(button);
 };
 
 describe('UI03 call graph tab', () => {
   beforeEach(() => window.localStorage.clear());
 
-  it('lists every node with the same fan-in and fan-out as the graph', () => {
+  it('shows the fan-in and fan-out of a node picked in the search', () => {
     render(<DependencyGraphView inventory={corpus} />);
-    const table = nodeTable();
-    expect(
-      screen.getByText(`${graph.nodes.length} / ${graph.nodes.length} node`),
-    ).toBeTruthy();
     const shared = graph.nodes.find(
       (node) => node.id === fileNodeId('common/Cmn01.bas'),
     );
     if (!shared) throw new Error('fixture');
-    const row = table.querySelector(`tr[data-node="${shared.id}"]`);
-    if (!(row instanceof HTMLElement)) throw new Error('row');
-    const cells = within(row).getAllByRole('cell');
-    expect(cells[2]?.textContent).toBe(String(shared.fanIn));
-    expect(cells[3]?.textContent).toBe(String(shared.fanOut));
+    pick('Cmn01', /Cmn01\.bas/);
+    const card = screen.getByRole('region', { name: 'Node đang chọn' });
+    const numbers = within(card).getAllByRole('definition');
+    expect(numbers[0]?.textContent).toBe(String(shared.fanIn));
+    expect(numbers[1]?.textContent).toBe(String(shared.fanOut));
   });
 
-  it('marks programs that were not analysed in the table', () => {
+  it('marks a program that was not analysed', () => {
     render(<DependencyGraphView inventory={corpus} />);
-    nodeTable();
-    fireEvent.change(screen.getByLabelText('Tìm node'), {
-      target: { value: 'F010049' },
-    });
-    const row = screen.getByRole('table').querySelector('tbody tr');
-    if (!(row instanceof HTMLElement)) throw new Error('row');
-    expect(within(row).getByText('Chưa phân tích')).toBeTruthy();
+    pick('F010049', /F010049/);
+    const card = screen.getByRole('region', { name: 'Node đang chọn' });
+    expect(within(card).getByText(/Chưa phân tích/)).toBeTruthy();
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    expect(
+      within(canvas).getAllByText('Chưa phân tích nên chưa biết phụ thuộc')
+        .length,
+    ).toBeGreaterThan(0);
   });
 
-  it('focuses a node from the table by keyboard and clears it with Escape', () => {
+  it('focuses a node by keyboard and clears it with Escape', () => {
     render(<DependencyGraphView inventory={corpus} />);
-    nodeTable();
-    fireEvent.change(screen.getByLabelText('Loại node'), {
-      target: { value: 'shared-module' },
+    fireEvent.click(screen.getByRole('button', { name: 'Mở tất cả thư mục' }));
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    const button = within(canvas).getByRole('button', {
+      name: 'Làm nổi bật Program F000000',
     });
-    const button = screen.getAllByRole('button', {
-      name: 'Làm nổi bật Dùng chung Cmn01.bas',
-    })[0];
-    if (!button) throw new Error('button');
     button.focus();
     fireEvent.click(button);
     const card = screen.getByRole('region', { name: 'Node đang chọn' });
-    expect(within(card).getByText('Cmn01.bas')).toBeTruthy();
+    expect(within(card).getByText('F000000')).toBeTruthy();
     expect(button.getAttribute('aria-pressed')).toBe('true');
     fireEvent.keyDown(button, { key: 'Escape' });
     expect(screen.queryByRole('region', { name: 'Node đang chọn' })).toBeNull();
+  });
+
+  it('has no hint line and no node table, only the search', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    expect(screen.queryByText(/Bấm vào một node/)).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByLabelText('Tìm program, module, bảng')).toBeTruthy();
   });
 
   it('shows common modules by fan-in and says which are hidden', () => {
@@ -100,19 +108,12 @@ describe('UI03 call graph tab', () => {
     const items = within(panel).getAllByRole('listitem');
     expect(items[0]?.textContent).toContain('Cmn00.bas');
     expect(items[0]?.textContent).toContain('đang ẩn');
-    expect(
-      screen.getByLabelText(/Hiện 2 module\/COM được hơn 80% program dùng/),
-    ).toBeTruthy();
+    expect(screen.getByLabelText('Hiện 2 module chung')).toBeTruthy();
   });
 
   it('switches to Japanese without losing the focused node', () => {
     render(<DependencyGraphView inventory={corpus} />);
-    nodeTable();
-    const button = screen.getAllByRole('button', {
-      name: /^Làm nổi bật Dùng chung Cmn02\.bas$/,
-    })[0];
-    if (!button) throw new Error('button');
-    fireEvent.click(button);
+    pick('Cmn02', /Cmn02\.bas/);
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     const card = screen.getByRole('region', { name: '選択中のノード' });
     expect(within(card).getByText('Cmn02.bas')).toBeTruthy();

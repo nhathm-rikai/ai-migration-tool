@@ -2120,12 +2120,21 @@ details.technical[open] > summary {
   font-weight: 600;
   color: var(--navy);
 }
+/* Resting edges: thin and faint, whatever they merge, so a closed graph
+   reads as boxes first. Edges of an open box are drawn in the brand colour
+   to tell what was opened. */
 .dep-edge path.react-flow__edge-path {
   stroke: var(--line-hover);
-  stroke-width: 1.2;
+  stroke-width: 1;
+  stroke-opacity: 0.45;
 }
 .dep-edge-call path.react-flow__edge-path {
   stroke: var(--info);
+  stroke-opacity: 0.35;
+}
+.dep-edge-opened path.react-flow__edge-path {
+  stroke: var(--brand);
+  stroke-width: 1.3;
   stroke-opacity: 0.6;
 }
 .has-focus .react-flow__node:not(.linked):not(.react-flow__node-folder) {
@@ -2252,16 +2261,6 @@ details.technical[open] > summary {
   font-size: 12px;
   line-height: 1.6;
 }
-.dep-graph-table {
-  grid-column: 1 / -1;
-}
-.dep-graph-table summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.dep-graph-table .program-filters {
-  margin-top: 12px;
-}
 @keyframes dash {
   to {
     stroke-dashoffset: -24;
@@ -2346,7 +2345,7 @@ details.technical[open] > summary {
   animation: none;
 }
 .dep-graph-expanded .dep-graph-canvas {
-  height: calc(100vh - 290px);
+  height: calc(100vh - 150px);
   min-height: 420px;
 }
 .dep-graph-actions {
@@ -2366,14 +2365,64 @@ details.technical[open] > summary {
 }
 .dep-graph-search {
   position: relative;
-  max-width: 420px;
+  flex: 0 1 260px;
+  min-width: 200px;
 }
-.dep-graph-search label {
+.dep-graph-search input {
+  width: 100%;
+}
+/* One row above the canvas: search, open boxes, actions on the right. */
+.dep-graph-bar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
   font-size: 12px;
-  color: var(--fg-2);
+}
+.dep-graph-bar .dep-graph-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-left: auto;
+}
+.dep-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--navy);
+  cursor: pointer;
+}
+.dep-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dep-icon-button:hover,
+.dep-icon-button[aria-pressed='true'] {
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+.dep-icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-graph-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 12px;
 }
 .dep-search-results {
   position: absolute;

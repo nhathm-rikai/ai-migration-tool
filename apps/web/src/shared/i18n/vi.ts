@@ -360,7 +360,6 @@ export const viMessages = {
       graph: {
         loading: 'Đang tải call graph…',
         empty: 'Kết quả kiểm kê không có program nào để vẽ graph.',
-        hint: 'Bấm vào một node để làm nổi bật các phụ thuộc trực tiếp; Esc để bỏ chọn.',
         lanes: {
           program: 'Program',
           own: 'Module riêng',
@@ -380,8 +379,10 @@ export const viMessages = {
           mapped: 'Bảng theo tên sau ánh xạ',
           raw: 'Bảng theo tên trong source',
         },
-        showCommon: (count: string) =>
-          `Hiện ${count} module/COM được hơn 80% program dùng`,
+        showCommon: (count: string) => `Hiện ${count} module chung`,
+        showCommonTitle:
+          'Module/COM được hơn 80% program dùng (hằng số, tiện ích chung); ẩn mặc định để graph gọn.',
+        lanesLabel: 'Thứ tự làn từ trái sang phải',
         layoutPending: 'Đang sắp xếp graph…',
         layoutFailed:
           'Không sắp xếp được graph tự động; đang hiển thị theo làn đơn giản.',
@@ -426,22 +427,6 @@ export const viMessages = {
         fanIn: 'Fan-in',
         fanOut: 'Fan-out',
         callers: 'File gọi tới',
-        tableTitle: 'Bảng node (thay cho graph)',
-        tableFilter: 'Tìm node',
-        tableKind: 'Loại node',
-        all: 'Tất cả',
-        columns: {
-          node: 'Node',
-          kind: 'Loại',
-          state: 'Trạng thái',
-          fanIn: 'Fan-in',
-          fanOut: 'Fan-out',
-          action: 'Thao tác',
-        },
-        focusAction: 'Làm nổi bật',
-        tableCount: (shown: number, total: number) =>
-          `${shown} / ${total} node`,
-        tablePagination: 'Phân trang bảng node',
         flow: {
           controls: 'Điều khiển zoom',
           zoomIn: 'Phóng to',

@@ -56,12 +56,16 @@ test(
     const canvas = assessment.getByRole('group', {
       name: 'Call graph toàn dự án',
     });
-    // The node table's search answers while the layout runs.
-    await assessment.getByText('Bảng node (thay cho graph)').click();
-    const search = assessment.getByLabel('Tìm node');
+    // The search answers while the layout runs.
+    const search = assessment.getByLabel('Tìm program, module, bảng');
     await search.fill('Cmn05');
     await expect(search).toHaveValue('Cmn05');
-    await expect(assessment.getByText(/^1 \/ \d+ node$/)).toBeVisible();
+    await expect(
+      assessment
+        .getByRole('list', { name: 'Kết quả tìm' })
+        .getByRole('button', { name: /Cmn05\.bas/ }),
+    ).toBeVisible();
+    await search.fill('');
     await expect(canvas.getByText('Đang sắp xếp graph…')).toBeHidden({
       timeout: 20_000,
     });
@@ -112,17 +116,18 @@ test(
       fullPage: true,
     });
 
-    // Keyboard: Escape clears; the table's focus button works from the keys.
+    // Keyboard: Escape clears; a search result picked with Enter focuses the
+    // node again and brings it into view.
     await node.focus();
     await page.keyboard.press('Escape');
     await expect(node).toHaveAttribute('aria-pressed', 'false');
-    const focusButton = assessment
-      .getByRole('table')
-      .getByRole('button', { name: 'Làm nổi bật Dùng chung Cmn05.bas' });
-    await focusButton.focus();
+    await search.fill('Cmn05');
+    const result = assessment
+      .getByRole('list', { name: 'Kết quả tìm' })
+      .getByRole('button', { name: /Cmn05\.bas/ });
+    await result.focus();
     await page.keyboard.press('Enter');
-    await expect(focusButton).toHaveAttribute('aria-pressed', 'true');
-    // The table brings the node into view.
+    await expect(node).toHaveAttribute('aria-pressed', 'true');
     await expect(node).toBeInViewport();
     await canvas.screenshot({ path: testInfo.outputPath('ui03-focus.png') });
 
@@ -249,6 +254,21 @@ test(
         );
       })
       .toBe(true);
+    // Resting edges stay thin; the opened folder's edges have their own style.
+    const restingWidth = await canvas
+      .locator(
+        '.react-flow__edge:not(.dep-edge-opened) path.react-flow__edge-path',
+      )
+      .first()
+      .evaluate((path) => parseFloat(getComputedStyle(path).strokeWidth));
+    expect(restingWidth).toBeLessThanOrEqual(1);
+    await expect(
+      canvas.locator('.react-flow__edge.dep-edge-opened').first(),
+    ).toBeAttached();
+    // Toolbar is one row: the canvas starts right under it.
+    const toolbar = await dialog.locator('.dep-graph-bar').boundingBox();
+    if (!toolbar) throw new Error('toolbar');
+    expect(toolbar.height).toBeLessThan(60);
     await page.screenshot({
       path: testInfo.outputPath('ui03-full-screen.png'),
     });

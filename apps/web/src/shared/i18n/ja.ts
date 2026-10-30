@@ -662,6 +662,8 @@ export const jaMessages = {
         layoutFailed:
           '図を自動配置できなかったため、簡易レーンで表示しています。',
         canvasLabel: 'プロシージャ間の呼び出し図',
+        fullScreen: '全画面で表示',
+        exitFullScreen: '全画面を終了',
         sideLabel: '選択中のプロシージャ',
         sideHint:
           '図または検索でプロシージャを選ぶと、呼び出し元・呼び出し先・アクセスするテーブルを表示します。',

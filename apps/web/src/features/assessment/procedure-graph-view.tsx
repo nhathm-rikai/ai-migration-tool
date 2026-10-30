@@ -15,11 +15,13 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  useStore,
   type Edge,
   type Node,
   type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
+import { createPortal } from 'react-dom';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import type { Messages } from '../../shared/i18n/vi';
@@ -39,6 +41,7 @@ import {
 } from './procedure-graph';
 import { procedureLayoutRequest } from './procedure-graph-layout';
 import { useGraphLayout } from './use-graph-layout';
+import { ICON, IconButton, useFloatingHost } from './graph-frame';
 
 // Call graph tab of the program detail (UI04): the program's procedures,
 // the shared procedures they reach, the native APIs they call and the
@@ -54,6 +57,10 @@ type FlowNodeData = { node: ProcedureNode; focused: boolean };
 type FlowNode = Node<FlowNodeData>;
 
 const SEARCH_RESULTS = 8;
+// Zoom below which node names cannot be read; zoom a focused node is shown at
+// when its neighbours do not fit above it.
+const READABLE_ZOOM = 0.55;
+const FOCUS_ZOOM = 0.85;
 const MINIMAP_NODES = 40;
 
 function reducedMotion(): boolean {
@@ -111,6 +118,7 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
   );
   const [focus, setFocus] = useState<string | null>(null);
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   // Each request remembers what it draws; the canvas shows the one whose
   // layout finished last, so nodes and positions always match.
@@ -140,23 +148,83 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
     [graph, focus],
   );
 
+  // A focused procedure is brought into view with what it calls and what
+  // calls it, so a large program (drawn tiny to fit) zooms to the part
+  // being read. When those are spread too far apart to read at once, the
+  // view centres the procedure at a readable zoom instead; its edges and
+  // the side card lead to the rest.
+  const paneWidth = useStore((state) => state.width);
+  const paneHeight = useStore((state) => state.height);
   useEffect(() => {
     if (!pendingReveal || !drawn) return;
     const frame = requestAnimationFrame(() => {
-      if (!flow.getNode(pendingReveal)) return;
-      void flow.fitView({
-        nodes: [{ id: pendingReveal }],
-        maxZoom: 1,
-        duration: reducedMotion() ? 0 : 250,
-      });
+      const node = flow.getNode(pendingReveal);
+      if (!node) return;
+      const duration = reducedMotion() ? 0 : 250;
+      const ids = [...procedureNeighbourhood(graph.edges, pendingReveal)]
+        .filter((id) => flow.getNode(id))
+        .map((id) => ({ id }));
+      const bounds = flow.getNodesBounds(ids.map(({ id }) => id));
+      const fits =
+        Math.min(
+          paneWidth / (bounds.width * 1.3),
+          paneHeight / (bounds.height * 1.3),
+        ) >= READABLE_ZOOM;
+      if (fits)
+        void flow.fitView({ nodes: ids, maxZoom: 1, padding: 0.15, duration });
+      else
+        void flow.setCenter(
+          node.position.x + NODE_WIDTH / 2,
+          node.position.y + NODE_HEIGHT / 2,
+          { zoom: FOCUS_ZOOM, duration },
+        );
       setPendingReveal(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [pendingReveal, drawn, flow]);
+  }, [pendingReveal, drawn, flow, graph, paneWidth, paneHeight]);
+
+  // Full screen as in the project graph: page scroll locked, Esc clears
+  // the focus first, then leaves; the graph is fitted to the new size.
+  useEffect(() => {
+    if (!expanded) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [expanded]);
+  useEffect(() => {
+    if (!expanded) return;
+    const onEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (focus) setFocus(null);
+      else setExpanded(false);
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [expanded, focus]);
+  const firstSize = useRef(true);
+  useEffect(() => {
+    if (firstSize.current) {
+      firstSize.current = false;
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      void flow.fitView({ duration: reducedMotion() ? 0 : 250 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, flow]);
 
   const toggleFocus = useCallback(
-    (id: string) => setFocus((current) => (current === id ? null : id)),
-    [],
+    (id: string) => {
+      if (focus === id) {
+        setFocus(null);
+        return;
+      }
+      setFocus(id);
+      setPendingReveal(id);
+    },
+    [focus],
   );
   // From the search or the side card: focuses the node, draws it (a
   // procedure without edges is hidden by default) and brings it into view.
@@ -171,71 +239,104 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
     [byId],
   );
 
+  // Handled on the window while full screen.
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') setFocus(null);
+    if (event.key === 'Escape' && !expanded) setFocus(null);
   };
 
-  return (
-    <div className="dep-graph-tab proc-graph-tab" onKeyDown={onKeyDown}>
-      <div className="dep-graph-main">
-        <div className="dep-graph-bar">
-          <ProcedureSearch graph={graph} copy={copy} onPick={reveal} />
-          {isolatedCount > 0 && (
-            <span className="dep-graph-actions">
-              <label className="dep-graph-toggle">
-                <input
-                  type="checkbox"
-                  checked={showIsolated}
-                  onChange={(event) =>
-                    setShowIsolated(event.currentTarget.checked)
-                  }
-                />
-                {copy.showIsolated(number(isolatedCount))}
-              </label>
-            </span>
-          )}
-        </div>
-        <GraphCanvas
-          drawn={drawn}
-          positions={layout?.positions ?? null}
-          focus={focus}
-          linked={linked}
-          pending={layoutState.pending}
-          failed={layoutState.failed}
-          onFocus={toggleFocus}
-          onClear={() => setFocus(null)}
+  const { slot, host } = useFloatingHost(expanded);
+  const content = (
+    <>
+      {expanded && (
+        <div
+          className="dep-graph-backdrop"
+          aria-hidden="true"
+          onClick={() => setExpanded(false)}
         />
-        <p className="dep-graph-caption muted">
-          <span data-testid="procedure-graph-summary">
-            {copy.summary(
-              number(graph.ownProcedures),
-              number(graph.sharedProcedures),
-              number(graph.edges.length),
-            )}{' '}
-            · {copy.tableView[graph.tableView]}
-          </span>
-          <span>
-            {copy.lanes.own} → {copy.lanes.shared} → {copy.lanes.api} →{' '}
-            {copy.lanes.tables}
-          </span>
-        </p>
-      </div>
-      <aside className="dep-graph-side" aria-label={copy.sideLabel}>
-        {focusedNode ? (
-          <FocusCard
-            graph={graph}
-            node={focusedNode}
-            byId={byId}
-            copy={copy}
-            onPick={reveal}
+      )}
+      <div
+        className={`dep-graph-tab proc-graph-tab${expanded ? ' dep-graph-expanded' : ''}`}
+        onKeyDown={onKeyDown}
+        {...(expanded
+          ? {
+              role: 'dialog',
+              'aria-modal': true,
+              'aria-label': copy.canvasLabel,
+            }
+          : {})}
+      >
+        <div className="dep-graph-main">
+          <div className="dep-graph-bar">
+            <ProcedureSearch graph={graph} copy={copy} onPick={reveal} />
+            <span className="dep-graph-actions">
+              {isolatedCount > 0 && (
+                <label className="dep-graph-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showIsolated}
+                    onChange={(event) =>
+                      setShowIsolated(event.currentTarget.checked)
+                    }
+                  />
+                  {copy.showIsolated(number(isolatedCount))}
+                </label>
+              )}
+              <IconButton
+                label={expanded ? copy.exitFullScreen : copy.fullScreen}
+                pressed={expanded}
+                onClick={() => setExpanded((value) => !value)}
+                path={expanded ? ICON.exitFullScreen : ICON.fullScreen}
+              />
+            </span>
+          </div>
+          <GraphCanvas
+            drawn={drawn}
+            positions={layout?.positions ?? null}
+            focus={focus}
+            linked={linked}
+            pending={layoutState.pending}
+            failed={layoutState.failed}
+            onFocus={toggleFocus}
             onClear={() => setFocus(null)}
           />
-        ) : (
-          <p className="muted dep-common-note">{copy.sideHint}</p>
-        )}
-        <p className="muted dep-common-note">{copy.note}</p>
-      </aside>
-    </div>
+          <p className="dep-graph-caption muted">
+            <span data-testid="procedure-graph-summary">
+              {copy.summary(
+                number(graph.ownProcedures),
+                number(graph.sharedProcedures),
+                number(graph.edges.length),
+              )}{' '}
+              · {copy.tableView[graph.tableView]}
+            </span>
+            <span>
+              {copy.lanes.own} → {copy.lanes.shared} → {copy.lanes.api} →{' '}
+              {copy.lanes.tables}
+            </span>
+          </p>
+        </div>
+        <aside className="dep-graph-side" aria-label={copy.sideLabel}>
+          {focusedNode ? (
+            <FocusCard
+              graph={graph}
+              node={focusedNode}
+              byId={byId}
+              copy={copy}
+              onPick={reveal}
+              onClear={() => setFocus(null)}
+            />
+          ) : (
+            <p className="muted dep-common-note">{copy.sideHint}</p>
+          )}
+          <p className="muted dep-common-note">{copy.note}</p>
+        </aside>
+      </div>
+    </>
+  );
+  return (
+    <>
+      <div ref={slot} />
+      {createPortal(content, host)}
+    </>
   );
 }
 
@@ -340,7 +441,8 @@ function GraphCanvas({
             ...edge,
             className: `${edge.className ?? ''} linked`,
             label: edgeLabel(value, copy, number),
-            zIndex: 1,
+            // Over the nodes they cross, so they can be followed.
+            zIndex: 1000,
           }
         : edge;
     });

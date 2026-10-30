@@ -683,6 +683,8 @@ export const viMessages = {
         layoutFailed:
           'Không sắp xếp được sơ đồ tự động; đang hiển thị theo làn đơn giản.',
         canvasLabel: 'Sơ đồ gọi giữa các procedure',
+        fullScreen: 'Xem toàn màn hình',
+        exitFullScreen: 'Thoát toàn màn hình',
         sideLabel: 'Procedure đang chọn',
         sideHint:
           'Chọn một procedure trên sơ đồ hoặc qua ô tìm để xem nơi gọi, lời gọi và bảng nó truy cập.',

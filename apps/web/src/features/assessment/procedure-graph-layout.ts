@@ -50,6 +50,10 @@ export function procedureLayoutRequest(
       'elk.spacing.nodeNode': String(NODE_GAP),
       'elk.layered.spacing.nodeNodeBetweenLayers': String(LAYER_SPACING),
       'elk.edgeRouting': 'POLYLINE',
+      // Fewer crossing-minimisation passes than the default 7: the largest
+      // pilot program (142 procedures drawn) lays out in ~0.3 s instead of
+      // ~0.7 s, with barely more crossings.
+      'elk.layered.thoroughness': '3',
     },
     children: nodes.map((node) => ({
       id: node.id,

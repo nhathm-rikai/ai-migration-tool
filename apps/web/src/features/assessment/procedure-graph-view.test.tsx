@@ -129,4 +129,22 @@ describe('UI04 procedure call graph tab', () => {
       ),
     ).toBeTruthy();
   });
+
+  it('opens full screen over the page and leaves it with Escape', () => {
+    render(
+      <ProcedureGraphView
+        inventory={procedureCorpus()}
+        projectPath={PROCEDURE_PROGRAM}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Xem toàn màn hình' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Sơ đồ gọi giữa các procedure',
+    });
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+    expect(document.body.style.overflow).toBe('hidden');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
 });

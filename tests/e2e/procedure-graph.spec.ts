@@ -70,6 +70,29 @@ test(
     expect(from.x).toBeLessThan(to.x);
 
     await load.click();
+    // The view zooms to the procedure and what it calls: all inside the
+    // canvas.
+    await expect
+      .poll(async () => {
+        const area = await canvas.boundingBox();
+        const boxes = await Promise.all(
+          [load, canvas.getByRole('button', { name: /Cmn00Run/ })].map((node) =>
+            node.boundingBox(),
+          ),
+        );
+        return (
+          area !== null &&
+          boxes.every(
+            (box) =>
+              box !== null &&
+              box.x >= area.x - 1 &&
+              box.y >= area.y - 1 &&
+              box.x + box.width <= area.x + area.width + 1 &&
+              box.y + box.height <= area.y + area.height + 1,
+          )
+        );
+      })
+      .toBe(true);
     const card = detail.getByRole('complementary', {
       name: 'Procedure đang chọn',
     });
@@ -100,5 +123,19 @@ test(
     });
     expect(fits).toBe(true);
     await shared.screenshot({ path: testInfo.outputPath('ui04-node.png') });
+
+    // Full screen over the page; Escape clears the focus, then leaves.
+    await detail.getByRole('button', { name: 'Xem toàn màn hình' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Sơ đồ gọi giữa các procedure',
+    });
+    await expect(dialog).toBeVisible();
+    const viewport = page.viewportSize();
+    const frame = await dialog.boundingBox();
+    if (!viewport || !frame) throw new Error('no box');
+    expect(frame.width).toBeGreaterThan(viewport.width - 40);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
   },
 );

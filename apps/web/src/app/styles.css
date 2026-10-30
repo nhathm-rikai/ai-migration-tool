@@ -2119,7 +2119,8 @@ details.technical[open] > summary {
   padding: 8px 12px;
   border: 1px dashed var(--brand-edge);
   border-radius: 14px;
-  background: rgba(227, 241, 251, 0.45);
+  /* Opaque: edges passing behind an open box do not show through. */
+  background: color-mix(in srgb, var(--brand-soft) 60%, var(--surface));
   font-size: 12px;
 }
 .dep-folder-label {
@@ -2496,7 +2497,8 @@ details.technical[open] > summary {
 }
 .dep-folder-close {
   margin-left: auto;
-  padding: 2px 10px;
+  padding: 0 9px;
+  line-height: 20px;
   border: 1px solid var(--brand-edge);
   border-radius: 999px;
   background: var(--surface);

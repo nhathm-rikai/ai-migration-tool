@@ -262,6 +262,9 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
         else next.add(box);
         return next;
       });
+      // A focused box that opens is no longer one node: nothing stays
+      // focused, so the graph is not left dimmed.
+      setFocus((current) => (current === box ? null : current));
       setRecent(box);
       setPendingReveal(box);
     },
@@ -854,7 +857,6 @@ function GraphCanvas({
         className: `${base.className ?? ''} linked`,
         // A merged edge stands for many: no single count to show.
         ...(own ? { label: edgeLabel(edge, copy, number) } : {}),
-        zIndex: 1,
       });
     }
     return [
@@ -890,6 +892,9 @@ function GraphCanvas({
           edges={edges}
           nodeTypes={nodeTypes}
           onlyRenderVisibleElements
+          // Edges stay under every node, open boxes included (React Flow would
+          // raise edges of nodes inside a box above the box).
+          zIndexMode="manual"
           fitView
           minZoom={0.03}
           maxZoom={2}

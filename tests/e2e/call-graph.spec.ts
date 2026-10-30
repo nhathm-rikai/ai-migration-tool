@@ -297,6 +297,32 @@ test(
     await page.screenshot({
       path: testInfo.outputPath('ui03-full-screen.png'),
     });
+    // Closing it from its header keeps it in the same place too, and the
+    // folders stay evenly spaced.
+    const openTop = await inCanvas(await folderNode.boundingBox());
+    await canvas.getByRole('button', { name: 'Thu gọn thư mục F03' }).click();
+    await expect(
+      canvas.getByRole('button', { name: /^Mở thư mục F03 / }),
+    ).toBeVisible();
+    await expect
+      .poll(async () => {
+        const closed = await inCanvas(await folderNode.boundingBox());
+        return Math.max(
+          Math.abs(closed.x - openTop.x),
+          Math.abs(closed.y - openTop.y),
+        );
+      })
+      .toBeLessThan(3);
+    const gaps = await canvas.evaluate((element) => {
+      const tops = [...element.querySelectorAll('.react-flow__node-box')]
+        .filter((node) => node.getAttribute('data-id')?.startsWith('folder:'))
+        .map((node) => node.getBoundingClientRect())
+        .sort((a, b) => a.top - b.top);
+      return tops
+        .slice(1)
+        .map((box, i) => Math.round(box.top - (tops[i]?.bottom ?? 0)));
+    });
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(2);
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await expect(

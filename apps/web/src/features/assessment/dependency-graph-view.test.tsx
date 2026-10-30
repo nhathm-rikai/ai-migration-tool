@@ -281,6 +281,10 @@ describe('UI03 call graph tab', () => {
     const card = screen.getByRole('region', { name: 'Node đang chọn' });
     expect(within(card).getByText('F01')).toBeTruthy();
     fireEvent.click(within(card).getByRole('button', { name: 'Mở ra' }));
+    // The opened folder is no longer one node: nothing stays focused and
+    // the graph is not left dimmed.
+    expect(canvas.className).not.toContain('has-focus');
+    expect(screen.queryByRole('region', { name: 'Node đang chọn' })).toBeNull();
     expect(
       within(canvas).getByRole('button', {
         name: 'Làm nổi bật Program F010004',

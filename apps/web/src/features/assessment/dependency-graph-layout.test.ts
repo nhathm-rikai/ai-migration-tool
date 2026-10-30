@@ -167,6 +167,10 @@ describe('UI03 closed boxes in the layout', () => {
     const before = await order(allClosed);
     const after = await order(oneOpen);
     expect(after.folders).toEqual(before.folders);
+    // Folders in name order, as the request lists them.
+    expect(before.folders).toEqual(
+      folders.filter((id) => before.folders.includes(id)),
+    );
     expect(after.shared).toEqual(before.shared);
   });
 });

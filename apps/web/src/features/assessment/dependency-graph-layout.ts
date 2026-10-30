@@ -20,7 +20,7 @@ export const NODE_WIDTH = 200;
 export const NODE_HEIGHT = 52;
 const GAP = 10;
 const GROUP_PADDING = 12;
-const GROUP_HEADER = 30;
+const GROUP_HEADER = 36;
 const LANE_SPACING = 160;
 // Rows of a table or COM box before it gets another column.
 const BOX_ROWS = 30;
@@ -259,6 +259,12 @@ export function layoutRequest(
       // crossing minimisation, most of its run time on large corpora, is
       // skipped and each layer keeps the request order.
       'elk.layered.crossingMinimization.strategy': 'NONE',
+      // Each lane in exactly the request order (folders by name).
+      'elk.layered.considerModelOrder.strategy': 'PREFER_NODES',
+      'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
+      // Evenly spaced boxes in each lane: the default placement moves a
+      // box up or down to straighten its edges, which leaves uneven gaps.
+      'elk.layered.nodePlacement.strategy': 'SIMPLE',
     },
     children,
     edges: [...layoutEdges.values()],

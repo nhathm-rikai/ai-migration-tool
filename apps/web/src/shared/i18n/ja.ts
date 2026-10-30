@@ -568,6 +568,7 @@ export const jaMessages = {
         procedures: 'プロシージャ',
         crud: 'CRUD',
         calls: '呼び出し',
+        graph: '呼び出し図',
       },
       rowRange: (from: string, to: string, total: string) =>
         `${total} 行中 ${from}–${to} 行`,
@@ -636,6 +637,60 @@ export const jaMessages = {
         resolution: '特定',
         targets: '呼び出し先',
         uses: '回数',
+      },
+      graph: {
+        loading: '呼び出し図を読み込み中…',
+        empty: 'このプログラムの解析済みファイルにプロシージャがありません。',
+        hint: 'プロシージャをクリックすると、呼び出し元と呼び出し先を強調表示します。Esc で解除します。',
+        lanes: {
+          own: '専用プロシージャ',
+          shared: '共通プロシージャ',
+          api: '外部API',
+          tables: 'DBテーブル',
+        },
+        kinds: { api: '外部API', table: 'DBテーブル' },
+        fileLevel: 'プロシージャ外',
+        shared: '共通',
+        summary: (own: string, shared: string, edges: string) =>
+          `専用プロシージャ ${own} · 到達可能な共通プロシージャ ${shared} · 関係 ${edges}`,
+        tableView: {
+          mapped: 'マッピング後のテーブル名',
+          raw: 'ソース上のテーブル名',
+        },
+        showIsolated: (count: string) =>
+          `呼び出し関係のないプロシージャ ${count} 件を表示`,
+        layoutPending: '図を配置しています…',
+        layoutFailed:
+          '図を自動配置できなかったため、簡易レーンで表示しています。',
+        canvasLabel: 'プロシージャ間の呼び出し図',
+        sideLabel: '選択中のプロシージャ',
+        sideHint:
+          '図または検索でプロシージャを選ぶと、呼び出し元・呼び出し先・アクセスするテーブルを表示します。',
+        note: '名前による静的解析で、プログラムは実行していません。破線は特定できない呼び出し（同名のプロシージャが複数）です。オブジェクト経由の呼び出し（Form1.Foo）は結び付けられません。一覧は「呼び出し」タブにあります。',
+        search: 'プロシージャ・API・テーブルを検索',
+        searchResults: '検索結果',
+        searchNone: '該当するノードがありません。',
+        focusNode: (kind: string, label: string) =>
+          `${kind} ${label} を強調表示`,
+        uses: (count: string) => `${count} 回`,
+        dynamicSql: (count: string) => `動的SQL ${count} 件`,
+        ambiguous: '未特定',
+        focusedTitle: '選択中のプロシージャ',
+        clearFocus: '選択解除',
+        codeLines: 'LoC',
+        decisions: '分岐点',
+        callers: '呼び出し元',
+        calledBy: '呼び出し元',
+        callsTo: '呼び出し先',
+        tables: 'アクセスするテーブル',
+        noEdges: '呼び出し・被呼び出し・テーブルアクセスはありません。',
+        flow: {
+          controls: 'ズーム操作',
+          zoomIn: '拡大',
+          zoomOut: '縮小',
+          fitView: '全体を表示',
+          minimap: 'ミニマップ',
+        },
       },
     },
     errors: {

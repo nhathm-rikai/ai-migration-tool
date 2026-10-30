@@ -1,4 +1,11 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import {
+  Suspense,
+  lazy,
+  useId,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { pageOf, programLabel } from './assessment-summary';
@@ -16,7 +23,14 @@ import {
 // or after table name mapping, calls and external dependencies of the
 // program selected in the overview, one tab each. Lists and tables only;
 // every value is rendered as text (React escapes it), never as HTML or a
-// link guessed from a name.
+// link guessed from a name. The call graph tab (UI04) draws the same calls
+// per procedure; it loads with its libraries when first opened.
+
+const ProcedureGraphView = lazy(() =>
+  import('./procedure-graph-view').then((module) => ({
+    default: module.ProcedureGraphView,
+  })),
+);
 
 function useNumber() {
   const { locale } = useLocale();
@@ -41,11 +55,12 @@ export function ProgramDetail({
   );
   const titleId = useId();
   const [tab, setTab] = useState<DetailTab>('summary');
+  const [graphOpened, setGraphOpened] = useState(false);
   if (!detail) return null;
   const label = programLabel(detail.projectPath);
   const analysis = detail.analysis;
   const tabs: DetailTab[] = analysis
-    ? ['summary', 'files', 'procedures', 'crud', 'calls']
+    ? ['summary', 'files', 'procedures', 'crud', 'calls', 'graph']
     : ['summary', 'files'];
   const panel = (value: DetailTab) => `${titleId}-${value}`;
   const count = (value: DetailTab): number | null => {
@@ -82,7 +97,10 @@ export function ProgramDetail({
               className="tab"
               aria-selected={tab === value}
               aria-controls={panel(value)}
-              onClick={() => setTab(value)}
+              onClick={() => {
+                setTab(value);
+                if (value === 'graph') setGraphOpened(true);
+              }}
             >
               {copy.tabs[value]}
               {total !== null && <span className="tab-count">{total}</span>}
@@ -112,13 +130,24 @@ export function ProgramDetail({
           <TabPanel id={panel('calls')} active={tab === 'calls'}>
             <Calls rows={analysis.calls} />
           </TabPanel>
+          <TabPanel id={panel('graph')} active={tab === 'graph'}>
+            {graphOpened && (
+              <Suspense fallback={<p role="status">{copy.graph.loading}</p>}>
+                <ProcedureGraphView
+                  inventory={inventory}
+                  projectPath={detail.projectPath}
+                />
+              </Suspense>
+            )}
+          </TabPanel>
         </>
       )}
     </section>
   );
 }
 
-type DetailTab = 'summary' | 'files' | 'procedures' | 'crud' | 'calls';
+type DetailTab =
+  'summary' | 'files' | 'procedures' | 'crud' | 'calls' | 'graph';
 
 function TabPanel({
   id,

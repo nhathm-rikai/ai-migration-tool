@@ -2614,3 +2614,53 @@ details.technical[open] > summary {
 .dep-search-item:focus-visible {
   background: var(--brand-soft);
 }
+/* Procedure call graph of the program detail (UI04): a narrower side card
+   so the canvas keeps most of the detail card. */
+.proc-graph-tab {
+  grid-template-columns: minmax(0, 1fr) 260px;
+}
+.proc-node-own-procedure .dep-node-type {
+  color: var(--navy);
+}
+.proc-node-shared-procedure .dep-node-type {
+  color: var(--info);
+}
+.proc-node-api .dep-node-type {
+  color: var(--ai);
+}
+.proc-node-table .dep-node-type {
+  color: var(--low);
+}
+.proc-node-file {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--fg-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.proc-edge-call path.react-flow__edge-path {
+  stroke: var(--info);
+  stroke-opacity: 0.6;
+}
+/* Ambiguous: one edge per candidate, none of them certain. */
+.proc-edge-ambiguous path.react-flow__edge-path {
+  stroke: var(--warn);
+  stroke-dasharray: 4 4;
+}
+.proc-edge-api path.react-flow__edge-path {
+  stroke: var(--ai);
+  stroke-opacity: 0.6;
+}
+.proc-focus-list-title {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.proc-focus-list {
+  position: static;
+  box-shadow: none;
+  max-height: 220px;
+  overflow-y: auto;
+}

@@ -588,6 +588,7 @@ export const viMessages = {
         procedures: 'Procedure',
         crud: 'CRUD',
         calls: 'Lời gọi',
+        graph: 'Sơ đồ gọi',
       },
       rowRange: (from: string, to: string, total: string) =>
         `Dòng ${from}–${to} / ${total}`,
@@ -656,6 +657,61 @@ export const viMessages = {
         resolution: 'Xác định',
         targets: 'Đích',
         uses: 'Số lần',
+      },
+      graph: {
+        loading: 'Đang tải sơ đồ gọi…',
+        empty:
+          'Program này không có procedure nào trong các file đã phân tích.',
+        hint: 'Bấm vào một procedure để làm nổi bật nơi gọi nó và những gì nó gọi; Esc để bỏ chọn.',
+        lanes: {
+          own: 'Procedure riêng',
+          shared: 'Procedure dùng chung',
+          api: 'API ngoài',
+          tables: 'Bảng DB',
+        },
+        kinds: { api: 'API ngoài', table: 'Bảng DB' },
+        fileLevel: 'Ngoài procedure',
+        shared: 'Dùng chung',
+        summary: (own: string, shared: string, edges: string) =>
+          `${own} procedure riêng · ${shared} procedure dùng chung gọi tới được · ${edges} liên kết`,
+        tableView: {
+          mapped: 'Bảng theo tên sau ánh xạ',
+          raw: 'Bảng theo tên trong source',
+        },
+        showIsolated: (count: string) =>
+          `Hiện ${count} procedure không gọi và không được gọi`,
+        layoutPending: 'Đang sắp xếp sơ đồ…',
+        layoutFailed:
+          'Không sắp xếp được sơ đồ tự động; đang hiển thị theo làn đơn giản.',
+        canvasLabel: 'Sơ đồ gọi giữa các procedure',
+        sideLabel: 'Procedure đang chọn',
+        sideHint:
+          'Chọn một procedure trên sơ đồ hoặc qua ô tìm để xem nơi gọi, lời gọi và bảng nó truy cập.',
+        note: 'Phân tích theo tên, không chạy chương trình. Nét đứt là lời gọi chưa xác định (nhiều procedure trùng tên). Lời gọi qua object (Form1.Foo) không nối được. Bảng đầy đủ ở tab Lời gọi.',
+        search: 'Tìm procedure, API, bảng',
+        searchResults: 'Kết quả tìm',
+        searchNone: 'Không tìm thấy node nào.',
+        focusNode: (kind: string, label: string) =>
+          `Làm nổi bật ${kind} ${label}`,
+        uses: (count: string) => `${count} lần`,
+        dynamicSql: (count: string) => `${count} SQL động`,
+        ambiguous: 'chưa xác định',
+        focusedTitle: 'Procedure đang chọn',
+        clearFocus: 'Bỏ chọn',
+        codeLines: 'LoC',
+        decisions: 'Điểm rẽ nhánh',
+        callers: 'Nơi gọi',
+        calledBy: 'Được gọi bởi',
+        callsTo: 'Gọi tới',
+        tables: 'Bảng truy cập',
+        noEdges: 'Không gọi, không được gọi và không truy cập bảng.',
+        flow: {
+          controls: 'Điều khiển zoom',
+          zoomIn: 'Phóng to',
+          zoomOut: 'Thu nhỏ',
+          fitView: 'Vừa khung',
+          minimap: 'Bản đồ thu nhỏ',
+        },
       },
     },
     errors: {

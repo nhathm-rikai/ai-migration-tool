@@ -633,7 +633,7 @@ export const viMessages = {
       queued: (_done: number, total: number) =>
         `Đang chờ tạo ${total} tài liệu`,
       running: (done: number, total: number) =>
-        `Đang tạo tài liệu · ${done} / ${total}`,
+        `Agent đang viết tài liệu… · ${done} / ${total}`,
       cancelling: () => 'Đang dừng Agent…',
       succeeded: (done: number) => `Đã tạo xong ${done} tài liệu`,
       failed: (done: number, total: number) =>
@@ -675,9 +675,9 @@ export const viMessages = {
     reading: 'Agent đang đọc phiếu input, bộ spec và source…',
     docStatus: {
       pending: 'Chờ',
-      writing: 'Đang viết…',
+      writing: 'Đang viết',
       written: 'Đã viết · chờ kiểm',
-      done: 'Xong',
+      done: 'Hoàn tất',
       notWritten: 'Không tạo',
     },
     view: 'Xem',

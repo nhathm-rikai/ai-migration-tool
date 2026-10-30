@@ -612,7 +612,7 @@ export const jaMessages = {
       queued: (_done: number, total: number) =>
         `${total} 件のドキュメント作成を待機中`,
       running: (done: number, total: number) =>
-        `作成中 · ${done} / ${total} ドキュメント`,
+        `エージェントがドキュメントを作成中… · ${done} / ${total}`,
       cancelling: () => 'エージェントを停止中…',
       succeeded: (done: number) => `${done} 件のドキュメントを作成しました`,
       failed: (done: number, total: number) =>
@@ -655,7 +655,7 @@ export const jaMessages = {
     reading: 'エージェントが入力票・パック・ソースを読み込んでいます…',
     docStatus: {
       pending: '待機',
-      writing: '作成中…',
+      writing: '作成中',
       written: '作成済み · 確認待ち',
       done: '完了',
       notWritten: '未作成',

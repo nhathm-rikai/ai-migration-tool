@@ -6,6 +6,7 @@ import {
   documentsToGenerate,
   type AgentModel,
   type DocumentLanguage,
+  type DocumentLogEntry,
   type DocumentRun,
   type PackageFileContent,
   type SpecDocumentId,
@@ -50,6 +51,49 @@ function RerunIcon() {
       <path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 2M5 16a8 8 0 0 0 13 2" />
     </svg>
   );
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+// Tag of a log line, read from what the line is (prototype agent.log).
+type LogTag =
+  'INIT' | 'READ' | 'GREP' | 'PLAN' | 'WRITE' | 'WARN' | 'CHECK' | 'DONE';
+
+function logTag(entry: DocumentLogEntry): LogTag {
+  if (entry.stream === 'stderr') return 'WARN';
+  if (entry.stream === 'agent') return 'PLAN';
+  const text = entry.text;
+  if (/^(init|start)\b/.test(text)) return 'INIT';
+  if (/^Grep\b/.test(text)) return 'GREP';
+  if (/^(Read|Glob)\b|^\$ /.test(text)) return 'READ';
+  if (/^write\b/.test(text)) return 'WRITE';
+  if (/^done\b/.test(text)) return 'DONE';
+  if (/lockdown|fail|error|unavailable|not available/i.test(text))
+    return 'WARN';
+  return 'CHECK';
+}
+
+function logTime(at: string): string {
+  const date = new Date(at);
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
 }
 
 function DocIcon() {
@@ -541,7 +585,13 @@ function DocumentsWorkspace({
             aria-label={copy.ringLabel(done, total)}
           >
             <div>
-              <strong>{Math.round(percent)}%</strong>
+              {published ? (
+                <strong className="ring-check" aria-hidden="true">
+                  ✓
+                </strong>
+              ) : (
+                <strong>{Math.round(percent)}%</strong>
+              )}
               <span>{run ? copy.runState[run.status] : copy.ready}</span>
             </div>
           </div>
@@ -608,33 +658,42 @@ function DocumentsWorkspace({
             {active && run ? (
               <button
                 type="button"
-                className="button generate-start"
+                className="button generate-start generate-stop"
                 disabled={
                   run.status === 'cancelling' || action.status === 'pending'
                 }
                 onClick={() => void documents.cancel(run)}
               >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
                 {run.status === 'cancelling' ? copy.cancelling : copy.cancel}
               </button>
             ) : run?.status === 'succeeded' && program ? (
               <>
+                <Link
+                  className="button primary generate-start pop-in"
+                  to={`${stepPath(projectId, 'review')}?program=${encodeURIComponent(program.key)}`}
+                >
+                  {copy.goReview}
+                  <ArrowIcon />
+                </Link>
                 <button
                   type="button"
                   className="button generate-start"
                   disabled={!canStart}
                   onClick={startRun}
                 >
-                  <RerunIcon />
                   {action.status === 'pending' && action.kind === 'start'
                     ? copy.starting
                     : copy.rerun}
                 </button>
-                <Link
-                  className="button primary generate-start"
-                  to={`${stepPath(projectId, 'review')}?program=${encodeURIComponent(program.key)}`}
-                >
-                  {copy.goReview}
-                </Link>
               </>
             ) : (
               <button
@@ -716,7 +775,9 @@ function DocumentsWorkspace({
                     <li key={row.name} className={`queue-${state}`}>
                       <span className="queue-dot" aria-hidden="true">
                         {state === 'done' || state === 'written' ? (
-                          '✓'
+                          <span className="queue-check">✓</span>
+                        ) : state === 'writing' ? (
+                          <span className="queue-spin" />
                         ) : (
                           <span />
                         )}
@@ -728,7 +789,26 @@ function DocumentsWorkspace({
                               row.name.replace(/\.md$/, '') as SpecDocumentId
                             ]?.name ?? row.name}
                           </strong>
-                          <span>{copy.docStatus[state]}</span>
+                          <span className="queue-state">
+                            {copy.docStatus[state]}
+                            {state === 'writing' && (
+                              <span className="queue-dots" aria-hidden="true">
+                                <i />
+                                <i />
+                                <i />
+                              </span>
+                            )}
+                            {state === 'writing' && row.sections && (
+                              <span className="mono">
+                                {Math.round(
+                                  (row.sections.done /
+                                    Math.max(row.sections.total, 1)) *
+                                    100,
+                                )}
+                                %
+                              </span>
+                            )}
+                          </span>
                           {published && run && (
                             <button
                               type="button"
@@ -741,6 +821,7 @@ function DocumentsWorkspace({
                         </span>
                         <span className="queue-bar" aria-hidden="true">
                           <span
+                            className={state === 'writing' ? 'run' : undefined}
                             style={{
                               width: `${
                                 state === 'done' || state === 'written'
@@ -822,20 +903,27 @@ function DocumentsWorkspace({
             <span className="log-dot" />
             <span className="log-dot" />
             <span className="log-title">agent.log · stream-json</span>
-            <span className="log-state">
+            <span className={`log-state${active ? ' log-state-running' : ''}`}>
               {run ? copy.runState[run.status] : copy.ready}
             </span>
           </div>
           <div className="agent-log-body" role="log" aria-live="polite">
-            {documents.log.map((entry) => (
-              <div
-                key={entry.sequence}
-                className={`log-line log-${entry.stream}`}
-              >
-                <span className="log-template">{entry.program ?? '·'}</span>
-                <span>{entry.text}</span>
-              </div>
-            ))}
+            {documents.log.map((entry) => {
+              const tag = logTag(entry);
+              return (
+                <div
+                  key={entry.sequence}
+                  className={`log-line log-${entry.stream}`}
+                  title={entry.text}
+                >
+                  <span className="log-time">{logTime(entry.at)}</span>
+                  <span className={`log-tag log-tag-${tag.toLowerCase()}`}>
+                    {tag}
+                  </span>
+                  <span className="log-text">{entry.text}</span>
+                </div>
+              );
+            })}
             {(!run || active) && (
               <div className="log-prompt">
                 <span>$</span>

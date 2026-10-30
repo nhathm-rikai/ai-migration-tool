@@ -304,6 +304,8 @@ export function createDocumentExecutor(deps: {
                 const line = event.text.trim();
                 if (FILE_LINE.test(line)) {
                   insideFile = true;
+                  // Only the file name reaches the log (the "WRITE" line).
+                  system(label, `write ${line.slice(10, -4)}`);
                   return;
                 }
                 if (line === FILE_END) {

@@ -222,9 +222,8 @@ describe('DocumentsStep', () => {
     // Without ?program= the screen shows the latest run's program.
     const { container } = renderStep(api, null);
     await screen.findByText('Đã tạo xong 1 tài liệu');
-    expect(
-      await screen.findByText('100%', undefined, { timeout: 3000 }),
-    ).toBeTruthy();
+    // A finished package shows a check instead of the percentage.
+    expect(container.querySelector('.ring-check')).toBeTruthy();
     expect(await screen.findByText('<b>not html</b>')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Xem' }));
     await screen.findByRole('heading', { level: 1, name: 'Business rules' });
@@ -313,7 +312,7 @@ describe('DocumentsStep', () => {
     });
     renderStep(fakeApi({ run: running, ...ready }), 'src/ORDER.VBP');
     expect(await screen.findByText('Đã viết · chờ kiểm')).toBeTruthy();
-    expect(screen.getByText('Đang viết…')).toBeTruthy();
+    expect(screen.getByText('Đang viết')).toBeTruthy();
     expect(
       await screen.findByText('50%', undefined, { timeout: 3000 }),
     ).toBeTruthy();

@@ -4,6 +4,15 @@
 
 Removed the floating screen-selector markup, unused CSS and JavaScript listeners from the standalone design HTML. Hash and sidebar navigation remain available. Scope: prototype UI only; no app/API changes.
 
+## 30/10/2026 — Bước 3: khớp chi tiết prototype `tpl-Generate`
+
+- Vòng tiến độ: xong thành công hiện ✓ (pop) thay số %. Tiêu đề khi chạy "Agent đang viết tài liệu… · x / y".
+- Nút: "Dừng" viền/nền đỏ nhạt + icon vuông; xong thành công "Sang review →" (chính, đứng trước, pop) rồi "Chạy lại" (phụ, không icon).
+- Dòng tài liệu: đang viết nền #EEF7FD, spinner trong vòng, "Đang viết" + 3 chấm, % mono (từ số section thật), thanh sọc chạy #5AAFE3; hoàn tất ✓ #0077BE, thanh #0077BE, nhãn "Hoàn tất".
+- agent.log: giờ HH:MM:SS + cột tag (INIT/READ/GREP/PLAN/WRITE/WARN/CHECK/DONE) suy ra từ sự kiện thật (stream, tên tool, mốc start/done); dòng một hàng, cắt ellipsis, toàn văn ở tooltip. API ghi thêm dòng system `write <file>.md` khi Agent mở một file trong gói (chỉ tên file, không nội dung). Trạng thái header màu cam khi chạy.
+- Card fadeUp theo nhịp trễ; mọi animation tắt khi `prefers-reduced-motion`.
+- Kiểm chứng: web 17/17 test documents, tsc sạch, build (main 363 kB); API documents/adapters 85/86 (lỗi còn lại là `local-source-root` có sẵn trước). Trình duyệt (runner fake, 1440px): trạng thái hoàn tất đúng; trạng thái đang viết chỉ kiểm qua unit test vì run fake xong quá nhanh. Commit riêng để có thể revert.
+
 ## 30/10/2026 — Bước 3: nút theo design (Dừng / Sang review / Chạy lại)
 
 - Theo prototype: đang chạy là "Dừng" (thay "Hủy"); xong thành công là "Chạy lại" (phụ, icon refresh) + "Sang review" (chính, link `/projects/<id>/review?program=<projectPath>`); thất bại/hủy/gián đoạn chỉ "Chạy lại" (chính). "Chạy lại" tạo run mới với lựa chọn tài liệu/model/ngôn ngữ hiện tại (key idempotency mới). Bước 4 Review vẫn là trang "Chưa khả dụng" cho tới khi được làm.

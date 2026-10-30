@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import { isAbsolute } from 'node:path';
 import {
   resolveDefaultDataDirectory,
   validateDataDirectory,
@@ -13,7 +14,10 @@ export type AppConfig = {
   webPorts: readonly number[];
   dataDir: string;
   mode: 'fixture';
-  runner: 'fake';
+  // Agent of document runs: fake (no network) or the local agent CLI.
+  runner: 'fake' | 'claude-cli' | 'codex-cli';
+  // Absolute path of the agent CLI; searched on PATH when absent.
+  agentExecutable: string | undefined;
   logLevel: 'info' | 'warn' | 'error' | 'silent';
 };
 
@@ -39,12 +43,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     env.PORTAL_WEB_PORT === undefined
       ? [...DEFAULT_WEB_PORTS]
       : [parsePort(env.PORTAL_WEB_PORT)];
+  const runner = env.PORTAL_RUNNER ?? 'fake';
   if (
     (env.PORTAL_MODE ?? 'fixture') !== 'fixture' ||
-    (env.PORTAL_RUNNER ?? 'fake') !== 'fake'
+    (runner !== 'fake' && runner !== 'claude-cli' && runner !== 'codex-cli')
   ) {
     throw new RuntimeError('INVALID_CONFIG');
   }
+  const agentExecutable = env.PORTAL_AGENT_CLI;
+  if (agentExecutable !== undefined && !isAbsolute(agentExecutable))
+    throw new RuntimeError('INVALID_CONFIG');
   const logLevel = env.PORTAL_LOG_LEVEL ?? 'info';
   // Narrow explicitly so configuration never relies on a type assertion.
   if (
@@ -74,7 +82,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webPorts,
     dataDir,
     mode: 'fixture',
-    runner: 'fake',
+    runner,
+    agentExecutable,
     logLevel,
   };
 }

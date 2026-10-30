@@ -8,3 +8,5 @@ export * from './source-registration.schema.js';
 export * from './run.schema.js';
 export * from './artifact.schema.js';
 export * from './analyze-api.js';
+export * from './documents.schema.js';
+export * from './documents-api.js';

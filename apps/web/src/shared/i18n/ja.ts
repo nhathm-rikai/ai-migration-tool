@@ -1,6 +1,7 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  type DocumentRunErrorCode,
 } from '@portal/contracts';
 import type { Messages } from './vi';
 
@@ -29,7 +30,7 @@ export const jaMessages = {
     pageTitles: {
       source: '顧客ソースコードの取込',
       analysis: 'ソースコード解析',
-      documents: 'ドキュメント生成',
+      documents: 'Agent CLI でドキュメント生成',
       review: 'ドキュメントのレビュー・承認',
       quote: '見積',
     },
@@ -549,6 +550,172 @@ export const jaMessages = {
         'このプロジェクトに該当するバージョンの結果が見つかりません。実行を再読み込みしてください。',
       mismatch:
         '受信した結果が要求したバージョンと一致しません。結果を再読み込みしてください。',
+    },
+  },
+  documents: {
+    lead: '解析画面で選んだプログラムのドキュメントを specification-design に沿って作成します。作成するドキュメントを選ぶと、Agent CLI がそのプログラムの一式を作成します。',
+    configLabel: '設定',
+    runLabel: '生成の進捗',
+    programTitle: 'プログラム',
+    changeProgram: 'プログラムを変更',
+    chooseProgram: 'プログラムを選択',
+    noProgram:
+      'プログラムが選択されていません。解析画面でプログラムを開き「このプログラムのドキュメントを作成」を押してください。',
+    programMissing: (key: string) =>
+      `プログラム ${key} は最新の解析結果にありません。解析画面で選び直してください。`,
+    programFacts: (files: number, forms: number, shared: number) =>
+      `固有ファイル ${files} · フォーム ${forms} · 共通モジュール ${shared}`,
+    programsLoading: 'プログラム情報を読み込んでいます…',
+    programsFailed: 'プログラムの解析結果を読み込めませんでした。',
+    documentsTitle: '作成するドキュメント',
+    documentsCount: (selected: number, total: number) =>
+      `${selected} / ${total} 件選択`,
+    specDocs: {
+      'business-rules': {
+        name: '業務ルール',
+        detail: '現行の業務ルール（根拠付き）',
+      },
+      'basic-design': {
+        name: '基本設計',
+        detail: '画面・項目・機能（業務ルール付き）',
+      },
+      'detail-design': {
+        name: '詳細設計',
+        detail: '機能ごとの処理（業務ルール・基本・DB 付き）',
+      },
+      'db-design': {
+        name: 'DB設計',
+        detail: 'テーブル・CRUD・呼出し箇所の SQL',
+      },
+      'security-audit': {
+        name: 'セキュリティ監査',
+        detail: 'プログラムのセキュリティリスク（静的レビュー・根拠付き）',
+      },
+    },
+    companion: '自動追加',
+    always:
+      '参照先ドキュメントは SD-CT-07 に従い自動で追加されます。生成状態・読込範囲・未解決の質問は各ドキュメント内に記載されます。',
+    agentTitle: 'エージェント設定',
+    model: 'モデル',
+    outputLanguage: '出力言語',
+    languages: { vi: 'Tiếng Việt', ja: '日本語', en: 'English' },
+    defaultModel: 'CLI の既定',
+    fakeRunner:
+      'バックエンドは疑似ランナーを使用中です。AIは呼び出さず、生成物はデモです。',
+    codexRunner:
+      'バックエンドは Codex CLI を使用中です。デモまたはクリーンなフィクスチャでの開発・テスト専用です。本番環境では Claude Code CLI を使用します。',
+    draftPack: (pack: string) =>
+      `specification-design ${pack} は未承認の DRAFT です。出力はキャリブレーション用の下書きです。`,
+    ready: '準備完了',
+    ringLabel: (done: number, total: number) =>
+      `${total} 件中 ${done} 件のドキュメントが完了`,
+    readyTitle: (name: string) => `${name} のドキュメントを作成できます`,
+    plan: (files: number) =>
+      `このプログラムの Markdown ${files} 件を作成します。`,
+    runTitles: {
+      queued: (_done: number, total: number) =>
+        `${total} 件のドキュメント作成を待機中`,
+      running: (done: number, total: number) =>
+        `エージェントがドキュメントを作成中… · ${done} / ${total}`,
+      cancelling: () => 'エージェントを停止中…',
+      succeeded: (done: number) => `${done} 件のドキュメントを作成しました`,
+      failed: (done: number, total: number) =>
+        `作成できなかったドキュメントがあります · ${done} / ${total}`,
+      cancelled: () => '生成を取り消しました',
+      interrupted: () => '生成が中断されました',
+    },
+    runState: {
+      queued: '待機中',
+      running: '実行中',
+      cancelling: '停止中',
+      succeeded: '完了',
+      failed: 'エラーあり',
+      cancelled: '取消済み',
+      interrupted: '中断',
+    },
+    itemStatus: {
+      pending: '待機',
+      running: '解析中…',
+      succeeded: '完了',
+      failed: 'エラー',
+      skipped: 'スキップ',
+      stopped: '停止',
+    },
+    elapsed: '経過時間',
+    tokens: 'トークン',
+    filesWritten: '書き込み済みファイル',
+    start: '生成を開始',
+    rerun: '再実行',
+    goReview: 'レビューへ',
+    starting: '送信中…',
+    cancel: '停止',
+    cancelling: '停止中…',
+    queueTitle: '実行中のプログラム',
+    noneSelected:
+      '解析画面でプログラムを選び、ドキュメントを1つ以上選択してください。',
+    otherActive: (name: string) =>
+      `${name} のドキュメント作成が実行中です。完了してから開始してください。`,
+    openOther: '実行中の作成を開く',
+    reading: 'エージェントが入力票・パック・ソースを読み込んでいます…',
+    docStatus: {
+      pending: '待機',
+      writing: '作成中',
+      written: '作成済み · 確認待ち',
+      done: '完了',
+      notWritten: '未作成',
+    },
+    view: '表示',
+    demoNoSource:
+      'デモプロジェクトにはソースファイルがなく、specification-design はソースの読込を必須とするため、Agent CLI では完成したドキュメントを作成できません。ソースのあるプロジェクト（このPC上のソース）を使用してください。',
+    working: 'エージェントが読込・作成中です…',
+    codexProgress:
+      'Codex はドキュメント一式を最後にまとめて返すため、各ドキュメントの状態は応答完了時に更新されます。',
+    downloadMd: '.md をダウンロード',
+    close: '閉じる',
+    draftNotice:
+      'DRAFT の specification-design に沿って AI が作成した未レビューの下書きです。利用前に TL が確認してください。',
+    documentLoading: 'ファイルを開いています…',
+    loading: '生成状況を読み込んでいます…',
+    loadFailed: '生成状況を読み込めませんでした。',
+    connectionLost:
+      'バックエンドとの接続が切れました。再試行中です。実行は取り消されていません。',
+    startUnknown:
+      '生成リクエストが受け付けられたか不明です。もう一度押すと同じリクエストを再送します。',
+    recovery:
+      '前回のエージェントプロセスがまだ動いている可能性があります。そのプロセスを終了してからバックエンドを再起動してください。',
+    needAnalysis: {
+      title: '解析結果がありません',
+      help: 'プログラム一覧は手順2の解析結果から取得します。先に解析を完了してください。',
+      action: '解析へ移動',
+    },
+    runErrors: {
+      AGENT_UNAVAILABLE:
+        'このPCで Agent CLI が見つかりません（PATH 上の claude.exe などの実行ファイル、または PORTAL_AGENT_CLI が必要です）。',
+      AGENT_AUTH_FAILED:
+        'Agent CLI が未ログイン、またはログインの有効期限切れです。ターミナルで使用中の CLI に再ログイン（claude または codex login）してから再試行してください。',
+      AGENT_QUOTA_EXCEEDED:
+        'Agent CLI の利用上限に達しました。上限がリセットされてから再試行してください。',
+      AGENT_FAILED:
+        'Agent CLI がエラーで終了しました。下のログを確認してください。',
+      AGENT_OUTPUT_INVALID:
+        'エージェントが要求どおりのファイル一式を返しませんでした。ログを確認して再試行してください。',
+      PACKAGE_INCOMPLETE:
+        '「hoàn tất」になっていないドキュメントがあるため、レビューに回せません。このプログラムを再実行してください。',
+      INPUT_UNAVAILABLE:
+        '解析結果またはプログラムのソーススナップショットを読み込めません。',
+      ARTIFACT_WRITE_FAILED:
+        'データディレクトリにドキュメントを書き込めませんでした。',
+      TIMEOUT: '生成が制限時間を超えたため停止しました。',
+      STOP_UNCONFIRMED:
+        'エージェントプロセスの停止を確認できませんでした。確認後にバックエンドを再起動してください。',
+      INTERNAL_ERROR:
+        'ドキュメント生成中にバックエンドでエラーが発生しました。',
+    } satisfies Record<DocumentRunErrorCode, string>,
+    requestErrors: {
+      ANALYSIS_REQUIRED:
+        'この解析には棚卸し結果がありません。解析を再実行してから試してください。',
+      DOCUMENT_NOT_FOUND:
+        'このファイルは存在しないか、一式がまだ完了していません。',
     },
   },
   errors: {

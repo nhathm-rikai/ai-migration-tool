@@ -183,6 +183,8 @@ test(
     });
     await expect(canvas.getByText(/Không sắp xếp được graph/)).toBeVisible();
     await expect(canvas.getByText('Đang sắp xếp graph…')).toHaveCount(0);
+    // Folders start closed: open them to reach a program.
+    await assessment.getByRole('button', { name: 'Mở tất cả thư mục' }).click();
     const node = canvas.getByRole('button', { name: /^Làm nổi bật Program / });
     await node.first().click();
     await expect(node.first()).toHaveAttribute('aria-pressed', 'true');

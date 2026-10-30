@@ -291,4 +291,26 @@ describe('UI03 call graph tab', () => {
       }),
     ).toBeTruthy();
   });
+
+  it('starts with every box closed, even in a small corpus', () => {
+    const small = syntheticCorpusFixture({
+      programs: 6,
+      sharedModules: 2,
+      tables: 4,
+      folders: 2,
+      components: 2,
+    });
+    render(<DependencyGraphView inventory={small} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    expect(
+      within(canvas).getByRole('button', { name: /^Mở Bảng DB / }),
+    ).toBeTruthy();
+    expect(
+      within(canvas).getByRole('button', { name: /^Mở COM / }),
+    ).toBeTruthy();
+    expect(
+      within(canvas).getAllByRole('button', { name: /^Mở thư mục / }),
+    ).toHaveLength(2);
+    expect(screen.queryByRole('list', { name: 'Đang mở' })).toBeNull();
+  });
 });

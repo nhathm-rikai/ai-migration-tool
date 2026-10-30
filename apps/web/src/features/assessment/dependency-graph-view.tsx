@@ -78,10 +78,6 @@ type FlowNodeData = {
 };
 type FlowNode = Node<FlowNodeData>;
 
-// Boxes with more members than this start closed (one node per folder, one
-// node for all tables, one for COM) so the whole project reads at a glance;
-// small corpora open with everything drawn.
-export const AUTO_OPEN_MEMBERS = 40;
 const SEARCH_RESULTS = 8;
 
 // Opens or closes a box (folder, tables, COM) from inside its node.
@@ -150,24 +146,6 @@ function drawnAs(drawn: Drawn) {
   };
 }
 
-// Boxes open at first: those with few enough members.
-function initiallyOpen(graph: DependencyGraph): Set<string> {
-  const sizes = new Map<string, number>();
-  for (const node of graph.nodes) {
-    const box = boxOf(node);
-    if (box !== null && node.kind !== 'own-module')
-      sizes.set(box, (sizes.get(box) ?? 0) + 1);
-  }
-  const small = graph.programs <= AUTO_OPEN_MEMBERS;
-  return new Set(
-    [...sizes]
-      .filter(([box, size]) =>
-        box.startsWith('folder:') ? small : size <= AUTO_OPEN_MEMBERS,
-      )
-      .map(([box]) => box),
-  );
-}
-
 function allBoxes(graph: DependencyGraph): string[] {
   return [
     ...graph.groups.map((group) => groupNodeId(group.id)),
@@ -183,9 +161,9 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   const flow = useReactFlow();
   const [showCommon, setShowCommon] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
-  const [open, setOpen] = useState<ReadonlySet<string>>(() =>
-    initiallyOpen(graph),
-  );
+  // Every box starts closed (one node per folder, one for all tables, one
+  // for COM), whatever the corpus size, so the first view is the same.
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const [pendingReveal, setPendingReveal] = useState<string | null>(null);
   // The box opened or closed last: brought into view and outlined so the
   // reader sees what changed without searching for it.

@@ -173,6 +173,7 @@ export function createDocumentExecutor(deps: {
                   selected: run.config.selected,
                   generated: run.config.generated,
                   inventoryRef: `artifact ${run.inventory.artifactId} v${run.inventory.version}`,
+                  language: run.config.outputLanguage,
                 }),
               },
               ...Object.entries(programP1(inventory, program)).map(
@@ -221,6 +222,9 @@ export function createDocumentExecutor(deps: {
             `${WORKSPACE.pack}/README.md`,
             `${WORKSPACE.pack}/analysis-method.md`,
             `${WORKSPACE.pack}/rules/artifacts.md`,
+            ...(run.config.generated.includes('security-audit')
+              ? [`${WORKSPACE.pack}/rules/security-audit.md`]
+              : []),
             ...run.config.generated.map(
               (id) => `${WORKSPACE.pack}/templates/${id}.md`,
             ),

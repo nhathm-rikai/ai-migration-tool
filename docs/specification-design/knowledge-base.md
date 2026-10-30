@@ -1,6 +1,6 @@
 # Specification design — Knowledge Base sau review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.9.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
 
 [Thứ tự đọc và nguồn quy định](README.md).
 

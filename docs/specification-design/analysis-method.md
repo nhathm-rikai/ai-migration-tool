@@ -1,6 +1,6 @@
 # Quy trình phân tích source đa ngôn ngữ
 
-**DRAFT — spec-design-rules-0.9.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
+**DRAFT — spec-design-rules-0.10.0-draft.** [README](README.md). Đây là hướng dẫn đọc source, không phải parser/plugin hay schema mới. Dùng chung cho Codex CLI và Claude CLI. Mục 1–7 là cách đọc source; [mục 8](#8-luồng-vận-hành-theo-phase) là luồng vận hành theo phase cho calibration/batch.
 
 ## 1. Nguyên tắc: không dùng profile theo ngôn ngữ
 

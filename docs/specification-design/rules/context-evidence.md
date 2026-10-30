@@ -1,6 +1,6 @@
 # Specification design — đầu vào và chứng cứ
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.9.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -32,6 +32,6 @@ SD-EV-05: không bịa tên bảng, khóa, quan hệ, kiểu dữ liệu, nghi�
 
 SD-EV-06: công cụ kiểm quote/range/hash độc lập với AI. Evidence khớp không đồng nghĩa diễn giải đúng. AI không được tự tạo hash, reviewer, approval hoặc evidence verified.
 
-SD-EV-07: tài liệu tiếng Việt UTF-8; giữ nguyên identifier và nhãn/thông báo ngôn ngữ gốc. Bản dịch đặt riêng, đánh dấu chưa xác nhận nếu còn mơ hồ. Không đổi dấu, làm tròn hay format số/ngày khi trích quote.
+SD-EV-07: tài liệu UTF-8, viết bằng ngôn ngữ đầu ra ở mục 3 phiếu input (mặc định tiếng Việt), gồm cả tiêu đề, heading và bảng; dòng trạng thái sinh cũng theo ngôn ngữ đó (vi: `Trạng thái sinh` = `hoàn tất`/`đang sinh`; ja: `生成状態` = `完了`/`生成中`; en: `Generation status` = `complete`/`in progress`); giữ nguyên identifier và nhãn/thông báo ngôn ngữ gốc. Bản dịch đặt riêng, đánh dấu chưa xác nhận nếu còn mơ hồ. Không đổi dấu, làm tròn hay format số/ngày khi trích quote.
 
 SD-EV-08: LoC/coverage/count lấy từ công cụ xác định và hồ sơ review, không dùng AI tự đếm. Bảng nào chưa đo thì ghi "chưa đo", không đặt 0 hoặc 100% giả.

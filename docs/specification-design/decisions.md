@@ -1,6 +1,6 @@
 # Specification design — quyết định chờ duyệt
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.9.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Report/export: đã bổ sung hai template Draft theo yêu cầu. Mặc định ghép section trong Basic/Detail, giữ bốn Markdown. Nếu cần bàn giao layout xlsx/per-report file riêng, cần chốt packaging, version/provenance và cách kiểm layout trước implementation; chưa tự đổi schema hoặc xây exporter. Xem [hướng dẫn report](report-templates.md).
 

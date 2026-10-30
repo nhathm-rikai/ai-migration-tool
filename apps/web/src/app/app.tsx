@@ -125,6 +125,7 @@ function AppShell({
     runsApi,
     sourcesApi,
     artifactsApi,
+    documentsApi,
   });
 
   // "Created" notice: shown on the new project's page until the next
@@ -263,8 +264,8 @@ function Sidebar({
     if (UNAVAILABLE_STEPS.includes(step)) return 'unavailable';
     if (progress.status !== 'ready') return 'todo';
     if (step === 'source') return progress.sourceSaved ? 'done' : 'todo';
-    // Whether documents were written is not part of project progress yet.
-    if (step === 'documents') return 'todo';
+    if (step === 'documents')
+      return progress.documentsWritten ? 'done' : 'todo';
     return progress.analysisRunId ? 'done' : 'todo';
   };
   return (
@@ -473,6 +474,10 @@ function StepPage({
               : { status: progress.status }
           }
           onRetryAnalysis={onRetryProgress}
+          documentsWritten={
+            progress.status === 'ready' && progress.documentsWritten
+          }
+          onDocumentsChanged={onProgress}
           api={apis.documentsApi}
           artifactsApi={apis.artifactsApi}
         />

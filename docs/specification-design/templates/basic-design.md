@@ -1,6 +1,6 @@
 # Basic Design — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.8.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + Q-ID.
+**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + Q-ID.
 
 ## 1. Thông tin tài liệu
 

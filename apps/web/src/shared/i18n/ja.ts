@@ -587,6 +587,10 @@ export const jaMessages = {
         name: 'DB設計',
         detail: 'テーブル・CRUD・呼出し箇所の SQL',
       },
+      'security-audit': {
+        name: 'セキュリティ監査',
+        detail: 'プログラムのセキュリティリスク（静的レビュー・根拠付き）',
+      },
     },
     companion: '自動追加',
     always:

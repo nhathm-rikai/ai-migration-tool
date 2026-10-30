@@ -608,6 +608,10 @@ export const viMessages = {
         name: 'Thiết kế CSDL',
         detail: 'Bảng, CRUD, SQL theo call site',
       },
+      'security-audit': {
+        name: 'Security audit',
+        detail: 'Rủi ro bảo mật của program, review tĩnh có evidence',
+      },
     },
     companion: 'sinh kèm',
     always:

@@ -176,7 +176,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       ],
       runner: 'fake',
       effort: 'medium',
-      promptVersion: 'spec-design-task-v2',
+      promptVersion: 'spec-design-task-v5',
     });
     expect(queued.config.specPack).toMatch(
       /^spec-design-rules-.+ \+ spec-design-templates-/,

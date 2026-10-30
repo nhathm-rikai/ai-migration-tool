@@ -160,6 +160,56 @@ function renderStep(
 }
 
 describe('DocumentsStep', () => {
+  it('asks to read the stepper mark again when the latest run disagrees', async () => {
+    const onDocumentsChanged = vi.fn();
+    const tree = (documentsWritten: boolean) => (
+      <LocaleProvider>
+        <DocumentsStep
+          projectId={PROJECT}
+          program="src/ORDER.VBP"
+          projectMode="local"
+          analysis={{ status: 'ready', runId: ANALYSIS }}
+          onRetryAnalysis={() => {}}
+          documentsWritten={documentsWritten}
+          onDocumentsChanged={onDocumentsChanged}
+          api={fakeApi({ run: documentRun(), ...ready })}
+          artifactsApi={artifactsApi}
+        />
+      </LocaleProvider>
+    );
+    const { rerender } = render(tree(false));
+    await screen.findByText('Đã tạo xong 1 tài liệu');
+    expect(onDocumentsChanged).toHaveBeenCalledTimes(1);
+    rerender(tree(true));
+    expect(onDocumentsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the choices of the latest run of the program', async () => {
+    const run = documentRun();
+    renderStep(
+      fakeApi({
+        run: {
+          ...run,
+          config: {
+            ...run.config,
+            selected: ['db-design', 'security-audit'],
+            generated: ['db-design', 'security-audit'],
+            outputLanguage: 'ja',
+          },
+        },
+        ...ready,
+      }),
+      'src/ORDER.VBP',
+    );
+    await screen.findByText('Đã tạo xong 1 tài liệu');
+    const checked = (name: string) =>
+      screen.getByRole<HTMLInputElement>('checkbox', { name: new RegExp(name) })
+        .checked;
+    expect(checked('Thiết kế CSDL')).toBe(true);
+    expect(checked('Security audit')).toBe(true);
+    expect(checked('Business rules')).toBe(false);
+  });
+
   it('asks for an analysis first', () => {
     renderStep(fakeApi({ run: null, ...ready }), 'src/ORDER.VBP', null);
     expect(screen.getByText('Chưa có kết quả phân tích')).toBeTruthy();

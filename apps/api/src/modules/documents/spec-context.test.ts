@@ -32,6 +32,13 @@ describe('specification-design package', () => {
       'basic-design',
       'detail-design',
     ]);
+    // Security audit stands alone and is written last.
+    expect(documentsToGenerate(['security-audit'])).toEqual(['security-audit']);
+    expect(documentsToGenerate(['security-audit', 'basic-design'])).toEqual([
+      'business-rules',
+      'basic-design',
+      'security-audit',
+    ]);
     // Pack 0.9.0: no coverage.md / open-questions.md.
     expect(packageFileNames(['business-rules', 'db-design'])).toEqual([
       'business-rules.md',
@@ -45,11 +52,15 @@ describe('specification-design package', () => {
       language: 'ja',
     });
     expect(prompt).toContain('in this order: business-rules.md, db-design.md.');
+    expect(prompt).toContain('rules/security-audit.md');
     expect(prompt).not.toContain('coverage');
     expect(prompt).not.toContain('open-questions');
-    expect(prompt).toContain('| Trạng thái sinh |');
+    expect(prompt).toContain('| 生成状態 |');
+    expect(prompt).not.toContain('Trạng thái sinh');
+    expect(prompt).toContain('No Vietnamese may remain');
     expect(prompt).toContain('context/input-context.md');
-    expect(prompt).toContain('Japanese');
+    expect(prompt).toContain('OUTPUT LANGUAGE: Japanese');
+    expect(prompt).toContain('section headings, table headers');
     expect(prompt).toContain('read-only');
   });
 
@@ -106,6 +117,14 @@ describe('specification-design package', () => {
     ).toEqual({ status: 'incomplete' });
     expect(generationState('| **Trạng thái sinh** | `hoàn tất` |')).toBe(
       'hoàn tất',
+    );
+    expect(generationState('| 生成状態 | `完了` |')).toBe('hoàn tất');
+    expect(generationState('| 生成状態 | 生成中 — ORDERS |')).toBe('đang sinh');
+    expect(generationState('| Generation status | Complete |')).toBe(
+      'hoàn tất',
+    );
+    expect(generationState('| Generation status | in progress |')).toBe(
+      'đang sinh',
     );
     expect(generationState('# no header')).toBeUndefined();
   });

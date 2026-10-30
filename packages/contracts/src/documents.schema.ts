@@ -16,12 +16,14 @@ export const SPEC_DOCUMENT_IDS = [
   'basic-design',
   'detail-design',
   'db-design',
+  'security-audit',
 ] as const;
 export const SpecDocumentIdSchema = Type.Union([
   Type.Literal('business-rules'),
   Type.Literal('basic-design'),
   Type.Literal('detail-design'),
   Type.Literal('db-design'),
+  Type.Literal('security-audit'),
 ]);
 export type SpecDocumentId = Static<typeof SpecDocumentIdSchema>;
 
@@ -32,6 +34,7 @@ export const SPEC_DOCUMENT_COMPANIONS: Record<
 > = {
   'business-rules': [],
   'db-design': [],
+  'security-audit': [],
   'basic-design': ['business-rules'],
   'detail-design': ['business-rules', 'basic-design', 'db-design'],
 };
@@ -40,6 +43,7 @@ export const SPEC_GENERATION_ORDER: readonly SpecDocumentId[] = [
   'db-design',
   'basic-design',
   'detail-design',
+  'security-audit',
 ];
 // Selected + companions, in generation order.
 export function documentsToGenerate(
@@ -212,11 +216,14 @@ export const DocumentRunConfigSchema = Type.Object(
     }),
     selected: Type.Array(SpecDocumentIdSchema, {
       minItems: 1,
-      maxItems: 4,
+      maxItems: SPEC_DOCUMENT_IDS.length,
       uniqueItems: true,
     }),
     // selected + SD-CT-07 companions, in generation order.
-    generated: Type.Array(SpecDocumentIdSchema, { minItems: 1, maxItems: 4 }),
+    generated: Type.Array(SpecDocumentIdSchema, {
+      minItems: 1,
+      maxItems: SPEC_DOCUMENT_IDS.length,
+    }),
     model: AgentModelSchema,
     // Absent on runs started before effort was passed (CLI default).
     effort: Type.Optional(AgentEffortSchema),

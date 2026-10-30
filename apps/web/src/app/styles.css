@@ -1823,6 +1823,9 @@ details.technical[open] > summary {
 .template-icon.tone-detail-design {
   color: var(--ai);
 }
+.template-icon.tone-security-audit {
+  color: var(--high);
+}
 
 .template-text {
   display: flex;

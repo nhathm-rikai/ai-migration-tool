@@ -4,6 +4,27 @@
 
 Removed the floating screen-selector markup, unused CSS and JavaScript listeners from the standalone design HTML. Hash and sidebar navigation remain available. Scope: prototype UI only; no app/API changes.
 
+## 30/10/2026 — Bước 3: ngôn ngữ đầu ra
+
+- Sửa lỗi chọn tiếng Nhật vẫn ra tiếng Việt: SD-EV-07 quy định cứng tiếng Việt, phiếu input không có ngôn ngữ, prompt yêu cầu giữ heading template. Nay SD-EV-07 theo mục 3 phiếu input; Portal ghi ngôn ngữ vào phiếu; prompt `spec-design-task-v4` yêu cầu viết toàn bộ bằng ngôn ngữ đã chọn, trừ ID, identifier, path, trích dẫn source và dòng `Trạng thái sinh`.
+- Dòng trạng thái sinh nay theo ngôn ngữ tài liệu (ja `生成状態`, en `Generation status`), Portal nhận cả ba; prompt `spec-design-task-v5`.
+- Kiểm chứng: test documents của API 19/19; Claude CLI thật trên fixture sạch `vb6-sample`, chọn tiếng Nhật, security-audit: heading và nội dung tiếng Nhật, gói hoàn tất. Tiếng Anh với v5 (business-rules + security-audit, fixture): không còn ký tự tiếng Việt, gói hoàn tất. Tiếng Nhật chưa chạy lại với v5. Các gói đã sinh trước đó không đổi, phải chạy lại.
+
+## 30/10/2026 — Bước 3: giữ lựa chọn khi quay lại màn hình
+
+- Mở lại bước 3 khôi phục tài liệu, model và ngôn ngữ từ run mới nhất của đúng program (`config.selected`, không gồm tài liệu sinh kèm). Chưa có run thì giữ mặc định. Kiểm chứng: test web, chưa xem trên trình duyệt.
+
+## 30/10/2026 — Thanh bước: đánh dấu xong bước 3
+
+- Bước "Tạo tài liệu" có dấu tích khi document run mới nhất của project thành công (đọc `document-runs/current`; lỗi đọc không ảnh hưởng các bước khác). Mức project, không theo từng program; chạy lại thất bại thì mất tích. Màn hình bước 3 yêu cầu đọc lại khi run đã kết thúc khác với dấu hiện tại; rời bước 3 lúc đang chạy thì dấu cập nhật khi quay lại hoặc tải lại trang.
+
+## 30/10/2026 — Bước 3: tài liệu security-audit
+
+- Thêm tài liệu thứ năm `security-audit` (độc lập, không sinh kèm, viết cuối gói): [rule](../specification-design/rules/security-audit.md) SD-SA-01..10 và [template](../specification-design/templates/security-audit.md), trung lập ngôn ngữ, phạm vi theo program, review tĩnh chỉ đọc. Pack `spec-design-rules-0.10.0-draft` + `spec-design-templates-0.9.0-draft`, prompt `spec-design-task-v3`.
+- Phương pháp tham khảo và viết lại từ `anthropics/claude-code-security-review` (MIT, có ghi nguồn trong rule); không cài hay gọi công cụ đó khi chạy, không nới khóa của runner. Khác bản gốc: audit hiện trạng thay vì diff, secret trong source bắt buộc báo (che giá trị), phát hiện dưới ngưỡng tin cậy chuyển sang "Cần xác minh".
+- Sửa lỗi: chọn đủ 5 tài liệu bị `INVALID_INPUT` vì schema còn giới hạn cứng 4; giới hạn nay lấy theo `SPEC_DOCUMENT_IDS.length`, có test contract riêng.
+- Kiểm chứng (Windows x64): contracts 43/43, web 155/155, API 528/532 ở lần chạy toàn bộ; đã sửa 1 test do đổi prompt version; `document-run` chạy riêng 19/19 và `analyze-run` 7/7 (cancel/B08 chỉ lỗi khi chạy toàn bộ, flaky theo tải); `local-source-root` là lỗi có sẵn. Sau khi sửa chưa chạy lại toàn bộ API. `verify-repository` pass. Claude CLI thật (sonnet) trên fixture sạch `vb6-sample`: chỉ chọn security-audit, 1m43s, gói hoàn tất, đúng template. Chưa calibration trên source thật, ngôn ngữ khác VB6, macOS/Linux.
+
 ## 30/10/2026 — Bước 3: khớp chi tiết prototype `tpl-Generate`
 
 - Vòng tiến độ: xong thành công hiện ✓ (pop) thay số %. Tiêu đề khi chạy "Agent đang viết tài liệu… · x / y".

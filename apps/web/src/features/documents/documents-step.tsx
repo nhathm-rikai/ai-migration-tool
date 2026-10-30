@@ -182,6 +182,8 @@ export function DocumentsStep({
   projectMode,
   analysis,
   onRetryAnalysis,
+  documentsWritten = false,
+  onDocumentsChanged,
   api,
   artifactsApi,
 }: {
@@ -194,6 +196,9 @@ export function DocumentsStep({
   analysis:
     { status: 'loading' | 'error' } | { status: 'ready'; runId: string | null };
   onRetryAnalysis: () => void;
+  // Stepper mark, and how to read it again once the latest run says otherwise.
+  documentsWritten?: boolean;
+  onDocumentsChanged?: () => void;
   api: DocumentsApi;
   artifactsApi: ArtifactsApi;
 }) {
@@ -204,6 +209,8 @@ export function DocumentsStep({
         program={program}
         projectMode={projectMode}
         analysisRunId={analysis.runId}
+        documentsWritten={documentsWritten}
+        onDocumentsChanged={onDocumentsChanged}
         api={api}
         artifactsApi={artifactsApi}
       />
@@ -258,6 +265,8 @@ function DocumentsWorkspace({
   program: chosenProgram,
   projectMode,
   analysisRunId,
+  documentsWritten,
+  onDocumentsChanged,
   api,
   artifactsApi,
 }: {
@@ -265,6 +274,8 @@ function DocumentsWorkspace({
   program: string | null;
   projectMode: 'demo' | 'local';
   analysisRunId: string;
+  documentsWritten: boolean;
+  onDocumentsChanged: (() => void) | undefined;
   api: DocumentsApi;
   artifactsApi: ArtifactsApi;
 }) {
@@ -283,6 +294,13 @@ function DocumentsWorkspace({
   const [viewing, setViewing] = useState<Viewing | null>(null);
 
   const latest = state.status === 'ready' ? state.run : null;
+  // An ended run that disagrees with the stepper mark: read the mark again.
+  const latestEnded =
+    latest && !isActiveRun(latest.status) ? latest.status : null;
+  useEffect(() => {
+    if (latestEnded && (latestEnded === 'succeeded') !== documentsWritten)
+      onDocumentsChanged?.();
+  }, [latestEnded, documentsWritten, onDocumentsChanged]);
   // Without ?program= the screen shows the program of the latest run.
   const programKey = chosenProgram ?? latest?.config.programs[0] ?? null;
   // The project's latest run belongs to this screen only when it was for the
@@ -291,6 +309,18 @@ function DocumentsWorkspace({
     latest && latest.config.programs[0] === programKey ? latest : null;
   const otherActive =
     latest && !run && isActiveRun(latest.status) ? latest : null;
+  // Coming back to the screen shows the choices of this program's latest run;
+  // later changes stay until another run appears.
+  const restoredConfig = run?.config ?? null;
+  const restoredRunId = run?.id ?? null;
+  useEffect(() => {
+    if (!restoredConfig) return;
+    setSelectedDocs(new Set(restoredConfig.selected));
+    setModel(restoredConfig.model);
+    setLanguage(restoredConfig.outputLanguage);
+    // Only a different run restores: polling returns new config objects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoredRunId]);
   const program = useMemo(() => {
     if (inventory.state.status !== 'ready' || programKey === null)
       return undefined;

@@ -1,6 +1,6 @@
 # Specification design — validation và human review
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.9.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft. [Thứ tự đọc và nguồn quy định](README.md).
 
 Phiếu dùng cho mỗi artifact/version: đánh dấu từng mục sau kiểm thực tế; chưa đánh dấu nghĩa là chưa kiểm. Findings ghi item/section, bằng chứng, tác động, hướng xử lý. Không AI ghi danh tính hay quyết định thay reviewer.
 
@@ -38,6 +38,7 @@ Review record tối thiểu: artifact ID/version, source hash, rule version, ite
 | Basic Design  | Có screen/item/flow/report hoặc giải thích không áp dụng/chưa xác định                |
 | Detail Design | Có inventory procedure, nhánh/lỗi/side effect và phần chưa phân tích                  |
 | DB            | CRUD có trace; type/key/relationship chưa biết không bị bịa                           |
+| Security audit | Phát hiện có file/dòng/kịch bản đúng với source; secret đã che; không kết luận "an toàn"; phần chưa đánh giá được hiển thị rõ |
 | Consistency   | BR ↔ design ↔ function ↔ DB không mâu thuẫn, references tồn tại                       |
 | Approval      | Không còn evidence lỗi cho claim giữ là observed; blocking questions đã có resolution |
 | Export        | Đúng version/review state; không lộ credential, absolute path, raw log nhạy cảm       |

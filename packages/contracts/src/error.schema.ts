@@ -33,6 +33,8 @@ export const AnalyzeApiErrorCodeSchema = Type.Union([
   Type.Literal('SNAPSHOT_UNAVAILABLE'),
   Type.Literal('ARTIFACT_NOT_FOUND'),
   Type.Literal('RUNTIME_RECOVERY_REQUIRED'),
+  // Too many open event streams (B09); the client falls back to GET.
+  Type.Literal('RUN_EVENTS_LIMIT'),
 ]);
 export type AnalyzeApiErrorCode = Static<typeof AnalyzeApiErrorCodeSchema>;
 // HTTP status of each code; the BE error catalog reuses it.
@@ -50,6 +52,7 @@ export const ANALYZE_API_ERROR_HTTP_STATUS = {
   SNAPSHOT_UNAVAILABLE: 409,
   ARTIFACT_NOT_FOUND: 404,
   RUNTIME_RECOVERY_REQUIRED: 503,
+  RUN_EVENTS_LIMIT: 429,
 } as const satisfies Record<AnalyzeApiErrorCode, number>;
 
 export const ErrorResponseSchema = Type.Object(

@@ -75,6 +75,10 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.ARTIFACT_NOT_FOUND,
     message: 'Artifact version not found.',
   },
+  RUN_EVENTS_LIMIT: {
+    status: S.RUN_EVENTS_LIMIT,
+    message: 'Too many open run event streams.',
+  },
   RUNTIME_RECOVERY_REQUIRED: {
     status: S.RUNTIME_RECOVERY_REQUIRED,
     message: 'The runtime needs recovery before it can start runs.',

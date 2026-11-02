@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
 test(
   'start, finish, reload and cancel an analyze run',
   { tag: '@smoke' },
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     const seedName = process.env.E2E_SEED_PROJECT_NAME ?? '';
     const runMutations: { url: string; status: number; key: string | null }[] =
       [];
@@ -36,6 +36,16 @@ test(
     await expect(
       page.getByRole('heading', { name: 'Tiến trình' }),
     ).toBeVisible();
+    // PF08: the demo run reports simulated per-file progress (labelled DEMO)
+    // over the event stream: a share and the latest files read.
+    await expect(page.locator('.scan-percent')).toHaveText(/^\s*\d+%$/);
+    await expect(
+      page.getByRole('heading', { name: /File đang đọc/ }),
+    ).toContainText('DEMO');
+    await page.screenshot({
+      path: testInfo.outputPath('pf08-scanning-vi.png'),
+      fullPage: true,
+    });
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });

@@ -17,6 +17,8 @@ import type {
   LocalProject,
   ProjectSourceResponse,
   Run,
+  RunEvent,
+  RunProgress,
 } from '@portal/contracts';
 import { SourceStep } from './source-step';
 import { useProjectSource } from './use-project-source';
@@ -838,4 +840,152 @@ describe('Scan card (UI04)', () => {
       });
     },
   );
+});
+
+// An SSE response the test writes to (F05).
+function eventStream() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const response = new Response(
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    }),
+    { headers: { 'Content-Type': 'text/event-stream' } },
+  );
+  return {
+    response,
+    push(event: RunEvent) {
+      controller?.enqueue(
+        encoder.encode(
+          `event: run\nid: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`,
+        ),
+      );
+    },
+    close() {
+      controller?.close();
+    },
+  };
+}
+
+const progressOf = (patch: Partial<RunProgress>): RunProgress => ({
+  phase: 'snapshot',
+  filesSnapshotted: 3,
+  filesAnalyzed: 0,
+  filesTotal: 10,
+  bytesDone: 3 * 1024 * 1024,
+  bytesTotal: 10 * 1024 * 1024,
+  recentPaths: ['programs/A/MAIN.BAS', 'programs/A/FORM1.FRM'],
+  ...patch,
+});
+
+describe('Scan progress per file (PF08)', () => {
+  it('F05-AC04 shows the real share, files, size and the latest files read', async () => {
+    const running = run({ stage: 'snapshot', progress: progressOf({}) });
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json(registered()),
+      [`GET ${runsUrl}/current`]: () => json({ run: running }),
+      [`GET ${runsUrl}/${running.id}`]: () => json(running),
+    });
+    render(step(server));
+    expect(await screen.findByText('15%')).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe(
+      '15',
+    );
+    expect(screen.getByText('3 / 10 file')).toBeTruthy();
+    expect(screen.getByText('3.0 MB')).toBeTruthy();
+    expect(screen.getByText('File đang đọc')).toBeTruthy();
+    expect(screen.getByText('programs/A/FORM1.FRM')).toBeTruthy();
+  });
+
+  it('F05-AC04 shows no number while the folder is still being listed', async () => {
+    const running = run({
+      stage: 'snapshot',
+      progress: progressOf({
+        phase: 'listing',
+        filesSnapshotted: 0,
+        filesTotal: null,
+        bytesTotal: null,
+        recentPaths: [],
+      }),
+    });
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json(registered()),
+      [`GET ${runsUrl}/current`]: () => json({ run: running }),
+      [`GET ${runsUrl}/${running.id}`]: () => json(running),
+    });
+    render(step(server));
+    await screen.findByText('Đang quét thư mục…');
+    expect(
+      screen.getByRole('progressbar').getAttribute('aria-valuenow'),
+    ).toBeNull();
+    expect(document.body.textContent).not.toMatch(/\d+\s*%|\/ \d+ file/);
+  });
+
+  it('F05-AC01 follows events of the shown run, drops stale or foreign ones, never goes back, reads a new version with GET', async () => {
+    const running = run({ stage: 'snapshot' });
+    const stream = eventStream();
+    let detail: Run = running;
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json(registered()),
+      [`GET ${runsUrl}/current`]: () => json({ run: running }),
+      [`GET ${runsUrl}/${running.id}`]: () => json(detail),
+      [`GET ${runsUrl}/${running.id}/events`]: () => stream.response,
+    });
+    const opened = vi.fn();
+    render(step(server, { onOpenResults: opened }));
+    await screen.findByText('Đang quét thư mục…');
+    const base = {
+      runId: running.id,
+      stateVersion: running.stateVersion,
+      status: 'running',
+      stage: 'snapshot',
+      occurredAt: '2026-10-22T02:00:05.000Z',
+    } as const;
+    await act(async () => {
+      stream.push({ ...base, sequence: 1, progress: progressOf({}) });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('15%')).toBeTruthy();
+    await act(async () => {
+      // A lower share, a stale version and another run: nothing changes.
+      stream.push({
+        ...base,
+        sequence: 2,
+        progress: progressOf({ filesSnapshotted: 1 }),
+      });
+      stream.push({
+        ...base,
+        sequence: 3,
+        stateVersion: running.stateVersion - 1,
+        progress: progressOf({ filesSnapshotted: 9 }),
+      });
+      stream.push({
+        ...base,
+        sequence: 4,
+        runId: '00000000-0000-4000-8000-00000000ffff',
+        progress: progressOf({ filesSnapshotted: 8 }),
+      });
+      await Promise.resolve();
+    });
+    expect(screen.getByText('15%')).toBeTruthy();
+    // A newer version is read back with GET.
+    detail = succeededRun();
+    await act(async () => {
+      stream.push({
+        ...base,
+        sequence: 5,
+        stateVersion: 3,
+        status: 'succeeded',
+        stage: null,
+      });
+      stream.close();
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByText('Quét xong · đang chuyển sang Phân tích…'),
+    ).toBeTruthy();
+    expect(server.calls.some((call) => call.method !== 'GET')).toBe(false);
+  });
 });

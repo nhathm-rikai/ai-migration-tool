@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACTIVE_RUN_STATUSES,
+  RunSchema,
   type Run,
+  type RunEvent,
   type RunStatus,
   type StartRunInput,
 } from '@portal/contracts';
+import { Check } from 'typebox/value';
 import { ApiError } from '../../shared/api/api-error';
 import type { RunsApi } from '../../shared/api/runs-api';
 import { hasErrorCode } from './run-messages';
@@ -15,6 +18,8 @@ import { hasErrorCode } from './run-messages';
 
 export const RUN_POLL_INTERVAL_MS = 1000;
 export const RUN_POLL_MAX_INTERVAL_MS = 8000;
+// Reconnects of a broken event stream before polling alone remains.
+export const RUN_EVENT_MAX_RECONNECTS = 5;
 
 export function isActiveRun(status: RunStatus): boolean {
   return (ACTIVE_RUN_STATUSES as readonly RunStatus[]).includes(status);
@@ -34,6 +39,15 @@ export function newerRun(existing: Run | null, incoming: Run): Run {
   return Date.parse(incoming.updatedAt) >= Date.parse(existing.updatedAt)
     ? incoming
     : existing;
+}
+
+// The run with the stage and progress of an event of the same version, or
+// null when the result would not be a valid run.
+export function withEvent(run: Run, event: RunEvent): Run | null {
+  const next: Record<string, unknown> = { ...run, stage: event.stage };
+  if (event.progress) next.progress = event.progress;
+  else delete next.progress;
+  return Check(RunSchema, next) ? next : null;
 }
 
 type RunsState =
@@ -82,6 +96,13 @@ export function useAnalyzeRuns(
   // A Start whose outcome is unknown: retried with the same key.
   const [uncertainStart, setUncertainStart] = useState(false);
   const intent = useRef<StartIntent | null>(null);
+  // The event stream of the active run is open (polling slows down).
+  const streaming = useRef(false);
+  // The current run as last shown, for comparing incoming events.
+  const latest = useRef<Run | null>(null);
+  useEffect(() => {
+    latest.current = state.status === 'ready' ? state.current : null;
+  });
   const busy = useRef(false);
   const loaded = useRef(false);
   const mutation = useRef<AbortController | null>(null);
@@ -144,6 +165,8 @@ export function useAnalyzeRuns(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let delay = RUN_POLL_INTERVAL_MS;
     const schedule = () => {
+      // While the event stream is open, polling is only a slow safety net.
+      const wait = streaming.current ? RUN_POLL_MAX_INTERVAL_MS : delay;
       timer = setTimeout(() => {
         api.get(projectId, tracked, controller.signal).then(
           (run) => {
@@ -162,12 +185,76 @@ export function useAnalyzeRuns(
             schedule();
           },
         );
-      }, delay);
+      }, wait);
     };
     schedule();
     return () => {
       controller.abort();
       clearTimeout(timer);
+    };
+  }, [api, projectId, tracked, apply, refresh]);
+
+  // Event stream of the active run (F05). An event of the shown version
+  // updates stage and progress in place; a newer version is read back with
+  // GET (the authoritative state); an older or foreign one is dropped. A
+  // broken stream reconnects with backoff, a bounded number of times, and
+  // the polling above covers the gap. Locale changes do not reconnect.
+  useEffect(() => {
+    if (!tracked) return;
+    const controller = new AbortController();
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const resync = () =>
+      api.get(projectId, tracked, controller.signal).then(
+        (run) => {
+          if (controller.signal.aborted) return;
+          apply(run);
+          if (!isActiveRun(run.status)) refresh();
+        },
+        () => undefined,
+      );
+    const onEvent = (event: RunEvent) => {
+      if (controller.signal.aborted || event.runId !== tracked) return;
+      streaming.current = true;
+      attempts = 0;
+      setConnectionLost(false);
+      const shown = latest.current;
+      if (!shown || shown.id !== event.runId) return;
+      if (event.stateVersion < shown.stateVersion) return;
+      if (event.stateVersion > shown.stateVersion) {
+        void resync();
+        return;
+      }
+      const patched = withEvent(shown, event);
+      if (patched) apply(patched);
+    };
+    const connect = () => {
+      api.events(projectId, tracked, controller.signal, onEvent).then(
+        () => {
+          // Ended by the server: the run ended or the backend stops.
+          streaming.current = false;
+          if (!controller.signal.aborted) void resync();
+        },
+        () => {
+          streaming.current = false;
+          if (controller.signal.aborted) return;
+          attempts++;
+          if (attempts > RUN_EVENT_MAX_RECONNECTS) return;
+          retry = setTimeout(
+            connect,
+            Math.min(
+              RUN_POLL_INTERVAL_MS * 2 ** attempts,
+              RUN_POLL_MAX_INTERVAL_MS,
+            ),
+          );
+        },
+      );
+    };
+    connect();
+    return () => {
+      controller.abort();
+      clearTimeout(retry);
+      streaming.current = false;
     };
   }, [api, projectId, tracked, apply, refresh]);
 

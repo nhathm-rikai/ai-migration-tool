@@ -57,6 +57,21 @@ export type SnapshotFailureCode = Extract<
   'SOURCE_UNREADABLE' | 'SOURCE_CHANGED' | 'SOURCE_LIMIT_EXCEEDED'
 >;
 
+// Progress of one snapshot (PF08): `listing` while the folder tree is read
+// (no total yet), then one `snapshot` report per source file handled. The
+// total grows only when a project declares a file outside the profile's
+// source types as code. `path` is relative to the root.
+export type SnapshotProgress =
+  | { phase: 'listing' }
+  | {
+      phase: 'snapshot';
+      filesDone: number;
+      filesTotal: number;
+      bytesDone: number;
+      bytesTotal: number;
+      path: string | null;
+    };
+
 export type CreateSnapshotRequest = {
   snapshotId: string;
   // Canonical root, already revalidated against the source policy.
@@ -68,6 +83,7 @@ export type CreateSnapshotRequest = {
   // Called after each file was read, before the next one; tests use it to
   // change the source in the middle of a copy.
   afterFileRead?: (relativePath: string) => Promise<void> | void;
+  onProgress?: (progress: SnapshotProgress) => void;
 };
 
 export type CreateSnapshotResult =

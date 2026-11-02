@@ -169,6 +169,8 @@ export function buildSourceInventory(input: {
   files: readonly { relativePath: string; bytes: Uint8Array }[];
   encodingOverrides?: ReadonlyMap<string, ProfileEncoding>;
   tableNames?: TableNameMapping;
+  // Called once per file after it was decoded and analyzed (PF08).
+  onFile?: (relativePath: string) => void;
 }): SourceInventory {
   const tableNames = input.tableNames ?? UNCONFIGURED_TABLE_NAMES;
   const { analyzer } = input.profile;
@@ -200,6 +202,7 @@ export function buildSourceInventory(input: {
       result.lines && role === 'code'
         ? analyzer.analyzeCodeFile(relativePath, result.lines.lines)
         : null;
+    if (!files.has(relativePath)) input.onFile?.(relativePath);
     files.set(relativePath, { manifest: result.entry, analysis });
     if (analysis?.status === 'analyzed' && result.lines)
       codeLines.set(relativePath, result.lines.lines);

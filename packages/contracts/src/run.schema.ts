@@ -62,6 +62,38 @@ export const AnalyzeStageSchema = Type.Union([
   Type.Literal('publish'),
 ]);
 
+// Per-file progress of an active run (PF08, UI-DEMO02-SCOPE §2b.2). Kept in
+// memory by the backend, never stored: present only while the run is active
+// and the backend knows it. One number for the whole run:
+//   done = filesSnapshotted + filesAnalyzed, total = 2 × filesTotal,
+// so it never goes down. `filesTotal` is null while the folder is still being
+// listed (show no number then). A run that reuses a snapshot counts its
+// snapshot as done at once. `phase` refines `stage` for the four steps of the
+// scan card; it never replaces `stage`.
+export const RUN_PROGRESS_RECENT_PATHS_MAX = 6;
+export const RunProgressPhaseSchema = Type.Union([
+  Type.Literal('listing'),
+  Type.Literal('snapshot'),
+  Type.Literal('inventory'),
+  Type.Literal('publish'),
+]);
+const Count = Type.Integer({ minimum: 0 });
+export const RunProgressSchema = Type.Object(
+  {
+    phase: RunProgressPhaseSchema,
+    filesSnapshotted: Count,
+    filesAnalyzed: Count,
+    filesTotal: Nullable(Count),
+    bytesDone: Count,
+    bytesTotal: Nullable(Count),
+    // Paths relative to the source root, newest last; never the root itself.
+    recentPaths: Type.Array(Type.String({ minLength: 1, maxLength: 1024 }), {
+      maxItems: RUN_PROGRESS_RECENT_PATHS_MAX,
+    }),
+  },
+  Strict,
+);
+
 // Why a run ended `failed`. API request errors use the error envelope instead.
 export const RunErrorCodeSchema = Type.Union([
   Type.Literal('SOURCE_UNREADABLE'),
@@ -143,6 +175,7 @@ const RunBase = {
   config: AnalyzeRunConfigSchema,
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
+  progress: Type.Optional(RunProgressSchema),
 };
 
 // Each status exists twice: a run on the current source gets its snapshot
@@ -347,6 +380,7 @@ export const RunEventSchema = Type.Object(
     status: RunStatusSchema,
     stage: Nullable(AnalyzeStageSchema),
     occurredAt: TimestampSchema,
+    progress: Type.Optional(RunProgressSchema),
   },
   Strict,
 );
@@ -365,3 +399,5 @@ export type CurrentRunResponse = Static<typeof CurrentRunResponseSchema>;
 export type CancelRunInput = Static<typeof CancelRunSchema>;
 export type RuntimeStatus = Static<typeof RuntimeStatusSchema>;
 export type RunEvent = Static<typeof RunEventSchema>;
+export type RunProgress = Static<typeof RunProgressSchema>;
+export type RunProgressPhase = Static<typeof RunProgressPhaseSchema>;

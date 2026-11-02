@@ -15,6 +15,7 @@ import {
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
+import { registerRunEventRoutes } from './modules/jobs/run-events.routes.js';
 import { registerArtifactRoutes } from './modules/artifacts/artifact.routes.js';
 import { registerSourceRegistrationRoutes } from './modules/projects/source-registration.routes.js';
 import { createLoggerOptions } from './plugins/logger.js';
@@ -55,6 +56,12 @@ export function buildApp(
   app.addHook('onReady', async () => {
     await dependencies.start();
   });
+  // Open event streams keep their connections busy; end them before the
+  // server waits for connections to close.
+  app.addHook('preClose', (done) => {
+    dependencies.runEvents.close();
+    done();
+  });
   app.addHook('onClose', async () => {
     await dependencies.close();
   });
@@ -77,6 +84,7 @@ export function buildApp(
   registerProjectRoutes(app, dependencies.projects);
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
+  registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);
   registerArtifactRoutes(app, dependencies.artifacts);
   registerFolderPickerRoutes(app, dependencies.folderPicker);
   return app;

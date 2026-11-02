@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import type { AnalyzeStage, Run } from '@portal/contracts';
+import type {
+  AnalyzeStage,
+  Run,
+  RunProgress,
+  RunProgressPhase,
+} from '@portal/contracts';
 import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { runRequestErrorMessage } from './run-messages';
@@ -13,9 +18,11 @@ import {
 // drop: choose a folder → folder chosen (Quét source / Đổi thư mục) →
 // scanning → done (opens the analysis step after a short pause) or ended
 // (failed/cancelled/interrupted, with the reason and a re-run).
-// Progress follows the run's real `stage` only: until the backend reports
-// file counts (PF08) there is no percentage, no file count and no file list,
-// and nothing advances on a timer.
+// Progress is what the backend reports (PF08 `progress`: one share for the
+// whole run, files, bytes, latest relative paths). Without it, or while the
+// folder is still being listed (no total yet), the bar runs without a number
+// and the steps follow `stage`; nothing advances on a timer, and the share
+// shown never goes down within a run.
 
 // Pause on "scan done" before the analysis step opens by itself.
 export const AUTO_OPEN_DELAY_MS = 1500;
@@ -95,6 +102,22 @@ export function ScanStage({
           : 'chosen';
   const pending = action.status === 'pending';
   const busy = pending || starting;
+  // Per-file progress (PF08), only while the backend reports it; the share
+  // shown never goes down within a run.
+  const progress = phase === 'scanning' ? (current?.progress ?? null) : null;
+  const highest = useRef<{ runId: string; value: number } | null>(null);
+  let percent: number | null = null;
+  if (progress && current && progress.filesTotal !== null) {
+    const value = Math.floor(progressShare(progress) * 100);
+    const previous =
+      highest.current?.runId === current.id ? highest.current.value : 0;
+    percent = Math.max(value, previous);
+  }
+  useEffect(() => {
+    if (current && percent !== null)
+      highest.current = { runId: current.id, value: percent };
+  });
+  const demo = source.status === 'demo';
   const folder =
     source.status === 'demo' ||
     source.status === 'ready' ||
@@ -162,7 +185,12 @@ export function ScanStage({
           </span>
         </div>
         <div className="scan-text" role="status">
-          <h2 id="scan-title">{title}</h2>
+          <h2 id="scan-title">
+            {title}
+            {percent !== null && (
+              <span className="scan-percent"> {percent}%</span>
+            )}
+          </h2>
           {phase === 'chosen' && folder && <FolderChip name={folder} />}
           {help && <p>{help}</p>}
           {phase === 'done' && folder && (
@@ -172,15 +200,37 @@ export function ScanStage({
           )}
         </div>
         {phase === 'choose' && chooser}
-        {phase === 'scanning' && (
-          <div
-            className="scan-bar indeterminate"
-            role="progressbar"
-            aria-label={copy.progressLabel}
-          >
-            <span />
-          </div>
-        )}
+        {phase === 'scanning' &&
+          (percent !== null && progress ? (
+            <div className="scan-meter">
+              <div
+                className="scan-bar determinate"
+                role="progressbar"
+                aria-label={copy.progressDone}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent}
+              >
+                <span style={{ width: `${percent}%` }} />
+              </div>
+              <div className="scan-counts">
+                <span>
+                  {copy.files(filesOfPhase(progress), progress.filesTotal ?? 0)}
+                </span>
+                <span>
+                  {copy.megabytes(formatMegabytes(progress.bytesDone))}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="scan-bar indeterminate"
+              role="progressbar"
+              aria-label={copy.progressLabel}
+            >
+              <span />
+            </div>
+          ))}
         {phase === 'done' && (
           <div className="scan-bar done" aria-hidden="true">
             <span />
@@ -257,41 +307,97 @@ export function ScanStage({
       </section>
       {phase === 'scanning' && current && (
         <div className="scan-panels">
-          <ScanSteps stage={current.stage} />
-          <section className="scan-target" aria-labelledby="scan-target-title">
-            <h3 id="scan-target-title">{copy.target}</h3>
-            <dl>
-              {folder && (
+          <ScanSteps stage={current.stage} phase={progress?.phase ?? null} />
+          {progress && progress.recentPaths.length > 0 ? (
+            <section className="scan-files" aria-labelledby="scan-files-title">
+              <h3 id="scan-files-title">
+                {copy.readingFiles}
+                {demo && (
+                  <span className="chip demo">
+                    {messages.projects.demoBadge}
+                  </span>
+                )}
+              </h3>
+              <ul>
+                {progress.recentPaths.map((path, index) => (
+                  <li key={`${index}:${path}`}>
+                    <span className={`file-ext ext-${extensionOf(path)}`}>
+                      {extensionOf(path)}
+                    </span>
+                    <span className="file-path">{path}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <section
+              className="scan-target"
+              aria-labelledby="scan-target-title"
+            >
+              <h3 id="scan-target-title">{copy.target}</h3>
+              <dl>
+                {folder && (
+                  <div>
+                    <dt>{copy.targetFolder}</dt>
+                    <dd className="mono">{folder}</dd>
+                  </div>
+                )}
                 <div>
-                  <dt>{copy.targetFolder}</dt>
-                  <dd className="mono">{folder}</dd>
+                  <dt>{copy.targetLanguage}</dt>
+                  <dd>VB6 · CP932</dd>
                 </div>
-              )}
-              <div>
-                <dt>{copy.targetLanguage}</dt>
-                <dd>VB6 · CP932</dd>
-              </div>
-              {current.startedAt && (
+                {current.startedAt && (
+                  <div>
+                    <dt>{runCopy.fields.startedAt}</dt>
+                    <dd>{formatDateTime(current.startedAt)}</dd>
+                  </div>
+                )}
                 <div>
-                  <dt>{runCopy.fields.startedAt}</dt>
-                  <dd>{formatDateTime(current.startedAt)}</dd>
+                  <dt>{runCopy.fields.stage}</dt>
+                  <dd>
+                    {current.stage
+                      ? runCopy.stage[current.stage]
+                      : runCopy.status[current.status]}
+                  </dd>
                 </div>
+              </dl>
+              {!progress && (
+                <p className="scan-target-note">{copy.noFileCount}</p>
               )}
-              <div>
-                <dt>{runCopy.fields.stage}</dt>
-                <dd>
-                  {current.stage
-                    ? runCopy.stage[current.stage]
-                    : runCopy.status[current.status]}
-                </dd>
-              </div>
-            </dl>
-            <p className="scan-target-note">{copy.noFileCount}</p>
-          </section>
+            </section>
+          )}
         </div>
       )}
     </>
   );
+}
+
+// Share of the run done (UI-DEMO02-SCOPE §2b.2), as the backend computes it.
+export function progressShare(progress: RunProgress): number {
+  if (progress.phase === 'publish') return 1;
+  if (!progress.filesTotal) return 0;
+  return Math.min(
+    1,
+    (progress.filesSnapshotted + progress.filesAnalyzed) /
+      (2 * progress.filesTotal),
+  );
+}
+
+// Files done in the current phase, for "n / total file".
+function filesOfPhase(progress: RunProgress): number {
+  if (progress.phase === 'inventory') return progress.filesAnalyzed;
+  if (progress.phase === 'publish') return progress.filesTotal ?? 0;
+  return progress.filesSnapshotted;
+}
+
+function formatMegabytes(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(1);
+}
+
+function extensionOf(path: string): string {
+  const name = path.split('/').pop() ?? path;
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'file';
 }
 
 function FolderChip({ name }: { name: string }) {
@@ -328,9 +434,25 @@ const STAGE_ORDER: readonly AnalyzeStage[] = [
   'publish',
 ];
 
+const PHASE_STEP: Record<RunProgressPhase, number> = {
+  listing: 0,
+  snapshot: 1,
+  inventory: 2,
+  publish: 3,
+};
+
+// The four steps: by the reported phase when the backend sends progress,
+// else by the stage (the first two both follow `snapshot`).
 export function stepStates(
   stage: AnalyzeStage | null,
+  phase: RunProgressPhase | null = null,
 ): ('done' | 'active' | 'todo')[] {
+  if (phase !== null) {
+    const active = PHASE_STEP[phase];
+    return [0, 1, 2, 3].map((index) =>
+      index < active ? 'done' : index === active ? 'active' : 'todo',
+    );
+  }
   const reached = stage === null ? -1 : STAGE_ORDER.indexOf(stage);
   return STEP_STAGES.map((step) => {
     const index = STAGE_ORDER.indexOf(step);
@@ -339,10 +461,16 @@ export function stepStates(
   });
 }
 
-function ScanSteps({ stage }: { stage: AnalyzeStage | null }) {
+function ScanSteps({
+  stage,
+  phase,
+}: {
+  stage: AnalyzeStage | null;
+  phase: RunProgressPhase | null;
+}) {
   const { messages } = useLocale();
   const copy = messages.sourceStep.steps;
-  const states = stepStates(stage);
+  const states = stepStates(stage, phase);
   return (
     <section className="scan-steps" aria-labelledby="scan-steps-title">
       <h3 id="scan-steps-title">{copy.title}</h3>

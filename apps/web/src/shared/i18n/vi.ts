@@ -181,6 +181,10 @@ export const viMessages = {
       queuedTitle: 'Đang chờ bắt đầu…',
       scanningTitle: 'Đang quét thư mục…',
       cancellingTitle: 'Đang hủy lượt quét…',
+      progressDone: 'Tiến độ quét',
+      files: (done: number, total: number) => `${done} / ${total} file`,
+      megabytes: (value: string) => `${value} MB`,
+      readingFiles: 'File đang đọc',
       progressLabel: 'Đang quét, chưa biết tổng số file',
       stage: (stage: string) => `Bước hiện tại: ${stage}`,
       doneTitle: 'Quét xong · đang chuyển sang Phân tích…',
@@ -332,6 +336,8 @@ export const viMessages = {
       SNAPSHOT_UNAVAILABLE: 'Lượt chạy cũ không có bản chụp nguồn để dùng lại.',
       SOURCE_PROFILE_UNSUPPORTED: 'Hồ sơ mã nguồn không được bản này hỗ trợ.',
       SOURCE_NOT_REGISTERED: 'Dự án chưa đăng ký mã nguồn.',
+      RUN_EVENTS_LIMIT:
+        'Đang mở quá nhiều luồng theo dõi lượt chạy. Trạng thái vẫn được cập nhật định kỳ.',
       RUNTIME_RECOVERY_REQUIRED:
         'Backend cần được khởi động lại sau một lượt chạy chưa dừng hẳn. Chưa có lượt chạy mới nào được tạo.',
     } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,

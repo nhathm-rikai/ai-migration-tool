@@ -2866,11 +2866,11 @@ details.technical[open] > summary {
   padding: 18px;
 }
 .scan-steps {
-  flex: 1 1 280px;
+  flex: 1 1 240px;
   background: var(--surface);
 }
 .scan-target {
-  flex: 2 1 340px;
+  flex: 2 1 280px;
   background: var(--surface-3);
 }
 .scan-steps h3,
@@ -3268,4 +3268,91 @@ details.technical[open] > summary {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Per-file progress on the scan card (PF08): a real share, file count and
+   the latest files read. Shown only while the backend reports them. */
+.scan-percent {
+  font-family: var(--f-mono);
+  color: var(--brand);
+}
+.scan-meter {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scan-bar.determinate > span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+  background: var(--brand);
+  transition: width var(--dur-fast) linear;
+}
+.scan-counts {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--f-mono);
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.scan-files {
+  flex: 2 1 280px;
+  min-width: 0;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-3);
+  padding: 18px;
+}
+.scan-files h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.scan-files ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+.scan-files li {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  color: var(--fg-2);
+  white-space: nowrap;
+  animation: slideIn var(--dur-base) var(--ease-out) both;
+}
+.file-ext {
+  flex: none;
+  min-width: 44px;
+  color: var(--brand);
+}
+.file-ext.ext-frm,
+.file-ext.ext-frx,
+.file-ext.ext-ctl {
+  color: var(--info);
+}
+.file-ext.ext-cls,
+.file-ext.ext-vbp {
+  color: var(--ai);
+}
+.file-ext.ext-txt,
+.file-ext.ext-sql {
+  color: var(--warn);
+}
+.file-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

@@ -165,6 +165,10 @@ export const jaMessages = {
       queuedTitle: '開始を待っています…',
       scanningTitle: 'フォルダーをスキャンしています…',
       cancellingTitle: 'スキャンをキャンセルしています…',
+      progressDone: 'スキャンの進捗',
+      files: (done: number, total: number) => `${done} / ${total} ファイル`,
+      megabytes: (value: string) => `${value} MB`,
+      readingFiles: '読み込み中のファイル',
       progressLabel: 'スキャン中（ファイル総数は未確定）',
       stage: (stage: string) => `現在の工程：${stage}`,
       doneTitle: 'スキャン完了・解析画面へ移動します…',
@@ -319,6 +323,8 @@ export const jaMessages = {
       SOURCE_PROFILE_UNSUPPORTED:
         'このバージョンはソースプロファイルに対応していません。',
       SOURCE_NOT_REGISTERED: 'プロジェクトのソースが登録されていません。',
+      RUN_EVENTS_LIMIT:
+        '実行を監視するストリームが多すぎます。状態は定期的に更新されます。',
       RUNTIME_RECOVERY_REQUIRED:
         '停止を確認できなかった実行があるため、バックエンドの再起動が必要です。新しい実行は作成されていません。',
     },

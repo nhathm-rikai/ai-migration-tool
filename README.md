@@ -45,6 +45,8 @@ npm.cmd run e2e:self-check
 
 ## Tài liệu
 
+- [Bộ specification-design Draft: rules, templates và checklist](docs/specification-design/README.md).
+
 - [Cách gọi API, đọc source và mở rộng từng lớp](apps/api/README.md).
 - [Rule và workflow dùng skill](docs/engineering/README.md).
 - [Bản đồ tìm file khi gặp edge case](docs/engineering/examples.md).

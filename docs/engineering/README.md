@@ -41,6 +41,8 @@ RIKAI là portal chạy local để chọn thư mục source legacy, phân tích
 
 ## Đặc tả khi làm Analyze/Understand
 
+- [Bộ tài liệu specification-design Draft](../specification-design/README.md): rules, templates dùng chung Codex/Claude, checklist và mapping đề xuất. Chưa được duyệt; không thay contract hiện hành hoặc triển khai pipeline.
+
 - [Đọc source, encoding, evidence và LoC](specs/source-analysis.md): CP932 cho profile BSN; binary không decode; metric `vb6-physical-code-v1` và cách đối chiếu baseline.
 - [Source inventory](specs/source-inventory.md): JSON `source-inventory-v1` cho agent/report: SQL/CRUD, call graph, complexity v0 và CLI.
 - [Báo cáo inventory theo program](specs/inventory-report.md): JSON/XLSX `inventory-report-v1` từ inventory, LoC theo function, dependency/CRUD, totals per-program và unique, cảnh báo.

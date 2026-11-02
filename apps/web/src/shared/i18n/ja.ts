@@ -337,7 +337,6 @@ export const jaMessages = {
       },
       histogramTitle: '複雑度の分布',
       histogramPrograms: (count: string) => `${count} プログラム`,
-      histogramNote: (version: string) => `参考 · ${version}`,
       notAnalyzed: (count: string) => `未解析 ${count} プログラム`,
       sectionLabel: '解析の詳細',
       graph: {

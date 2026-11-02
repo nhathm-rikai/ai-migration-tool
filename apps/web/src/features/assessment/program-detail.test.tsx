@@ -53,6 +53,9 @@ describe('Program detail (F04)', () => {
     expect(screen.getByTestId('detail-raw-complexity').textContent).toContain(
       'Thấp · 12',
     );
+    expect(
+      screen.getByTestId('detail-raw-complexity').textContent,
+    ).not.toContain('complexity-');
     expect(screen.getByRole('note').textContent).toBe(
       'Tên như trong mã nguồn · Xem sau ánh xạ',
     );

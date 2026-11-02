@@ -308,6 +308,22 @@ test(
     await page.screenshot({
       path: testInfo.outputPath('ui03-full-screen.png'),
     });
+    // The reveal outline of the opened folder must disappear as soon as
+    // attention moves to another folder; only the new selection is lit.
+    const otherFolder = canvas.getByRole('button', {
+      name: /^Làm nổi bật đường nối của F02 /,
+    });
+    await otherFolder.click();
+    await expect(otherFolder).toHaveAttribute('aria-pressed', 'true');
+    await expect(canvas.locator('.react-flow__node.recent')).toHaveCount(0);
+    await expect(dialog.locator('.dep-open-box.recent')).toHaveCount(0);
+    await expect(folderNode.locator('.dep-folder')).toHaveCSS(
+      'box-shadow',
+      'none',
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('ui03-folder-focus-transferred.png'),
+    });
     // A program inside the open folder: its edges are drawn over the boxes
     // (resting edges stay under them), so they can be followed.
     await canvas

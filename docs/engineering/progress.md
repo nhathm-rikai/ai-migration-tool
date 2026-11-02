@@ -8,6 +8,15 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 02/11/2026 — UI03/UI02/F04: chuyển viền graph và ẩn mã complexity
+
+- Dùng `portal-implement`, nhánh `feat/ui04-source-step` từ HEAD `da3fac8`, FEATURE:ui/analysis; fixture sạch, không đọc source khách hàng. Working tree sạch lúc bắt đầu; không thay contract/backend hoặc dữ liệu artifact.
+- Call graph: `recent` (folder vừa mở/thu gọn/đưa vào khung nhìn) trước đây độc lập với `focus`, nên chọn folder khác vẫn giữ ring cũ. Regression fail trên code cũ cho cả folder mở và thu gọn; thêm case đang focus một folder rồi mở folder khác. Nay chọn node/search xóa recent, mở/thu gọn/chọn chip folder xóa focus cũ, vùng trống/nền folder mở/Escape/nút bỏ chọn xóa cả hai. Giữ mở nhiều folder, chỉ viền của hành động hiện tại được nhấn mạnh.
+- Complexity: bỏ toàn bộ dòng “Tham khảo · complexity-…” dưới histogram và mã version bên cạnh score ở chi tiết program, đồng bộ catalog VI/JA. Mức/điểm raw/mapped vẫn lấy nguyên từ inventory, số program chưa phân tích và cảnh báo partial/draft vẫn còn; version chỉ là metadata của artifact.
+- Kiểm chứng: regression trước sửa 5 assertion fail; sau sửa 235 test web pass (2 worker), format/lint/typecheck/build/notices pass. E2E bổ sung chọn folder F02 sau khi mở F03: không còn `.recent`, chip cũ bỏ nhấn và box-shadow folder cũ = none; local inventory kiểm chart/detail không render complexity version và chụp ảnh.
+- Browser E2E production Chromium 13/13 pass; đã xem ảnh graph chuyển focus và chart/score: folder cũ trở về viền nhóm nét đứt mảnh, chỉ folder đang chọn có focus ring; chart/detail không còn mã complexity version. Ảnh trong `test-results/e2e/artifacts/` (Git ignored). `verify-repository` và `git diff --check` pass.
+- Chưa commit/push/merge; thực kiểm Windows x64, Node 24.16.0, chưa kiểm macOS/Linux.
+
 ## 02/11/2026 — PF08: sửa danh sách file đứng ở một dòng trong development
 
 - Dùng `portal-implement`; cùng nhánh `feat/ui04-source-step`, giữ toàn bộ sửa review chưa commit bên dưới. FEATURE:ui/jobs, chỉ fixture sạch. Không thay API/contract hoặc tăng tốc độ giả lập tiến độ.

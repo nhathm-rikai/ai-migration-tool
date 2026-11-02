@@ -109,6 +109,12 @@ test(
     });
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
+    await expect(assessment.locator('.histogram')).not.toContainText(
+      'complexity-',
+    );
+    await assessment
+      .locator('.histogram')
+      .screenshot({ path: testInfo.outputPath('complexity-chart.png') });
     await expect(
       assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
@@ -129,6 +135,12 @@ test(
     const detail = assessment.getByRole('region', {
       name: 'Chi tiết program SAMPLE',
     });
+    await expect(detail.getByTestId('detail-raw-complexity')).not.toContainText(
+      'complexity-',
+    );
+    await detail
+      .getByTestId('detail-raw-complexity')
+      .screenshot({ path: testInfo.outputPath('complexity-score.png') });
     await detail.getByRole('tab', { name: /^File/ }).click();
     await expect(detail.getByText('File của SAMPLE')).toBeVisible();
     await expect(

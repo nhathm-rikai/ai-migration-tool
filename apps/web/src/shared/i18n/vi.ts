@@ -352,7 +352,6 @@ export const viMessages = {
       },
       histogramTitle: 'Phân bố complexity',
       histogramPrograms: (count: string) => `${count} program`,
-      histogramNote: (version: string) => `Tham khảo · ${version}`,
       notAnalyzed: (count: string) => `${count} program chưa phân tích`,
       sectionLabel: 'Chi tiết phân tích',
       graph: {

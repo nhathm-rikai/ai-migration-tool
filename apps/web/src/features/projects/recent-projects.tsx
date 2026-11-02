@@ -123,8 +123,9 @@ export function RecentProjects({
                       )}
                     </span>
                     <span className="recent-meta">
-                      {project.customerName ?? copy.noCustomer} ·{' '}
-                      {formatDateTime(run?.updatedAt ?? project.createdAt)}
+                      {copy.updated(
+                        formatDateTime(run?.updatedAt ?? project.createdAt),
+                      )}
                     </span>
                   </span>
                   <span className="recent-status">{copy.status[status]}</span>

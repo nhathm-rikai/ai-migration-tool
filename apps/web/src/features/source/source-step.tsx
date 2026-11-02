@@ -5,51 +5,41 @@ import {
   SOURCE_PROFILE_IDS,
   UpdateProjectSchema,
   type Project,
-  type ProjectSource,
   type TableNameMapping,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
+import { ApiError } from '../../shared/api/api-error';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import type { SourcesApi } from '../../shared/api/sources-api';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { projectErrorMessage } from '../projects/project-messages';
-import { RunHistory } from '../jobs/run-history';
 import { ScanStage, type ScanSource } from '../jobs/scan-stage';
 import { isActiveRun, useAnalyzeRuns } from '../jobs/use-analyze-runs';
 import { sourceErrorMessage } from './source-messages';
 import { startableRevision, useProjectSource } from './use-project-source';
 
-// Step 1 "Nạp source" (UI04): scan card, project information (name,
-// customer, source folder, analysis language) and run history; the caller
-// places the recent projects beside it.
+// Step 1 "Nạp source" (UI04), as demo02: the scan card (choose a folder,
+// "Quét source", "Đổi thư mục") and the project information (name and
+// analysis language); the caller places the recent projects beside it.
 //
-// "Bắt đầu phân tích" saves what changed first (project PATCH, source PUT)
-// and only then starts a run on the revision that save returned. Nothing
-// here runs on open, reload or locale change. The registered path never
-// comes back from the API, so an empty path field keeps the registered one.
+// Choosing a folder registers it (PUT source); the registered path never
+// comes back from the API, so the card shows the folder name. "Quét source"
+// needs a project name and a chosen language, saves a changed name (PATCH)
+// and only then starts a run on the registered revision. Nothing here runs
+// on open, reload or locale change. Table-name mapping and run history are
+// kept in the API but not shown here (user request, 02/11/2026).
 
-type MappingStatus = TableNameMapping['status'];
-type FieldErrors = {
-  name: boolean;
-  customerName: boolean;
-  rootPath: 'required' | 'reenter' | 'invalid' | null;
-  defaultSchema: boolean;
-};
+type FieldErrors = { name: boolean; language: boolean; rootPath: boolean };
 const NO_ERRORS: FieldErrors = {
   name: false,
-  customerName: false,
-  rootPath: null,
-  defaultSchema: false,
+  language: false,
+  rootPath: false,
 };
-
-type InfoSave =
-  | { status: 'idle' }
-  | { status: 'saved' }
-  | { status: 'error'; error: unknown };
 
 // Language chips of demo02. Only VB6 has an analysis profile; the others
 // are listed as coming and cannot be chosen.
+type Language = 'vb6';
 const COMING_LANGUAGES = [
   'Java',
   'C#',
@@ -58,6 +48,10 @@ const COMING_LANGUAGES = [
   'COBOL',
   'JavaScript',
 ] as const;
+const UNCONFIGURED: TableNameMapping = {
+  defaultSchema: null,
+  status: 'unconfigured',
+};
 
 export function SourceStep({
   project,
@@ -75,12 +69,14 @@ export function SourceStep({
   sourcesApi: SourcesApi;
   // Shown beside the step (recent projects).
   aside?: ReactNode;
-  // A saved name or customer; the shell shows it without re-reading.
+  // A saved name; the shell shows it without re-reading.
   onProjectChange: (project: Project) => void;
   // A source was saved or a run started or ended: step marks re-read.
   onProgress: () => void;
   onOpenResults: (runId: string) => void;
 }) {
+  const { messages } = useLocale();
+  const copy = messages.sourceStep;
   const demo = project.mode === 'demo';
   const source = useProjectSource(sourcesApi, project.id, !demo);
   const revision = demo
@@ -88,7 +84,7 @@ export function SourceStep({
     : startableRevision(source.state);
   const runs = useAnalyzeRuns(runsApi, project.id, revision);
 
-  // Report run starts and ends after the first read, as the run panel did.
+  // Report run starts and ends after the first read.
   const current = runs.state.status === 'ready' ? runs.state.current : null;
   const activeRunId =
     current && isActiveRun(current.status) ? current.id : null;
@@ -104,148 +100,139 @@ export function SourceStep({
     if (sourceSaved) onProgress();
   }, [sourceSaved, onProgress]);
 
-  // Form values. Kept across failed saves, reloads and locale changes.
+  const registered =
+    source.state.status === 'ready' && source.state.source?.kind === 'local'
+      ? source.state.source
+      : null;
+  // Kept across failed saves, reloads and locale changes.
   const [name, setName] = useState(project.name);
-  const [customerName, setCustomerName] = useState(project.customerName ?? '');
-  const [rootPath, setRootPath] = useState('');
-  // null: as registered (or unconfigured when nothing is registered).
-  const [mappingStatus, setMappingStatus] = useState<MappingStatus | null>(
-    null,
+  // The bundled fixture, or a source registered before this page opened,
+  // already names its profile; a new source needs the language chosen.
+  const [language, setLanguage] = useState<Language | null>(
+    demo ? 'vb6' : null,
   );
-  const [defaultSchema, setDefaultSchema] = useState<string | null>(null);
+  const languageRead = useRef(demo);
+  useEffect(() => {
+    if (languageRead.current || source.state.status === 'loading') return;
+    languageRead.current = true;
+    if (source.state.status === 'ready' && source.state.source)
+      setLanguage((chosen) => chosen ?? 'vb6');
+  }, [source.state]);
+  const chosenLanguage = language;
+  const [rootPath, setRootPath] = useState('');
+  const [changingFolder, setChangingFolder] = useState(false);
   const [invalid, setInvalid] = useState<FieldErrors>(NO_ERRORS);
-  const [infoSave, setInfoSave] = useState<InfoSave>({ status: 'idle' });
+  const [infoError, setInfoError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const mutation = useRef<AbortController | null>(null);
   useEffect(() => () => mutation.current?.abort(), []);
 
-  const registered =
-    source.state.status === 'ready' && source.state.source?.kind === 'local'
-      ? source.state.source
-      : null;
-  const shownMapping = mappingStatus ?? registered?.tableNameMapping.status;
-  const mapping: MappingStatus = shownMapping ?? 'unconfigured';
-  const schema =
-    defaultSchema ?? registered?.tableNameMapping.defaultSchema ?? '';
-  const mappingChanged =
-    !demo &&
-    (mapping !== (registered?.tableNameMapping.status ?? 'unconfigured') ||
-      (mapping !== 'unconfigured' &&
-        schema.trim() !== (registered?.tableNameMapping.defaultSchema ?? '')));
-  const pathGiven = !demo && rootPath.trim() !== '';
-  const canStart = revision !== null || pathGiven;
-
-  function validate(forStart: boolean): FieldErrors | null {
-    const trimmedName = name.trim();
-    const trimmedCustomer = customerName.trim();
-    const errors: FieldErrors = {
-      name: !Check(UpdateProjectSchema, { name: trimmedName }),
-      customerName:
-        trimmedCustomer !== '' &&
-        !Check(UpdateProjectSchema, { customerName: trimmedCustomer }),
-      rootPath: null,
-      defaultSchema: false,
-    };
-    if (!demo) {
-      if (pathGiven) {
-        if (!Check(PutProjectSourceSchema.properties.rootPath, rootPath.trim()))
-          errors.rootPath = 'invalid';
-      } else if (mappingChanged) errors.rootPath = 'reenter';
-      else if (forStart && revision === null) errors.rootPath = 'required';
-      errors.defaultSchema =
-        mapping !== 'unconfigured' &&
-        (pathGiven || mappingChanged) &&
-        !Check(PutProjectSourceSchema.properties.tableNameMapping, {
-          defaultSchema: schema.trim(),
-          status: mapping,
-        });
-    }
-    setInvalid(errors);
-    return errors.name ||
-      errors.customerName ||
-      errors.rootPath ||
-      errors.defaultSchema
-      ? null
-      : errors;
-  }
-
-  // Saves what changed; resolves the revision a run may lock (null: not
-  // saved, or no readable source), or undefined when a save failed.
-  async function save(forStart: boolean): Promise<number | null | undefined> {
-    if (!validate(forStart)) return undefined;
-    const trimmedName = name.trim();
-    const trimmedCustomer = customerName.trim();
-    if (
-      trimmedName !== project.name ||
-      trimmedCustomer !== (project.customerName ?? '')
-    ) {
-      const controller = new AbortController();
-      mutation.current = controller;
-      try {
-        const saved = await api.update(
-          project.id,
-          { name: trimmedName, customerName: trimmedCustomer || null },
-          controller.signal,
-        );
-        if (controller.signal.aborted) return undefined;
-        setInfoSave({ status: 'saved' });
-        onProjectChange(saved);
-      } catch (error) {
-        if (!controller.signal.aborted) setInfoSave({ status: 'error', error });
-        return undefined;
-      }
-    }
-    if (!pathGiven) return revision;
-    const tableNameMapping: TableNameMapping =
-      mapping === 'unconfigured'
-        ? { defaultSchema: null, status: 'unconfigured' }
-        : { defaultSchema: schema.trim(), status: mapping };
-    const saved: ProjectSource | null = await source.put({
-      rootPath: rootPath.trim(),
-      profileId: SOURCE_PROFILE_IDS[0],
-      tableNameMapping,
-      // The revision this page read; a newer one answers 409.
-      expectedSourceRevision: registered?.revision ?? null,
-    });
-    if (!saved) return undefined;
-    setRootPath('');
-    setMappingStatus(null);
-    setDefaultSchema(null);
-    return saved.kind === 'local' && saved.status === 'ready'
-      ? saved.revision
-      : null;
-  }
-
-  async function submit(intent: 'save' | 'start', retryOfRunId?: string) {
+  async function exclusive(task: () => Promise<void>) {
     if (busy.current) return;
-    // A Start whose outcome is unknown is resent as it was: nothing else
-    // is saved or changed before it.
-    if (intent === 'start' && runs.uncertainStart) {
-      void runs.start();
-      return;
-    }
     busy.current = true;
     setSaving(true);
-    setInfoSave({ status: 'idle' });
     try {
-      const locked = await save(intent === 'start');
-      if (intent !== 'start' || locked === undefined || locked === null) return;
-      if (retryOfRunId) await runs.retry(retryOfRunId, locked);
-      else await runs.start(locked);
+      await task();
     } finally {
       busy.current = false;
       setSaving(false);
     }
   }
 
+  // Registers the folder typed on the scan card; the table-name mapping
+  // stays as registered (unconfigured for a new source).
+  function chooseFolder() {
+    const path = rootPath.trim();
+    if (!Check(PutProjectSourceSchema.properties.rootPath, path)) {
+      setInvalid((errors) => ({ ...errors, rootPath: true }));
+      return;
+    }
+    void exclusive(async () => {
+      const saved = await source.put({
+        rootPath: path,
+        profileId: SOURCE_PROFILE_IDS[0],
+        tableNameMapping: registered?.tableNameMapping ?? UNCONFIGURED,
+        // The revision this page read; a newer one answers 409.
+        expectedSourceRevision: registered?.revision ?? null,
+      });
+      if (!saved) return;
+      setRootPath('');
+      setChangingFolder(false);
+    });
+  }
+
+  function scan(retryOfRunId: string | null) {
+    // A Start whose outcome is unknown is resent as it was: nothing else
+    // is saved or changed before it.
+    if (runs.uncertainStart) {
+      void runs.start();
+      return;
+    }
+    const trimmed = name.trim();
+    const errors: FieldErrors = {
+      name: !Check(UpdateProjectSchema, { name: trimmed }),
+      language: chosenLanguage === null,
+      rootPath: false,
+    };
+    setInvalid(errors);
+    if (errors.name || errors.language || revision === null) return;
+    void exclusive(async () => {
+      setInfoError(null);
+      if (trimmed !== project.name) {
+        const controller = new AbortController();
+        mutation.current = controller;
+        try {
+          const saved = await api.update(
+            project.id,
+            { name: trimmed },
+            controller.signal,
+          );
+          if (controller.signal.aborted) return;
+          onProjectChange(saved);
+        } catch (error) {
+          if (!controller.signal.aborted) setInfoError(error);
+          return;
+        }
+      }
+      if (retryOfRunId) await runs.retry(retryOfRunId, revision);
+      else await runs.start(revision);
+    });
+  }
+
+  const choosing =
+    !demo &&
+    source.state.status !== 'loading' &&
+    (changingFolder || !registered || registered.status !== 'ready');
   const scanSource: ScanSource = demo
-    ? { status: 'demo' }
+    ? { status: 'demo', folder: copy.form.demoFolder(project.fixtureId) }
     : source.state.status === 'loading'
       ? { status: 'loading' }
       : registered
         ? { status: registered.status, folder: registered.displayName }
         : { status: 'none' };
+
+  const chooser = choosing ? (
+    <FolderChooser
+      value={rootPath}
+      invalid={invalid.rootPath}
+      pending={saving || source.save.status === 'pending'}
+      error={
+        source.state.status === 'error'
+          ? source.state.error
+          : source.save.status === 'error'
+            ? source.save.error
+            : null
+      }
+      onChange={(value) => {
+        setRootPath(value);
+        setInvalid((errors) => ({ ...errors, rootPath: false }));
+      }}
+      onSubmit={chooseFolder}
+      onReload={source.refresh}
+      onCancel={registered ? () => setChangingFolder(false) : null}
+    />
+  ) : null;
 
   return (
     <div className="source-step">
@@ -253,351 +240,165 @@ export function SourceStep({
         <ScanStage
           runs={runs}
           source={scanSource}
-          canStart={canStart}
+          chooser={chooser}
           starting={saving}
-          onStart={(retryOf) => void submit('start', retryOf ?? undefined)}
+          onStart={scan}
+          onChangeFolder={demo ? null : () => setChangingFolder(true)}
           onOpenResults={onOpenResults}
         />
-        <ProjectInfoForm
-          demo={demo}
-          fixtureId={project.mode === 'demo' ? project.fixtureId : null}
-          source={source}
-          registered={registered}
-          values={{ name, customerName, rootPath, mapping, schema }}
-          onChange={{
-            name: (value) => {
-              setName(value);
-              setInvalid((errors) => ({ ...errors, name: false }));
-            },
-            customerName: (value) => {
-              setCustomerName(value);
-              setInvalid((errors) => ({ ...errors, customerName: false }));
-            },
-            rootPath: (value) => {
-              setRootPath(value);
-              setInvalid((errors) => ({ ...errors, rootPath: null }));
-            },
-            mapping: (value) => {
-              setMappingStatus(value);
-              setInvalid((errors) => ({ ...errors, defaultSchema: false }));
-            },
-            schema: (value) => {
-              setDefaultSchema(value);
-              setInvalid((errors) => ({ ...errors, defaultSchema: false }));
-            },
-          }}
-          invalid={invalid}
-          infoSave={infoSave}
-          saving={saving}
-          onSave={() => void submit('save')}
-        />
-        <RunHistory
-          runs={runs}
-          demo={demo}
-          canStart={revision !== null}
-          onOpenResults={onOpenResults}
-        />
-      </div>
-      {aside}
-    </div>
-  );
-}
-
-type Values = {
-  name: string;
-  customerName: string;
-  rootPath: string;
-  mapping: MappingStatus;
-  schema: string;
-};
-
-function ProjectInfoForm({
-  demo,
-  fixtureId,
-  source,
-  registered,
-  values,
-  onChange,
-  invalid,
-  infoSave,
-  saving,
-  onSave,
-}: {
-  demo: boolean;
-  fixtureId: string | null;
-  source: ReturnType<typeof useProjectSource>;
-  registered: Extract<ProjectSource, { kind: 'local' }> | null;
-  values: Values;
-  onChange: { [K in keyof Values]: (value: Values[K]) => void };
-  invalid: FieldErrors;
-  infoSave: InfoSave;
-  saving: boolean;
-  onSave: () => void;
-}) {
-  const { messages } = useLocale();
-  const copy = messages.sourceStep.form;
-  const sourceCopy = messages.source;
-  const pending = saving || source.save.status === 'pending';
-  const rootPathError =
-    invalid.rootPath === 'required'
-      ? copy.folderRequired
-      : invalid.rootPath === 'reenter'
-        ? copy.folderReenter
-        : invalid.rootPath === 'invalid'
-          ? sourceCopy.form.rootPathInvalid
-          : null;
-  return (
-    <form
-      className="panel project-info"
-      noValidate
-      aria-labelledby="project-info-title"
-      aria-busy={pending}
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave();
-      }}
-    >
-      <div className="section-heading">
-        <h2 id="project-info-title">{copy.title}</h2>
-        {!demo && (
-          <button
-            type="button"
-            className="button small"
-            onClick={source.refresh}
-          >
-            {sourceCopy.reload}
-          </button>
-        )}
-      </div>
-      {infoSave.status === 'saved' && (
-        <p role="status" className="success">
-          {copy.saved}
-        </p>
-      )}
-      {source.save.status === 'saved' && (
-        <p role="status" className="success">
-          {sourceCopy.form.saved}
-        </p>
-      )}
-      <div className="field-grid">
-        <div>
-          <label htmlFor="project-name">{copy.name}</label>
+        <section className="panel project-info" aria-labelledby="info-title">
+          <h2 id="info-title">{copy.form.title}</h2>
+          <label htmlFor="project-name">{copy.form.name}</label>
           <input
             id="project-name"
             autoComplete="off"
-            value={values.name}
-            disabled={pending}
+            value={name}
+            disabled={saving}
             aria-invalid={invalid.name}
             aria-describedby={invalid.name ? 'project-name-error' : undefined}
-            onChange={(event) => onChange.name(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value);
+              setInvalid((errors) => ({ ...errors, name: false }));
+            }}
           />
           {invalid.name && (
             <p id="project-name-error" role="alert" className="error">
               {messages.projects.create.nameInvalid}
             </p>
           )}
-        </div>
-        <div>
-          <label htmlFor="project-customer">{copy.customer}</label>
-          <input
-            id="project-customer"
-            autoComplete="off"
-            value={values.customerName}
-            disabled={pending}
-            aria-invalid={invalid.customerName}
-            aria-describedby={
-              invalid.customerName
-                ? 'project-customer-help project-customer-error'
-                : 'project-customer-help'
-            }
-            onChange={(event) => onChange.customerName(event.target.value)}
-          />
-          <p className="field-help" id="project-customer-help">
-            {copy.customerHelp}
-          </p>
-          {invalid.customerName && (
-            <p id="project-customer-error" role="alert" className="error">
-              {copy.customerInvalid}
+          {infoError !== null && (
+            <p role="alert" className="error">
+              {projectErrorMessage(infoError, 'update', messages.errors)}
             </p>
           )}
-        </div>
+          <fieldset
+            className="language-chips"
+            aria-describedby={invalid.language ? 'language-error' : undefined}
+          >
+            <legend>{copy.form.language}</legend>
+            <label
+              className={
+                'language-chip' + (chosenLanguage === 'vb6' ? ' selected' : '')
+              }
+            >
+              <input
+                type="radio"
+                name="analysis-language"
+                checked={chosenLanguage === 'vb6'}
+                disabled={saving}
+                onChange={() => {
+                  setLanguage('vb6');
+                  setInvalid((errors) => ({ ...errors, language: false }));
+                }}
+              />
+              <span>VB6</span>
+            </label>
+            {COMING_LANGUAGES.map((label) => (
+              <label key={label} className="language-chip coming">
+                <input type="radio" name="analysis-language" disabled />
+                <span>{label}</span>
+                <span className="chip-note">{copy.form.comingSoon}</span>
+              </label>
+            ))}
+          </fieldset>
+          {invalid.language && (
+            <p id="language-error" role="alert" className="error">
+              {copy.form.languageRequired}
+            </p>
+          )}
+        </section>
       </div>
-      {infoSave.status === 'error' && (
-        <p role="alert" className="error">
-          {projectErrorMessage(infoSave.error, 'update', messages.errors)}
-        </p>
-      )}
-      {demo ? (
-        <div className="field">
-          <span className="field-label">{copy.folder}</span>
-          <p className="folder-fixed mono">
-            {copy.demoFolder(fixtureId ?? '')}
-          </p>
-        </div>
-      ) : (
-        <SourceFields
-          source={source}
-          registered={registered}
-          values={values}
-          onChange={onChange}
-          invalid={invalid}
-          rootPathError={rootPathError}
-          pending={pending}
-        />
-      )}
-      <fieldset className="language-chips">
-        <legend>{copy.language}</legend>
-        <label className="language-chip selected">
-          <input type="radio" name="analysis-language" checked readOnly />
-          <span>VB6</span>
-        </label>
-        {COMING_LANGUAGES.map((language) => (
-          <label key={language} className="language-chip coming">
-            <input type="radio" name="analysis-language" disabled />
-            <span>{language}</span>
-            <span className="chip-note">{copy.comingSoon}</span>
-          </label>
-        ))}
-      </fieldset>
-      <div className="form-actions">
-        <button className="button" type="submit" disabled={pending}>
-          {pending ? copy.saving : copy.save}
-        </button>
-      </div>
-    </form>
+      {aside}
+    </div>
   );
 }
 
-function SourceFields({
-  source,
-  registered,
-  values,
-  onChange,
+// Folder form on the scan card while UI05 (native folder dialog) is not
+// available: an absolute path typed by the user.
+function FolderChooser({
+  value,
   invalid,
-  rootPathError,
   pending,
+  error,
+  onChange,
+  onSubmit,
+  onReload,
+  onCancel,
 }: {
-  source: ReturnType<typeof useProjectSource>;
-  registered: Extract<ProjectSource, { kind: 'local' }> | null;
-  values: Values;
-  onChange: { [K in keyof Values]: (value: Values[K]) => void };
-  invalid: FieldErrors;
-  rootPathError: string | null;
+  value: string;
+  invalid: boolean;
   pending: boolean;
+  error: unknown;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onReload: () => void;
+  onCancel: (() => void) | null;
 }) {
   const { messages } = useLocale();
   const copy = messages.sourceStep.form;
-  const sourceCopy = messages.source;
-  const { state } = source;
-  const describedBy = ['source-root-help'];
-  if (rootPathError) describedBy.push('source-root-error');
+  const stale =
+    error instanceof ApiError && error.code === 'SOURCE_REVISION_CONFLICT';
   return (
-    <div className="field">
+    <form
+      className="folder-chooser"
+      noValidate
+      aria-busy={pending}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
       <label htmlFor="source-root">{copy.folder}</label>
-      {state.status === 'loading' && (
-        <p role="status" className="muted">
-          {sourceCopy.loading}
-        </p>
-      )}
-      {state.status === 'error' && (
-        <p role="alert" className="error">
-          {sourceErrorMessage(state.error, messages)}
-        </p>
-      )}
-      {registered && (
-        <p className="registered-folder">
-          <span className="muted">{copy.registered}:</span>{' '}
-          <span className="mono">{registered.displayName}</span>{' '}
-          <span className={`source-status status-${registered.status}`}>
-            {sourceCopy.status[registered.status]}
-          </span>
-        </p>
-      )}
-      <input
-        id="source-root"
-        autoComplete="off"
-        spellCheck={false}
-        className="mono"
-        value={values.rootPath}
-        disabled={pending}
-        aria-invalid={invalid.rootPath !== null}
-        aria-describedby={describedBy.join(' ')}
-        onChange={(event) => onChange.rootPath(event.target.value)}
-      />
-      <p className="field-help" id="source-root-help">
-        {registered ? `${copy.keepFolder} ` : ''}
-        {sourceCopy.form.rootPathHelp}
-      </p>
-      {rootPathError && (
-        <p id="source-root-error" role="alert" className="error">
-          {rootPathError}
-        </p>
-      )}
-      {source.save.status === 'error' && (
-        <p role="alert" className="error">
-          {sourceErrorMessage(source.save.error, messages)}
-        </p>
-      )}
-      {/* Opens by itself when its field needs attention. */}
-      <details
-        className="technical mapping-fields"
-        open={invalid.defaultSchema || undefined}
-      >
-        <summary>{copy.mapping}</summary>
-        <label htmlFor="source-mapping-status">
-          {sourceCopy.form.mappingStatus}
-        </label>
-        <select
-          id="source-mapping-status"
-          value={values.mapping}
+      <div className="folder-row">
+        <input
+          id="source-root"
+          autoComplete="off"
+          spellCheck={false}
+          className="mono"
+          value={value}
           disabled={pending}
-          onChange={(event) => {
-            const value = event.target.value;
-            if (
-              value === 'unconfigured' ||
-              value === 'assumed' ||
-              value === 'confirmed'
-            )
-              onChange.mapping(value);
-          }}
+          aria-invalid={invalid}
+          aria-describedby={
+            invalid ? 'source-root-help source-root-error' : 'source-root-help'
+          }
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          className="button primary large"
+          type="submit"
+          disabled={pending}
         >
-          {(['unconfigured', 'assumed', 'confirmed'] as const).map((status) => (
-            <option key={status} value={status}>
-              {sourceCopy.mappingStatus[status]}
-            </option>
-          ))}
-        </select>
-        {values.mapping !== 'unconfigured' && (
-          <>
-            <label htmlFor="source-schema">
-              {sourceCopy.form.defaultSchema}
-            </label>
-            <input
-              id="source-schema"
-              autoComplete="off"
-              spellCheck={false}
-              className="mono"
-              value={values.schema}
-              disabled={pending}
-              aria-invalid={invalid.defaultSchema}
-              aria-describedby={
-                invalid.defaultSchema
-                  ? 'source-schema-help source-schema-error'
-                  : 'source-schema-help'
-              }
-              onChange={(event) => onChange.schema(event.target.value)}
-            />
-            <p className="field-help" id="source-schema-help">
-              {sourceCopy.form.defaultSchemaHelp}
-            </p>
-            {invalid.defaultSchema && (
-              <p id="source-schema-error" role="alert" className="error">
-                {sourceCopy.form.defaultSchemaInvalid}
-              </p>
-            )}
-          </>
+          {pending ? copy.saving : copy.choose}
+        </button>
+        {onCancel && (
+          <button
+            className="button large"
+            type="button"
+            disabled={pending}
+            onClick={onCancel}
+          >
+            {copy.cancel}
+          </button>
         )}
-      </details>
-    </div>
+      </div>
+      <p className="field-help" id="source-root-help">
+        {messages.source.form.rootPathHelp}
+      </p>
+      {invalid && (
+        <p id="source-root-error" role="alert" className="error">
+          {messages.source.form.rootPathInvalid}
+        </p>
+      )}
+      {error !== null && error !== undefined && (
+        <div role="alert" className="error">
+          {sourceErrorMessage(error, messages)}{' '}
+          {stale && (
+            <button className="button small" type="button" onClick={onReload}>
+              {messages.source.reload}
+            </button>
+          )}
+        </div>
+      )}
+    </form>
   );
 }

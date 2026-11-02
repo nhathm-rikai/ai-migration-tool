@@ -25,11 +25,12 @@ test(
     const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
     await projects.getByRole('link', { name: seedName }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
-    const history = page.getByRole('region', { name: /Lịch sử lượt chạy/ });
-    await expect(history.getByText('Chưa có lượt chạy nào')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
+    ).toBeVisible();
     expect(runMutations).toEqual([]);
 
-    const start = page.getByRole('button', { name: 'Bắt đầu phân tích' });
+    const start = page.getByRole('button', { name: 'Quét source' });
     await start.click();
     // UI04: the scan card follows the run, then the analysis step opens.
     await expect(
@@ -48,13 +49,7 @@ test(
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     await page.reload();
     await expect(
-      history.locator('.run-history .run-status', {
-        hasText: 'Hoàn tất (demo)',
-      }),
-    ).toBeVisible();
-    await expect(history.locator('.run-history > li')).toHaveCount(1);
-    await expect(
-      page.getByRole('button', { name: 'Xem kết quả lần phân tích gần nhất' }),
+      page.getByRole('button', { name: 'Xem kết quả lần quét gần nhất' }),
     ).toBeVisible();
     await page.waitForTimeout(2_000);
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
@@ -63,9 +58,9 @@ test(
     await start.click();
     await page.getByRole('button', { name: 'Hủy lượt chạy' }).click();
     await expect(
-      page.getByRole('heading', { name: 'Đã hủy lượt chạy' }),
+      page.getByRole('heading', { name: 'Đã hủy lượt quét' }),
     ).toBeVisible();
-    await expect(history.locator('.run-history > li')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Chạy lại' })).toBeVisible();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const [first, second, ...cancels] = runMutations;
     expect([first?.status, second?.status]).toEqual([202, 202]);

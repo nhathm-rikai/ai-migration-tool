@@ -36,7 +36,7 @@ test(
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     // UI04: Start on the scan card; the analysis step opens by itself.
-    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
@@ -170,7 +170,7 @@ test(
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     // UI04: Start on the scan card; the analysis step opens by itself.
-    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
@@ -213,7 +213,7 @@ test(
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     // UI04: Start on the scan card; the analysis step opens by itself.
-    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });

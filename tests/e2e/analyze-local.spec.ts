@@ -64,29 +64,42 @@ test(
     await page.getByLabel('Tên dự án').fill(projectName);
     await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    // UI04: path and mapping in the project information form.
-    const source = page.getByRole('form', { name: 'Thông tin dự án' });
-    await source
-      .getByLabel('Thư mục source (đường dẫn tuyệt đối)')
+    // UI04: the folder is chosen on the scan card.
+    await page
+      .getByLabel('Đường dẫn thư mục source (tuyệt đối)')
       .fill(sourceRoot);
-    await source.getByText('Ánh xạ tên bảng (tùy chọn)').click();
-    await source
-      .getByLabel('Schema mặc định của tên bảng')
-      .selectOption('assumed');
-    await source.getByLabel('Tên schema', { exact: true }).fill('APP');
     const registered = page.waitForResponse(
       (response) =>
         response.request().method() === 'PUT' &&
         /\/source$/.test(response.url()),
     );
-    await source.getByRole('button', { name: 'Lưu thông tin' }).click();
+    await page.getByRole('button', { name: 'Chọn thư mục' }).click();
     const registration = await registered;
     expect(registration.status()).toBe(200);
     const authorization = registration.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
+    // The table-name mapping has no UI on this step (02/11/2026): the
+    // assumed schema of this fixture is set through the API, then the page
+    // reads the new revision back.
+    const projectId = new URL(page.url()).pathname.split('/')[2] ?? '';
+    const mapped = await page.request.put(
+      `/api/v1/projects/${projectId}/source`,
+      {
+        headers: { authorization },
+        data: {
+          rootPath: sourceRoot,
+          profileId: 'vb6-cp932-v1',
+          tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
+          expectedSourceRevision: 1,
+        },
+      },
+    );
+    expect(mapped.status()).toBe(200);
+    await page.reload();
+    await expect(page.getByRole('radio', { name: 'VB6' })).toBeChecked();
 
-    // Start on the scan card; the analysis step opens by itself.
-    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    // "Quét source"; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });

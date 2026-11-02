@@ -19,7 +19,7 @@ const at = (id: number, createdAt: string): LocalProject => ({
   createdAt,
 });
 const projects: Project[] = [
-  { ...at(1, '2026-10-01T00:00:00.000Z'), customerName: 'Corp A' },
+  at(1, '2026-10-01T00:00:00.000Z'),
   at(2, '2026-10-02T00:00:00.000Z'),
   at(3, '2026-10-03T00:00:00.000Z'),
   at(4, '2026-10-04T00:00:00.000Z'),
@@ -90,7 +90,6 @@ describe('Recent projects (UI04)', () => {
       cards.map((card) => card.querySelector('.recent-status')?.textContent),
     ).toEqual(['Đang phân tích', 'Đã phân tích', 'Thất bại', 'Chưa phân tích']);
     expect(cards[1]?.getAttribute('aria-current')).toBe('page');
-    expect(cards[1]?.textContent).toContain('Corp A');
     expect(cards[0]?.getAttribute('href')).toBe(
       `/projects/${projects[1]!.id}/source`,
     );

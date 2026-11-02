@@ -2,6 +2,7 @@ import {
   act,
   fireEvent,
   render as renderWithLibrary,
+  renderHook,
   screen,
   waitFor,
 } from '@testing-library/react';
@@ -18,6 +19,7 @@ import type {
   Run,
 } from '@portal/contracts';
 import { SourceStep } from './source-step';
+import { useProjectSource } from './use-project-source';
 import { AUTO_OPEN_DELAY_MS, stepStates } from '../jobs/scan-stage';
 import { RUN_POLL_INTERVAL_MS } from '../jobs/use-analyze-runs';
 import { createProjectsApi } from '../../shared/api/projects-api';
@@ -127,125 +129,80 @@ const errorBody = (code: string, status: number) =>
     status,
   );
 
-const FOLDER = 'Thư mục source (đường dẫn tuyệt đối)';
-const startButton = () =>
-  screen.getByRole('button', { name: 'Bắt đầu phân tích' });
-const saveButton = () => screen.getByRole('button', { name: 'Lưu thông tin' });
-const openMapping = () => fireEvent.click(screen.getByText(/Ánh xạ tên bảng/));
+const FOLDER = 'Đường dẫn thư mục source (tuyệt đối)';
+const scanButton = () => screen.getByRole('button', { name: 'Quét source' });
+const chooseButton = () => screen.getByRole('button', { name: 'Chọn thư mục' });
+const chosen = () => screen.findByText('Đã chọn thư mục');
+const vb6Chosen = () =>
+  waitFor(() =>
+    expect(screen.getByRole('radio', { name: 'VB6' })).toHaveProperty(
+      'checked',
+      true,
+    ),
+  );
 
 afterEach(() => {
   vi.useRealTimers();
   window.localStorage.clear();
 });
 
-describe('Source step form (F01 on the UI04 layout)', () => {
-  it('blocks Start without a source until a path is entered', async () => {
+describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
+  it('asks for a folder first; nothing can be scanned without one', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
     });
     render(step(server));
-    expect(await screen.findByText('Chưa có thư mục source')).toBeTruthy();
-    expect(startButton()).toHaveProperty('disabled', true);
-    expect(screen.getByText(/Cần đăng ký một thư mục mã nguồn/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText(FOLDER), {
-      target: { value: ROOT },
-    });
-    expect(startButton()).toHaveProperty('disabled', false);
-    expect(screen.queryByText('DEMO')).toBeNull();
-  });
-
-  it('offers VB6 only; other languages are listed as coming', async () => {
-    const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json({ source: null }),
-    });
-    render(step(server));
-    expect(await screen.findByRole('radio', { name: 'VB6' })).toHaveProperty(
-      'checked',
-      true,
-    );
-    const others = screen
-      .getAllByRole('radio')
-      .filter((chip) => !(chip as HTMLInputElement).checked);
-    expect(others).toHaveLength(6);
-    for (const chip of others) expect(chip).toHaveProperty('disabled', true);
-    for (const language of ['Java', 'C#', 'PHP', 'PL/SQL', 'COBOL'])
-      expect(screen.getByText(language)).toBeTruthy();
-    expect(screen.getAllByText('Sắp hỗ trợ')).toHaveLength(6);
-  });
-
-  it('F01-AC01 shows field errors and sends nothing for a missing path or schema', async () => {
-    const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json({ source: null }),
-    });
-    render(step(server));
-    await screen.findByText('Chưa có thư mục source');
-    openMapping();
-    fireEvent.change(screen.getByLabelText('Schema mặc định của tên bảng'), {
-      target: { value: 'assumed' },
-    });
-    fireEvent.change(screen.getByLabelText('Tên schema'), {
-      target: { value: 'APP' },
-    });
-    fireEvent.click(saveButton());
+    expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
+    fireEvent.click(chooseButton());
     expect(
-      await screen.findByText(/Nhập lại đường dẫn thư mục để lưu/),
+      await screen.findByText('Nhập đường dẫn thư mục mã nguồn.'),
     ).toBeTruthy();
     expect(screen.getByLabelText(FOLDER).getAttribute('aria-invalid')).toBe(
       'true',
     );
-    fireEvent.change(screen.getByLabelText(FOLDER), {
-      target: { value: ROOT },
-    });
-    fireEvent.change(screen.getByLabelText('Tên schema'), {
-      target: { value: 'APP; DROP' },
-    });
-    fireEvent.click(saveButton());
-    expect(await screen.findByText(/Nhập tên schema bắt đầu/)).toBeTruthy();
     expect(server.puts()).toEqual([]);
-    expect(server.patches()).toEqual([]);
+    expect(screen.queryByText('DEMO')).toBeNull();
   });
 
-  it('saves a source, then starts on its revision without the path in any URL', async () => {
+  it('offers VB6 only, not chosen yet for a new source; other languages are coming', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+    });
+    render(step(server));
+    const vb6 = await screen.findByRole('radio', { name: 'VB6' });
+    expect(vb6).toHaveProperty('checked', false);
+    const others = screen.getAllByRole('radio').filter((chip) => chip !== vb6);
+    expect(others).toHaveLength(6);
+    for (const chip of others) expect(chip).toHaveProperty('disabled', true);
+    expect(screen.getAllByText('Sắp hỗ trợ')).toHaveLength(6);
+  });
+
+  it('registers the folder, keeps the path out of URLs and shows the chosen folder', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
       [`PUT ${sourceUrl()}`]: () => json(registered()),
-      [`POST ${runsUrl}`]: () => errorBody('RUN_ACTIVE_CONFLICT', 409),
     });
     render(step(server));
     fireEvent.change(await screen.findByLabelText(FOLDER), {
       target: { value: `  ${ROOT}  ` },
     });
-    openMapping();
-    fireEvent.change(screen.getByLabelText('Schema mặc định của tên bảng'), {
-      target: { value: 'assumed' },
-    });
-    fireEvent.change(screen.getByLabelText('Tên schema'), {
-      target: { value: 'APP' },
-    });
-    fireEvent.click(saveButton());
-    expect(await screen.findByText('Đã lưu mã nguồn.')).toBeTruthy();
+    fireEvent.click(chooseButton());
+    await chosen();
     expect(server.puts().map((call) => call.body)).toEqual([
       {
         rootPath: ROOT,
         profileId: 'vb6-cp932-v1',
-        tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
+        tableNameMapping: { defaultSchema: null, status: 'unconfigured' },
         expectedSourceRevision: null,
       },
     ]);
-    expect(screen.getByLabelText(FOLDER)).toHaveProperty('value', '');
-    expect(screen.getAllByText('order-module')).not.toHaveLength(0);
-    expect(
-      screen.getByLabelText('Schema mặc định của tên bảng'),
-    ).toHaveProperty('value', 'assumed');
-    expect(startButton()).toHaveProperty('disabled', false);
-    fireEvent.click(startButton());
-    await waitFor(() => expect(server.starts()).toHaveLength(1));
-    expect(server.puts()).toHaveLength(1);
-    expect(server.starts()[0]?.body).toMatchObject({
-      source: { strategy: 'current-source', expectedSourceRevision: 1 },
-    });
+    expect(screen.getByText('order-module')).toBeTruthy();
+    expect(scanButton()).toHaveProperty('disabled', false);
+    expect(screen.queryByLabelText(FOLDER)).toBeNull();
     for (const call of server.calls) expect(call.url).not.toContain('work');
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('work');
+    expect(server.starts()).toEqual([]);
   });
 
   it.each([
@@ -255,10 +212,9 @@ describe('Source step form (F01 on the UI04 layout)', () => {
       422,
       /không tồn tại hoặc ứng dụng không có quyền đọc/,
     ],
-    ['SOURCE_REVISION_CONFLICT', 409, /vừa được cập nhật ở nơi khác/],
     ['INVALID_INPUT', 400, /đường dẫn phải là đường dẫn tuyệt đối/],
   ])(
-    'F01-AC02 keeps the input, shows a safe message and starts nothing for %s',
+    'F01-AC02 keeps the input and shows a safe message for %s',
     async (code, status, message) => {
       const server = createServer({
         [`GET ${sourceUrl()}`]: () => json({ source: null }),
@@ -267,17 +223,52 @@ describe('Source step form (F01 on the UI04 layout)', () => {
       render(step(server));
       const field = await screen.findByLabelText(FOLDER);
       fireEvent.change(field, { target: { value: ROOT } });
-      // Start saves first; a refused save starts nothing.
-      fireEvent.click(startButton());
+      fireEvent.click(chooseButton());
       expect(await screen.findByText(message)).toBeTruthy();
       expect(screen.queryByText('raw server text')).toBeNull();
       expect(field).toHaveProperty('value', ROOT);
       // A backend refusal is not a field error.
       expect(field.getAttribute('aria-invalid')).toBe('false');
+      expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
       expect(server.puts()).toHaveLength(1);
-      expect(server.starts()).toEqual([]);
     },
   );
+
+  it('F01-AC02 a stale save keeps the input and reloads on request before saving again', async () => {
+    let reads = 0;
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () =>
+        json(registered({ revision: reads++ === 0 ? 1 : 2 })),
+      [`PUT ${sourceUrl()}`]: (call) =>
+        (call.body as { expectedSourceRevision: number })
+          .expectedSourceRevision === 1
+          ? errorBody('SOURCE_REVISION_CONFLICT', 409)
+          : json(registered({ revision: 3 })),
+    });
+    render(step(server));
+    await chosen();
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
+    fireEvent.change(screen.getByLabelText(FOLDER), {
+      target: { value: ROOT },
+    });
+    fireEvent.click(chooseButton());
+    expect(
+      await screen.findByText(/vừa được cập nhật ở nơi khác/),
+    ).toBeTruthy();
+    expect(screen.getByLabelText(FOLDER)).toHaveProperty('value', ROOT);
+    fireEvent.click(screen.getByRole('button', { name: 'Tải lại mã nguồn' }));
+    await waitFor(() => expect(reads).toBe(2));
+    fireEvent.click(chooseButton());
+    await chosen();
+    expect(server.puts().map((call) => call.body)).toMatchObject([
+      { expectedSourceRevision: 1 },
+      {
+        expectedSourceRevision: 2,
+        // The registered mapping stays as it was (UI hidden).
+        tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
+      },
+    ]);
+  });
 
   it('F01-AC02 asks to reload before resending when the save outcome is unknown', async () => {
     const server = createServer({
@@ -288,14 +279,14 @@ describe('Source step form (F01 on the UI04 layout)', () => {
     fireEvent.change(await screen.findByLabelText(FOLDER), {
       target: { value: ROOT },
     });
-    fireEvent.click(saveButton());
+    fireEvent.click(chooseButton());
     expect(
       await screen.findByText(/Chưa xác nhận được backend đã lưu mã nguồn/),
     ).toBeTruthy();
     expect(server.puts()).toHaveLength(1);
   });
 
-  it('blocks Start on an unreadable source and saves a new path on its revision', async () => {
+  it('asks for another folder when the registered one is unreadable', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () =>
         json(registered({ status: 'unreadable', revision: 3 })),
@@ -303,21 +294,32 @@ describe('Source step form (F01 on the UI04 layout)', () => {
     });
     render(step(server));
     expect(
-      await screen.findByText(/Không đọc được thư mục đã đăng ký. Nhập lại/),
+      await screen.findByText(/Không đọc được thư mục đã chọn/),
     ).toBeTruthy();
-    expect(startButton()).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
     fireEvent.change(screen.getByLabelText(FOLDER), {
       target: { value: ROOT },
     });
-    fireEvent.click(saveButton());
-    await screen.findByText('Đã lưu mã nguồn.');
-    // The registered mapping is sent again as it was.
+    fireEvent.click(chooseButton());
+    await chosen();
     expect(server.puts()[0]?.body).toMatchObject({
       expectedSourceRevision: 3,
       tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
     });
-    expect(startButton()).toHaveProperty('disabled', false);
-    expect(server.starts()).toEqual([]);
+    expect(scanButton()).toHaveProperty('disabled', false);
+  });
+
+  it('changes the folder on request and can go back without saving', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json(registered()),
+    });
+    render(step(server));
+    await chosen();
+    fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
+    expect(screen.getByLabelText(FOLDER)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+    await chosen();
+    expect(server.puts()).toEqual([]);
   });
 
   it('F01-AC03 drops a late source response of the previous project', async () => {
@@ -333,15 +335,60 @@ describe('Source step form (F01 on the UI04 layout)', () => {
     const view = render(step(server));
     await waitFor(() => expect(releaseA).toBeDefined());
     view.rerender(step(server, { project: otherProject }));
-    expect(await screen.findByText('Chưa có thư mục source')).toBeTruthy();
+    expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
     await act(async () => {
       releaseA?.();
       await Promise.resolve();
     });
     expect(screen.queryByText(/project-a/)).toBeNull();
-    expect(startButton()).toHaveProperty('disabled', true);
+    expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
   });
 
+  it('F01-AC03 keeps the input and the pending save when the locale changes', async () => {
+    let finish: (() => void) | undefined;
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`PUT ${sourceUrl()}`]: () =>
+        new Promise((resolve) => {
+          finish = () => resolve(errorBody('SOURCE_UNREADABLE', 422));
+        }),
+    });
+    function LocaleSwitch() {
+      const { setLocale } = useLocale();
+      return <button onClick={() => setLocale('ja')}>ja</button>;
+    }
+    render(
+      <>
+        <LocaleSwitch />
+        {step(server)}
+      </>,
+    );
+    fireEvent.change(await screen.findByLabelText(FOLDER), {
+      target: { value: ROOT },
+    });
+    fireEvent.click(chooseButton());
+    expect(
+      await screen.findByRole('button', { name: 'Đang kiểm tra…' }),
+    ).toHaveProperty('disabled', true);
+    fireEvent.click(screen.getByRole('button', { name: 'ja' }));
+    expect(
+      await screen.findByRole('button', { name: '確認中…' }),
+    ).toHaveProperty('disabled', true);
+    expect(
+      screen.getByLabelText('ソースフォルダーのパス（絶対パス）'),
+    ).toHaveProperty('value', ROOT);
+    await act(async () => {
+      finish?.();
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(/フォルダーが存在しないか/)).toBeTruthy();
+    expect(server.puts()).toHaveLength(1);
+  });
+});
+
+// The hook behind the folder form: a saved revision is never overwritten by
+// a GET that started before the save completed.
+describe('useProjectSource', () => {
   it.each([
     { outcome: 'success', when: 'before PUT' },
     { outcome: 'error', when: 'before PUT' },
@@ -374,92 +421,90 @@ describe('Source step form (F01 on the UI04 layout)', () => {
                 json(registered({ displayName: 'saved source', revision: 2 })),
               );
           }),
-        [`POST ${runsUrl}`]: () => errorBody('RUN_ACTIVE_CONFLICT', 409),
       });
-      render(step(server));
-      await screen.findByText(/Thư mục order-module đọc được/);
-      fireEvent.change(screen.getByLabelText(FOLDER), {
-        target: { value: ROOT },
-      });
-      const reload = () =>
-        fireEvent.click(
-          screen.getByRole('button', { name: 'Tải lại mã nguồn' }),
-        );
+      const { result } = renderHook(() =>
+        useProjectSource(server.props.sourcesApi, localProject.id),
+      );
+      await waitFor(() => expect(result.current.state.status).toBe('ready'));
       if (when === 'before PUT') {
-        reload();
+        act(() => result.current.refresh());
         await waitFor(() => expect(finishRead).toBeDefined());
       }
-      fireEvent.click(saveButton());
+      let saving: Promise<unknown> | undefined;
+      act(() => {
+        saving = result.current.put({
+          rootPath: ROOT,
+          profileId: 'vb6-cp932-v1',
+          tableNameMapping: { defaultSchema: null, status: 'unconfigured' },
+          expectedSourceRevision: 1,
+        });
+      });
       await waitFor(() => expect(finishSave).toBeDefined());
       if (when === 'during PUT') {
-        reload();
+        act(() => result.current.refresh());
         await waitFor(() => expect(finishRead).toBeDefined());
       }
       await act(async () => {
         finishSave?.();
-        await Promise.resolve();
+        await saving;
       });
-      await screen.findByText('Đã lưu mã nguồn.');
       await act(async () => {
         finishRead?.();
         await Promise.resolve();
       });
-      expect(screen.getAllByText('saved source')).not.toHaveLength(0);
-      expect(screen.queryByText('stale source')).toBeNull();
-      expect(screen.queryByText(/Thư mục không tồn tại hoặc/)).toBeNull();
-      fireEvent.click(startButton());
-      await waitFor(() => expect(server.starts()).toHaveLength(1));
-      expect(server.starts()[0]?.body).toMatchObject({
-        source: { expectedSourceRevision: 2 },
+      expect(result.current.state).toMatchObject({
+        status: 'ready',
+        source: { displayName: 'saved source', revision: 2 },
       });
     },
   );
+});
 
-  it('F01-AC03 keeps the input and the pending save when the locale changes', async () => {
-    let finish: (() => void) | undefined;
+describe('Scan card (UI04)', () => {
+  it('needs a project name and a language before scanning', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
-      [`PUT ${sourceUrl()}`]: () =>
-        new Promise((resolve) => {
-          finish = () => resolve(errorBody('SOURCE_UNREADABLE', 422));
-        }),
+      [`PUT ${sourceUrl()}`]: () => json(registered()),
+      [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
-    function LocaleSwitch() {
-      const { setLocale } = useLocale();
-      return <button onClick={() => setLocale('ja')}>ja</button>;
-    }
-    render(
-      <>
-        <LocaleSwitch />
-        {step(server)}
-      </>,
-    );
+    render(step(server));
     fireEvent.change(await screen.findByLabelText(FOLDER), {
       target: { value: ROOT },
     });
-    fireEvent.click(saveButton());
-    expect(
-      await screen.findByRole('button', { name: 'Đang lưu…' }),
-    ).toHaveProperty('disabled', true);
-    fireEvent.click(screen.getByRole('button', { name: 'ja' }));
-    expect(
-      await screen.findByRole('button', { name: '保存中…' }),
-    ).toHaveProperty('disabled', true);
-    expect(
-      screen.getByLabelText('ソースフォルダー（絶対パス）'),
-    ).toHaveProperty('value', ROOT);
-    await act(async () => {
-      finish?.();
-      await Promise.resolve();
+    fireEvent.click(chooseButton());
+    await chosen();
+    fireEvent.change(screen.getByLabelText('Tên dự án'), {
+      target: { value: '  ' },
     });
-    expect(await screen.findByText(/フォルダーが存在しないか/)).toBeTruthy();
-    expect(server.puts()).toHaveLength(1);
+    fireEvent.click(scanButton());
+    expect(await screen.findByText(/Nhập tên dự án từ 1 đến 120/)).toBeTruthy();
+    expect(
+      screen.getByText('Chọn ngôn ngữ phân tích trước khi quét.'),
+    ).toBeTruthy();
+    expect(server.starts()).toEqual([]);
+    fireEvent.change(screen.getByLabelText('Tên dự án'), {
+      target: { value: localProject.name },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'VB6' }));
+    fireEvent.click(scanButton());
+    await waitFor(() => expect(server.starts()).toHaveLength(1));
+    expect(server.starts()[0]?.body).toMatchObject({
+      source: { strategy: 'current-source', expectedSourceRevision: 1 },
+    });
+    expect(server.patches()).toEqual([]);
   });
-});
 
-describe('Project information (UI04 customer)', () => {
-  it('saves name and customer before Start and reports the saved project', async () => {
-    const saved = { ...localProject, name: 'Payroll', customerName: 'Corp' };
+  it('a source registered before the page opened has its language chosen', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json(registered()),
+    });
+    render(step(server));
+    await chosen();
+    await vb6Chosen();
+  });
+
+  it('saves a changed name before the scan and reports the saved project', async () => {
+    const saved = { ...localProject, name: 'Payroll' };
     const changed = vi.fn();
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json(registered()),
@@ -467,106 +512,60 @@ describe('Project information (UI04 customer)', () => {
       [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(step(server, { onProjectChange: changed }));
-    await screen.findByText(/Thư mục order-module đọc được/);
+    await chosen();
+    await vb6Chosen();
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
       target: { value: ' Payroll ' },
     });
-    fireEvent.change(screen.getByLabelText('Khách hàng'), {
-      target: { value: ' Corp ' },
-    });
-    fireEvent.click(startButton());
+    fireEvent.click(scanButton());
     await waitFor(() => expect(server.starts()).toHaveLength(1));
     expect(server.patches().map((call) => call.body)).toEqual([
-      { name: 'Payroll', customerName: 'Corp' },
+      { name: 'Payroll' },
     ]);
     expect(server.calls.indexOf(server.patches()[0]!)).toBeLessThan(
       server.calls.indexOf(server.starts()[0]!),
     );
     expect(changed).toHaveBeenCalledWith(saved);
-    expect(server.puts()).toEqual([]);
   });
 
-  it('clears the customer with null and sends nothing when nothing changed', async () => {
-    const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json(registered()),
-      [`PATCH /api/v1/projects/${localProject.id}`]: () =>
-        json({ ...localProject }),
-    });
-    const project = { ...localProject, customerName: 'Corp' };
-    render(step(server, { project }));
-    await screen.findByText(/Thư mục order-module đọc được/);
-    expect(screen.getByLabelText('Khách hàng')).toHaveProperty('value', 'Corp');
-    fireEvent.change(screen.getByLabelText('Khách hàng'), {
-      target: { value: '   ' },
-    });
-    fireEvent.click(saveButton());
-    expect(await screen.findByText('Đã lưu thông tin dự án.')).toBeTruthy();
-    expect(server.patches().map((call) => call.body)).toEqual([
-      { name: localProject.name, customerName: null },
-    ]);
-  });
-
-  it('rejects a too long customer before any request and keeps it', async () => {
-    const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json(registered()),
-    });
-    render(step(server));
-    await screen.findByText(/Thư mục order-module đọc được/);
-    const long = 'x'.repeat(121);
-    fireEvent.change(screen.getByLabelText('Khách hàng'), {
-      target: { value: long },
-    });
-    fireEvent.click(startButton());
-    expect(await screen.findByText(/Tên khách hàng tối đa 120/)).toBeTruthy();
-    expect(screen.getByLabelText('Khách hàng')).toHaveProperty('value', long);
-    expect(server.patches()).toEqual([]);
-    expect(server.starts()).toEqual([]);
-  });
-
-  it('a refused project save starts nothing', async () => {
+  it('a refused name save starts nothing', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json(registered()),
       [`PATCH /api/v1/projects/${localProject.id}`]: () =>
         errorBody('INVALID_INPUT', 400),
     });
     render(step(server));
-    await screen.findByText(/Thư mục order-module đọc được/);
-    fireEvent.change(screen.getByLabelText('Khách hàng'), {
-      target: { value: 'Corp' },
+    await chosen();
+    await vb6Chosen();
+    fireEvent.change(screen.getByLabelText('Tên dự án'), {
+      target: { value: 'Payroll' },
     });
-    fireEvent.click(startButton());
+    fireEvent.click(scanButton());
     expect(
       await screen.findByText(/Thông tin dự án không hợp lệ/),
     ).toBeTruthy();
     expect(server.starts()).toEqual([]);
   });
-});
 
-describe('Scan card (UI04)', () => {
-  it('UI04-AC01 a double click saves once and starts one run', async () => {
+  it('UI04-AC01 a double click starts one run', async () => {
     const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json({ source: null }),
-      [`PUT ${sourceUrl()}`]: () => json(registered()),
+      [`GET ${sourceUrl()}`]: () => json(registered()),
       [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(step(server));
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
-      target: { value: ROOT },
-    });
-    const start = startButton();
-    fireEvent.click(start);
-    fireEvent.click(start);
-    await waitFor(() => expect(server.starts()).toHaveLength(1));
+    await chosen();
+    await vb6Chosen();
+    const scan = scanButton();
+    fireEvent.click(scan);
+    fireEvent.click(scan);
     await screen.findByText('Đang chờ bắt đầu…');
-    expect(server.puts()).toHaveLength(1);
     expect(server.starts()).toHaveLength(1);
   });
 
-  it('UI04-AC01 resends a Start lost after the backend wrote it with the same key and saves nothing again', async () => {
+  it('UI04-AC01 resends a Start lost after the backend wrote it with the same key', async () => {
     let attempt = 0;
     const server = createServer({
-      [`GET ${sourceUrl()}`]: () => json({ source: null }),
-      [`PUT ${sourceUrl()}`]: () => json(registered()),
+      [`GET ${sourceUrl()}`]: () => json(registered()),
       [`POST ${runsUrl}`]: () => {
         attempt++;
         if (attempt === 1) throw new TypeError('connection reset');
@@ -574,22 +573,20 @@ describe('Scan card (UI04)', () => {
       },
     });
     render(step(server));
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(startButton());
+    await chosen();
+    await vb6Chosen();
+    fireEvent.click(scanButton());
     expect(
       await screen.findByText(/Chưa xác nhận được backend đã nhận yêu cầu/),
     ).toBeTruthy();
     // The main button resends the same intent too.
-    fireEvent.click(startButton());
+    fireEvent.click(scanButton());
     await screen.findByText('Đang chờ bắt đầu…');
     const keys = server
       .starts()
       .map((call) => call.headers.get('Idempotency-Key'));
     expect(keys).toHaveLength(2);
     expect(keys[1]).toBe(keys[0]);
-    expect(server.puts()).toHaveLength(1);
   });
 
   it('UI04-AC03 shows the real stage without a percentage or file count', async () => {
@@ -608,9 +605,8 @@ describe('Scan card (UI04)', () => {
       /\d+\s*%|\d+\s*\/\s*\d+ file/,
     );
     expect(screen.getByText('Tiến trình')).toBeTruthy();
-    expect(
-      screen.queryByRole('button', { name: 'Bắt đầu phân tích' }),
-    ).toBeNull();
+    expect(screen.getByText('order-module')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Hủy lượt chạy' })).toBeTruthy();
   });
 
@@ -629,13 +625,6 @@ describe('Scan card (UI04)', () => {
   it('opens the analysis step after a run seen running succeeds, or at once on request', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const running = run({ stage: 'publish' });
-    const succeeded = run({
-      status: 'succeeded',
-      stage: null,
-      stateVersion: 3,
-      finishedAt: '2026-10-22T02:00:09.000Z',
-      updatedAt: '2026-10-22T02:00:09.000Z',
-    });
     let detail: Run = running;
     const opened = vi.fn();
     const server = createServer({
@@ -645,7 +634,7 @@ describe('Scan card (UI04)', () => {
     });
     render(step(server, { onOpenResults: opened }));
     await screen.findByText('Đang quét thư mục…');
-    detail = succeeded;
+    detail = succeededRun();
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS + 10));
     expect(
       await screen.findByText('Quét xong · đang chuyển sang Phân tích…'),
@@ -653,8 +642,6 @@ describe('Scan card (UI04)', () => {
     expect(opened).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Xem kết quả ngay' }));
     expect(opened).toHaveBeenCalledWith(running.id);
-    await act(() => vi.advanceTimersByTimeAsync(AUTO_OPEN_DELAY_MS + 10));
-    expect(opened).toHaveBeenLastCalledWith(running.id);
   });
 
   it('opens the results by itself after the pause', async () => {
@@ -680,47 +667,37 @@ describe('Scan card (UI04)', () => {
 
   it('a run that had already succeeded before the page opened never opens by itself', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const succeeded = succeededRun();
     const opened = vi.fn();
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json(registered()),
-      [`GET ${runsUrl}/current`]: () => json({ run: succeeded }),
-      [`GET ${runsUrl}`]: () => json({ items: [succeeded], nextCursor: null }),
+      [`GET ${runsUrl}/current`]: () => json({ run: succeededRun() }),
     });
     render(step(server, { onOpenResults: opened }));
     expect(
       await screen.findByRole('button', {
-        name: 'Xem kết quả lần phân tích gần nhất',
+        name: 'Xem kết quả lần quét gần nhất',
       }),
     ).toBeTruthy();
     await act(() => vi.advanceTimersByTimeAsync(AUTO_OPEN_DELAY_MS * 2));
     expect(opened).not.toHaveBeenCalled();
     expect(server.starts()).toEqual([]);
-    expect(startButton()).toHaveProperty('disabled', false);
+    expect(scanButton()).toHaveProperty('disabled', false);
   });
 
   it.each([
     [
       'failed',
-      'Phân tích thất bại',
+      'Quét source thất bại',
       'SOURCE_CHANGED',
       /đã thay đổi trong lúc chạy/,
     ],
-    ['cancelled', 'Đã hủy lượt chạy', null, /dừng theo yêu cầu/],
-    ['interrupted', 'Lượt chạy bị gián đoạn', null, /Backend đã dừng/],
+    ['cancelled', 'Đã hủy lượt quét', null, /dừng theo yêu cầu/],
+    ['interrupted', 'Lượt quét bị gián đoạn', null, /Backend đã dừng/],
   ] as const)(
     'UI04-AC02 a %s run stays on the step with its reason and a re-run',
     async (status, title, errorCode, reason) => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const running = run({ stage: 'inventory' });
-      const ended = run({
-        status,
-        stage: null,
-        stateVersion: 3,
-        errorCode,
-        finishedAt: '2026-10-22T02:00:09.000Z',
-        updatedAt: '2026-10-22T02:00:09.000Z',
-      });
       let detail: Run = running;
       const opened = vi.fn();
       const server = createServer({
@@ -731,13 +708,20 @@ describe('Scan card (UI04)', () => {
       });
       render(step(server, { onOpenResults: opened }));
       await screen.findByText('Đang quét thư mục…');
-      detail = ended;
+      detail = run({
+        status,
+        stage: null,
+        stateVersion: 3,
+        errorCode,
+        finishedAt: '2026-10-22T02:00:09.000Z',
+        updatedAt: '2026-10-22T02:00:09.000Z',
+      });
       await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS + 10));
       expect(await screen.findByText(title)).toBeTruthy();
-      expect(screen.getAllByText(reason)).not.toHaveLength(0);
+      expect(screen.getByText(reason)).toBeTruthy();
       await act(() => vi.advanceTimersByTimeAsync(AUTO_OPEN_DELAY_MS * 2));
       expect(opened).not.toHaveBeenCalled();
-      fireEvent.click(screen.getAllByRole('button', { name: 'Chạy lại' })[0]!);
+      fireEvent.click(screen.getByRole('button', { name: 'Chạy lại' }));
       await waitFor(() => expect(server.starts()).toHaveLength(1));
       expect(server.starts()[0]?.body).toMatchObject({
         retryOfRunId: running.id,

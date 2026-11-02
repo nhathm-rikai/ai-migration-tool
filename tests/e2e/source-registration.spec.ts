@@ -64,16 +64,13 @@ test(
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     const project = await payload(await created, ProjectSchema);
     expect(project.mode).toBe('local');
-    // UI04: the source step has the scan card (Start) and the project
-    // information form (folder, mapping, Save).
-    const source = page.getByRole('form', { name: 'Thông tin dự án' });
-    const folder = source.getByLabel('Thư mục source (đường dẫn tuyệt đối)');
-    const start = page.getByRole('button', { name: 'Bắt đầu phân tích' });
-    const noSource = page.getByRole('heading', {
-      name: 'Chưa có thư mục source',
-    });
-    await expect(noSource).toBeVisible();
-    await expect(start).toBeDisabled();
+    // UI04: the scan card asks for the folder, then offers "Quét source".
+    const card = page.getByRole('region', { name: /thư mục/ });
+    const folder = page.getByLabel('Đường dẫn thư mục source (tuyệt đối)');
+    const scan = page.getByRole('button', { name: 'Quét source' });
+    const choose = page.getByRole('heading', { name: 'Chọn thư mục source' });
+    await expect(choose).toBeVisible();
+    await expect(scan).toHaveCount(0);
 
     const save = async (expectedStatus: number) => {
       const pending = page.waitForResponse(
@@ -81,7 +78,7 @@ test(
           response.request().method() === 'PUT' &&
           /\/source$/.test(response.url()),
       );
-      await source.getByRole('button', { name: 'Lưu thông tin' }).click();
+      await page.getByRole('button', { name: 'Chọn thư mục' }).click();
       const response = await pending;
       expect(response.status()).toBe(expectedStatus);
       const text = await response.text();
@@ -97,42 +94,40 @@ test(
     for (const forbidden of [required('E2E_REPOSITORY_ROOT'), dataDir]) {
       await folder.fill(forbidden);
       await save(422);
-      await expect(source.getByRole('alert')).toContainText(
+      await expect(card.getByRole('alert')).toContainText(
         'Không được dùng thư mục này',
       );
-      await expect(noSource).toBeVisible();
+      await expect(choose).toBeVisible();
     }
     await folder.fill(sourceRoot + '-missing');
     await save(422);
-    await expect(source.getByRole('alert')).toContainText(
+    await expect(card.getByRole('alert')).toContainText(
       'Thư mục không tồn tại',
     );
     await folder.fill(sourceRoot);
-    await source.getByText('Ánh xạ tên bảng (tùy chọn)').click();
-    await source
-      .getByLabel('Schema mặc định của tên bảng')
-      .selectOption('assumed');
-    await source.getByLabel('Tên schema', { exact: true }).fill('APP');
     const registered = await save(200);
     const registration = await payload(registered, ProjectSourceResponseSchema);
     expect(registration.source).toMatchObject({
       kind: 'local',
       revision: 1,
       status: 'ready',
+      // Table-name mapping is not shown (02/11/2026): a new source stays
+      // unconfigured.
+      tableNameMapping: { defaultSchema: null, status: 'unconfigured' },
     });
     const authorization = registered.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
     const headers = { authorization };
     const url = `/api/v1/projects/${project.id}/source`;
-    await expect(start).toBeEnabled();
-    await expect(folder).toHaveValue('');
+    await expect(
+      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
+    ).toBeVisible();
+    await expect(scan).toBeEnabled();
     expect(starts).toBe(0);
 
-    // Another client advances the revision while this edit is open.
+    // Another client advances the revision while the folder is being changed.
+    await page.getByRole('button', { name: 'Đổi thư mục' }).click();
     await folder.fill(sourceRoot);
-    await source
-      .getByLabel('Schema mặc định của tên bảng')
-      .selectOption('confirmed');
     const concurrent = await page.request.put(url, {
       headers,
       data: {
@@ -144,32 +139,35 @@ test(
     });
     expect(concurrent.status()).toBe(200);
     await save(409);
-    await expect(source.getByRole('alert')).toContainText(
+    await expect(card.getByRole('alert')).toContainText(
       'Mã nguồn vừa được cập nhật',
     );
     await expect(folder).toHaveValue(sourceRoot);
-    await expect(source.getByLabel('Schema mặc định của tên bảng')).toHaveValue(
-      'confirmed',
-    );
     const refreshed = page.waitForResponse(
       (response) =>
         response.request().method() === 'GET' &&
         /\/source$/.test(response.url()),
     );
-    await source.getByRole('button', { name: 'Tải lại mã nguồn' }).click();
+    await card.getByRole('button', { name: 'Tải lại mã nguồn' }).click();
     expect(
       (await payload(await refreshed, ProjectSourceResponseSchema)).source
         ?.revision,
     ).toBe(2);
     const updated = await payload(await save(200), ProjectSourceResponseSchema);
+    // The mapping set elsewhere is kept as it was.
     expect(updated.source).toMatchObject({
       revision: 3,
-      tableNameMapping: { defaultSchema: 'APP', status: 'confirmed' },
+      tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
     });
 
-    // UI04-AC04: the customer is saved with the project before Start.
-    await source.getByLabel('Khách hàng').fill('Khách hàng mẫu');
-    await start.click();
+    // "Quét source" needs the analysis language of a new source.
+    await scan.click();
+    await expect(
+      page.getByText('Chọn ngôn ngữ phân tích trước khi quét.'),
+    ).toBeVisible();
+    expect(starts).toBe(0);
+    await page.getByRole('radio', { name: 'VB6' }).check();
+    await scan.click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
@@ -229,12 +227,11 @@ test(
         ),
       ),
     ).toEqual(before);
-    // Back on the source step: the run is in the history.
+    // Back on the source step: the scan card offers the last result.
     await page.goBack();
-    const done = page.locator('.run-history .run-status', {
-      hasText: 'Hoàn tất',
-    });
-    await expect(done).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Xem kết quả lần quét gần nhất' }),
+    ).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: testInfo.outputPath('pf05-desktop-vi.png'),
@@ -242,23 +239,20 @@ test(
     });
 
     await page.getByRole('radio', { name: '日本語' }).check();
-    const doneJa = page.locator('.run-history .run-status', {
-      hasText: '完了',
+    const lastJa = page.getByRole('button', {
+      name: '前回のスキャン結果を見る',
     });
-    await expect(doneJa).toBeVisible();
+    await expect(lastJa).toBeVisible();
     // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
-    // Reload stays on the project's source step.
+    // Reload stays on the project's source step and starts nothing.
     await page.reload();
-    await expect(doneJa).toBeVisible();
-    await expect(page.getByLabel('顧客')).toHaveValue('Khách hàng mẫu');
-    // The run ID is technical information, folded by default.
-    await page.locator('.run-detail details.technical > summary').click();
-    await expect(page.getByText(run.id, { exact: true }).first()).toBeVisible();
+    await expect(lastJa).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'VB6' })).toBeChecked();
     expect(starts).toBe(1);
     expect(page.url()).not.toContain(sourceRoot);
   },

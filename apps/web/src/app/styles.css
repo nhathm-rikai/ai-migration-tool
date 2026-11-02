@@ -2851,13 +2851,30 @@ details.technical[open] > summary {
   max-width: 560px;
   text-align: left;
 }
-.scan-steps {
+/* While scanning: progress steps beside what is being scanned, as demo02
+   (its file list needs per-file progress from PF08). */
+.scan-panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.scan-steps,
+.scan-target {
+  min-width: 0;
   border-radius: 16px;
-  background: var(--surface);
   border: 1px solid var(--line);
   padding: 18px;
 }
-.scan-steps h3 {
+.scan-steps {
+  flex: 1 1 280px;
+  background: var(--surface);
+}
+.scan-target {
+  flex: 2 1 340px;
+  background: var(--surface-3);
+}
+.scan-steps h3,
+.scan-target h3 {
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -2866,8 +2883,8 @@ details.technical[open] > summary {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 .scan-step {
@@ -2876,9 +2893,15 @@ details.technical[open] > summary {
   gap: 10px;
   font-size: 13px;
   color: var(--fg-3);
+  animation: slideIn var(--dur-base) var(--ease-out) both;
 }
-.scan-step.done,
+.scan-step.done {
+  color: var(--brand);
+}
 .scan-step.active {
+  color: var(--fg);
+}
+.scan-step.active .scan-step-mark {
   color: var(--brand);
 }
 .scan-step-mark {
@@ -2908,16 +2931,86 @@ details.technical[open] > summary {
   border-top-color: transparent;
   animation: spin 0.8s linear infinite;
 }
-.project-info .field-grid {
+.scan-target dl {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
+  grid-template-columns: minmax(90px, auto) 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 13px;
 }
-.project-info .field {
-  margin-bottom: 16px;
+.scan-target dl > div {
+  display: contents;
 }
-.project-info .field-label {
+.scan-target dt {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: 12px;
+}
+.scan-target dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  animation: slideIn var(--dur-base) var(--ease-out) both;
+}
+.scan-target-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid #dce4ee;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  animation: pop 0.4s var(--ease-out) both;
+}
+.folder-chip svg,
+.button-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.folder-chip svg {
+  stroke: var(--brand);
+}
+.folder-chooser {
+  width: 100%;
+  max-width: 640px;
+  text-align: left;
+}
+.folder-row {
+  display: flex;
+  gap: 8px;
+}
+.folder-row input {
+  flex: 1;
+  min-height: 46px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+.folder-row .button {
+  flex: none;
+}
+.folder-chooser .error {
+  margin: 8px 0 0;
+}
+.project-info h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.project-info label[for] {
   display: block;
   font-size: 13px;
   font-weight: 600;
@@ -2928,25 +3021,10 @@ details.technical[open] > summary {
   min-height: 44px;
   border-radius: 10px;
   background: var(--bg);
+  margin-bottom: 18px;
 }
-.project-info select {
-  width: 100%;
-  margin-bottom: 12px;
-}
-.folder-fixed,
-.registered-folder {
-  margin: 0 0 8px;
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-.folder-fixed {
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--line-2);
-  background: var(--surface-2);
-}
-.mapping-fields {
-  margin-top: 12px;
+.project-info .error {
+  margin-top: -10px;
 }
 .language-chips {
   border: 0;
@@ -3154,6 +3232,29 @@ details.technical[open] > summary {
     transform: rotate(360deg);
   }
 }
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 @keyframes travel {
   from {
     left: -35%;
@@ -3166,8 +3267,5 @@ details.technical[open] > summary {
   .source-step {
     flex-direction: column;
     align-items: stretch;
-  }
-  .scan-steps ol {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

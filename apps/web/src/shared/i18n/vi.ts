@@ -1,7 +1,6 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
-  PROJECT_CUSTOMER_NAME_MAX_LENGTH,
 } from '@portal/contracts';
 import type {
   AnalyzeApiErrorCode,
@@ -147,28 +146,10 @@ export const viMessages = {
   source: {
     loading: 'Đang tải thông tin mã nguồn…',
     reload: 'Tải lại mã nguồn',
-    status: {
-      ready: 'Đọc được (mới kiểm tra thư mục, chưa đọc nội dung)',
-      unreadable:
-        'Không đọc được thư mục đã đăng ký. Kiểm tra thư mục rồi đăng ký lại.',
-    },
-    mappingStatus: {
-      unconfigured: 'Chưa cấu hình',
-      assumed: 'Giả định, chưa xác nhận',
-      confirmed: 'Đã được người quản lý DB xác nhận',
-    } satisfies Record<TableNameMapping['status'], string>,
     form: {
-      rootPath: 'Đường dẫn thư mục (tuyệt đối)',
       rootPathHelp:
         'Ví dụ C:\\work\\order-module hoặc /home/dev/order-module. Backend kiểm tra thư mục và quyền đọc; nội dung chỉ được đọc khi chạy phân tích.',
       rootPathInvalid: 'Nhập đường dẫn thư mục mã nguồn.',
-      mappingStatus: 'Schema mặc định của tên bảng',
-      defaultSchema: 'Tên schema',
-      defaultSchemaHelp:
-        'Schema mà tên bảng không có tiền tố trỏ tới (ví dụ user đăng nhập). Chỉ chọn “đã xác nhận” khi người quản lý DB đã xác nhận.',
-      defaultSchemaInvalid:
-        'Nhập tên schema bắt đầu bằng chữ cái hoặc “_”, chỉ gồm chữ, số, _, $, #.',
-      saved: 'Đã lưu mã nguồn.',
     },
     errors: {
       SOURCE_FORBIDDEN:
@@ -183,36 +164,38 @@ export const viMessages = {
     } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,
     outcomeUnknown:
       'Chưa xác nhận được backend đã lưu mã nguồn. Tải lại mã nguồn để kiểm tra trước khi gửi lại.',
-    startBlocked:
-      'Cần đăng ký một thư mục mã nguồn đọc được trước khi chạy phân tích.',
   },
   sourceStep: {
     lead: 'Chọn thư mục chứa source cũ. Mọi xử lý chạy trên máy này, source không rời khỏi máy của bạn.',
     hero: {
-      readyTitle: 'Sẵn sàng phân tích',
-      readyHelp: (folder: string) =>
-        `Thư mục ${folder} đọc được. Bấm “Bắt đầu phân tích” để quét.`,
+      chooseTitle: 'Chọn thư mục source',
+      chosenTitle: 'Đã chọn thư mục',
+      chosenHelp: 'Kiểm tra thông tin dự án bên dưới rồi bấm “Quét source”.',
       demoHelp:
-        'Dự án demo phân tích bộ mẫu đi kèm ứng dụng, không đọc thư mục nào trên máy.',
-      noSourceTitle: 'Chưa có thư mục source',
-      noSourceHelp:
-        'Nhập đường dẫn thư mục source ở mục Thông tin dự án bên dưới rồi bấm “Bắt đầu phân tích”.',
+        'Dự án demo quét bộ mẫu đi kèm ứng dụng, không đọc thư mục nào trên máy.',
       unreadableHelp:
-        'Không đọc được thư mục đã đăng ký. Nhập lại đường dẫn bên dưới rồi bắt đầu.',
+        'Không đọc được thư mục đã chọn. Kiểm tra thư mục hoặc chọn thư mục khác.',
+      scan: 'Quét source',
+      changeFolder: 'Đổi thư mục',
       queuedTitle: 'Đang chờ bắt đầu…',
       scanningTitle: 'Đang quét thư mục…',
-      cancellingTitle: 'Đang hủy lượt chạy…',
+      cancellingTitle: 'Đang hủy lượt quét…',
       progressLabel: 'Đang quét, chưa biết tổng số file',
       stage: (stage: string) => `Bước hiện tại: ${stage}`,
       doneTitle: 'Quét xong · đang chuyển sang Phân tích…',
       goNow: 'Xem kết quả ngay',
       endedTitle: {
-        failed: 'Phân tích thất bại',
-        cancelled: 'Đã hủy lượt chạy',
-        interrupted: 'Lượt chạy bị gián đoạn',
+        failed: 'Quét source thất bại',
+        cancelled: 'Đã hủy lượt quét',
+        interrupted: 'Lượt quét bị gián đoạn',
       },
-      cancelledHelp: 'Lượt chạy đã dừng theo yêu cầu, chưa có kết quả mới.',
-      lastResult: 'Xem kết quả lần phân tích gần nhất',
+      cancelledHelp: 'Lượt quét đã dừng theo yêu cầu, chưa có kết quả mới.',
+      lastResult: 'Xem kết quả lần quét gần nhất',
+      target: 'Đang quét',
+      targetFolder: 'Thư mục',
+      targetLanguage: 'Ngôn ngữ',
+      noFileCount:
+        'Số file và phần trăm sẽ hiện khi backend báo tiến độ theo file.',
     },
     steps: {
       title: 'Tiến trình',
@@ -227,22 +210,14 @@ export const viMessages = {
     form: {
       title: 'Thông tin dự án',
       name: 'Tên dự án',
-      customer: 'Khách hàng',
-      customerHelp: `Không bắt buộc, tối đa ${PROJECT_CUSTOMER_NAME_MAX_LENGTH} ký tự.`,
-      customerInvalid: `Tên khách hàng tối đa ${PROJECT_CUSTOMER_NAME_MAX_LENGTH} ký tự, không chỉ chứa khoảng trắng.`,
-      folder: 'Thư mục source (đường dẫn tuyệt đối)',
-      registered: 'Đang dùng',
-      keepFolder: 'Để trống để giữ thư mục đang dùng.',
-      folderRequired: 'Nhập đường dẫn thư mục source.',
-      folderReenter:
-        'Nhập lại đường dẫn thư mục để lưu thay đổi ánh xạ tên bảng.',
-      demoFolder: (fixtureId: string) => `Bộ mẫu ${fixtureId} đi kèm ứng dụng`,
+      folder: 'Đường dẫn thư mục source (tuyệt đối)',
+      choose: 'Chọn thư mục',
+      cancel: 'Hủy',
+      saving: 'Đang kiểm tra…',
+      demoFolder: (fixtureId: string) => `${fixtureId} (bộ mẫu)`,
       language: 'Ngôn ngữ phân tích (chọn 1)',
+      languageRequired: 'Chọn ngôn ngữ phân tích trước khi quét.',
       comingSoon: 'Sắp hỗ trợ',
-      mapping: 'Ánh xạ tên bảng (tùy chọn)',
-      save: 'Lưu thông tin',
-      saving: 'Đang lưu…',
-      saved: 'Đã lưu thông tin dự án.',
     },
     recent: {
       title: 'Dự án gần đây',
@@ -251,7 +226,7 @@ export const viMessages = {
       failed: 'Không tải được danh sách dự án.',
       empty: 'Chưa có dự án nào.',
       open: 'Đang mở',
-      noCustomer: 'Chưa ghi khách hàng',
+      updated: (date: string) => `Cập nhật ${date}`,
       status: {
         none: 'Chưa phân tích',
         active: 'Đang phân tích',

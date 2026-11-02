@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AnalyzeStage, Run } from '@portal/contracts';
 import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
@@ -9,9 +9,10 @@ import {
   type RunAction,
 } from './use-analyze-runs';
 
-// Scan card of the source step (demo02 drop zone without drag and drop):
-// idle → scanning → done (opens the analysis step after a short pause) or
-// ended (failed/cancelled/interrupted, with the reason and a re-run).
+// Scan card of the source step, as the demo02 drop zone without drag and
+// drop: choose a folder → folder chosen (Quét source / Đổi thư mục) →
+// scanning → done (opens the analysis step after a short pause) or ended
+// (failed/cancelled/interrupted, with the reason and a re-run).
 // Progress follows the run's real `stage` only: until the backend reports
 // file counts (PF08) there is no percentage, no file count and no file list,
 // and nothing advances on a timer.
@@ -21,11 +22,11 @@ export const AUTO_OPEN_DELAY_MS = 1500;
 
 export type ScanSource =
   | { status: 'loading' }
-  | { status: 'demo' }
+  | { status: 'demo'; folder: string }
   | { status: 'none' }
   | { status: 'ready' | 'unreadable'; folder: string };
 
-type Phase = 'idle' | 'scanning' | 'done' | 'ended';
+type Phase = 'choose' | 'chosen' | 'scanning' | 'done' | 'ended';
 type EndedStatus = 'failed' | 'cancelled' | 'interrupted';
 
 function isEnded(status: Run['status']): status is EndedStatus {
@@ -37,22 +38,26 @@ function isEnded(status: Run['status']): status is EndedStatus {
 export function ScanStage({
   runs,
   source,
-  canStart,
+  chooser,
   starting,
   onStart,
+  onChangeFolder,
   onOpenResults,
 }: {
   runs: AnalyzeRunsControl;
   source: ScanSource;
-  // false: no readable source and no path entered; Start is blocked.
-  canStart: boolean;
+  // The folder form, shown instead of the chosen folder while there is no
+  // readable source or the user changes it; null keeps the chosen folder.
+  chooser: ReactNode;
   // A save or Start of this page is in flight.
   starting: boolean;
   // A new run, or a re-run of the ended run named.
   onStart: (retryOfRunId: string | null) => void;
+  // null: the folder cannot be changed (demo project).
+  onChangeFolder: (() => void) | null;
   onOpenResults: (runId: string) => void;
 }) {
-  const { messages } = useLocale();
+  const { messages, formatDateTime } = useLocale();
   const copy = messages.sourceStep.hero;
   const runCopy = messages.runs;
   const { state, action } = runs;
@@ -83,13 +88,19 @@ export function ScanStage({
     ? 'scanning'
     : doneId
       ? 'done'
-      : current && isEnded(current.status)
-        ? 'ended'
-        : 'idle';
+      : chooser
+        ? 'choose'
+        : current && isEnded(current.status)
+          ? 'ended'
+          : 'chosen';
   const pending = action.status === 'pending';
   const busy = pending || starting;
-  // A Start whose outcome is unknown can still be resent as it was.
-  const blocked = !canStart && !runs.uncertainStart;
+  const folder =
+    source.status === 'demo' ||
+    source.status === 'ready' ||
+    source.status === 'unreadable'
+      ? source.folder
+      : null;
 
   let title: string;
   let help: string | null = null;
@@ -110,22 +121,18 @@ export function ScanStage({
       : current.status === 'interrupted'
         ? runCopy.interruptedHelp
         : copy.cancelledHelp;
-  } else if (source.status === 'demo') {
-    title = copy.readyTitle;
-    help = copy.demoHelp;
-  } else if (source.status === 'ready') {
-    title = copy.readyTitle;
-    help = copy.readyHelp(source.folder);
-  } else if (source.status === 'unreadable') {
-    title = copy.noSourceTitle;
-    help = copy.unreadableHelp;
+  } else if (phase === 'choose') {
+    title = copy.chooseTitle;
+    help = source.status === 'unreadable' ? copy.unreadableHelp : null;
+  } else if (source.status === 'loading') {
+    title = messages.source.loading;
   } else {
-    title = copy.noSourceTitle;
-    help = copy.noSourceHelp;
+    title = copy.chosenTitle;
+    help = source.status === 'demo' ? copy.demoHelp : copy.chosenHelp;
   }
 
   const lastSucceeded =
-    phase === 'idle' && current?.status === 'succeeded' ? current : null;
+    phase === 'chosen' && current?.status === 'succeeded' ? current : null;
 
   return (
     <>
@@ -156,8 +163,15 @@ export function ScanStage({
         </div>
         <div className="scan-text" role="status">
           <h2 id="scan-title">{title}</h2>
+          {phase === 'chosen' && folder && <FolderChip name={folder} />}
           {help && <p>{help}</p>}
+          {phase === 'done' && folder && (
+            <p>
+              <span className="mono">{folder}</span>
+            </p>
+          )}
         </div>
+        {phase === 'choose' && chooser}
         {phase === 'scanning' && (
           <div
             className="scan-bar indeterminate"
@@ -172,58 +186,63 @@ export function ScanStage({
             <span />
           </div>
         )}
-        <div className="scan-actions">
-          {phase === 'scanning' && current ? (
-            current.status !== 'cancelling' && (
+        {phase !== 'choose' && (
+          <div className="scan-actions">
+            {phase === 'scanning' && current ? (
+              current.status !== 'cancelling' && (
+                <button
+                  className="button large"
+                  disabled={pending}
+                  onClick={() => void runs.cancel(current)}
+                >
+                  {pending && action.kind === 'cancel'
+                    ? runCopy.cancelSending
+                    : runCopy.cancel}
+                </button>
+              )
+            ) : phase === 'done' && doneId ? (
               <button
-                className="button"
-                disabled={pending}
-                onClick={() => void runs.cancel(current)}
+                className="button primary large"
+                onClick={() => onOpenResults(doneId)}
               >
-                {pending && action.kind === 'cancel'
-                  ? runCopy.cancelSending
-                  : runCopy.cancel}
+                {copy.goNow}
               </button>
-            )
-          ) : phase === 'done' && doneId ? (
-            <button
-              className="button primary large"
-              onClick={() => onOpenResults(doneId)}
-            >
-              {copy.goNow}
-            </button>
-          ) : phase === 'ended' && current ? (
-            <button
-              className="button primary large"
-              disabled={busy || blocked}
-              aria-describedby={blocked ? 'scan-start-blocked' : undefined}
-              onClick={() => onStart(current.id)}
-            >
-              {runCopy.retry}
-            </button>
-          ) : (
-            <button
-              className="button primary large"
-              disabled={busy || blocked}
-              aria-describedby={blocked ? 'scan-start-blocked' : undefined}
-              onClick={() => onStart(null)}
-            >
-              {busy ? runCopy.starting : runCopy.start}
-            </button>
-          )}
-          {lastSucceeded && (
-            <button
-              className="button large"
-              onClick={() => onOpenResults(lastSucceeded.id)}
-            >
-              {copy.lastResult}
-            </button>
-          )}
-        </div>
-        {blocked && phase !== 'scanning' && phase !== 'done' && (
-          <p className="notice" id="scan-start-blocked">
-            {messages.source.startBlocked}
-          </p>
+            ) : (
+              <>
+                <button
+                  className="button primary large"
+                  disabled={busy || source.status === 'loading'}
+                  onClick={() =>
+                    onStart(phase === 'ended' && current ? current.id : null)
+                  }
+                >
+                  <SearchIcon />
+                  {busy
+                    ? runCopy.starting
+                    : phase === 'ended'
+                      ? runCopy.retry
+                      : copy.scan}
+                </button>
+                {onChangeFolder && (
+                  <button
+                    className="button large"
+                    disabled={busy}
+                    onClick={onChangeFolder}
+                  >
+                    {copy.changeFolder}
+                  </button>
+                )}
+                {lastSucceeded && (
+                  <button
+                    className="button large"
+                    onClick={() => onOpenResults(lastSucceeded.id)}
+                  >
+                    {copy.lastResult}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )}
         {runs.connectionLost && (
           <p role="status" className="notice">
@@ -236,8 +255,62 @@ export function ScanStage({
           onResend={() => void runs.start()}
         />
       </section>
-      {phase === 'scanning' && current && <ScanSteps stage={current.stage} />}
+      {phase === 'scanning' && current && (
+        <div className="scan-panels">
+          <ScanSteps stage={current.stage} />
+          <section className="scan-target" aria-labelledby="scan-target-title">
+            <h3 id="scan-target-title">{copy.target}</h3>
+            <dl>
+              {folder && (
+                <div>
+                  <dt>{copy.targetFolder}</dt>
+                  <dd className="mono">{folder}</dd>
+                </div>
+              )}
+              <div>
+                <dt>{copy.targetLanguage}</dt>
+                <dd>VB6 · CP932</dd>
+              </div>
+              {current.startedAt && (
+                <div>
+                  <dt>{runCopy.fields.startedAt}</dt>
+                  <dd>{formatDateTime(current.startedAt)}</dd>
+                </div>
+              )}
+              <div>
+                <dt>{runCopy.fields.stage}</dt>
+                <dd>
+                  {current.stage
+                    ? runCopy.stage[current.stage]
+                    : runCopy.status[current.status]}
+                </dd>
+              </div>
+            </dl>
+            <p className="scan-target-note">{copy.noFileCount}</p>
+          </section>
+        </div>
+      )}
     </>
+  );
+}
+
+function FolderChip({ name }: { name: string }) {
+  return (
+    <span className="folder-chip">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      </svg>
+      <span className="mono">{name}</span>
+    </span>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.5-3.5" />
+    </svg>
   );
 }
 

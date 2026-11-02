@@ -1,7 +1,6 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
-  PROJECT_CUSTOMER_NAME_MAX_LENGTH,
 } from '@portal/contracts';
 import type { ProgramState } from '../../features/assessment/assessment-summary';
 import type { Messages } from './vi';
@@ -130,28 +129,10 @@ export const jaMessages = {
   source: {
     loading: 'ソース情報を読み込み中…',
     reload: 'ソースを再読み込み',
-    status: {
-      ready: '読み取り可能（フォルダーのみ確認、内容は未読）',
-      unreadable:
-        '登録したフォルダーを読み取れません。フォルダーを確認して再登録してください。',
-    },
-    mappingStatus: {
-      unconfigured: '未設定',
-      assumed: '仮定（未確認）',
-      confirmed: 'DB管理者が確認済み',
-    },
     form: {
-      rootPath: 'フォルダーのパス（絶対パス）',
       rootPathHelp:
         '例：C:\\work\\order-module、/home/dev/order-module。バックエンドがフォルダーと読み取り権限を確認します。内容は解析の実行時にのみ読み込まれます。',
       rootPathInvalid: 'ソースフォルダーのパスを入力してください。',
-      mappingStatus: 'テーブル名のデフォルトスキーマ',
-      defaultSchema: 'スキーマ名',
-      defaultSchemaHelp:
-        '修飾なしのテーブル名が指すスキーマ（例：ログインユーザー）。DB管理者が確認した場合のみ「確認済み」を選択してください。',
-      defaultSchemaInvalid:
-        'スキーマ名は英字または「_」で始め、英数字・_・$・# のみで入力してください。',
-      saved: 'ソースを保存しました。',
     },
     errors: {
       SOURCE_FORBIDDEN:
@@ -167,36 +148,40 @@ export const jaMessages = {
     },
     outcomeUnknown:
       'バックエンドがソースを保存したか確認できませんでした。再送信する前にソースを再読み込みして確認してください。',
-    startBlocked:
-      '解析の前に、読み取り可能なソースフォルダーを登録してください。',
   },
   sourceStep: {
     lead: '旧システムのソースフォルダーを選択します。処理はすべてこの端末で行われ、ソースが端末の外に出ることはありません。',
     hero: {
-      readyTitle: '解析の準備ができました',
-      readyHelp: (folder: string) =>
-        `フォルダー ${folder} を読み込めます。「解析を開始」を押してスキャンします。`,
+      chooseTitle: 'ソースフォルダーを選択',
+      chosenTitle: 'フォルダーを選択しました',
+      chosenHelp:
+        '下のプロジェクト情報を確認して「ソースをスキャン」を押してください。',
       demoHelp:
-        'デモプロジェクトはアプリ同梱のサンプルを解析します。端末のフォルダーは読み込みません。',
-      noSourceTitle: 'ソースフォルダーが未設定です',
-      noSourceHelp:
-        '下の「プロジェクト情報」でソースフォルダーのパスを入力し、「解析を開始」を押してください。',
+        'デモプロジェクトはアプリ同梱のサンプルをスキャンします。端末のフォルダーは読み込みません。',
       unreadableHelp:
-        '登録済みのフォルダーを読み込めません。下でパスを入力し直してから開始してください。',
+        '選択したフォルダーを読み込めません。フォルダーを確認するか、別のフォルダーを選択してください。',
+      scan: 'ソースをスキャン',
+      changeFolder: 'フォルダーを変更',
       queuedTitle: '開始を待っています…',
       scanningTitle: 'フォルダーをスキャンしています…',
-      cancellingTitle: '実行をキャンセルしています…',
+      cancellingTitle: 'スキャンをキャンセルしています…',
       progressLabel: 'スキャン中（ファイル総数は未確定）',
       stage: (stage: string) => `現在の工程：${stage}`,
       doneTitle: 'スキャン完了・解析画面へ移動します…',
       goNow: 'すぐに結果を見る',
       endedTitle: {
-        failed: '解析に失敗しました',
-        cancelled: '実行をキャンセルしました',
-        interrupted: '実行が中断されました',
+        failed: 'スキャンに失敗しました',
+        cancelled: 'スキャンをキャンセルしました',
+        interrupted: 'スキャンが中断されました',
       },
-      cancelledHelp: '要求により実行を停止しました。新しい結果はありません。',
-      lastResult: '前回の解析結果を見る',
+      cancelledHelp:
+        '要求によりスキャンを停止しました。新しい結果はありません。',
+      lastResult: '前回のスキャン結果を見る',
+      target: 'スキャン対象',
+      targetFolder: 'フォルダー',
+      targetLanguage: '言語',
+      noFileCount:
+        'ファイル数と進捗率は、バックエンドがファイル単位の進捗を報告すると表示されます。',
     },
     steps: {
       title: '進行状況',
@@ -211,22 +196,14 @@ export const jaMessages = {
     form: {
       title: 'プロジェクト情報',
       name: 'プロジェクト名',
-      customer: '顧客',
-      customerHelp: `任意。最大${PROJECT_CUSTOMER_NAME_MAX_LENGTH}文字。`,
-      customerInvalid: `顧客名は最大${PROJECT_CUSTOMER_NAME_MAX_LENGTH}文字で入力してください。空白のみは使用できません。`,
-      folder: 'ソースフォルダー（絶対パス）',
-      registered: '使用中',
-      keepFolder: '空欄のままにすると使用中のフォルダーを維持します。',
-      folderRequired: 'ソースフォルダーのパスを入力してください。',
-      folderReenter:
-        'テーブル名マッピングの変更を保存するには、フォルダーのパスを入力し直してください。',
-      demoFolder: (fixtureId: string) => `アプリ同梱のサンプル ${fixtureId}`,
+      folder: 'ソースフォルダーのパス（絶対パス）',
+      choose: 'フォルダーを選択',
+      cancel: 'キャンセル',
+      saving: '確認中…',
+      demoFolder: (fixtureId: string) => `${fixtureId}（サンプル）`,
       language: '解析言語（1つ選択）',
+      languageRequired: 'スキャンする前に解析言語を選択してください。',
       comingSoon: '対応予定',
-      mapping: 'テーブル名マッピング（任意）',
-      save: '情報を保存',
-      saving: '保存中…',
-      saved: 'プロジェクト情報を保存しました。',
     },
     recent: {
       title: '最近のプロジェクト',
@@ -235,7 +212,7 @@ export const jaMessages = {
       failed: 'プロジェクト一覧を読み込めませんでした。',
       empty: 'プロジェクトはまだありません。',
       open: '表示中',
-      noCustomer: '顧客未設定',
+      updated: (date: string) => `更新 ${date}`,
       status: {
         none: '未解析',
         active: '解析中',

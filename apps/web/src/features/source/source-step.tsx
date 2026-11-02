@@ -31,7 +31,7 @@ import { startableRevision, useProjectSource } from './use-project-source';
 // on open, reload or locale change. Table-name mapping and run history are
 // kept in the API but not shown here (user request, 02/11/2026).
 
-type PickerState =
+export type PickerState =
   | { status: 'idle' }
   | { status: 'pending' }
   | { status: 'unavailable'; reason: FolderPickerUnavailableReason }
@@ -46,7 +46,7 @@ const NO_ERRORS: FieldErrors = {
 
 // Language chips of demo02. Only VB6 has an analysis profile; the others
 // are listed as coming and cannot be chosen.
-type Language = 'vb6';
+export type Language = 'vb6';
 const COMING_LANGUAGES = [
   'Java',
   'C#',
@@ -301,76 +301,109 @@ export function SourceStep({
           onChangeFolder={demo ? null : () => setChangingFolder(true)}
           onOpenResults={onOpenResults}
         />
-        <section className="panel project-info" aria-labelledby="info-title">
-          <h2 id="info-title">{copy.form.title}</h2>
-          <label htmlFor="project-name">{copy.form.name}</label>
-          <input
-            id="project-name"
-            autoComplete="off"
-            value={name}
-            disabled={saving}
-            aria-invalid={invalid.name}
-            aria-describedby={invalid.name ? 'project-name-error' : undefined}
-            onChange={(event) => {
-              setName(event.target.value);
-              setInvalid((errors) => ({ ...errors, name: false }));
-            }}
-          />
-          {invalid.name && (
-            <p id="project-name-error" role="alert" className="error">
-              {messages.projects.create.nameInvalid}
-            </p>
-          )}
-          {infoError !== null && (
-            <p role="alert" className="error">
-              {projectErrorMessage(infoError, 'update', messages.errors)}
-            </p>
-          )}
-          <fieldset
-            className="language-chips"
-            aria-describedby={invalid.language ? 'language-error' : undefined}
-          >
-            <legend>{copy.form.language}</legend>
-            <label
-              className={
-                'language-chip' + (chosenLanguage === 'vb6' ? ' selected' : '')
-              }
-            >
-              <input
-                type="radio"
-                name="analysis-language"
-                checked={chosenLanguage === 'vb6'}
-                disabled={saving}
-                onChange={() => {
-                  setLanguage('vb6');
-                  setInvalid((errors) => ({ ...errors, language: false }));
-                }}
-              />
-              <span>VB6</span>
-            </label>
-            {COMING_LANGUAGES.map((label) => (
-              <label key={label} className="language-chip coming">
-                <input type="radio" name="analysis-language" disabled />
-                <span>{label}</span>
-                <span className="chip-note">{copy.form.comingSoon}</span>
-              </label>
-            ))}
-          </fieldset>
-          {invalid.language && (
-            <p id="language-error" role="alert" className="error">
-              {copy.form.languageRequired}
-            </p>
-          )}
-        </section>
+        <ProjectInfoPanel
+          name={name}
+          language={chosenLanguage}
+          invalid={invalid}
+          disabled={saving}
+          error={infoError}
+          onName={(value) => {
+            setName(value);
+            setInvalid((errors) => ({ ...errors, name: false }));
+          }}
+          onLanguage={(value) => {
+            setLanguage(value);
+            setInvalid((errors) => ({ ...errors, language: false }));
+          }}
+        />
       </div>
       {aside}
     </div>
   );
 }
 
+// "Thông tin dự án": project name and analysis language (only VB6 can be
+// chosen). Shared by the step of an existing and of a new project.
+export function ProjectInfoPanel({
+  name,
+  language,
+  invalid,
+  disabled,
+  error,
+  onName,
+  onLanguage,
+}: {
+  name: string;
+  language: Language | null;
+  invalid: { name: boolean; language: boolean };
+  disabled: boolean;
+  // A refused save of the project.
+  error: unknown;
+  onName: (value: string) => void;
+  onLanguage: (value: Language) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.sourceStep.form;
+  return (
+    <section className="panel project-info" aria-labelledby="info-title">
+      <h2 id="info-title">{copy.title}</h2>
+      <label htmlFor="project-name">{copy.name}</label>
+      <input
+        id="project-name"
+        autoComplete="off"
+        value={name}
+        disabled={disabled}
+        aria-invalid={invalid.name}
+        aria-describedby={invalid.name ? 'project-name-error' : undefined}
+        onChange={(event) => onName(event.target.value)}
+      />
+      {invalid.name && (
+        <p id="project-name-error" role="alert" className="error">
+          {messages.projects.create.nameInvalid}
+        </p>
+      )}
+      {error !== null && error !== undefined && (
+        <p role="alert" className="error">
+          {projectErrorMessage(error, 'update', messages.errors)}
+        </p>
+      )}
+      <fieldset
+        className="language-chips"
+        aria-describedby={invalid.language ? 'language-error' : undefined}
+      >
+        <legend>{copy.language}</legend>
+        <label
+          className={'language-chip' + (language === 'vb6' ? ' selected' : '')}
+        >
+          <input
+            type="radio"
+            name="analysis-language"
+            checked={language === 'vb6'}
+            disabled={disabled}
+            onChange={() => onLanguage('vb6')}
+          />
+          <span>VB6</span>
+        </label>
+        {COMING_LANGUAGES.map((label) => (
+          <label key={label} className="language-chip coming">
+            <input type="radio" name="analysis-language" disabled />
+            <span>{label}</span>
+            <span className="chip-note">{copy.comingSoon}</span>
+          </label>
+        ))}
+      </fieldset>
+      {invalid.language && (
+        <p id="language-error" role="alert" className="error">
+          {copy.languageRequired}
+        </p>
+      )}
+    </section>
+  );
+}
+
 // Folder choice on the scan card: the OS folder dialog (UI05), or an
 // absolute path typed by the user when asked for or when no dialog exists.
-function FolderChooser({
+export function FolderChooser({
   value,
   manual,
   invalid,

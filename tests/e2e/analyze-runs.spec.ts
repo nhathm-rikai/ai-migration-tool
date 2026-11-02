@@ -21,9 +21,16 @@ test(
         });
     });
 
+    // UI04: an existing project is opened from "Xem tất cả".
     await page.goto('/');
-    const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
-    await projects.getByRole('link', { name: seedName }).click();
+    await page.getByRole('button', { name: 'Xem tất cả' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Tất cả dự án' });
+    await dialog.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await dialog
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first()
+      .click();
+    await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     await expect(
       page.getByRole('heading', { name: 'Đã chọn thư mục' }),

@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   failedRunFixture,
@@ -9,6 +15,7 @@ import type { LocalProject, Project, Run } from '@portal/contracts';
 import { RecentProjects } from './recent-projects';
 import type { ProjectListControl } from './use-project-list';
 import { createRunsApi } from '../../shared/api/runs-api';
+import { createProjectsApi } from '../../shared/api/projects-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { json, requestUrl, testCredentials } from '../../testing/fixtures';
 
@@ -67,6 +74,7 @@ describe('Recent projects (UI04)', () => {
       <LocaleProvider>
         <RecentProjects
           list={list(projects)}
+          api={createProjectsApi(fetcher, testCredentials)}
           runsApi={createRunsApi(fetcher, testCredentials)}
           openProjectId={projects[0]!.id}
           version=""
@@ -104,6 +112,7 @@ describe('Recent projects (UI04)', () => {
       <LocaleProvider>
         <RecentProjects
           list={list([projects[3]!])}
+          api={createProjectsApi(fetcher, testCredentials)}
           runsApi={createRunsApi(fetcher, testCredentials)}
           openProjectId="none"
           version=""
@@ -112,5 +121,63 @@ describe('Recent projects (UI04)', () => {
     );
     expect(await screen.findByText('Không đọc được trạng thái')).toBeTruthy();
     expect(screen.queryByText('Chưa phân tích')).toBeNull();
+  });
+
+  it('"Xem tất cả" lists every project page by page, searches, opens one and closes', async () => {
+    const many: Project[] = Array.from({ length: 11 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-0000000002${String(index).padStart(2, '0')}`,
+      name: index === 10 ? 'Payroll' : `Dự án ${index}`,
+      mode: 'local',
+      createdAt: `2026-10-${String(index + 10)}T00:00:00.000Z`,
+    }));
+    const fetcher = vi.fn<typeof fetch>((input, init) => {
+      expect(init?.method ?? 'GET').toBe('GET');
+      const url = requestUrl(input);
+      if (url.includes('/runs/current'))
+        return Promise.resolve(json({ run: null }));
+      // Two pages of the API, read in full by the dialog.
+      return Promise.resolve(
+        url.includes('cursor=')
+          ? json({ items: many.slice(6), nextCursor: null })
+          : json({ items: many.slice(0, 6), nextCursor: many[5]!.id }),
+      );
+    });
+    render(
+      <LocaleProvider>
+        <RecentProjects
+          list={list(many.slice(0, 3))}
+          api={createProjectsApi(fetcher, testCredentials)}
+          runsApi={createRunsApi(fetcher, testCredentials)}
+          openProjectId={null}
+          version=""
+        />
+      </LocaleProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Tất cả dự án' });
+    await within(dialog).findByText('Trang 1 / 2');
+    // Newest first, eight per page.
+    expect(within(dialog).getAllByRole('link')).toHaveLength(8);
+    expect(within(dialog).getAllByRole('link')[0]?.textContent).toContain(
+      'Payroll',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sau' }));
+    expect(within(dialog).getAllByRole('link')).toHaveLength(3);
+    fireEvent.change(within(dialog).getByLabelText('Tìm dự án theo tên'), {
+      target: { value: 'payroll' },
+    });
+    const found = within(dialog).getAllByRole('link');
+    expect(found).toHaveLength(1);
+    expect(found[0]?.getAttribute('href')).toBe(
+      `/projects/${many[10]!.id}/source`,
+    );
+    // No way to create a project in the dialog.
+    expect(within(dialog).queryByRole('textbox', { name: /Tên/ })).toBeNull();
+    fireEvent.click(found[0]!);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
+    await screen.findByRole('dialog');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

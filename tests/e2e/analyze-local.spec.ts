@@ -60,13 +60,10 @@ test(
     });
 
     const projectName = `PF07 local ${Date.now()}`;
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(projectName);
-    await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    // UI04/UI05: "Chọn thư mục" asks the backend for its folder dialog; the
-    // dialog's answer is stubbed here (no window in a headless run), the
-    // registration that follows is real.
+    // UI04: step 1 of a new project. "Chọn thư mục" asks the backend for
+    // its folder dialog; the dialog's answer is stubbed (no window in a
+    // headless run). Nothing is stored until "Quét source": then the project
+    // is created, the folder registered and the first run started.
     let picks = 0;
     await page.route('**/api/v1/local/folder-picker', async (route) => {
       picks++;
@@ -76,42 +73,37 @@ test(
         headers: { 'cache-control': 'no-store' },
       });
     });
+    let creates = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && /\/projects$/.test(request.url()))
+        creates++;
+    });
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await page.getByRole('button', { name: 'Chọn thư mục' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
+    ).toBeVisible();
+    expect(picks).toBe(1);
+    expect(creates).toBe(0);
+    await page.getByLabel('Tên dự án').fill(projectName);
+    await page.getByRole('radio', { name: 'VB6' }).check();
     const registered = page.waitForResponse(
       (response) =>
         response.request().method() === 'PUT' &&
         /\/source$/.test(response.url()),
     );
-    await page.getByRole('button', { name: 'Chọn thư mục' }).click();
+    await page.getByRole('button', { name: 'Quét source' }).click();
     const registration = await registered;
     expect(registration.status()).toBe(200);
-    expect(picks).toBe(1);
+    expect(creates).toBe(1);
     expect(
       (registration.request().postDataJSON() as { rootPath: string }).rootPath,
     ).toBe(sourceRoot);
     const authorization = registration.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
-    // The table-name mapping has no UI on this step (02/11/2026): the
-    // assumed schema of this fixture is set through the API, then the page
-    // reads the new revision back.
-    const projectId = new URL(page.url()).pathname.split('/')[2] ?? '';
-    const mapped = await page.request.put(
-      `/api/v1/projects/${projectId}/source`,
-      {
-        headers: { authorization },
-        data: {
-          rootPath: sourceRoot,
-          profileId: 'vb6-cp932-v1',
-          tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
-          expectedSourceRevision: 1,
-        },
-      },
-    );
-    expect(mapped.status()).toBe(200);
-    await page.reload();
-    await expect(page.getByRole('radio', { name: 'VB6' })).toBeChecked();
-
-    // "Quét source"; the analysis step opens by itself.
-    await page.getByRole('button', { name: 'Quét source' }).click();
+    // The created project's step 1 follows the run; the analysis step opens
+    // by itself.
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
@@ -153,10 +145,8 @@ test(
     await detail.getByRole('tab', { name: /^Lời gọi/ }).click();
     await expect(detail.getByText('Lời gọi', { exact: true })).toBeVisible();
     await detail.getByRole('tab', { name: /^CRUD/ }).click();
-    // The mapped view opens first; its line names the assumed schema.
-    await expect(
-      detail.getByText(/Giả định, cần người quản lý DB xác nhận/),
-    ).toBeVisible();
+    // A new source has no table-name mapping (no UI for it on step 1).
+    await expect(detail.getByText(/Chưa cấu hình/).first()).toBeVisible();
     await expect(
       detail.getByText('Không phát hiện truy cập bảng.'),
     ).toBeVisible();
@@ -178,8 +168,8 @@ test(
       complete: false,
     });
     expect(first.payload.tableNames).toMatchObject({
-      defaultSchema: 'APP',
-      status: 'assumed',
+      defaultSchema: null,
+      status: 'unconfigured',
     });
     expect(await readdir(join(dataDir, 'artifacts', '.staging'))).toEqual([]);
 

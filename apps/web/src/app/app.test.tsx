@@ -1,44 +1,75 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { localSourceResponseFixture } from '@portal/contracts/fixtures';
 import { App } from './app';
-import { json, project, testCredentials } from '../testing/fixtures';
+import {
+  json,
+  localProject,
+  requestUrl,
+  testCredentials,
+} from '../testing/fixtures';
 import { createProjectsApi } from '../shared/api/projects-api';
-
+import { createRunsApi } from '../shared/api/runs-api';
+import { createSourcesApi } from '../shared/api/sources-api';
+import { createArtifactsApi } from '../shared/api/artifacts-api';
 import { LOCALE_STORAGE_KEY } from '../shared/i18n/locale';
 import { LocaleProvider } from '../shared/i18n/locale-provider';
 import { useLocale } from '../shared/i18n/locale-context';
 
-// Global fetch is stubbed per test; the credential is ready without network.
-function TestApp() {
+// The app opens on step 1 of a new project (UI04). A fake backend answers by
+// `METHOD /path`; unknown routes answer an empty project list.
+type Handler = (init?: RequestInit) => Response | Promise<Response>;
+
+function backend(routes: Record<string, Handler> = {}) {
+  const fetcher = vi.fn<typeof fetch>((input, init) => {
+    const url = requestUrl(input).split('?')[0] ?? '';
+    const handler = routes[`${init?.method ?? 'GET'} ${url}`];
+    if (handler) return Promise.resolve(handler(init));
+    if (url.endsWith('/runs/current'))
+      return Promise.resolve(json({ run: null }));
+    return Promise.resolve(json({ items: [], nextCursor: null }));
+  });
+  return fetcher;
+}
+
+function TestApp({ fetcher }: { fetcher: typeof fetch }) {
   return (
     <App
-      api={createProjectsApi(
-        (input, init) => fetch(input, init),
-        testCredentials,
-      )}
+      api={createProjectsApi(fetcher, testCredentials)}
+      runsApi={createRunsApi(fetcher, testCredentials)}
+      sourcesApi={createSourcesApi(fetcher, testCredentials)}
+      artifactsApi={createArtifactsApi(fetcher, testCredentials)}
       session={testCredentials}
     />
   );
 }
 
+const ROOT = 'D:\\work\\order-module';
+const posts = (fetcher: ReturnType<typeof backend>) =>
+  fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+
+// Types a folder on the scan card of the new project.
+async function typeFolder(path = ROOT) {
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Nhập đường dẫn' }),
+  );
+  fireEvent.change(
+    screen.getByLabelText('Đường dẫn thư mục source (tuyệt đối)'),
+    { target: { value: path } },
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Dùng thư mục này' }));
+  await screen.findByText('Đã chọn thư mục');
+}
+
 beforeEach(() => {
   window.localStorage.clear();
+  window.history.replaceState(null, '', '/');
 });
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
 });
-
-function mockEmptyList() {
-  const fetcher = vi
-    .fn<typeof fetch>()
-    .mockImplementation(() =>
-      Promise.resolve(json({ items: [], nextCursor: null })),
-    );
-  vi.stubGlobal('fetch', fetcher);
-  return fetcher;
-}
 
 it('synchronizes document language before descendant passive effects on mount and switch', () => {
   const originalLanguage = document.documentElement.lang;
@@ -63,10 +94,11 @@ it('synchronizes document language before descendant passive effects on mount an
   expect(document.documentElement.lang).toBe(originalLanguage);
 });
 
-it('switches Vietnamese/Japanese, preserves input, persists the locale and exposes no theme toggle', async () => {
-  const fetcher = mockEmptyList();
-  const view = render(<TestApp />);
-  await screen.findByText('Chưa có dự án');
+it('opens on step 1 of a new project; switching language keeps the input, persists and exposes no theme toggle', async () => {
+  const fetcher = backend();
+  const view = render(<TestApp fetcher={fetcher} />);
+  expect(window.location.pathname).toBe('/projects/new');
+  expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: '入力した名前' },
   });
@@ -74,103 +106,82 @@ it('switches Vietnamese/Japanese, preserves input, persists the locale and expos
   expect(screen.getByLabelText('プロジェクト名')).toBe(
     screen.getByDisplayValue('入力した名前'),
   );
-  expect(
-    screen.getByRole('navigation', { name: 'プロジェクト一覧' }),
-  ).toBeTruthy();
   expect(document.documentElement.lang).toBe('ja');
   expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('ja');
   expect(screen.queryByRole('button', { name: /Giao diện|テーマ/ })).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  // Opening the page reads only; nothing is created.
+  expect(posts(fetcher)).toEqual([]);
   view.unmount();
-  render(<TestApp />);
+  render(<TestApp fetcher={fetcher} />);
   expect(screen.getByLabelText('プロジェクト名')).toBeTruthy();
-  await screen.findByText('プロジェクトはまだありません');
   fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
   expect(screen.getByLabelText('Tên dự án')).toBeTruthy();
   expect(document.documentElement.lang).toBe('vi');
 });
 
-it('retranslates an existing validation error without submitting or clearing the form', async () => {
-  const fetcher = mockEmptyList();
-  render(<TestApp />);
-  await screen.findByText('Chưa có dự án');
-  fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
-  expect(screen.getByRole('alert').textContent).toContain('1 đến 120');
+it('retranslates a validation error without creating anything or clearing the form', async () => {
+  const fetcher = backend();
+  render(<TestApp fetcher={fetcher} />);
+  await typeFolder();
+  // The name follows the folder until edited.
+  expect(screen.getByLabelText('Tên dự án')).toHaveProperty(
+    'value',
+    'order-module',
+  );
+  fireEvent.change(screen.getByLabelText('Tên dự án'), {
+    target: { value: ' ' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
+  expect(screen.getAllByRole('alert')[0]?.textContent).toContain('1 đến 120');
   fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
-  expect(screen.getByRole('alert').textContent).toContain('1～120文字');
+  expect(screen.getAllByRole('alert')[0]?.textContent).toContain('1～120文字');
   expect(
     screen.getByLabelText('プロジェクト名').getAttribute('aria-invalid'),
   ).toBe('true');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(posts(fetcher)).toEqual([]);
 });
 
-it('preserves a pending create, then selection, success notice and dates when switching locale', async () => {
+it('keeps a pending first scan across a language switch, then opens the created project', async () => {
   let finish: ((response: Response) => void) | undefined;
-  const fetcher = vi
-    .fn<typeof fetch>()
-    .mockResolvedValueOnce(json({ items: [], nextCursor: null }))
-    .mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    )
-    .mockImplementation((url) =>
-      Promise.resolve(
-        typeof url === 'string' && url.endsWith(project.id)
-          ? json(project)
-          : json({ items: [project], nextCursor: null }),
-      ),
-    );
-  vi.stubGlobal('fetch', fetcher);
-  render(<TestApp />);
-  await screen.findByText('Chưa có dự án');
-  fireEvent.change(screen.getByLabelText('Tên dự án'), {
-    target: { value: project.name },
+  const runsUrl = `/api/v1/projects/${localProject.id}/runs`;
+  const fetcher = backend({
+    'POST /api/v1/projects': () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    [`PUT /api/v1/projects/${localProject.id}/source`]: () =>
+      json(localSourceResponseFixture),
+    [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
+    [`GET /api/v1/projects/${localProject.id}`]: () => json(localProject),
   });
-  fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
+  render(<TestApp fetcher={fetcher} />);
+  await typeFolder();
+  fireEvent.click(screen.getByRole('radio', { name: 'VB6' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
   fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(
-    screen.getByRole('button', { name: '作成中…' }).hasAttribute('disabled'),
+    screen
+      .getByRole('button', { name: /リクエストを送信中/ })
+      .hasAttribute('disabled'),
   ).toBe(true);
-  expect(screen.getByDisplayValue(project.name)).toBeTruthy();
-  expect(
-    fetcher.mock.calls.filter(([, options]) => options?.method === 'POST'),
-  ).toHaveLength(1);
+  expect(screen.getByDisplayValue('order-module')).toBeTruthy();
+  expect(posts(fetcher)).toHaveLength(1);
   await act(async () => {
-    finish?.(json(project, 201));
+    finish?.(json(localProject, 201));
     await Promise.resolve();
   });
-  expect(await screen.findByLabelText('プロジェクト名')).toHaveProperty(
-    'value',
-    project.name,
+  await vi.waitFor(() =>
+    expect(window.location.pathname).toBe(
+      `/projects/${localProject.id}/source`,
+    ),
   );
-  expect(screen.getByText('プロジェクトを作成しました。')).toBeTruthy();
-  expect(screen.getByText(`ステップ 1 / 5 · ${project.name}`)).toBeTruthy();
-  expect(
-    screen.getByRole('heading', { level: 1, name: '顧客ソースコードの取込' }),
-  ).toBeTruthy();
-  const formatted = new Intl.DateTimeFormat('ja-JP', {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-  }).format(new Date(project.createdAt));
-  // The recent projects card shows the creation date.
-  expect(
-    await screen.findByText((text) => text.includes(formatted), {
-      selector: '.recent-meta',
-    }),
-  ).toBeTruthy();
-  const requestsBeforeSwitch = fetcher.mock.calls.length;
-  fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
-  expect(screen.getByLabelText('Tên dự án')).toHaveProperty(
-    'value',
-    project.name,
-  );
-  expect(screen.getByText('Đã tạo dự án.')).toBeTruthy();
-  expect(fetcher).toHaveBeenCalledTimes(requestsBeforeSwitch);
+  expect(JSON.parse(posts(fetcher)[0]?.[1]?.body as string)).toEqual({
+    name: 'order-module',
+    mode: 'local',
+  });
 });
 
-it('retranslates list and detail HTTP errors without refetching them', async () => {
+it('retranslates list and project errors without reading them again', async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
     json(
       {
@@ -183,77 +194,71 @@ it('retranslates list and detail HTTP errors without refetching them', async () 
       404,
     ),
   );
-  vi.stubGlobal('fetch', fetcher);
-  const view = render(<TestApp />);
+  const view = render(<TestApp fetcher={fetcher} />);
   expect((await screen.findByRole('alert')).textContent).toContain(
-    'Không tìm thấy API',
+    'Không tải được danh sách dự án',
   );
+  expect(document.body.textContent).not.toContain('private-server-message');
+  const before = fetcher.mock.calls.length;
   fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
-  expect(screen.getByRole('alert').textContent).toContain('要求されたAPI');
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('alert').textContent).toContain(
+    'プロジェクト一覧を読み込めませんでした',
+  );
+  expect(fetcher).toHaveBeenCalledTimes(before);
   view.unmount();
   // A project that no longer exists shows the not-found page, translated in
   // place without reading it again.
-  fetcher.mockReset().mockImplementation((url) =>
-    Promise.resolve(
-      typeof url === 'string' && url.endsWith(project.id)
-        ? json(
-            {
-              error: {
-                code: 'PROJECT_NOT_FOUND',
-                message: 'safe-server-message',
-                requestId: 'request-002',
-              },
-            },
-            404,
-          )
-        : json({ items: [project], nextCursor: null }),
-    ),
-  );
-  render(<TestApp />);
-  fireEvent.click(await screen.findByRole('link', { name: project.name }));
+  const missing = backend({
+    [`GET /api/v1/projects/${localProject.id}`]: () =>
+      json(
+        {
+          error: {
+            code: 'PROJECT_NOT_FOUND',
+            message: 'safe-server-message',
+            requestId: 'request-002',
+          },
+        },
+        404,
+      ),
+  });
+  window.history.replaceState(null, '', `/projects/${localProject.id}/source`);
+  render(<TestApp fetcher={missing} />);
   expect(
     await screen.findByRole('heading', {
       level: 1,
       name: 'プロジェクトが見つかりません',
     }),
   ).toBeTruthy();
+  const reads = missing.mock.calls.length;
   fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
   expect(
     screen.getByRole('heading', { level: 1, name: 'Không tìm thấy dự án' }),
   ).toBeTruthy();
-  expect(screen.getByRole('link', { name: 'Về danh sách dự án' })).toBeTruthy();
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(missing).toHaveBeenCalledTimes(reads);
 });
 
-it('retranslates an uncertain submission outcome and preserves a valid name', async () => {
-  const fetcher = vi
-    .fn<typeof fetch>()
-    .mockResolvedValueOnce(json({ items: [], nextCursor: null }))
-    .mockResolvedValueOnce(json({ stored: true }, 201));
-  vi.stubGlobal('fetch', fetcher);
-  render(<TestApp />);
-  await screen.findByText('Chưa có dự án');
-  fireEvent.change(screen.getByLabelText('Tên dự án'), {
-    target: { value: '変更しない名前' },
+it('retranslates an uncertain create and keeps the name', async () => {
+  const fetcher = backend({
+    'POST /api/v1/projects': () => json({ stored: true }, 201),
   });
-  fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
-  expect((await screen.findByRole('alert')).textContent).toContain(
-    'Làm mới danh sách',
-  );
-  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
-  expect(screen.getByRole('alert').textContent).toContain('再作成する前に');
+  render(<TestApp fetcher={fetcher} />);
+  await typeFolder();
+  fireEvent.click(screen.getByRole('radio', { name: 'VB6' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
   expect(
-    screen.getByDisplayValue('変更しない名前').getAttribute('aria-invalid'),
-  ).toBe('false');
-  expect(fetcher).toHaveBeenCalledTimes(2);
+    (await screen.findByText(/Làm mới danh sách để kiểm tra/)).textContent,
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
+  expect(screen.getByText(/再作成する前に/)).toBeTruthy();
+  expect(screen.getByDisplayValue('order-module')).toBeTruthy();
+  expect(posts(fetcher)).toHaveLength(1);
 });
 
 it('falls back safely for unsupported preferences and still switches when storage is blocked', async () => {
-  mockEmptyList();
+  const fetcher = backend();
   window.localStorage.setItem(LOCALE_STORAGE_KEY, 'unsupported-locale');
-  const view = render(<TestApp />);
-  await screen.findByText('Chưa có dự án');
+  const view = render(<TestApp fetcher={fetcher} />);
+  await screen.findByText('Chọn thư mục source');
   expect(screen.getByRole('group', { name: 'Ngôn ngữ' })).toBeTruthy();
   view.unmount();
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
@@ -262,7 +267,7 @@ it('falls back safely for unsupported preferences and still switches when storag
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
     throw new DOMException('Blocked', 'SecurityError');
   });
-  render(<TestApp />);
+  render(<TestApp fetcher={fetcher} />);
   fireEvent.click(screen.getByRole('radio', { name: '日本語' }));
   expect(screen.getByLabelText('プロジェクト名')).toBeTruthy();
   expect(document.documentElement.lang).toBe('ja');

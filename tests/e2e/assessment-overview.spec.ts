@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { openNewDemoProject } from './demo-project.js';
 import { ArtifactListSchema, type ArtifactRef } from '@portal/contracts';
 import { Check } from 'typebox/value';
 
@@ -37,10 +38,7 @@ test(
     });
 
     const projectName = `PF06 demo ${Date.now()}`;
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(projectName);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    await openNewDemoProject(page, projectName);
     // UI04: Start on the scan card; the analysis step opens by itself.
     await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {

@@ -6,6 +6,9 @@ import { App } from './app';
 import { json, requestUrl } from '../testing/fixtures';
 import { createLocalSession } from '../shared/api/local-session';
 import { createProjectsApi } from '../shared/api/projects-api';
+import { createRunsApi } from '../shared/api/runs-api';
+import { createSourcesApi } from '../shared/api/sources-api';
+import { createArtifactsApi } from '../shared/api/artifacts-api';
 
 const token = 'C'.repeat(43);
 
@@ -32,6 +35,9 @@ function renderApp(
     <StrictMode>
       <App
         api={createProjectsApi(fetcher, localSession)}
+        runsApi={createRunsApi(fetcher, localSession)}
+        sourcesApi={createSourcesApi(fetcher, localSession)}
+        artifactsApi={createArtifactsApi(fetcher, localSession)}
         session={localSession}
       />
     </StrictMode>,
@@ -60,10 +66,18 @@ it('shows a bootstrap failure, sends no POST on submit and recovers by explicit 
       'Không khởi tạo được phiên làm việc với backend cục bộ. Chưa có dữ liệu nào được gửi.',
     ),
   ).toBeTruthy();
+  // The first scan of a new project needs the session.
+  fireEvent.click(screen.getByRole('button', { name: 'Nhập đường dẫn' }));
+  fireEvent.change(
+    screen.getByLabelText('Đường dẫn thư mục source (tuyệt đối)'),
+    { target: { value: 'D:/work/order-module' } },
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Dùng thư mục này' }));
   fireEvent.change(screen.getByLabelText('Tên dự án'), {
     target: { value: 'Không được gửi' },
   });
-  fireEvent.click(screen.getByRole('button', { name: /^Tạo dự án$/ }));
+  fireEvent.click(screen.getByRole('radio', { name: 'VB6' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
   expect(
     await screen.findByText(
       'Chưa kết nối được phiên làm việc với backend nên yêu cầu chưa được gửi. Thử kết nối lại.',
@@ -105,7 +119,7 @@ it('does not bootstrap or mutate again when the locale changes while bootstrap i
     answer(json({ token }));
     await Promise.resolve();
   });
-  expect(await screen.findByText('Chưa có dự án')).toBeTruthy();
+  expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
   expect(screen.queryByText('Đang kết nối backend cục bộ…')).toBeNull();
   expect(app.sessionCalls()).toHaveLength(1);
   expect(app.posts()).toHaveLength(0);

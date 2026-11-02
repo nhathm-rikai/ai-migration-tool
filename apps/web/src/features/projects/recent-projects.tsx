@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Project, Run } from '@portal/contracts';
 import type { RunsApi } from '../../shared/api/runs-api';
 import { useLocale } from '../../shared/i18n/locale-context';
-import { Link, stepPath } from '../../app/router';
+import { Link, NEW_PROJECT_PATH, stepPath } from '../../app/router';
+import type { ProjectsApi } from '../../shared/api/projects-api';
+import { ProjectsDialog } from './projects-dialog';
 import { isActiveRun } from '../jobs/use-analyze-runs';
 import type { ProjectListControl } from './use-project-list';
 
@@ -71,25 +73,43 @@ export function useRecentProjects(
 
 export function RecentProjects({
   list,
+  api,
   runsApi,
   openProjectId,
   version,
 }: {
   list: ProjectListControl;
+  api: ProjectsApi;
   runsApi: RunsApi;
-  openProjectId: string;
+  // null on the step of a new project.
+  openProjectId: string | null;
   version: string;
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.sourceStep.recent;
   const projects = list.state.status === 'ready' ? list.state.page.items : null;
   const items = useRecentProjects(projects, runsApi, version);
+  const [showAll, setShowAll] = useState(false);
   return (
     <aside className="recent-projects" aria-labelledby="recent-title">
       <div className="recent-heading">
         <h2 id="recent-title">{copy.title}</h2>
-        <Link to="/projects">{copy.all}</Link>
+        <span className="recent-links">
+          {openProjectId !== null && (
+            <Link to={NEW_PROJECT_PATH}>{copy.new}</Link>
+          )}
+          <button className="link-button" onClick={() => setShowAll(true)}>
+            {copy.all}
+          </button>
+        </span>
       </div>
+      {showAll && (
+        <ProjectsDialog
+          api={api}
+          openProjectId={openProjectId}
+          onClose={() => setShowAll(false)}
+        />
+      )}
       {list.state.status === 'error' ? (
         <p role="alert" className="error">
           {copy.failed}

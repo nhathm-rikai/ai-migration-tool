@@ -53,61 +53,83 @@ test(
         starts++;
     });
     const projectName = `PF05 local ${Date.now()}`;
+    let creates = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && /\/projects$/.test(request.url()))
+        creates++;
+    });
+    // UI04: step 1 of a new project. Nothing is stored until "Quét source";
+    // then the project is created once, the folder registered and the first
+    // run started. The native dialog (UI05) is not opened here; paths are
+    // typed.
     await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(projectName);
-    await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
-    const created = page.waitForResponse(
-      (response) =>
-        response.request().method() === 'POST' &&
-        /\/projects$/.test(response.url()),
-    );
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const project = await payload(await created, ProjectSchema);
-    expect(project.mode).toBe('local');
-    // UI04: the scan card asks for the folder, then offers "Quét source".
+    await expect(page).toHaveURL(/\/projects\/new$/);
     const card = page.getByRole('region', { name: /thư mục/ });
     const folder = page.getByLabel('Đường dẫn thư mục source (tuyệt đối)');
     const scan = page.getByRole('button', { name: 'Quét source' });
-    const choose = page.getByRole('heading', { name: 'Chọn thư mục source' });
-    await expect(choose).toBeVisible();
+    const chosen = page.getByRole('heading', { name: 'Đã chọn thư mục' });
+    await expect(
+      page.getByRole('heading', { name: 'Chọn thư mục source' }),
+    ).toBeVisible();
     await expect(scan).toHaveCount(0);
-    // The native dialog (UI05) is not opened here; the typed path is.
-    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
+    await page.getByLabel('Tên dự án').fill(projectName);
 
-    const save = async (expectedStatus: number) => {
-      const pending = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'PUT' &&
-          /\/source$/.test(response.url()),
-      );
+    const typeFolder = async (path: string) => {
+      const change = page.getByRole('button', { name: 'Đổi thư mục' });
+      if (await change.isVisible()) await change.click();
+      await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
+      await folder.fill(path);
       await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+    };
+    const checked = async (pending: Promise<Response>, status: number) => {
       const response = await pending;
-      expect(response.status()).toBe(expectedStatus);
+      expect(response.status()).toBe(status);
       const text = await response.text();
       expect(text).not.toContain(sourceRoot);
       expect(text).not.toContain(dataDir);
       return response;
     };
+    const nextPut = () =>
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' &&
+          /\/source$/.test(response.url()),
+      );
+    const scanNew = async (status: number) => {
+      const pending = nextPut();
+      await scan.click();
+      return checked(pending, status);
+    };
 
-    // Rejected writes keep the input and register nothing.
-    await folder.fill('relative/source');
-    await save(400);
-    await expect(folder).toHaveValue('relative/source');
+    // A language is needed before anything is created.
+    await typeFolder('relative/source');
+    await expect(chosen).toBeVisible();
+    await scan.click();
+    await expect(
+      page.getByText('Chọn ngôn ngữ phân tích trước khi quét.'),
+    ).toBeVisible();
+    expect(creates).toBe(0);
+    await page.getByRole('radio', { name: 'VB6' }).check();
+
+    // Refused folders register nothing and create no second project.
+    await scanNew(400);
     for (const forbidden of [required('E2E_REPOSITORY_ROOT'), dataDir]) {
-      await folder.fill(forbidden);
-      await save(422);
+      await typeFolder(forbidden);
+      await scanNew(422);
       await expect(card.getByRole('alert')).toContainText(
         'Không được dùng thư mục này',
       );
-      await expect(choose).toBeVisible();
     }
-    await folder.fill(sourceRoot + '-missing');
-    await save(422);
+    await typeFolder(sourceRoot + '-missing');
+    await scanNew(422);
     await expect(card.getByRole('alert')).toContainText(
       'Thư mục không tồn tại',
     );
-    await folder.fill(sourceRoot);
-    const registered = await save(200);
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    expect(starts).toBe(0);
+    await typeFolder(sourceRoot);
+    const registered = await scanNew(200);
+    expect(creates).toBe(1);
     const registration = await payload(registered, ProjectSourceResponseSchema);
     expect(registration.source).toMatchObject({
       kind: 'local',
@@ -120,17 +142,26 @@ test(
     const authorization = registered.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
     const headers = { authorization };
-    const url = `/api/v1/projects/${project.id}/source`;
-    await expect(
-      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
-    ).toBeVisible();
-    await expect(scan).toBeEnabled();
-    expect(starts).toBe(0);
+    const projectId = /\/projects\/([^/]+)\/source$/.exec(
+      registered.url(),
+    )?.[1];
+    if (!projectId) throw new Error('No project in the source URL.');
+    const project: unknown = await (
+      await page.request.get(`/api/v1/projects/${projectId}`, { headers })
+    ).json();
+    if (!Check(ProjectSchema, project)) throw new Error('No project.');
+    expect(project).toMatchObject({ name: projectName, mode: 'local' });
+    // The first run goes on in the project's step 1, then opens step 2.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
+    expect(starts).toBe(1);
 
-    // Another client advances the revision while the folder is being changed.
-    await page.getByRole('button', { name: 'Đổi thư mục' }).click();
-    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
-    await folder.fill(sourceRoot);
+    // Another client advances the revision while the folder is changed on
+    // the project's own step 1.
+    const url = `/api/v1/projects/${project.id}/source`;
+    await page.goto(`/projects/${project.id}/source`);
+    await expect(chosen).toBeVisible();
     const concurrent = await page.request.put(url, {
       headers,
       data: {
@@ -141,7 +172,12 @@ test(
       },
     });
     expect(concurrent.status()).toBe(200);
-    await save(409);
+    await page.getByRole('button', { name: 'Đổi thư mục' }).click();
+    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
+    await folder.fill(sourceRoot);
+    let pending = nextPut();
+    await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+    await checked(pending, 409);
     await expect(card.getByRole('alert')).toContainText(
       'Mã nguồn vừa được cập nhật',
     );
@@ -156,20 +192,17 @@ test(
       (await payload(await refreshed, ProjectSourceResponseSchema)).source
         ?.revision,
     ).toBe(2);
-    const updated = await payload(await save(200), ProjectSourceResponseSchema);
+    pending = nextPut();
+    await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+    const updated = await payload(
+      await checked(pending, 200),
+      ProjectSourceResponseSchema,
+    );
     // The mapping set elsewhere is kept as it was.
     expect(updated.source).toMatchObject({
       revision: 3,
       tableNameMapping: { defaultSchema: 'APP', status: 'assumed' },
     });
-
-    // "Quét source" needs the analysis language of a new source.
-    await scan.click();
-    await expect(
-      page.getByText('Chọn ngôn ngữ phân tích trước khi quét.'),
-    ).toBeVisible();
-    expect(starts).toBe(0);
-    await page.getByRole('radio', { name: 'VB6' }).check();
     await scan.click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
@@ -186,7 +219,7 @@ test(
       throw new Error('Local run did not publish its snapshot.');
     const run = current.run;
     expect(run.source).toMatchObject({ kind: 'local', revision: 3 });
-    expect(starts).toBe(1);
+    expect(starts).toBe(2);
     const snapshot = join(dataDir, 'snapshots', run.sourceSnapshotId);
     const normalized = "Sub Main()\n' あ\nEnd Sub\n";
     const raw = await readFile(join(sourceRoot, 'MAIN.BAS'));
@@ -256,7 +289,7 @@ test(
     await page.reload();
     await expect(lastJa).toBeVisible();
     await expect(page.getByRole('radio', { name: 'VB6' })).toBeChecked();
-    expect(starts).toBe(1);
+    expect(starts).toBe(2);
     expect(page.url()).not.toContain(sourceRoot);
   },
 );

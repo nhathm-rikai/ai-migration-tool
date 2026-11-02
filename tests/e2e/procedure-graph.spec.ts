@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openNewDemoProject } from './demo-project.js';
 import { syntheticCorpusFixture } from '@portal/contracts/fixtures';
 
 // UI03-EXT01: the call graph tab of one program's detail lays out its procedures,
@@ -25,10 +26,7 @@ test(
     const workers: string[] = [];
     page.on('worker', (worker) => workers.push(worker.url()));
 
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03-EXT01 graph ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    await openNewDemoProject(page, `UI03-EXT01 graph ${Date.now()}`);
     // UI04: Start on the scan card; the analysis step opens by itself.
     await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {

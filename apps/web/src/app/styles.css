@@ -3356,3 +3356,107 @@ details.technical[open] > summary {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* "Xem tất cả": every project in a dialog, to open one again (UI04). */
+.recent-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+.recent-links a {
+  text-decoration: none;
+}
+.link-button {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration: underline;
+}
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px;
+  background: rgba(15, 34, 54, 0.35);
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+.dialog {
+  width: min(560px, 100%);
+  max-height: 80vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(15, 34, 54, 0.2);
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dialog-heading h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.projects-dialog input[type='search'] {
+  min-height: 42px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.projects-dialog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.projects-dialog-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 13px;
+}
+.projects-dialog-list a:hover,
+.projects-dialog-list a[aria-current='page'] {
+  border-color: var(--brand);
+}
+.projects-dialog-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.projects-dialog-list .muted {
+  flex: none;
+  font-size: 12px;
+}
+.dialog-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 13px;
+}

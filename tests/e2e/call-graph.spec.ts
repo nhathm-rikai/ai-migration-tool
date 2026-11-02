@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openNewDemoProject } from './demo-project.js';
 import { syntheticCorpusFixture } from '@portal/contracts/fixtures';
 
 // UI03-AC03/AC04: the call graph of a synthetic corpus (~300 programs, 30
@@ -31,10 +32,7 @@ test(
     const workers: string[] = [];
     page.on('worker', (worker) => workers.push(worker.url()));
 
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 graph ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    await openNewDemoProject(page, `UI03 graph ${Date.now()}`);
     // UI04: Start on the scan card; the analysis step opens by itself.
     await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
@@ -165,10 +163,7 @@ test(
     await page
       .context()
       .route(/elk-worker[^/]*\.js/, (route) => route.abort('failed'));
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 fallback ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    await openNewDemoProject(page, `UI03 fallback ${Date.now()}`);
     // UI04: Start on the scan card; the analysis step opens by itself.
     await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
@@ -208,10 +203,7 @@ test(
       if (typeof body !== 'object' || body === null) throw new Error('body');
       await route.fulfill({ response, json: { ...body, payload: corpus } });
     });
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 full ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
+    await openNewDemoProject(page, `UI03 full ${Date.now()}`);
     // UI04: Start on the scan card; the analysis step opens by itself.
     await page.getByRole('button', { name: 'Quét source' }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {

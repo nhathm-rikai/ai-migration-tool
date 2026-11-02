@@ -888,6 +888,42 @@ export const viMessages = {
       DOCUMENT_NOT_FOUND: 'File này không có hoặc gói chưa hoàn tất.',
     },
   },
+  review: {
+    loading: 'Đang tải tài liệu…',
+    emptyTitle: 'Chưa có tài liệu để review',
+    emptyHelp: 'Tạo tài liệu cho một program ở bước 3, kết quả sẽ hiện ở đây.',
+    emptyAction: 'Sang Tạo tài liệu',
+    createQuote: 'Tạo báo giá',
+    previewQuote: 'Xem trước báo giá',
+    listLabel: 'Danh sách tài liệu',
+    preview: 'Xem trước tài liệu',
+    reviewLabel: 'Đánh giá',
+    noDocuments: 'Không có tài liệu nào ở trạng thái này.',
+    filters: { all: 'Tất cả', pending: 'Chờ duyệt', approved: 'Đã duyệt' },
+    status: { pending: 'Chờ duyệt', approved: 'Đã duyệt' },
+    setOf: (total: number) => `Bộ tài liệu · ${total} tài liệu`,
+    downloadSet: (name: string) => `Tải bộ tài liệu ${name}`,
+    approvedOf: (done: number, total: number) => `${done}/${total} đã duyệt`,
+    unresolved: (count: number) =>
+      `Có ${count} điểm chưa xác định trong tài liệu này.`,
+    seeUnresolved: 'Xem',
+    docNames: {
+      'business-rules': 'Business rules',
+      'basic-design': 'Thiết kế cơ bản',
+      'detail-design': 'Thiết kế chi tiết',
+      'db-design': 'Thiết kế CSDL',
+      'security-audit': 'Security audit',
+    },
+    comments: 'Nhận xét',
+    noComments: 'Chưa có nhận xét.',
+    commentPlaceholder: 'Viết nhận xét…',
+    send: 'Gửi',
+    approve: 'Duyệt tài liệu',
+    errors: {
+      REVIEW_STALE:
+        'Tài liệu này đã có phiên bản mới hơn. Tải lại trang để review đúng phiên bản.',
+    },
+  },
   errors: {
     unexpected: 'Có lỗi khi xử lý yêu cầu. Vui lòng thử lại.',
     outcomeUnknown:

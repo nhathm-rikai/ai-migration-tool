@@ -7,6 +7,7 @@ import {
   cancelDocumentRunSuccessStatus,
   documentRunLocation,
 } from '@portal/contracts';
+import type { DocumentReviewService } from '../reviews/document-review.service.js';
 import type { DocumentRunService } from './document-run.service.js';
 
 // Document runs (step 3). Paths and schemas come from the contract table;
@@ -14,6 +15,7 @@ import type { DocumentRunService } from './document-run.service.js';
 export function registerDocumentRoutes(
   instance: FastifyInstance,
   service: DocumentRunService,
+  reviews: DocumentReviewService,
 ): void {
   const app = instance.withTypeProvider<TypeBoxTypeProvider>();
   const ops = DOCUMENTS_API_OPERATIONS;
@@ -133,5 +135,34 @@ export function registerDocumentRoutes(
         request.params.item,
         request.params.file,
       ),
+  );
+  app.get(
+    ops.getReviewBoard.path,
+    {
+      schema: {
+        params: ops.getReviewBoard.params,
+        querystring: ops.getReviewBoard.querystring,
+        response: {
+          200: ops.getReviewBoard.response,
+          default: ErrorResponseSchema,
+        },
+      },
+    },
+    (request) => reviews.board(request.params.projectId),
+  );
+  app.post(
+    ops.addReviewEvent.path,
+    {
+      schema: {
+        params: ops.addReviewEvent.params,
+        querystring: ops.addReviewEvent.querystring,
+        body: ops.addReviewEvent.body,
+        response: {
+          200: ops.addReviewEvent.response,
+          default: ErrorResponseSchema,
+        },
+      },
+    },
+    (request) => reviews.add(request.params.projectId, request.body),
   );
 }

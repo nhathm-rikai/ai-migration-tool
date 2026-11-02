@@ -1,12 +1,12 @@
 # Business Rules — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** Điền [phần đầu chung](../README.md); áp dụng [yêu cầu BR](../rules/deliverables.md).
+**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** Điền [phần đầu chung](../README.md); áp dụng [yêu cầu BR](../rules/deliverables.md).
 
-| BR ID   | Tiêu đề/phát biểu | Basis | Trigger/điều kiện/ngoại lệ | Input/output | Công thức/precision/rounding/Null/Empty/giới hạn | Dependency | Evidence refs | Q-IDs |
+| BR ID   | Tiêu đề/phát biểu | Basis | Trigger/điều kiện/ngoại lệ | Input/output | Công thức/precision/rounding/Null/Empty/giới hạn | Dependency | Evidence refs | U-IDs |
 | ------- | ----------------- | ----- | -------------------------- | ------------ | ------------------------------------------------ | ---------- | ------------- | ----- |
 | <BR-ID> |                   |       |                            |              |                                                  |            |               |       |
 
-| Nhóm kiểm tra                           | Tìm thấy/chưa xác định/không áp dụng | Phạm vi đã kiểm/lý do | BR hoặc Q-ID |
+| Nhóm kiểm tra                           | Tìm thấy/chưa xác định/không áp dụng | Phạm vi đã kiểm/lý do | BR hoặc U-ID |
 | --------------------------------------- | ------------------------------------ | --------------------- | ------------ |
 | Validation                              |                                      |                       |              |
 | Quyền/trạng thái                        |                                      |                       |              |
@@ -22,9 +22,6 @@ Evidence registry: mỗi ref ghi path POSIX tương đối, symbol nếu biết,
 
 Markdown chưa phải BR xlsx bàn giao; export theo [checklist](../review-checklist.md).
 
-## Câu hỏi mở
+## Điểm chưa xác định
 
-Theo [phần cuối chung](../README.md#phần-đầu-và-phần-cuối-chung). Không có câu hỏi thì ghi "Không có".
-
-| Q-ID   | Câu hỏi/thiếu gì | Related BR/DS/section | Blocking đề xuất | Phần ảnh hưởng | Evidence/context cần thêm |
-| ------ | ---------------- | --------------------- | ---------------- | -------------- | ------------------------- |
+Theo [phần cuối chung](../README.md#phần-đầu-và-phần-cuối-chung). Không có thì ghi "Không có".

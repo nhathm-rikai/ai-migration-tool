@@ -1,3 +1,4 @@
+import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,6 +35,8 @@ import { createFakeDocumentRunner } from './adapters/fake/fake-document.runner.j
 import { createClaudeCliRunner } from './adapters/local/claude-cli.runner.js';
 import { createCodexCliRunner } from './adapters/local/codex-cli.runner.js';
 import { resolveAgentExecutable } from './platform/agent-executable.js';
+import { createDocumentReviewService } from './modules/reviews/document-review.service.js';
+import { createReviewEventRepository } from './modules/reviews/review-event.repository.js';
 import { createDocumentRunRepository } from './modules/documents/document-run.repository.js';
 import { createDocumentDispatcher } from './modules/documents/document-dispatcher.js';
 import {
@@ -90,6 +93,15 @@ function unavailableRunner(reason: string): AgentRunner {
       return Promise.resolve({ status: 'failed', code: 'AGENT_UNAVAILABLE' });
     },
   };
+}
+
+// Single-user local Portal: the review author is the OS account (DATA-07).
+function localReviewer(): string {
+  try {
+    return userInfo().username || 'local';
+  } catch {
+    return 'local';
+  }
 }
 
 function createDocumentAgent(
@@ -330,7 +342,16 @@ export function createDependencies(
       nextId: randomUUID,
       now,
     });
+    const reviews = createDocumentReviewService({
+      events: createReviewEventRepository(db),
+      listEndedRuns: (projectId) => documentRuns.listEnded(projectId),
+      checkProject: (projectId) => void projects.get(projectId),
+      reviewer: localReviewer(),
+      nextId: randomUUID,
+      now,
+    });
     return {
+      reviews,
       projects,
       sources,
       jobs,

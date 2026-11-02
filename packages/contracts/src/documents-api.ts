@@ -14,6 +14,7 @@ import {
   StartDocumentRunSchema,
   type DocumentRun,
 } from './documents.schema.js';
+import { AddReviewEventSchema, ReviewBoardSchema } from './reviews.schema.js';
 import type { AnalyzeOperationErrorCode } from './analyze-api.js';
 
 // Operations of document runs (step 3), in the shape of
@@ -35,6 +36,7 @@ const PROJECT_READ_ERRORS = ['INVALID_INPUT', 'PROJECT_NOT_FOUND'] as const;
 const RUN_READ_ERRORS = [...PROJECT_READ_ERRORS, 'RUN_NOT_FOUND'] as const;
 
 const RunsPath = '/api/v1/projects/:projectId/document-runs';
+const ReviewsPath = '/api/v1/projects/:projectId/document-reviews';
 
 export const DOCUMENTS_API_OPERATIONS = {
   startDocumentRun: {
@@ -96,6 +98,28 @@ export const DOCUMENTS_API_OPERATIONS = {
     querystring: EmptyQuerySchema,
     response: PackageFileContentSchema,
     errorCodes: [...RUN_READ_ERRORS, 'DOCUMENT_NOT_FOUND'],
+  },
+  getReviewBoard: {
+    method: 'GET',
+    path: ReviewsPath,
+    params: ProjectParamsSchema,
+    querystring: EmptyQuerySchema,
+    response: ReviewBoardSchema,
+    errorCodes: PROJECT_READ_ERRORS,
+  },
+  addReviewEvent: {
+    method: 'POST',
+    path: ReviewsPath,
+    params: ProjectParamsSchema,
+    querystring: EmptyQuerySchema,
+    body: AddReviewEventSchema,
+    response: ReviewBoardSchema,
+    errorCodes: [
+      ...PROJECT_READ_ERRORS,
+      ...BODY_ERRORS,
+      'DOCUMENT_NOT_FOUND',
+      'REVIEW_STALE',
+    ],
   },
 } as const satisfies Record<string, DocumentOperation>;
 

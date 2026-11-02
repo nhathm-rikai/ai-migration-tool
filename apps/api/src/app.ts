@@ -82,6 +82,6 @@ export function buildApp(
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
   registerArtifactRoutes(app, dependencies.artifacts);
-  registerDocumentRoutes(app, dependencies.documents);
+  registerDocumentRoutes(app, dependencies.documents, dependencies.reviews);
   return app;
 }

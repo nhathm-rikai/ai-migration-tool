@@ -4,6 +4,15 @@
 
 Removed the floating screen-selector markup, unused CSS and JavaScript listeners from the standalone design HTML. Hash and sidebar navigation remain available. Scope: prototype UI only; no app/API changes.
 
+## 02/11/2026 — Bước 4: Review & duyệt tài liệu, bỏ câu hỏi mở
+
+- Màn hình theo prototype `tpl-Review`, trừ luồng câu hỏi: danh sách tài liệu theo program (gói mới nhất), bộ lọc, xem Markdown, nhận xét, duyệt.
+- Quyết định của TL: source cũ không có câu hỏi và blocking, khác prototype. Pack `spec-design-rules-0.11.0-draft` + `spec-design-templates-0.10.0-draft`, prompt `spec-design-task-v6`: mục cuối mỗi tài liệu là "Điểm chưa xác định" (U-ID) chỉ để ghi nhận, không chặn duyệt. Màn Review nhắc số điểm và cuộn tới mục đó. Mode JSON `understanding-v1` vẫn dùng `questions` theo contract.
+- API `GET/POST /api/v1/projects/:projectId/document-reviews`, migration `0007` và `0008` append-only gắn run + file + sha256 (DATA-07); `0008` bỏ các cột câu hỏi của `0007`, giữ nhận xét và lượt duyệt. Người review lấy từ tài khoản OS ở backend. Sai phiên bản hoặc không còn là gói mới nhất trả 409 `REVIEW_STALE`.
+- Mỗi lần chỉ hiện một program: theo `?program=`, không có thì program có gói mới nhất. Bộ lọc ẩn nhóm và tài liệu không khớp. Nút báo giá nằm cùng hàng tiêu đề.
+- Nút tải cả bộ tải lần lượt từng file `.md`, chưa đóng gói zip.
+- Chưa làm: skeleton, toast, dấu tích bước 4, bỏ duyệt. Gói đã sinh trước đó vẫn có bảng câu hỏi cũ cho tới khi chạy lại. `notes/spec-design-operations.md` còn nội dung cũ.
+
 ## 30/10/2026 — Bước 3: ngôn ngữ đầu ra
 
 - Sửa lỗi chọn tiếng Nhật vẫn ra tiếng Việt: SD-EV-07 quy định cứng tiếng Việt, phiếu input không có ngôn ngữ, prompt yêu cầu giữ heading template. Nay SD-EV-07 theo mục 3 phiếu input; Portal ghi ngôn ngữ vào phiếu; prompt `spec-design-task-v4` yêu cầu viết toàn bộ bằng ngôn ngữ đã chọn, trừ ID, identifier, path, trích dẫn source và dòng `Trạng thái sinh`.

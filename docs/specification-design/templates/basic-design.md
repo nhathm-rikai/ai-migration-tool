@@ -1,6 +1,6 @@
 # Basic Design — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + Q-ID.
+**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** [Phần đầu chung](../README.md), [yêu cầu nội dung](../rules/deliverables.md). Mọi section có nội dung hoặc lý do/phạm vi không áp dụng hoặc chưa xác định + U-ID.
 
 ## 1. Thông tin tài liệu
 
@@ -28,7 +28,7 @@ UI có thể là form designer, trang/template web, terminal map hoặc dạng k
 
 ## 6. Report/export
 
-Với mỗi report/mode trong bảng dưới, ghép [Basic report template](basic-design-report.md) thành section con theo [hướng dẫn report](../report-templates.md). Bảng này là danh mục; layout/field/file contract chi tiết chỉ định nghĩa một lần trong section report. Nếu không có hoặc chưa xác định, ghi lý do/phạm vi/Q-ID.
+Với mỗi report/mode trong bảng dưới, ghép [Basic report template](basic-design-report.md) thành section con theo [hướng dẫn report](../report-templates.md). Bảng này là danh mục; layout/field/file contract chi tiết chỉ định nghĩa một lần trong section report. Nếu không có hoặc chưa xác định, ghi lý do/phạm vi/U-ID.
 
 | Tên/đích | Điều kiện | Filter/sort/group | Field/công thức | Encoding/format | Template thiếu | Evidence |
 | -------- | --------- | ----------------- | --------------- | --------------- | -------------- | -------- |
@@ -38,6 +38,10 @@ Với mỗi report/mode trong bảng dưới, ghép [Basic report template](basi
 | Nguyên văn | Dịch riêng | Điều kiện | Tác động | Evidence |
 | ---------- | ---------- | --------- | -------- | -------- |
 
-## 8. Questions và evidence registry
+## 8. Evidence registry
 
-<Q-ID, blocking/nonblocking, phần ảnh hưởng; mỗi evidence ref ghi path/symbol/range/quote nguyên văn>
+<mỗi evidence ref ghi path/symbol/range/quote nguyên văn>
+
+## Điểm chưa xác định
+
+Theo [phần cuối chung](../README.md#phần-đầu-và-phần-cuối-chung). Không có thì ghi "Không có".

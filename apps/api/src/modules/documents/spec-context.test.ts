@@ -58,6 +58,8 @@ describe('specification-design package', () => {
     expect(prompt).toContain('| 生成状態 |');
     expect(prompt).not.toContain('Trạng thái sinh');
     expect(prompt).toContain('No Vietnamese may remain');
+    expect(prompt).toContain('headed exactly "未確定事項"');
+    expect(prompt).toContain('do not ask questions');
     expect(prompt).toContain('context/input-context.md');
     expect(prompt).toContain('OUTPUT LANGUAGE: Japanese');
     expect(prompt).toContain('section headings, table headers');

@@ -1,8 +1,8 @@
 # Detail Design — <PROGRAM> — <Tên chức năng>
 
-**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
+**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** Thay revision riêng p2-detail-design-0.1.1-draft; thuật ngữ trung lập theo [quy trình phân tích](../analysis-method.md). [Phần đầu chung](../README.md), [yêu cầu](../rules/deliverables.md), [căn cứ tham khảo](../detail-design-reference.md).
 
-Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ procedure. Một xử lý có thể gồm nhiều procedure, một procedure có thể phục vụ nhiều xử lý. ID xử lý là tham chiếu Markdown, không thêm field vào understanding-v1. Mọi mục có nội dung hoặc “không áp dụng” kèm lý do/phạm vi đã kiểm hoặc “chưa xác định” kèm Q-ID. E-ref trỏ evidence registry mục 7.
+Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ procedure. Một xử lý có thể gồm nhiều procedure, một procedure có thể phục vụ nhiều xử lý. ID xử lý là tham chiếu Markdown, không thêm field vào understanding-v1. Mọi mục có nội dung hoặc “không áp dụng” kèm lý do/phạm vi đã kiểm hoặc “chưa xác định” kèm U-ID. E-ref trỏ evidence registry mục 7.
 
 ## 1. Tổng quan — 処理概要
 
@@ -10,12 +10,12 @@ Tổ chức theo xử lý nghiệp vụ; inventory bảo đảm không bỏ proc
 
 <unit/program, project/entrypoint path và alias, ngôn ngữ/runtime phát hiện, snapshot/version được cung cấp, mục đích, loại màn hình/báo cáo/xử lý chung, phạm vi và giới hạn>
 
-| ID xử lý | Tên/mục đích | Trigger/entry point | Procedure chính | Mục chi tiết | BR/Q-ID | E-ref |
+| ID xử lý | Tên/mục đích | Trigger/entry point | Procedure chính | Mục chi tiết | BR/U-ID | E-ref |
 | -------- | ------------ | ------------------- | --------------- | ------------ | ------- | ----- |
 
 ### 1.2 Điều kiện truy cập
 
-| Vai trò/trạng thái thấy trong source | Menu/entry point | Điều kiện cho phép | Khi không đủ điều kiện | Phạm vi dữ liệu | E-ref/Q-ID |
+| Vai trò/trạng thái thấy trong source | Menu/entry point | Điều kiện cho phép | Khi không đủ điều kiện | Phạm vi dữ liệu | E-ref/U-ID |
 | ------------------------------------ | ---------------- | ------------------ | ---------------------- | --------------- | ---------- |
 
 Không suy phân quyền từ control bị ẩn; không mặc định có URL/session/web layer khi source không có.
@@ -30,11 +30,11 @@ Basic Design giữ định nghĩa item đầy đủ. Tại đây chỉ tham chi�
 | Bước | Khởi tạo/lifecycle/event | Điều kiện | ID xử lý gọi tới | Message/kết quả/điều hướng | State giữ/đổi | E-ref |
 | ---- | ----------------------------- | --------- | ---------------- | -------------------------- | ------------- | ----- |
 
-Bao gồm code khởi tạo module/file và code ngoài đơn vị logic. Chưa có căn cứ thứ tự event thì ghi Q-ID.
+Bao gồm code khởi tạo module/file và code ngoài đơn vị logic. Chưa có căn cứ thứ tự event thì ghi U-ID.
 
 ## 2. Inventory và ánh xạ source
 
-| Inventory ID/path | Symbol đầy đủ/kind/visibility | Range gốc | ID xử lý/mục mô tả | Đã/chưa phân tích | Lý do/Q-ID |
+| Inventory ID/path | Symbol đầy đủ/kind/visibility | Range gốc | ID xử lý/mục mô tả | Đã/chưa phân tích | Lý do/U-ID |
 | ---------- | ----------------------------- | --------- | ------------------ | ----------------- | ---------- |
 
 Liệt kê mọi đơn vị logic theo ngôn ngữ thực (function/method/accessor/Sub/Property/paragraph/section/stored routine/trigger/handler…) và code file/module-level. Đơn vị chưa gắn xử lý vẫn phải ghi. Mỗi đơn vị có chữ ký, tham số và cách truyền/default nếu thấy, return, global state, caller/callee và unresolved ở mục 3; dẫn tới đó thay vì lặp nội dung.
@@ -43,7 +43,7 @@ Liệt kê mọi đơn vị logic theo ngôn ngữ thực (function/method/acces
 
 ### 3.x.1 Mục đích và điều kiện gọi — 呼び出し条件
 
-<ID/tên xử lý, mục đích hiện trạng, tiền điều kiện, observed/hypothesis, BR/Q-ID>
+<ID/tên xử lý, mục đích hiện trạng, tiền điều kiện, observed/hypothesis, BR/U-ID>
 
 | Trigger/caller | Điều kiện/trạng thái | Input trực tiếp | Procedure/entry point | Kết quả theo source | E-ref |
 | -------------- | -------------------- | --------------- | --------------------- | ------------------- | ----- |
@@ -81,7 +81,7 @@ BR list giữ phát biểu chuẩn; ở đây ghi thứ tự áp dụng và đi�
 
 ### 3.x.6 Truy cập dữ liệu và SQL — データアクセス・SQL
 
-| Call-site ID/path/symbol/range | Mục đích | Table/column as written | C/R/U/D hoặc X | Connection | Nơi dựng/nơi thực thi SQL | Kết quả/handling | E-ref/Q-ID |
+| Call-site ID/path/symbol/range | Mục đích | Table/column as written | C/R/U/D hoặc X | Connection | Nơi dựng/nơi thực thi SQL | Kết quả/handling | E-ref/U-ID |
 | ------------------------------ | -------- | ----------------------- | -------------- | ---------- | ------------------------- | ---------------- | ---------- |
 
 Mỗi call site có SQL nguyên dạng hoặc code dựng SQL (string, query builder, ORM, mapper XML/annotation, embedded SQL) trong code block riêng + E-ref. SQL đã ghép là diễn giải, không phải quote nguyên văn; giữ biểu thức nguồn. SQL động unresolved phải còn trong bảng.
@@ -93,7 +93,7 @@ DDL/type/PK/FK và CRUD tổng hợp tham chiếu DB Design. Schema mặc địn
 
 ### 3.x.7 Transaction, lỗi và cleanup — トランザクション・例外
 
-| Tình huống/boundary | Điều kiện/phạm vi | Begin/commit/rollback thấy được | Cơ chế lỗi/nhánh xử lý | Side effect đã xảy ra/còn lại | Cleanup/tài nguyên | E-ref/Q-ID |
+| Tình huống/boundary | Điều kiện/phạm vi | Begin/commit/rollback thấy được | Cơ chế lỗi/nhánh xử lý | Side effect đã xảy ra/còn lại | Cleanup/tài nguyên | E-ref/U-ID |
 | ------------------- | ----------------- | ------------------------------- | --------------------------- | ----------------------------- | ------------------ | ---------- |
 
 Không suy transaction từ cùng connection hoặc nhiều SQL liên tiếp. Nêu trạng thái dữ liệu/UI khi lỗi giữa chừng, đóng cursor/recordset/connection/file nếu có bằng chứng; thiếu thì chưa xác định.
@@ -111,11 +111,11 @@ Không tự tạo mã message theo mẫu tham khảo nếu source không có mã
 
 Với mỗi report/mode, ghép [Detail report template](detail-design-report.md) thành section con tại đây theo [hướng dẫn report](../report-templates.md). Dùng cùng Report ID/mode/field với phần [Basic report](basic-design-report.md); bảng query, vòng lặp, tính toán, mapping, serialization và lỗi chỉ định nghĩa một lần ở section report. Inventory và khối common của program tham chiếu vào đây, không lặp toàn bộ logic.
 
-Không có report thì ghi không áp dụng + phạm vi kiểm; thiếu source/layout hoặc chưa xác định mode thì Q-ID. Template chuyên biệt thay bảng tóm tắt cũ ở mục này, không bỏ coverage/evidence.
+Không có report thì ghi không áp dụng + phạm vi kiểm; thiếu source/layout hoặc chưa xác định mode thì U-ID. Template chuyên biệt thay bảng tóm tắt cũ ở mục này, không bỏ coverage/evidence.
 
 ### 4.2 Dependency/giao tiếp ngoài
 
-| File/library/native/COM/API/queue/print/CSV/interface | Caller/call site | Input/output | Resolved/missing/unsupported | Tác động khi lỗi | E-ref/Q-ID |
+| File/library/native/COM/API/queue/print/CSV/interface | Caller/call site | Input/output | Resolved/missing/unsupported | Tác động khi lỗi | E-ref/U-ID |
 | ---------------------------------------- | ---------------- | ------------ | ---------------------------- | ---------------- | ---------- |
 
 ## 5. Xử lý chung — 共通詳細設計参照
@@ -129,19 +129,23 @@ Reference Markdown phải tồn tại, rõ version/snapshot. JSON v1 theo [mappi
 
 ## 6. Rủi ro diễn giải và thiếu dữ liệu
 
-| Hiện tượng có evidence | Nguy cơ hiểu sai | Phần ảnh hưởng | Đã biết/chưa biết | E-ref/Q-ID |
+| Hiện tượng có evidence | Nguy cơ hiểu sai | Phần ảnh hưởng | Đã biết/chưa biết | E-ref/U-ID |
 | ---------------------- | ---------------- | -------------- | ----------------- | ---------- |
 
 Xét theo [checklist semantics chung](../analysis-method.md#4-checklist-semantics-chung) cho ngôn ngữ thực: kiểu/null, số học/rounding, chuỗi/ngày/locale, scope/state, lỗi/cleanup, transaction/đồng thời, biên dịch có điều kiện/macro/include, gọi động và hành vi ngầm. Không tự chọn build config, không mượn semantics của ngôn ngữ khác hoặc của mẫu tham khảo.
 
 ## 7. Phạm vi phân tích và evidence registry
 
-| File/inventory symbol ID/file-level code | ID xử lý/mục mô tả | Đã/chưa phân tích | Phần thiếu/chunk | Coverage/Q-ID |
+| File/inventory symbol ID/file-level code | ID xử lý/mục mô tả | Đã/chưa phân tích | Phần thiếu/chunk | Coverage/U-ID |
 | ------------------------------------ | ------------------ | ----------------- | ---------------- | ------------- |
 
-Đối chiếu phạm vi đã đọc trong phần đầu chung và mục Câu hỏi mở. Mọi đơn vị logic mục 2 phải ánh xạ hoặc có lý do chưa phân tích. Số đo do công cụ cung cấp, không AI tự đếm.
+Đối chiếu phạm vi đã đọc trong phần đầu chung và mục Điểm chưa xác định. Mọi đơn vị logic mục 2 phải ánh xạ hoặc có lý do chưa phân tích. Số đo do công cụ cung cấp, không AI tự đếm.
 
 | E-ref | Relative POSIX path | Symbol nếu biết | startLine/endLine gốc | Claim/mục sử dụng |
 | ----- | ------------------- | --------------- | --------------------- | ----------------- |
 
 Sau mỗi E-ref đặt quote nguyên văn trong fenced block, giữ tab/khoảng trắng/tiếng Nhật, không thêm line prefix hoặc newline vào nội dung quote. Không AI đánh verified. E-ref chỉ là trình bày Markdown; evidence JSON vẫn chỉ path/startLine/endLine/quote.
+
+## Điểm chưa xác định
+
+Theo [phần cuối chung](../README.md#phần-đầu-và-phần-cuối-chung). Không có thì ghi "Không có".

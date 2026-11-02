@@ -135,6 +135,8 @@ function fakeApi(current: CurrentDocumentRunResponse) {
         content: '# Business rules\n<script>x</script>',
       }),
     ),
+    reviewBoard: vi.fn(),
+    addReview: vi.fn(),
   } satisfies Record<keyof DocumentsApi, unknown>;
 }
 
@@ -162,6 +164,8 @@ function renderStep(
 describe('DocumentsStep', () => {
   it('asks to read the stepper mark again when the latest run disagrees', async () => {
     const onDocumentsChanged = vi.fn();
+    // One API for both renders: a new one would read the run again.
+    const api = fakeApi({ run: documentRun(), ...ready });
     const tree = (documentsWritten: boolean) => (
       <LocaleProvider>
         <DocumentsStep
@@ -172,14 +176,14 @@ describe('DocumentsStep', () => {
           onRetryAnalysis={() => {}}
           documentsWritten={documentsWritten}
           onDocumentsChanged={onDocumentsChanged}
-          api={fakeApi({ run: documentRun(), ...ready })}
+          api={api}
           artifactsApi={artifactsApi}
         />
       </LocaleProvider>
     );
     const { rerender } = render(tree(false));
     await screen.findByText('Đã tạo xong 1 tài liệu');
-    expect(onDocumentsChanged).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onDocumentsChanged).toHaveBeenCalledTimes(1));
     rerender(tree(true));
     expect(onDocumentsChanged).toHaveBeenCalledTimes(1);
   });

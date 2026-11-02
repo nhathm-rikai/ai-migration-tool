@@ -1,8 +1,10 @@
 import {
   CurrentDocumentRunResponseSchema,
+  ReviewBoardSchema,
   DocumentLogPageSchema,
   DocumentRunSchema,
   PackageFileContentSchema,
+  type AddReviewEvent,
   type StartDocumentRunInput,
 } from '@portal/contracts';
 import { createApiClient } from './api-client';
@@ -81,6 +83,19 @@ export function createDocumentsApi(
           encodeURIComponent(file),
         PackageFileContentSchema,
         signal,
+      ),
+    reviewBoard: (projectId: string, signal: AbortSignal) =>
+      request(
+        `/projects/${encodeURIComponent(projectId)}/document-reviews`,
+        ReviewBoardSchema,
+        signal,
+      ),
+    addReview: (projectId: string, event: AddReviewEvent) =>
+      request(
+        `/projects/${encodeURIComponent(projectId)}/document-reviews`,
+        ReviewBoardSchema,
+        new AbortController().signal,
+        { method: 'POST', body: event },
       ),
   };
 }

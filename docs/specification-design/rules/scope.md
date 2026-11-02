@@ -1,6 +1,6 @@
 # Specification design — phạm vi và pilot
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.11.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -8,7 +8,7 @@
 
 Specification design mô tả đúng **hệ thống đang có, độc lập ngôn ngữ nguồn**, đủ dẫn chứng để người đọc kiểm tra và làm đầu vào P3/P4/P5.
 
-- Trong phạm vi: BR, màn hình/item/event, luồng xử lý, báo cáo/CSV, logic function, truy cập dữ liệu, xử lý lỗi, dependency, câu hỏi còn mở, tài liệu đã duyệt trong KB.
+- Trong phạm vi: BR, màn hình/item/event, luồng xử lý, báo cáo/CSV, logic function, truy cập dữ liệu, xử lý lỗi, dependency, điểm chưa xác định, tài liệu đã duyệt trong KB.
 - Ngoài phạm vi: chọn kiến trúc đích, viết conversion/coding rules, chuyển đổi ngôn ngữ, sửa nghiệp vụ, chạy source/SQL/script khách hàng, sinh bộ test thực thi đầy đủ.
 - Quy tắc tạo tài liệu specification-design trong file này khác với **Migration Rules P3** và khác với **Business Rules trích từ source**.
 - P1 `complete=true` chỉ phản ánh tiêu chí parser; không chứng minh AI hiểu đúng, BR đầy đủ hoặc thiết kế được duyệt.

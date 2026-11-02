@@ -1,6 +1,6 @@
 # Specification design — yêu cầu nội dung đầu ra
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.11.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -18,7 +18,7 @@ Một BR mô tả một hành vi nghiệp vụ có thể kiểm chứng. Không 
 | Công thức / giá trị | Thứ tự tính, precision/rounding, null/empty, giới hạn nếu có bằng chứng           |
 | Dependency          | Function, module, bảng, report, tệp ngoài                                         |
 | Evidence            | Một hoặc nhiều path + range + quote                                               |
-| Open questions      | ID câu hỏi chưa giải quyết                                                        |
+| Điểm chưa xác định  | U-ID liên quan                                                                    |
 
 SD-BR-01: kiểm tra validation, quyền/trạng thái, tính toán, CRUD, transaction, điều kiện in/xuất, cập nhật tồn kho và lỗi nghiệp vụ khi source có chúng. Mỗi nhóm có ghi nhận tìm thấy hoặc chưa xác định, không áp đặt nhóm nào cũng phải có BR.
 
@@ -39,9 +39,9 @@ Report/export áp dụng thêm [Basic report template](../templates/basic-design
 5. **Luồng xử lý:** trigger → kiểm tra → xử lý → DB/side effect → kết quả; nhánh lỗi/hủy; liên kết BR và function. Có Mermaid khi cần thể hiện nhánh.
 6. **Báo cáo và export:** tên, điều kiện chạy, filter/sort/group, field/công thức, đích xuất, encoding/format nếu xác định được; phụ thuộc report template chưa có.
 7. **Thông báo và điều hướng:** nguyên văn, điều kiện hiển thị, tác động, evidence.
-8. **Câu hỏi và thiếu dữ liệu:** blocking/nonblocking, phần bị ảnh hưởng.
+8. **Evidence registry:** evidence ref của tài liệu. Thiếu dữ liệu ghi ở mục Điểm chưa xác định.
 
-SD-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm lý do/phạm vi đã kiểm, hoặc "chưa xác định" kèm câu hỏi. Không dựng ảnh UI hoặc hành vi tương tác chỉ từ tên control.
+SD-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm lý do/phạm vi đã kiểm, hoặc "chưa xác định" kèm U-ID. Không dựng ảnh UI hoặc hành vi tương tác chỉ từ tên control.
 
 ## 8. Detail Design — template mỗi program
 
@@ -51,7 +51,7 @@ SD-BD-01: mọi section phải có nội dung, hoặc "không áp dụng" kèm l
 4. DB access theo call site: SQL nguyên dạng hoặc biểu thức xây SQL, biến tham gia, operation/table nhận diện được, connection, transaction boundary, handling kết quả/lỗi.
 5. File/library/native API/network/message queue/print/CSV/integration: interface thấy trong source, trạng thái dependency, giới hạn phân tích.
 6. Rủi ro hiểu sai: type conversion, null/missing values, precision/overflow, locale/date, state/lifecycle, error propagation, concurrency/async và conditional compilation theo [checklist semantics chung](../analysis-method.md#4-checklist-semantics-chung). Chỉ ghi hiện tượng có bằng chứng; không khẳng định semantics chưa được xác minh.
-7. Phạm vi đã đọc (phần đầu chung) đối chiếu inventory symbol của công cụ được chọn; câu hỏi mở ở mục Câu hỏi mở cuối tài liệu.
+7. Phạm vi đã đọc (phần đầu chung) đối chiếu inventory symbol của công cụ được chọn; điểm chưa xác định ở mục cuối tài liệu.
 
 SD-DD-01: không chỉ paraphrase source từng dòng. Mô tả nhánh, trạng thái và tác động đủ để người review kiểm tra tính tương đương.
 
@@ -64,7 +64,7 @@ SD-DD-02: unresolved call/dynamic dispatch phải hiện rõ; không dựng call
 | Table inventory       | Schema/table as written, normalized name nếu có, nguồn tên, program sử dụng, evidence                                                 |
 | Column definition     | Column, type, length/precision/scale, nullable/default, PK/FK/index, nguồn DDL/schema hoặc observed usage, confidence/basis, evidence |
 | CRUD Matrix           | Program/function, table, C/R/U/D xác định được, call site, dynamic/unresolved access, evidence                                        |
-| Transaction/relations | Boundary/locking/relation thấy trong source hoặc DDL, provenance, câu hỏi                                                             |
+| Transaction/relations | Boundary/locking/relation thấy trong source hoặc DDL, provenance, U-ID                                                                |
 
 SD-DB-01: nếu không có DDL/schema, chỉ xuất **column usage suy ra từ source**, giữ type/length/PK/FK là unknown khi thiếu chứng cứ. Dùng JOIN không chứng minh có FK constraint; kiểu biến trong ngôn ngữ nguồn không chứng minh kiểu cột DB.
 

@@ -1,6 +1,6 @@
 # Security Audit — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** [Phần đầu chung](../README.md), [rule security audit](../rules/security-audit.md).
+**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** [Phần đầu chung](../README.md), [rule security audit](../rules/security-audit.md).
 
 ## 1. Phạm vi và giới hạn
 
@@ -51,6 +51,6 @@ Sắp theo severity giảm dần. Lặp lại khối dưới đây cho từng ph
 
 Luôn xét: luồng qua program khác, cấu hình và triển khai, quyền DB, dependency/binary/thư viện ngoài, hành vi chỉ lộ ra khi chạy.
 
-## 7. Câu hỏi mở
+## 7. Điểm chưa xác định
 
-<Bảng câu hỏi mở chung theo README; không có thì ghi "Không có">
+Theo [phần cuối chung](../README.md#phần-đầu-và-phần-cuối-chung). Không có thì ghi "Không có".

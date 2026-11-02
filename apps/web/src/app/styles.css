@@ -1635,11 +1635,6 @@ details.technical[open] > summary {
 .program-toggle[aria-expanded='true']::before {
   transform: rotate(45deg);
 }
-.program-detail-row > td {
-  background: var(--surface-3);
-  padding: 16px 18px;
-  animation: fadeUp var(--dur-base) var(--ease-out) both;
-}
 .detail-actions {
   display: flex;
   justify-content: flex-start;
@@ -1669,13 +1664,13 @@ details.technical[open] > summary {
   text-align: left;
 }
 .program-list .program-table thead th:nth-child(1) {
-  width: 22%;
+  width: 19%;
 }
 .program-list .program-table thead th:nth-child(2) {
   width: 12%;
 }
 .program-list .program-table thead th:nth-child(3) {
-  width: 12%;
+  width: 11%;
 }
 .program-list .program-table thead th:nth-child(8) {
   width: 15%;
@@ -1734,4 +1729,955 @@ details.technical[open] > summary {
 .table-name-view {
   margin: 4px 0 8px;
   font-size: 12px;
+}
+
+/* demo02 tabs: fixed-width tabs, a sliding indicator and panels fading in. */
+.dashboard-tabs {
+  position: relative;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+.dashboard-tabs .tab {
+  flex: 0 0 220px;
+  border-bottom: 0;
+  color: var(--fg-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: color var(--dur-fast);
+}
+.dashboard-tabs .tab[aria-selected='true'] {
+  color: var(--fg);
+}
+.dashboard-tabs .tab-count {
+  margin: 0;
+  border: 0;
+  background: #e6ecf3;
+  color: var(--fg-2);
+  font-family: var(--f-mono);
+  padding: 2px 7px;
+}
+.tab-indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 12px;
+  width: 220px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand);
+  transition: transform 350ms var(--ease-out);
+}
+.analysis-tabs [role='tabpanel']:not([hidden]) {
+  animation: fadeUp 350ms ease both;
+}
+
+/* demo02 program list: header bar, 56px rows, mono numbers, complexity bar,
+   chevron; the whole row opens the detail card. */
+.program-list .table-scroll {
+  border-radius: 12px;
+}
+.program-list .program-table thead th {
+  background: #f2f6fa;
+  color: var(--fg-2);
+  font-size: 12px;
+  padding: 10px 12px;
+  border-bottom: 0;
+}
+.program-list .program-table tbody td,
+.program-list .program-table tbody th {
+  padding: 10px 12px;
+  border-bottom: 0;
+  border-top: 1px solid #e6ecf3;
+  vertical-align: middle;
+  font-size: 13px;
+}
+.program-row {
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  animation: fadeUp 350ms ease both;
+}
+.program-row:hover {
+  background: var(--bg);
+}
+.program-row.selected {
+  background: var(--tint);
+}
+.program-row:nth-child(n + 2) {
+  animation-delay: 30ms;
+}
+.program-row:nth-child(n + 6) {
+  animation-delay: 60ms;
+}
+.program-row .program-toggle {
+  font-family: var(--f-mono);
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+}
+.program-row .program-toggle::before {
+  content: none;
+}
+.program-list .program-table td.num {
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+}
+.raw-count {
+  font-family: var(--f-ui);
+  font-size: 11px;
+}
+.kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--fg-body);
+  font-size: 11px;
+}
+.kind-chip i {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--info);
+}
+.cx-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.cx-bar {
+  width: 100%;
+  max-width: 120px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e3eaf2;
+  overflow: hidden;
+}
+.cx-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transform-origin: left;
+  animation: barGrow 700ms var(--ease-out) both;
+}
+.cx-bar .tone-low {
+  background: var(--brand);
+}
+.cx-bar .tone-medium {
+  background: var(--warn);
+}
+.cx-bar .tone-high {
+  background: #e0712b;
+}
+.cx-bar .tone-very-high {
+  background: var(--risk);
+}
+.program-list .chevron-col {
+  width: 44px;
+  text-align: center;
+}
+.program-list td.chevron-col svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.program-row.selected td.chevron-col svg {
+  transform: rotate(180deg);
+}
+.program-detail-row > td {
+  background: var(--tint);
+  padding: 0 16px 16px 18px;
+  animation: none;
+}
+.detail-card {
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid #dce4ee;
+  animation: fadeUp 300ms var(--ease-out) both;
+}
+.detail-card .program-detail {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+.program-list .program-table thead th {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.program-list .kind-chip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Headers stay on one line (short labels, full meaning in the tooltip). */
+.program-list .program-table thead th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.program-list .sort-button {
+  white-space: nowrap;
+}
+.dashboard-tabs .tab {
+  white-space: nowrap;
+}
+/* Complexity colours: bar, histogram and tag use the same tone per level. */
+.cx-bar .tone-low,
+.histogram .tone-low {
+  background: var(--low);
+}
+.cx-bar .tone-medium,
+.histogram .tone-medium {
+  background: #d9a514;
+}
+.cx-bar .tone-high,
+.histogram .tone-high {
+  background: #e0712b;
+}
+.cx-bar .tone-very-high,
+.histogram .tone-very-high {
+  background: var(--high);
+}
+/* Call graph tab (UI03): canvas + right panel like demo02, table below. */
+.dep-graph-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  animation: fadeUp 350ms ease both;
+}
+.dep-graph-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.dep-graph-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.dep-graph-lanes {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dep-graph-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-body);
+  cursor: pointer;
+}
+.dep-graph-canvas {
+  position: relative;
+  height: 560px;
+  border: 1px solid #e6ecf3;
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: var(--surface-3);
+  background-image: radial-gradient(#e6ecf3 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.dep-graph-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.dep-node {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  /* A tight shadow: a soft 14px blur on hundreds of nodes made panning a
+     fully opened graph about 2.5 times slower to paint. */
+  box-shadow: 0 1px 2px rgba(15, 34, 54, 0.08);
+  transition:
+    border-color var(--dur-base),
+    box-shadow var(--dur-base);
+}
+.dep-node-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+/* Type, name and a note line fit the node height: tight lines, centred. */
+.dep-graph-canvas .dep-node-button {
+  justify-content: center;
+  line-height: 1.25;
+}
+.dep-node-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-node-type {
+  display: flex;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.dep-node-own-module .dep-node-type {
+  color: var(--navy);
+}
+.dep-node-shared-module .dep-node-type {
+  color: var(--info);
+}
+.dep-node-table .dep-node-type {
+  color: var(--low);
+}
+.dep-node-component .dep-node-type {
+  color: var(--ai);
+}
+.dep-node-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dep-node-note {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--warn-fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dep-node-state {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  text-transform: none;
+}
+/* Not analysed: dashed outline, never drawn like a program without
+   dependencies. */
+.dep-node-unsupported {
+  border-style: dashed;
+  border-color: var(--warn);
+  background: var(--surface-3);
+}
+.dep-node-partial {
+  border-color: var(--mid);
+}
+.dep-node .react-flow__handle,
+.dep-folder .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+}
+.dep-folder {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 8px 12px;
+  border: 1px dashed var(--brand-edge);
+  border-radius: 14px;
+  /* Opaque: edges passing behind an open box do not show through. */
+  background: color-mix(in srgb, var(--brand-soft) 60%, var(--surface));
+  font-size: 12px;
+}
+.dep-folder-label {
+  font-weight: 600;
+  color: var(--navy);
+}
+/* Resting edges: thin and faint, whatever they merge, so a closed graph
+   reads as boxes first. Edges of an open box are drawn in the brand colour
+   to tell what was opened. */
+.dep-edge path.react-flow__edge-path {
+  stroke: var(--line-hover);
+  stroke-width: 1;
+  stroke-opacity: 0.45;
+}
+.dep-edge-call path.react-flow__edge-path {
+  stroke: var(--info);
+  stroke-opacity: 0.35;
+}
+.dep-edge-opened path.react-flow__edge-path {
+  stroke: var(--brand);
+  stroke-width: 1.3;
+  stroke-opacity: 0.6;
+}
+/* An open box is a container: dimming it would dim the linked nodes it
+   holds, so only its members dim. */
+.has-focus .react-flow__node:not(.linked):not(.box-open) {
+  opacity: 0.35;
+}
+/* While the view is dragged, shadows (repainted on every frame for
+   hundreds of nodes) are dropped. */
+.react-flow__pane.dragging .dep-node,
+.react-flow__pane.dragging .dep-folder {
+  box-shadow: none;
+  transition: none;
+}
+.has-focus .react-flow__edge:not(.linked) {
+  opacity: 0.12;
+}
+.react-flow__node.focused .dep-node {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  box-shadow:
+    0 0 0 4px rgba(0, 137, 210, 0.15),
+    0 8px 24px rgba(15, 34, 54, 0.12);
+}
+.react-flow__node.linked:not(.focused) .dep-node {
+  border-color: var(--brand-edge);
+}
+.react-flow__edge.linked path.react-flow__edge-path {
+  stroke: var(--brand);
+  stroke-width: 2;
+  stroke-opacity: 1;
+  stroke-dasharray: 6 6;
+  animation: dash 800ms linear infinite;
+}
+.react-flow__edge.linked .react-flow__edge-textbg {
+  fill: var(--surface);
+}
+.react-flow__edge.linked .react-flow__edge-text {
+  font-family: var(--f-mono);
+  font-size: 11px;
+}
+/* Zoom controls and minimap in the portal's style (the library's base
+   stylesheet leaves them bare). */
+.dep-graph-canvas .react-flow__controls {
+  gap: 6px;
+}
+.dep-graph-canvas .react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--navy);
+  box-shadow: 0 2px 6px rgba(15, 34, 54, 0.08);
+  cursor: pointer;
+}
+.dep-graph-canvas .react-flow__controls-button svg {
+  max-width: 13px;
+  max-height: 13px;
+}
+.dep-graph-canvas .react-flow__controls-button:hover {
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+.dep-graph-canvas .react-flow__controls-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-graph-canvas .react-flow__minimap {
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(15, 34, 54, 0.1);
+}
+.dep-graph-canvas .react-flow__minimap-mask {
+  fill: rgba(227, 241, 251, 0.6);
+}
+.dep-graph-canvas .react-flow__minimap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.dep-graph-canvas .minimap-folder {
+  fill: var(--brand-soft);
+}
+.dep-graph-canvas .minimap-node {
+  fill: var(--line-hover);
+}
+.dep-graph-side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-3);
+}
+.dep-graph-side h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.dep-focus-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dep-focus-label {
+  margin: 8px 0 2px;
+  overflow-wrap: anywhere;
+}
+.dep-focus-card p {
+  font-size: 12px;
+}
+.dep-focus-numbers {
+  display: flex;
+  gap: 18px;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.dep-focus-numbers dt {
+  color: var(--fg-2);
+}
+.dep-focus-numbers dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dep-common-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dep-common-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.dep-common-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.dep-common-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: #e3eaf2;
+  overflow: hidden;
+}
+.dep-common-bar i {
+  display: block;
+  height: 100%;
+  background: var(--info);
+  transform-origin: left;
+  animation: barGrow 800ms var(--ease-out) both;
+}
+.dep-common-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@keyframes dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+/* Open boxes: one chip per open folder/box, the last one toggled outlined;
+   the chip brings its box into view, x closes it. */
+.dep-open-boxes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.dep-graph-stage {
+  position: relative;
+}
+.dep-graph-stage > .dep-open-boxes {
+  position: absolute;
+  z-index: 6;
+  top: 10px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(15, 34, 54, 0.08);
+}
+.dep-graph-stage .dep-graph-status {
+  top: auto;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.dep-open-box {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--brand-edge);
+  border-radius: 999px;
+  background: var(--brand-soft);
+}
+.dep-open-box.recent {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(0, 137, 210, 0.18);
+}
+.dep-open-box-name {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 999px 0 0 999px;
+  background: transparent;
+  color: var(--navy);
+  font-size: 12px;
+  cursor: pointer;
+}
+.dep-open-box-name:hover {
+  text-decoration: underline;
+}
+/* Close: its own round target, apart from the name. */
+.dep-open-box-close {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0 3px 0 0;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--brand-edge);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.dep-open-box-close svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.dep-open-box-close:hover {
+  border-left-color: transparent;
+  background: var(--surface);
+  color: var(--high);
+}
+.dep-open-box-name:focus-visible,
+.dep-open-box-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.react-flow__node.recent .dep-folder,
+.react-flow__node.recent .dep-node-folder {
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 4px rgba(0, 137, 210, 0.15);
+  animation: recentBox 1.2s ease-out 2;
+}
+@keyframes recentBox {
+  50% {
+    box-shadow: 0 0 0 10px rgba(0, 137, 210, 0.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__node.recent .dep-folder,
+  .react-flow__node.recent .dep-node-folder {
+    animation: none;
+  }
+}
+/* Full screen: the tab over the page, the canvas taking the height left. */
+.dep-graph-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(15, 34, 54, 0.45);
+}
+.dep-graph-expanded {
+  position: fixed;
+  inset: 16px;
+  z-index: 901;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 18px;
+  overflow: auto;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 64px rgba(15, 34, 54, 0.3);
+  animation: none;
+}
+.dep-graph-expanded .dep-graph-canvas {
+  height: calc(100vh - 150px);
+  min-height: 420px;
+}
+.dep-graph-actions {
+  display: inline-flex;
+  gap: 12px;
+}
+.dep-node-folder {
+  position: relative;
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+/* + on a closed box opens it; the rest of the box highlights its edges. */
+.dep-box-open {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--brand-edge);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--brand);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+.dep-box-open svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.dep-box-open:hover {
+  background: var(--brand);
+  color: #fff;
+}
+.dep-box-open:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-node-folder .dep-node-type {
+  color: var(--navy);
+}
+.dep-node-folder .dep-node-button {
+  padding-right: 42px;
+}
+.dep-folder-close {
+  margin-left: auto;
+  padding: 0 9px;
+  line-height: 20px;
+  border: 1px solid var(--brand-edge);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--navy);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dep-folder-close:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+.dep-folder-close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-graph-search {
+  position: relative;
+  flex: 0 1 260px;
+  min-width: 200px;
+}
+.dep-graph-search input {
+  width: 100%;
+}
+/* One row above the canvas: search, open boxes, actions on the right. */
+.dep-graph-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 12px;
+}
+.dep-graph-bar .dep-graph-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-left: auto;
+}
+.dep-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--navy);
+  cursor: pointer;
+}
+.dep-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dep-icon-button:hover,
+.dep-icon-button[aria-pressed='true'] {
+  border-color: var(--brand-edge);
+  background: var(--brand-soft);
+}
+.dep-icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dep-graph-caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 12px;
+}
+.dep-search-results {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(15, 34, 54, 0.12);
+}
+.dep-search-results li.muted {
+  padding: 8px;
+  font-size: 12px;
+}
+.dep-search-item {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.dep-search-item:hover,
+.dep-search-item:focus-visible {
+  background: var(--brand-soft);
+}
+/* Procedure call graph of the program detail (UI03-EXT01): a narrower side card
+   so the canvas keeps most of the detail card. */
+.proc-graph-tab {
+  grid-template-columns: minmax(0, 1fr) 260px;
+}
+.proc-node-own-procedure .dep-node-type {
+  color: var(--navy);
+}
+.proc-node-shared-procedure .dep-node-type {
+  color: var(--info);
+}
+.proc-node-api .dep-node-type {
+  color: var(--ai);
+}
+.proc-node-table .dep-node-type {
+  color: var(--low);
+}
+/* Two lines per node (kind and file, then name) so nothing is clipped at
+   the node height shared with the project graph. */
+.proc-graph-tab .dep-node-button {
+  justify-content: center;
+  line-height: 1.3;
+}
+.proc-graph-tab .dep-node-type {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.proc-node-file {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-3);
+  text-overflow: ellipsis;
+}
+/* A form with many handlers draws many long edges: resting edges stay
+   faint so the nodes read first. */
+.proc-graph-tab .react-flow__edge:not(.linked) path.react-flow__edge-path {
+  stroke-opacity: 0.3;
+}
+.proc-edge-call path.react-flow__edge-path {
+  stroke: var(--info);
+  stroke-opacity: 0.6;
+}
+/* Ambiguous: one edge per candidate, none of them certain. */
+.proc-edge-ambiguous path.react-flow__edge-path {
+  stroke: var(--warn);
+  stroke-dasharray: 4 4;
+}
+.proc-edge-api path.react-flow__edge-path {
+  stroke: var(--ai);
+  stroke-opacity: 0.6;
+}
+.proc-focus-list-title {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.proc-focus-list {
+  position: static;
+  box-shadow: none;
+  max-height: 220px;
+  overflow-y: auto;
 }

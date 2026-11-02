@@ -3,3 +3,6 @@
 
 # Analyzer fixtures are byte-exact (CP932, CRLF/LF, missing final newline).
 tests/fixtures/** -text
+
+# License texts ship byte for byte as in their packages (checked after build).
+apps/web/public/licenses/** -text

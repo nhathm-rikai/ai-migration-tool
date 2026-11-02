@@ -357,8 +357,88 @@ export const viMessages = {
       histogramNote: (version: string) => `Tham khảo · ${version}`,
       notAnalyzed: (count: string) => `${count} program chưa phân tích`,
       sectionLabel: 'Chi tiết phân tích',
-      graphSoon:
-        'Call graph toàn dự án sẽ có ở bước tiếp theo. Lời gọi của từng program xem ở tab Lời gọi trong chi tiết program.',
+      graph: {
+        loading: 'Đang tải call graph…',
+        empty: 'Kết quả kiểm kê không có program nào để vẽ graph.',
+        lanes: {
+          program: 'Program',
+          own: 'Module riêng',
+          shared: 'Module dùng chung',
+          tables: 'Bảng DB · COM',
+        },
+        kinds: {
+          program: 'Program',
+          'own-module': 'Module riêng',
+          'shared-module': 'Dùng chung',
+          table: 'Bảng DB',
+          component: 'COM',
+        },
+        summary: (nodes: string, edges: string, calls: string) =>
+          `${nodes} node · ${edges} cạnh · ${calls} lượt gọi giữa các file`,
+        tableView: {
+          mapped: 'Bảng theo tên sau ánh xạ',
+          raw: 'Bảng theo tên trong source',
+        },
+        showCommon: (count: string) =>
+          `Hiện module hầu hết program đều dùng (${count})`,
+        showCommonTitle:
+          'Module/COM được hơn 80% program khai báo, thường là hằng số hoặc hàm tiện ích. Chúng nối tới gần như mọi program nên được ẩn để graph gọn; panel Common module vẫn liệt kê và ghi "đang ẩn".',
+        lanesLabel: 'Thứ tự làn từ trái sang phải',
+        layoutPending: 'Đang sắp xếp graph…',
+        layoutFailed:
+          'Không sắp xếp được graph tự động; đang hiển thị theo làn đơn giản.',
+        canvasLabel: 'Call graph toàn dự án',
+        rootGroup: '(thư mục gốc)',
+        groupCount: (count: string) => `${count} program`,
+        boxCount: (count: string) => `${count} node`,
+        folderType: 'Thư mục',
+        expandFolder: (folder: string, count: string) =>
+          `Mở thư mục ${folder} (${count})`,
+        collapseFolder: (folder: string) => `Thu gọn thư mục ${folder}`,
+        expandBox: (box: string, count: string) => `Mở ${box} (${count})`,
+        collapseBox: (box: string) => `Thu gọn ${box}`,
+        collapse: 'Thu gọn',
+        focusBox: (box: string, count: string) =>
+          `Làm nổi bật đường nối của ${box} (${count})`,
+        openBox: 'Mở ra',
+        fullScreen: 'Xem toàn màn hình',
+        exitFullScreen: 'Thoát toàn màn hình',
+        openBoxes: 'Đang mở',
+        showBox: (box: string) => `Đưa ${box} vào khung nhìn`,
+        expandAll: 'Mở tất cả thư mục',
+        collapseAll: 'Thu gọn tất cả',
+        search: 'Tìm program, module, bảng',
+        searchResults: 'Kết quả tìm',
+        searchNone: 'Không tìm thấy node nào.',
+        state: {
+          complete: 'Đầy đủ',
+          partial: 'Chưa đầy đủ',
+          unsupported: 'Chưa phân tích',
+        } satisfies Record<ProgramState, string>,
+        unknownDependencies: 'Chưa phân tích nên chưa biết phụ thuộc',
+        missingMembers: (count: string) =>
+          `${count} file khai báo không tìm thấy`,
+        focusNode: (kind: string, label: string) =>
+          `Làm nổi bật ${kind} ${label}`,
+        calls: (count: string) => `${count} lượt gọi`,
+        commonTitle: 'Common module (fan-in)',
+        commonNote:
+          'Fan-in = số program khai báo file. Module fan-in cao ảnh hưởng nhiều program nhất khi sửa, nên tài liệu hoá trước.',
+        commonHidden: 'đang ẩn',
+        commonNone: 'Không có module dùng chung.',
+        focusedTitle: 'Node đang chọn',
+        clearFocus: 'Bỏ chọn',
+        fanIn: 'Fan-in',
+        fanOut: 'Fan-out',
+        callers: 'File gọi tới',
+        flow: {
+          controls: 'Điều khiển zoom',
+          zoomIn: 'Phóng to',
+          zoomOut: 'Thu nhỏ',
+          fitView: 'Vừa khung',
+          minimap: 'Bản đồ thu nhỏ',
+        },
+      },
       tablesNone: 'Không phát hiện truy cập bảng.',
       tablesPagination: 'Phân trang bảng DB',
       columns: {
@@ -368,6 +448,7 @@ export const viMessages = {
         top: 'Program truy cập nhiều nhất',
       },
       createDocs: 'Tạo tài liệu cho program này',
+      detailColumn: 'Mở chi tiết',
       expand: (program: string) => `Mở chi tiết ${program}`,
       kinds: {
         form: 'Form',
@@ -413,6 +494,13 @@ export const viMessages = {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
     },
+    tableSchema: {
+      assumed: (schema: string, inferred: boolean) =>
+        inferred
+          ? `Tên bảng được gộp theo schema giả định ${schema} (tiền tố xuất hiện nhiều nhất trong mã nguồn).`
+          : `Tên bảng được gộp theo schema giả định ${schema}.`,
+      none: 'Chưa có schema mặc định: tên bảng giữ như trong mã nguồn.',
+    },
     warnings: {
       PROGRAM_UNSUPPORTED: 'Có program không phân tích được.',
       PROGRAM_INCOMPLETE: 'Có program thiếu file hoặc có file chưa phân tích.',
@@ -437,7 +525,7 @@ export const viMessages = {
       noMatch: 'Không có program khớp bộ lọc.',
       none: 'Kiểm kê không có program nào.',
       notAnalyzed: 'Chưa phân tích',
-      mappedTables: (count: string) => `(sau ánh xạ: ${count})`,
+      rawTables: (count: string) => `(gốc: ${count})`,
       draft: 'Nháp',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,
@@ -451,10 +539,15 @@ export const viMessages = {
         kind: 'Loại',
         state: 'Trạng thái',
         ownCodeLines: 'LoC riêng',
-        codeLines: 'LoC gồm file dùng chung',
+        codeLines: 'LoC + dùng chung',
         procedures: 'Procedure riêng',
         tables: 'Số bảng',
-        complexity: 'Độ phức tạp (tham khảo)',
+        complexity: 'Độ phức tạp',
+      },
+      columnHints: {
+        codeLines:
+          'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+        complexity: 'Độ phức tạp tham khảo, không dùng để tính công sức',
       },
       state: {
         complete: 'Đầy đủ',
@@ -495,6 +588,7 @@ export const viMessages = {
         procedures: 'Procedure',
         crud: 'CRUD',
         calls: 'Lời gọi',
+        graph: 'Sơ đồ gọi',
       },
       rowRange: (from: string, to: string, total: string) =>
         `Dòng ${from}–${to} / ${total}`,
@@ -563,6 +657,65 @@ export const viMessages = {
         resolution: 'Xác định',
         targets: 'Đích',
         uses: 'Số lần',
+      },
+      graph: {
+        loading: 'Đang tải sơ đồ gọi…',
+        empty:
+          'Program này không có procedure nào trong các file đã phân tích.',
+        lanes: {
+          own: 'Procedure riêng',
+          shared: 'Procedure dùng chung',
+          api: 'API ngoài',
+          tables: 'Bảng DB',
+        },
+        kinds: { api: 'API ngoài', table: 'Bảng DB' },
+        fileLevel: 'Ngoài procedure',
+        shared: 'Dùng chung',
+        summary: (own: string, shared: string, edges: string) =>
+          `${own} procedure riêng · ${shared} procedure dùng chung gọi tới được · ${edges} liên kết`,
+        tableView: {
+          mapped: 'Bảng theo tên sau ánh xạ',
+          raw: 'Bảng theo tên trong source',
+        },
+        showIsolated: (count: string) =>
+          `Hiện ${count} procedure không gọi và không được gọi`,
+        layoutPending: 'Đang sắp xếp sơ đồ…',
+        layoutFailed:
+          'Không sắp xếp được sơ đồ tự động; đang hiển thị theo làn đơn giản.',
+        canvasLabel: 'Sơ đồ gọi giữa các procedure',
+        fullScreen: 'Xem toàn màn hình',
+        exitFullScreen: 'Thoát toàn màn hình',
+        sideLabel: 'Procedure đang chọn',
+        sideHint:
+          'Chọn một procedure trên sơ đồ hoặc qua ô tìm để xem nơi gọi, lời gọi và bảng nó truy cập.',
+        note: 'Phân tích theo tên, không chạy chương trình. Nét đứt là lời gọi chưa xác định (nhiều procedure trùng tên). Lời gọi qua object (Form1.Foo) không nối được. Bảng đầy đủ ở tab Lời gọi.',
+        search: 'Tìm procedure, API, bảng',
+        searchResults: 'Kết quả tìm',
+        searchNone: 'Không tìm thấy node nào.',
+        focusNode: (kind: string, label: string) =>
+          `Làm nổi bật ${kind} ${label}`,
+        uses: (count: string) => `${count} lần`,
+        dynamicSql: (count: string) => `${count} SQL động`,
+        ambiguous: 'chưa xác định',
+        candidate: 'Ứng viên',
+        candidateNote:
+          'Chỉ là ứng viên của một lời gọi chưa xác định (nhiều procedure trùng tên): chưa chắc program gọi tới, nên những gì nó gọi hoặc truy cập không được vẽ tiếp.',
+        focusedTitle: 'Procedure đang chọn',
+        clearFocus: 'Bỏ chọn',
+        codeLines: 'LoC',
+        decisions: 'Điểm rẽ nhánh',
+        callers: 'Nơi gọi',
+        calledBy: 'Được gọi bởi',
+        callsTo: 'Gọi tới',
+        tables: 'Bảng truy cập',
+        noEdges: 'Không gọi, không được gọi và không truy cập bảng.',
+        flow: {
+          controls: 'Điều khiển zoom',
+          zoomIn: 'Phóng to',
+          zoomOut: 'Thu nhỏ',
+          fitView: 'Vừa khung',
+          minimap: 'Bản đồ thu nhỏ',
+        },
       },
     },
     errors: {

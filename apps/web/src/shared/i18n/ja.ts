@@ -2,6 +2,7 @@ import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
 } from '@portal/contracts';
+import type { ProgramState } from '../../features/assessment/assessment-summary';
 import type { Messages } from './vi';
 
 export const jaMessages = {
@@ -340,8 +341,88 @@ export const jaMessages = {
       histogramNote: (version: string) => `参考 · ${version}`,
       notAnalyzed: (count: string) => `未解析 ${count} プログラム`,
       sectionLabel: '解析の詳細',
-      graphSoon:
-        'プロジェクト全体のコールグラフは次のステップで提供します。各プログラムの呼び出しはプログラム詳細の「呼び出し」タブで確認できます。',
+      graph: {
+        loading: 'コールグラフを読み込み中…',
+        empty: 'インベントリにグラフを描画するプログラムがありません。',
+        lanes: {
+          program: 'プログラム',
+          own: '専用モジュール',
+          shared: '共通モジュール',
+          tables: 'DBテーブル · COM',
+        },
+        kinds: {
+          program: 'プログラム',
+          'own-module': '専用モジュール',
+          'shared-module': '共通',
+          table: 'DBテーブル',
+          component: 'COM',
+        },
+        summary: (nodes: string, edges: string, calls: string) =>
+          `${nodes} ノード · ${edges} エッジ · ファイル間呼び出し ${calls} 回`,
+        tableView: {
+          mapped: 'マッピング後のテーブル名',
+          raw: 'ソース上のテーブル名',
+        },
+        showCommon: (count: string) =>
+          `ほぼ全プログラムが使うモジュールを表示（${count}）`,
+        showCommonTitle:
+          '80% を超えるプログラムが宣言するモジュール/COM（主に定数・共通処理）。ほぼすべてのプログラムにつながりグラフが煩雑になるため非表示にしています。共通モジュールのパネルには「非表示」付きで表示されます。',
+        lanesLabel: '左から右へのレーン順',
+        layoutPending: 'グラフを配置中…',
+        layoutFailed:
+          '自動配置できなかったため、簡易レーン配置で表示しています。',
+        canvasLabel: 'プロジェクト全体のコールグラフ',
+        rootGroup: '（ルートフォルダ）',
+        groupCount: (count: string) => `${count} プログラム`,
+        boxCount: (count: string) => `${count} ノード`,
+        folderType: 'フォルダ',
+        expandFolder: (folder: string, count: string) =>
+          `フォルダ ${folder} を開く（${count}）`,
+        collapseFolder: (folder: string) => `フォルダ ${folder} を閉じる`,
+        expandBox: (box: string, count: string) => `${box} を開く（${count}）`,
+        collapseBox: (box: string) => `${box} を閉じる`,
+        collapse: '閉じる',
+        focusBox: (box: string, count: string) =>
+          `${box}（${count}）の接続を強調表示`,
+        openBox: '展開',
+        fullScreen: '全画面で表示',
+        exitFullScreen: '全画面を終了',
+        openBoxes: '展開中',
+        showBox: (box: string) => `${box} を表示範囲に移動`,
+        expandAll: 'すべてのフォルダを開く',
+        collapseAll: 'すべて閉じる',
+        search: 'プログラム・モジュール・テーブルを検索',
+        searchResults: '検索結果',
+        searchNone: '該当するノードはありません。',
+        state: {
+          complete: '完全',
+          partial: '不完全',
+          unsupported: '未解析',
+        } satisfies Record<ProgramState, string>,
+        unknownDependencies: '未解析のため依存関係は不明です',
+        missingMembers: (count: string) =>
+          `宣言されたファイル ${count} 件が見つかりません`,
+        focusNode: (kind: string, label: string) =>
+          `${kind} ${label} を強調表示`,
+        calls: (count: string) => `呼び出し ${count} 回`,
+        commonTitle: '共通モジュール（ファンイン）',
+        commonNote:
+          'ファンイン = ファイルを宣言するプログラム数。ファンインが高いモジュールは変更の影響が大きいため、先にドキュメント化することを推奨します。',
+        commonHidden: '非表示中',
+        commonNone: '共通モジュールはありません。',
+        focusedTitle: '選択中のノード',
+        clearFocus: '選択解除',
+        fanIn: 'ファンイン',
+        fanOut: 'ファンアウト',
+        callers: '呼び出し元ファイル',
+        flow: {
+          controls: 'ズーム操作',
+          zoomIn: '拡大',
+          zoomOut: '縮小',
+          fitView: '全体を表示',
+          minimap: 'ミニマップ',
+        },
+      },
       tablesNone: 'テーブルアクセスは検出されませんでした。',
       tablesPagination: 'DBテーブルのページ',
       columns: {
@@ -351,6 +432,7 @@ export const jaMessages = {
         top: '最も多くアクセスするプログラム',
       },
       createDocs: 'このプログラムのドキュメントを生成',
+      detailColumn: '詳細を開く',
       expand: (program: string) => `${program} の詳細を開く`,
       kinds: {
         form: 'Form',
@@ -396,6 +478,13 @@ export const jaMessages = {
       coverageValue: (analyzed: string, total: string) =>
         `${analyzed} / ${total}`,
     },
+    tableSchema: {
+      assumed: (schema: string, inferred: boolean) =>
+        inferred
+          ? `テーブル名はスキーマ ${schema} を仮定してまとめています（ソースで最も多い接頭辞）。`
+          : `テーブル名はスキーマ ${schema} を仮定してまとめています。`,
+      none: '既定スキーマがないため、テーブル名はソースのままです。',
+    },
     warnings: {
       PROGRAM_UNSUPPORTED: '解析できないプログラムがあります。',
       PROGRAM_INCOMPLETE:
@@ -421,7 +510,7 @@ export const jaMessages = {
       noMatch: '条件に一致するプログラムはありません。',
       none: 'インベントリにプログラムがありません。',
       notAnalyzed: '未解析',
-      mappedTables: (count: string) => `（マッピング後: ${count}）`,
+      rawTables: (count: string) => `（元: ${count}）`,
       draft: 'ドラフト',
       declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
       sortBy: (column: string) => `${column}で並べ替え`,
@@ -435,10 +524,15 @@ export const jaMessages = {
         kind: '種類',
         state: '状態',
         ownCodeLines: '固有LoC',
-        codeLines: '共通ファイル込みLoC',
+        codeLines: 'LoC（共通込み）',
         procedures: '固有プロシージャ',
         tables: 'テーブル数',
-        complexity: '複雑度（参考）',
+        complexity: '複雑度',
+      },
+      columnHints: {
+        codeLines:
+          '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
+        complexity: '参考の複雑度。工数の算出には使いません',
       },
       state: {
         complete: '完全',
@@ -474,6 +568,7 @@ export const jaMessages = {
         procedures: 'プロシージャ',
         crud: 'CRUD',
         calls: '呼び出し',
+        graph: '呼び出し図',
       },
       rowRange: (from: string, to: string, total: string) =>
         `${total} 行中 ${from}–${to} 行`,
@@ -542,6 +637,64 @@ export const jaMessages = {
         resolution: '特定',
         targets: '呼び出し先',
         uses: '回数',
+      },
+      graph: {
+        loading: '呼び出し図を読み込み中…',
+        empty: 'このプログラムの解析済みファイルにプロシージャがありません。',
+        lanes: {
+          own: '専用プロシージャ',
+          shared: '共通プロシージャ',
+          api: '外部API',
+          tables: 'DBテーブル',
+        },
+        kinds: { api: '外部API', table: 'DBテーブル' },
+        fileLevel: 'プロシージャ外',
+        shared: '共通',
+        summary: (own: string, shared: string, edges: string) =>
+          `専用プロシージャ ${own} · 到達可能な共通プロシージャ ${shared} · 関係 ${edges}`,
+        tableView: {
+          mapped: 'マッピング後のテーブル名',
+          raw: 'ソース上のテーブル名',
+        },
+        showIsolated: (count: string) =>
+          `呼び出し関係のないプロシージャ ${count} 件を表示`,
+        layoutPending: '図を配置しています…',
+        layoutFailed:
+          '図を自動配置できなかったため、簡易レーンで表示しています。',
+        canvasLabel: 'プロシージャ間の呼び出し図',
+        fullScreen: '全画面で表示',
+        exitFullScreen: '全画面を終了',
+        sideLabel: '選択中のプロシージャ',
+        sideHint:
+          '図または検索でプロシージャを選ぶと、呼び出し元・呼び出し先・アクセスするテーブルを表示します。',
+        note: '名前による静的解析で、プログラムは実行していません。破線は特定できない呼び出し（同名のプロシージャが複数）です。オブジェクト経由の呼び出し（Form1.Foo）は結び付けられません。一覧は「呼び出し」タブにあります。',
+        search: 'プロシージャ・API・テーブルを検索',
+        searchResults: '検索結果',
+        searchNone: '該当するノードがありません。',
+        focusNode: (kind: string, label: string) =>
+          `${kind} ${label} を強調表示`,
+        uses: (count: string) => `${count} 回`,
+        dynamicSql: (count: string) => `動的SQL ${count} 件`,
+        ambiguous: '未特定',
+        candidate: '候補',
+        candidateNote:
+          '特定できない呼び出し（同名のプロシージャが複数）の候補にすぎません。呼び出されるとは限らないため、その先の呼び出しやテーブルアクセスは描画しません。',
+        focusedTitle: '選択中のプロシージャ',
+        clearFocus: '選択解除',
+        codeLines: 'LoC',
+        decisions: '分岐点',
+        callers: '呼び出し元',
+        calledBy: '呼び出し元',
+        callsTo: '呼び出し先',
+        tables: 'アクセスするテーブル',
+        noEdges: '呼び出し・被呼び出し・テーブルアクセスはありません。',
+        flow: {
+          controls: 'ズーム操作',
+          zoomIn: '拡大',
+          zoomOut: '縮小',
+          fitView: '全体を表示',
+          minimap: 'ミニマップ',
+        },
       },
     },
     errors: {

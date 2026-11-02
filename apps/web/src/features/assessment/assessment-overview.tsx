@@ -1,5 +1,7 @@
 import {
   Fragment,
+  Suspense,
+  lazy,
   useEffect,
   useId,
   useMemo,
@@ -44,13 +46,13 @@ import {
   ProgramStateTag,
   TableNameView,
 } from './tags';
-import { effectiveMapping } from './table-mapping';
+import { effectiveMapping, type EffectiveMapping } from './table-mapping';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
 // KPI cards, line split and complexity histogram, the corpus totals apart
 // from per-program totals, warnings, then tabs for the program list (detail
-// opens inline under its row), the call graph (UI03) and the project-wide
+// opens inline under its row), the call graph (UI03, loaded lazily) and the project-wide
 // CRUD matrix. Version/snapshot metadata stays under "technical
 // information". Parent keys it by run.
 
@@ -104,6 +106,14 @@ export function AssessmentOverview({
 
 type Tab = 'programs' | 'graph' | 'tables';
 const TABS: Tab[] = ['programs', 'graph', 'tables'];
+
+// The call graph and its libraries (React Flow, ELK) load only when the
+// tab is first opened.
+const DependencyGraphView = lazy(() =>
+  import('./dependency-graph-view').then((module) => ({
+    default: module.DependencyGraphView,
+  })),
+);
 
 const EMPTY_FILTER: ProgramFilter = { query: '', state: 'all', level: 'all' };
 const DEFAULT_SORT: ProgramSort = { key: 'complexity', direction: 'desc' };
@@ -179,6 +189,9 @@ function ArtifactView({
     [artifact.payload, summary.programs],
   );
   const [tab, setTab] = useState<Tab>('programs');
+  // Kept mounted once opened, so its layout is not computed again.
+  const [graphOpened, setGraphOpened] = useState(false);
+  if (tab === 'graph' && !graphOpened) setGraphOpened(true);
   const [filter, setFilter] = useState<ProgramFilter>(EMPTY_FILTER);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const baseId = useId();
@@ -219,7 +232,11 @@ function ArtifactView({
           onShowPrograms={showPrograms}
         />
       </div>
-      <Warnings summary={summary} onShowPrograms={showPrograms} />
+      <Warnings
+        summary={summary}
+        mapping={effectiveMapping(artifact.payload)}
+        onShowPrograms={showPrograms}
+      />
       <section
         className="panel analysis-tabs"
         aria-label={copy.dashboard.sectionLabel}
@@ -246,6 +263,12 @@ function ArtifactView({
               )}
             </button>
           ))}
+          {/* Slides under the selected tab (demo02 tab indicator). */}
+          <span
+            className="tab-indicator"
+            aria-hidden="true"
+            style={{ transform: `translateX(${TABS.indexOf(tab) * 100}%)` }}
+          />
         </div>
         <div
           role="tabpanel"
@@ -271,7 +294,13 @@ function ArtifactView({
           aria-labelledby={`${panelId('graph')}-tab`}
           hidden={tab !== 'graph'}
         >
-          <p className="notice">{copy.dashboard.graphSoon}</p>
+          {graphOpened && (
+            <Suspense
+              fallback={<p role="status">{copy.dashboard.graph.loading}</p>}
+            >
+              <DependencyGraphView inventory={artifact.payload} />
+            </Suspense>
+          )}
         </div>
         <div
           role="tabpanel"
@@ -537,9 +566,11 @@ function warningTarget(code: AssessmentWarning): Partial<ProgramFilter> | null {
 
 function Warnings({
   summary,
+  mapping,
   onShowPrograms,
 }: {
   summary: AssessmentSummary;
+  mapping: EffectiveMapping;
   onShowPrograms: (filter: Partial<ProgramFilter>) => void;
 }) {
   const { messages } = useLocale();
@@ -568,7 +599,16 @@ function Warnings({
           const target = warningTarget(code);
           return (
             <li key={code}>
-              {copy.warnings[code]}
+              {/* Says which schema the table names are merged under,
+                  rather than only that the mapping is unconfirmed. */}
+              {code === 'TABLE_NAMES_NOT_CONFIRMED'
+                ? mapping.defaultSchema !== null
+                  ? copy.tableSchema.assumed(
+                      mapping.defaultSchema,
+                      mapping.inferred,
+                    )
+                  : copy.tableSchema.none
+                : copy.warnings[code]}
               {count !== null && (
                 <strong> {copy.programCount(number(count))}</strong>
               )}
@@ -692,7 +732,11 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 8;
+const COLUMNS = 9;
+
+// List row: the table count shown first is the mapped one when there is a
+// mapped view (configured or inferred); the count as written stays beside it.
+type ListRow = ProgramRow & { rawTables: number | null };
 
 function ProgramList({
   artifact,
@@ -717,9 +761,18 @@ function ProgramList({
   const [sort, setSort] = useState<ProgramSort>(DEFAULT_SORT);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
+  const listRows = useMemo(
+    (): ListRow[] =>
+      rows.map((row) => ({
+        ...row,
+        tables: row.mappedTables ?? row.tables,
+        rawTables: row.tables,
+      })),
+    [rows],
+  );
   const visible = useMemo(
-    () => sortPrograms(filterPrograms(rows, filter), sort),
-    [rows, filter, sort],
+    () => sortPrograms(filterPrograms(listRows, filter), sort),
+    [listRows, filter, sort],
   );
   const current = pageOf(visible, page, pageSize);
   const number = useNumber();
@@ -729,10 +782,15 @@ function ProgramList({
     onFilter(next);
     setPage(1);
   };
-  const header = (key: ProgramSortKey, label: string): ReactNode => {
+  const header = (
+    key: ProgramSortKey,
+    label: string,
+    hint?: string,
+  ): ReactNode => {
     const active = sort.key === key;
     return (
       <th
+        title={hint}
         scope="col"
         aria-sort={
           active
@@ -842,10 +900,21 @@ function ProgramList({
                   {header('kind', copy.columns.kind)}
                   {header('state', copy.columns.state)}
                   {header('ownCodeLines', copy.columns.ownCodeLines)}
-                  {header('codeLines', copy.columns.codeLines)}
+                  {header(
+                    'codeLines',
+                    copy.columns.codeLines,
+                    copy.columnHints.codeLines,
+                  )}
                   {header('procedures', copy.columns.procedures)}
                   {header('tables', copy.columns.tables)}
-                  {header('complexity', copy.columns.complexity)}
+                  {header(
+                    'complexity',
+                    copy.columns.complexity,
+                    copy.columnHints.complexity,
+                  )}
+                  <th scope="col" className="chevron-col">
+                    <span className="sr-only">{dashboard.detailColumn}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -853,15 +922,25 @@ function ProgramList({
                   const label = programLabel(row.projectPath);
                   const open = row.key === openKey;
                   const detailId = `program-detail-${row.key}`;
+                  const kindText = memberKinds(row)
+                    .map(
+                      (item) =>
+                        `${item.count} ${dashboard.kinds[item.kind] ?? item.kind}`,
+                    )
+                    .join(' · ');
                   return (
                     <Fragment key={row.key}>
-                      <tr className={open ? 'selected' : undefined}>
+                      {/* The whole row opens the detail; the button keeps it
+                          reachable by keyboard (its click bubbles here). */}
+                      <tr
+                        className={`program-row${open ? ' selected' : ''}`}
+                        onClick={() => onToggle(row.key)}
+                      >
                         <th scope="row">
                           <button
                             className="link-button program-toggle"
                             aria-expanded={open}
                             aria-controls={open ? detailId : undefined}
-                            onClick={() => onToggle(row.key)}
                           >
                             {label}
                           </button>
@@ -875,50 +954,63 @@ function ProgramList({
                           </span>
                         </th>
                         <td>
-                          <span className="kind-list">
-                            {memberKinds(row)
-                              .map(
-                                (item) =>
-                                  `${item.count} ${dashboard.kinds[item.kind] ?? item.kind}`,
-                              )
-                              .join(' · ')}
+                          <span className="kind-chip" title={kindText}>
+                            <i aria-hidden="true" />
+                            {kindText}
                           </span>
                         </td>
                         <td>
                           <ProgramStateTag state={row.state} />
                         </td>
-                        <td>{metric(row.ownCodeLines)}</td>
-                        <td>{metric(row.codeLines)}</td>
-                        <td>{metric(row.procedures)}</td>
-                        <td>
+                        <td className="num">{metric(row.ownCodeLines)}</td>
+                        <td className="num">{metric(row.codeLines)}</td>
+                        <td className="num">{metric(row.procedures)}</td>
+                        <td className="num">
                           {metric(row.tables)}
-                          {row.mappedTables !== null &&
-                            row.mappedTables !== row.tables && (
-                              <span className="muted">
+                          {row.rawTables !== null &&
+                            row.rawTables !== row.tables && (
+                              <span className="muted raw-count">
                                 {' '}
-                                {copy.mappedTables(number(row.mappedTables))}
+                                {copy.rawTables(number(row.rawTables))}
                               </span>
                             )}
                         </td>
                         <td>
-                          <ComplexityCell complexity={row.complexity} />
+                          <span className="cx-cell">
+                            {row.complexity && (
+                              <span className="cx-bar" aria-hidden="true">
+                                <i
+                                  className={`tone-${row.complexity.level}`}
+                                  style={{ width: `${row.complexity.score}%` }}
+                                />
+                              </span>
+                            )}
+                            <ComplexityCell complexity={row.complexity} />
+                          </span>
+                        </td>
+                        <td className="chevron-col">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
                         </td>
                       </tr>
                       {open && (
                         <tr className="program-detail-row" id={detailId}>
                           <td colSpan={COLUMNS}>
-                            <div className="detail-actions">
-                              <Link
-                                className="button primary small"
-                                to={`${stepPath(projectId, 'documents')}?program=${encodeURIComponent(row.projectPath)}`}
-                              >
-                                {dashboard.createDocs} →
-                              </Link>
+                            <div className="detail-card">
+                              <div className="detail-actions">
+                                <Link
+                                  className="button primary small"
+                                  to={`${stepPath(projectId, 'documents')}?program=${encodeURIComponent(row.projectPath)}`}
+                                >
+                                  {dashboard.createDocs} →
+                                </Link>
+                              </div>
+                              <ProgramDetail
+                                inventory={artifact.payload}
+                                projectPath={row.key}
+                              />
                             </div>
-                            <ProgramDetail
-                              inventory={artifact.payload}
-                              projectPath={row.key}
-                            />
                           </td>
                         </tr>
                       )}

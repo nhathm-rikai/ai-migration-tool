@@ -1,0 +1,176 @@
+import { describe, expect, it } from 'vitest';
+import ELK from 'elkjs/lib/elk.bundled.js';
+import { syntheticCorpusFixture } from '@portal/contracts/fixtures';
+import { buildDependencyGraph, LANE, visibleGraph } from './dependency-graph';
+import {
+  NODE_WIDTH,
+  groupGrid,
+  groupNodeId,
+  groupSlot,
+  laneLayout,
+  layoutBoxes,
+  layoutRequest,
+  readLayout,
+  TABLE_BOX,
+  type LayoutRequest,
+  type Point,
+} from './dependency-graph-layout';
+
+const corpus = syntheticCorpusFixture({
+  programs: 60,
+  sharedModules: 8,
+  tables: 20,
+  folders: 4,
+});
+const graph = buildDependencyGraph(corpus);
+const drawn = visibleGraph(graph, false);
+const request = layoutRequest(graph, drawn.nodes, drawn.edges);
+
+// Lane of a top-level box, from the partition the request gives ELK.
+const laneOf = (id: string): number => {
+  const child = request.children.find((value) => value.id === id);
+  if (!child) throw new Error(id);
+  return Number(child.layoutOptions?.['elk.partitioning.partition']);
+};
+
+// Every box of a lane lies right of every box of the lanes before it.
+function expectLanes(positions: Map<string, Point>, input: LayoutRequest) {
+  const extent = new Map<number, { min: number; max: number }>();
+  for (const child of input.children) {
+    const point = positions.get(child.id);
+    if (!point) throw new Error(`no position for ${child.id}`);
+    const lane = laneOf(child.id);
+    const current = extent.get(lane) ?? { min: Infinity, max: -Infinity };
+    extent.set(lane, {
+      min: Math.min(current.min, point.x),
+      max: Math.max(current.max, point.x + child.width),
+    });
+  }
+  const lanes = [...extent.keys()].sort();
+  expect(lanes).toEqual([0, 1, 2, 3]);
+  for (let index = 1; index < lanes.length; index++) {
+    const before = extent.get(lanes[index - 1] ?? 0);
+    const after = extent.get(lanes[index] ?? 0);
+    expect(after?.min).toBeGreaterThan(before?.max ?? Infinity);
+  }
+}
+
+describe('UI03 layout request', () => {
+  it('boxes programs and own files by folder, tables and COM apart', () => {
+    const boxes = layoutBoxes(graph, drawn.nodes);
+    expect(boxes.map((box) => box.kind).sort()).toEqual(
+      [
+        ...graph.groups.flatMap(() => ['programs', 'own']),
+        'tables',
+        'components',
+      ].sort(),
+    );
+    for (const box of boxes)
+      for (const node of box.members) expect(LANE[node.kind]).toBe(box.lane);
+    // Shared files are the only nodes ELK places one by one.
+    const shared = drawn.nodes.filter((node) => node.kind === 'shared-module');
+    expect(request.children).toHaveLength(boxes.length + shared.length);
+    const boxed = boxes.reduce((sum, box) => sum + box.members.length, 0);
+    expect(boxed + shared.length).toBe(drawn.nodes.length);
+    expect(laneOf(groupNodeId(graph.groups[0]?.id ?? ''))).toBe(0);
+    // One layout edge per (box, target); never backwards across lanes.
+    const ids = new Set(request.edges.map((edge) => edge.id));
+    expect(ids.size).toBe(request.edges.length);
+    for (const edge of request.edges)
+      expect(laneOf(edge.sources[0] ?? '')).toBeLessThanOrEqual(
+        laneOf(edge.targets[0] ?? ''),
+      );
+  });
+
+  it('places programs in a grid inside their folder box', () => {
+    expect(groupGrid(1).columns).toBe(1);
+    expect(groupGrid(30).columns).toBe(6);
+    const grid = groupGrid(5);
+    const last = groupSlot(4, grid.columns);
+    expect(last.x + NODE_WIDTH).toBeLessThanOrEqual(grid.width);
+    expect(groupSlot(1, 2).y).toBe(groupSlot(0, 2).y);
+  });
+
+  it('lays out in four lanes with ELK, as the worker does', async () => {
+    const result = await new ELK().layout(request);
+    const positions = readLayout(result, request);
+    expect(positions).not.toBeNull();
+    if (positions) expectLanes(positions, request);
+  });
+
+  it('keeps the same lanes without ELK', () => {
+    expectLanes(laneLayout(request), request);
+  });
+
+  it('rejects a worker answer that is not a full layout', () => {
+    expect(readLayout(null, request)).toBeNull();
+    expect(
+      readLayout({ children: [{ id: 'x', x: 'a', y: 0 }] }, request),
+    ).toBeNull();
+    expect(readLayout({ children: [] }, request)).toBeNull();
+    const full = {
+      children: request.children.map((child) => ({ id: child.id, x: 1, y: 2 })),
+    };
+    expect(readLayout(full, request)?.size).toBe(request.children.length);
+  });
+});
+
+describe('UI03 closed boxes in the layout', () => {
+  it('sends one small node per closed box and keeps open ones boxed', async () => {
+    const folders = graph.groups.map((group) => groupNodeId(group.id));
+    const closed = new Set([...folders.slice(1), TABLE_BOX]);
+    const input = layoutRequest(graph, drawn.nodes, drawn.edges, closed);
+    const boxes = layoutBoxes(graph, drawn.nodes, closed);
+    const shut = boxes.filter((box) => box.collapsed);
+    expect(shut.map((box) => box.id).sort()).toEqual([...closed].sort());
+    expect(
+      boxes.filter((box) => box.kind === 'programs' && !box.collapsed),
+    ).toHaveLength(1);
+    // A closed folder stands for its programs and own files.
+    expect(
+      shut
+        .find((box) => box.id === folders[1])
+        ?.members.some((node) => node.kind === 'own-module'),
+    ).toBe(true);
+    for (const id of closed)
+      expect(input.children.find((child) => child.id === id)).toMatchObject({
+        width: NODE_WIDTH,
+      });
+    const result = await new ELK().layout(input);
+    expect(readLayout(result, input)?.size).toBe(input.children.length);
+  });
+
+  // Feedback 30/10: opening a folder makes room but keeps the top-to-bottom
+  // order of the other boxes and of the shared files.
+  it('keeps the vertical order when a folder opens', async () => {
+    const folders = graph.groups.map((group) => groupNodeId(group.id));
+    const allClosed = new Set([...folders, TABLE_BOX]);
+    const oneOpen = new Set([...folders.filter((_, i) => i !== 1), TABLE_BOX]);
+    const order = async (closed: Set<string>) => {
+      const input = layoutRequest(graph, drawn.nodes, drawn.edges, closed);
+      const positions = readLayout(await new ELK().layout(input), input);
+      if (!positions) throw new Error('layout');
+      const lane = (value: number) =>
+        input.children
+          .filter(
+            (child) =>
+              child.layoutOptions?.['elk.partitioning.partition'] ===
+              String(value),
+          )
+          .map((child) => child.id)
+          .filter((id) => id !== folders[1])
+          .sort(
+            (a, b) => (positions.get(a)?.y ?? 0) - (positions.get(b)?.y ?? 0),
+          );
+      return { folders: lane(0), shared: lane(2) };
+    };
+    const before = await order(allClosed);
+    const after = await order(oneOpen);
+    expect(after.folders).toEqual(before.folders);
+    // Folders in name order, as the request lists them.
+    expect(before.folders).toEqual(
+      folders.filter((id) => before.folders.includes(id)),
+    );
+    expect(after.shared).toEqual(before.shared);
+  });
+});

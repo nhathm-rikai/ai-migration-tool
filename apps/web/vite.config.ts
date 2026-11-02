@@ -15,6 +15,16 @@ const port = (name: string, fallback: number) => {
 const proxy = { '/api': `http://127.0.0.1:${port('PORTAL_PORT', 4310)}` };
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // elkjs (EPL-2.0) API in a chunk of its own, named in
+        // public/licenses/THIRD-PARTY-NOTICES.txt.
+        manualChunks: (id) =>
+          id.includes('/node_modules/elkjs/') ? 'elk-api' : undefined,
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: port('PORTAL_WEB_PORT', 5173),

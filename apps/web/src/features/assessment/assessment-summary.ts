@@ -257,10 +257,10 @@ export type ProgramFilter = {
   level: ComplexityLevel | 'all';
 };
 
-export function filterPrograms(
-  rows: readonly ProgramRow[],
+export function filterPrograms<T extends ProgramRow>(
+  rows: readonly T[],
   filter: ProgramFilter,
-): ProgramRow[] {
+): T[] {
   const query = filter.query.trim().toLowerCase();
   return rows.filter(
     (row) =>
@@ -319,10 +319,10 @@ function sortValue(row: ProgramRow, key: ProgramSortKey): number | string {
 
 // Stable sort; programs without a value (not analyzed) always come last so
 // sorting never presents them as 0.
-export function sortPrograms(
-  rows: readonly ProgramRow[],
+export function sortPrograms<T extends ProgramRow>(
+  rows: readonly T[],
   sort: ProgramSort,
-): ProgramRow[] {
+): T[] {
   const sign = sort.direction === 'asc' ? 1 : -1;
   return rows
     .map((row, index) => ({ row, index, value: sortValue(row, sort.key) }))

@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 // Projects smoke on the fixture API (UI04): the app opens on step 1 of a
-// new project; "Xem tất cả" lists the seeded project and opens it; reload
+// new project; "Dự án gần đây" finds the seeded project and opens it; reload
 // stays on the project's URL; the sidebar picker goes back to a new project.
 test(
-  'open a project from "Xem tất cả", reload it and go back to a new one',
+  'open a project from recent projects, reload it and go back to a new one',
   { tag: '@smoke' },
   async ({ page }) => {
     const seedName = process.env.E2E_SEED_PROJECT_NAME ?? '';
@@ -35,14 +35,11 @@ test(
     await page.goto('/');
     await expect(page).toHaveURL(/\/projects\/new$/);
     await expect(page.getByText('Bước 1 / 5 · Dự án mới')).toBeVisible();
-    await page.getByRole('button', { name: 'Xem tất cả' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Tất cả dự án' });
-    // A list to reopen projects only: nothing to create here.
-    await expect(
-      dialog.getByRole('textbox', { name: /Tên dự án/ }),
-    ).toHaveCount(0);
-    await dialog.getByLabel('Tìm dự án theo tên').fill(seedName);
-    await dialog
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await recent
       .getByRole('link', { name: new RegExp(seedName) })
       .first()
       .click();
@@ -87,10 +84,11 @@ test(
     });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/projects');
-    await page.getByRole('button', { name: 'Xem tất cả' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Tất cả dự án' });
-    await dialog.getByLabel('Tìm dự án theo tên').fill(seedName);
-    await dialog
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await recent
       .getByRole('link', { name: new RegExp(seedName) })
       .first()
       .click();

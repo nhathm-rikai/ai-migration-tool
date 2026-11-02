@@ -144,7 +144,6 @@ function AppShell({
           {route.name === 'new' ? (
             <NewProjectPage
               apis={apis}
-              list={list}
               onCreated={(next) => {
                 list.refresh();
                 navigate(stepPath(next.id, 'source'));
@@ -184,7 +183,6 @@ function AppShell({
               onProgress={progress.refresh}
               onRetryProgress={progress.refresh}
               apis={apis}
-              list={list}
               onProjectChange={(next) => {
                 project.replace(next);
                 list.retry();
@@ -387,7 +385,6 @@ function StepPage({
   onProgress,
   onRetryProgress,
   apis,
-  list,
   onProjectChange,
 }: {
   project: Project;
@@ -397,7 +394,6 @@ function StepPage({
   onProgress: () => void;
   onRetryProgress: () => void;
   apis: Apis;
-  list: ProjectListControl;
   onProjectChange: (project: Project) => void;
 }) {
   const { messages } = useLocale();
@@ -431,7 +427,6 @@ function StepPage({
           onOpenResults={(id) => navigate(stepPath(project.id, 'analysis', id))}
           aside={
             <RecentProjects
-              list={list}
               api={apis.api}
               runsApi={apis.runsApi}
               openProjectId={project.id}
@@ -457,11 +452,9 @@ function StepPage({
 // Step 1 before the project exists (UI04): created by its first scan.
 function NewProjectPage({
   apis,
-  list,
   onCreated,
 }: {
   apis: Apis;
-  list: ProjectListControl;
   onCreated: (project: Project) => void;
 }) {
   const { messages } = useLocale();
@@ -482,7 +475,6 @@ function NewProjectPage({
         onCreated={onCreated}
         aside={
           <RecentProjects
-            list={list}
             api={apis.api}
             runsApi={apis.runsApi}
             openProjectId={null}

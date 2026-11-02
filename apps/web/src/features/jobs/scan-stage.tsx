@@ -50,6 +50,7 @@ export function ScanStage({
   starting,
   onStart,
   onChangeFolder,
+  picking = false,
   onOpenResults,
 }: {
   runs: AnalyzeRunsControl;
@@ -61,8 +62,10 @@ export function ScanStage({
   starting: boolean;
   // A new run, or a re-run of the ended run named.
   onStart: (retryOfRunId: string | null) => void;
-  // null: the folder cannot be changed (demo project).
+  // null: the folder cannot be changed (demo project). Opens the dialog.
   onChangeFolder: (() => void) | null;
+  // The folder dialog is open.
+  picking?: boolean;
   onOpenResults: (runId: string) => void;
 }) {
   const { messages, formatDateTime } = useLocale();
@@ -280,7 +283,9 @@ export function ScanStage({
                     disabled={busy}
                     onClick={onChangeFolder}
                   >
-                    {copy.changeFolder}
+                    {picking
+                      ? messages.sourceStep.form.picking
+                      : copy.changeFolder}
                   </button>
                 )}
                 {lastSucceeded && (

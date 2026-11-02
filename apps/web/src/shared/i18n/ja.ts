@@ -170,7 +170,6 @@ export const jaMessages = {
       picking: 'ダイアログを開いています…',
       pickingHelp:
         'この端末でフォルダー選択ダイアログが開いています。フォルダーを選んで OK を押してください。',
-      typePath: 'パスを入力',
       useFolder: 'このフォルダーを使用',
       pickerUnavailable: {
         'no-tool':
@@ -187,23 +186,11 @@ export const jaMessages = {
       languageRequired: 'スキャンする前に解析言語を選択してください。',
       comingSoon: '対応予定',
     },
-    projects: {
-      title: 'すべてのプロジェクト',
-      close: '閉じる',
-      search: '名前でプロジェクトを検索',
-      loading: 'プロジェクト一覧を読み込んでいます…',
-      empty: 'プロジェクトはまだありません。',
-      noMatch: '一致するプロジェクトはありません。',
-      created: (date: string) => `作成 ${date}`,
-      pages: 'プロジェクト一覧のページ',
-      previous: '前へ',
-      next: '次へ',
-      page: (page: number, total: number) => `${page} / ${total} ページ`,
-    },
     recent: {
       title: '最近のプロジェクト',
+      search: '名前でプロジェクトを検索',
+      noMatch: '一致するプロジェクトはありません。',
       new: '+ 新規プロジェクト',
-      all: 'すべて表示',
       loading: '最近のプロジェクトを読み込んでいます…',
       failed: 'プロジェクト一覧を読み込めませんでした。',
       empty: 'プロジェクトはまだありません。',

@@ -19,6 +19,7 @@ import { useLocale } from '../shared/i18n/locale-context';
 
 // The app opens on step 1 of a new project (UI04). A fake backend answers by
 // `METHOD /path`; unknown routes answer an empty project list.
+const ROOT = 'D:\\work\\order-module';
 type Handler = (init?: RequestInit) => Response | Promise<Response>;
 
 function backend(routes: Record<string, Handler> = {}) {
@@ -26,6 +27,8 @@ function backend(routes: Record<string, Handler> = {}) {
     const url = requestUrl(input).split('?')[0] ?? '';
     const handler = routes[`${init?.method ?? 'GET'} ${url}`];
     if (handler) return Promise.resolve(handler(init));
+    if (url === '/api/v1/local/folder-picker')
+      return Promise.resolve(json({ status: 'selected', path: ROOT }));
     if (url.endsWith('/runs/current'))
       return Promise.resolve(json({ run: null }));
     return Promise.resolve(json({ items: [], nextCursor: null }));
@@ -45,20 +48,18 @@ function TestApp({ fetcher }: { fetcher: typeof fetch }) {
   );
 }
 
-const ROOT = 'D:\\work\\order-module';
+// Writes; opening the folder dialog is not one.
 const posts = (fetcher: ReturnType<typeof backend>) =>
-  fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+  fetcher.mock.calls.filter(
+    ([input, init]) =>
+      init?.method === 'POST' &&
+      requestUrl(input) !== '/api/v1/local/folder-picker',
+  );
 
-// Types a folder on the scan card of the new project.
-async function typeFolder(path = ROOT) {
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Nhập đường dẫn' }),
-  );
-  fireEvent.change(
-    screen.getByLabelText('Đường dẫn thư mục source (tuyệt đối)'),
-    { target: { value: path } },
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Dùng thư mục này' }));
+// Chooses a folder on the scan card of the new project; the backend's
+// folder dialog answers ROOT (see `backend`).
+async function typeFolder() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Chọn thư mục' }));
   await screen.findByText('Đã chọn thư mục');
 }
 

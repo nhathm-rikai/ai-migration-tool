@@ -186,7 +186,6 @@ export const viMessages = {
       picking: 'Đang mở hộp thoại…',
       pickingHelp:
         'Hộp thoại chọn thư mục đã mở trên máy này. Chọn thư mục rồi bấm OK.',
-      typePath: 'Nhập đường dẫn',
       useFolder: 'Dùng thư mục này',
       pickerUnavailable: {
         'no-tool':
@@ -203,23 +202,11 @@ export const viMessages = {
       languageRequired: 'Chọn ngôn ngữ phân tích trước khi quét.',
       comingSoon: 'Sắp hỗ trợ',
     },
-    projects: {
-      title: 'Tất cả dự án',
-      close: 'Đóng',
-      search: 'Tìm dự án theo tên',
-      loading: 'Đang tải danh sách dự án…',
-      empty: 'Chưa có dự án nào.',
-      noMatch: 'Không có dự án nào khớp.',
-      created: (date: string) => `Tạo ${date}`,
-      pages: 'Phân trang danh sách dự án',
-      previous: 'Trước',
-      next: 'Sau',
-      page: (page: number, total: number) => `Trang ${page} / ${total}`,
-    },
     recent: {
       title: 'Dự án gần đây',
+      search: 'Tìm dự án theo tên',
+      noMatch: 'Không có dự án nào khớp.',
       new: '+ Dự án mới',
-      all: 'Xem tất cả',
       loading: 'Đang tải dự án gần đây…',
       failed: 'Không tải được danh sách dự án.',
       empty: 'Chưa có dự án nào.',

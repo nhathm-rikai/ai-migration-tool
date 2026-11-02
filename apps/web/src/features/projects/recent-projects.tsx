@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import type { Project, Run } from '@portal/contracts';
+import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { Link, NEW_PROJECT_PATH, stepPath } from '../../app/router';
-import type { ProjectsApi } from '../../shared/api/projects-api';
-import { ProjectsDialog } from './projects-dialog';
 import { isActiveRun } from '../jobs/use-analyze-runs';
-import type { ProjectListControl } from './use-project-list';
 
-// "Dự án gần đây" of the source step: projects of the loaded list page with
-// the state of their last run, most recent activity first. Read only; a
-// project whose run cannot be read says so instead of looking unanalysed.
+// "Dự án gần đây" of step 1 (UI04): every project with the state of its last
+// run, most recent activity first, a search by name and its own scroll; the
+// place to reopen a project and to start a new one. Read only; a project
+// whose run cannot be read says so instead of looking unanalysed.
 
-export const RECENT_PROJECT_COUNT = 4;
+// More than a local workspace is expected to hold; the rest is not read.
+export const MAX_PROJECTS = 500;
 
 type RecentStatus =
   | 'none'
@@ -41,44 +41,59 @@ function activity(item: Recent): number {
   return Date.parse(item.run?.updatedAt ?? item.project.createdAt);
 }
 
+type RecentState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; items: Recent[] };
+
+// The API pages by ID: every page is read (bounded), then each project's
+// current run.
 export function useRecentProjects(
-  projects: readonly Project[] | null,
+  api: ProjectsApi,
   runsApi: RunsApi,
   // Changes when a run of the open project starts or ends.
   version: string,
-) {
-  const [state, setState] = useState<Recent[] | null>(null);
+): RecentState {
+  const [state, setState] = useState<RecentState>({ status: 'loading' });
   useEffect(() => {
-    if (!projects) return;
     const controller = new AbortController();
-    void Promise.all(
-      projects.map((project) =>
-        runsApi.current(project.id, controller.signal).then(
-          ({ run }): Recent => ({ project, run, status: recentStatus(run) }),
-          (): Recent => ({ project, run: null, status: 'unknown' }),
+    const { signal } = controller;
+    void (async () => {
+      const projects: Project[] = [];
+      let cursor: string | null = null;
+      do {
+        const page = await api.list(cursor, signal);
+        projects.push(...page.items);
+        cursor = page.nextCursor;
+      } while (cursor && projects.length < MAX_PROJECTS);
+      const items = await Promise.all(
+        projects.slice(0, MAX_PROJECTS).map((project) =>
+          runsApi.current(project.id, signal).then(
+            ({ run }): Recent => ({ project, run, status: recentStatus(run) }),
+            (): Recent => ({ project, run: null, status: 'unknown' }),
+          ),
         ),
-      ),
-    ).then((items) => {
-      if (controller.signal.aborted) return;
-      setState(
-        [...items]
-          .sort((a, b) => activity(b) - activity(a))
-          .slice(0, RECENT_PROJECT_COUNT),
       );
-    });
+      return items.sort((a, b) => activity(b) - activity(a));
+    })().then(
+      (items) => {
+        if (!signal.aborted) setState({ status: 'ready', items });
+      },
+      () => {
+        if (!signal.aborted) setState({ status: 'error' });
+      },
+    );
     return () => controller.abort();
-  }, [projects, runsApi, version]);
+  }, [api, runsApi, version]);
   return state;
 }
 
 export function RecentProjects({
-  list,
   api,
   runsApi,
   openProjectId,
   version,
 }: {
-  list: ProjectListControl;
   api: ProjectsApi;
   runsApi: RunsApi;
   // null on the step of a new project.
@@ -87,41 +102,49 @@ export function RecentProjects({
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.sourceStep.recent;
-  const projects = list.state.status === 'ready' ? list.state.page.items : null;
-  const items = useRecentProjects(projects, runsApi, version);
-  const [showAll, setShowAll] = useState(false);
+  const state = useRecentProjects(api, runsApi, version);
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLocaleLowerCase();
+  const items =
+    state.status === 'ready'
+      ? state.items.filter(({ project }) =>
+          project.name.toLocaleLowerCase().includes(needle),
+        )
+      : [];
   return (
     <aside className="recent-projects" aria-labelledby="recent-title">
       <div className="recent-heading">
         <h2 id="recent-title">{copy.title}</h2>
-        <span className="recent-links">
-          {openProjectId !== null && (
-            <Link to={NEW_PROJECT_PATH}>{copy.new}</Link>
-          )}
-          <button className="link-button" onClick={() => setShowAll(true)}>
-            {copy.all}
-          </button>
-        </span>
+        {openProjectId !== null && (
+          <Link className="button small primary" to={NEW_PROJECT_PATH}>
+            {copy.new}
+          </Link>
+        )}
       </div>
-      {showAll && (
-        <ProjectsDialog
-          api={api}
-          openProjectId={openProjectId}
-          onClose={() => setShowAll(false)}
-        />
-      )}
-      {list.state.status === 'error' ? (
+      <label htmlFor="recent-search" className="sr-only">
+        {copy.search}
+      </label>
+      <input
+        id="recent-search"
+        type="search"
+        className="recent-search"
+        autoComplete="off"
+        placeholder={copy.search}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      {state.status === 'error' ? (
         <p role="alert" className="error">
           {copy.failed}
         </p>
-      ) : !items ? (
+      ) : state.status === 'loading' ? (
         <p role="status" className="muted">
           {copy.loading}
         </p>
       ) : items.length === 0 ? (
-        <p className="muted">{copy.empty}</p>
+        <p className="muted">{needle ? copy.noMatch : copy.empty}</p>
       ) : (
-        <ul>
+        <ul className="recent-list">
           {items.map(({ project, run, status }) => (
             <li key={project.id}>
               <Link
@@ -135,7 +158,7 @@ export function RecentProjects({
                   </span>
                   <span className="recent-text">
                     <span className="recent-name">
-                      {project.name}
+                      <span className="recent-title">{project.name}</span>
                       {project.mode === 'demo' && (
                         <span className="chip demo">
                           {messages.projects.demoBadge}

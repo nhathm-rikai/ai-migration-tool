@@ -47,14 +47,7 @@ const NO_ERRORS: FieldErrors = {
 // Language chips of demo02. Only VB6 has an analysis profile; the others
 // are listed as coming and cannot be chosen.
 export type Language = 'vb6';
-const COMING_LANGUAGES = [
-  'Java',
-  'C#',
-  'PHP',
-  'PL/SQL',
-  'COBOL',
-  'JavaScript',
-] as const;
+const COMING_LANGUAGES = ['COBOL', 'PHP', 'C#', 'Java'] as const;
 const UNCONFIGURED: TableNameMapping = {
   defaultSchema: null,
   status: 'unconfigured',
@@ -192,16 +185,18 @@ export function SourceStep({
         if (result.status === 'unavailable') {
           setPicker({ status: 'unavailable', reason: result.reason });
           setManualPath(true);
+          setChangingFolder(true);
           return;
         }
         setPicker({ status: 'idle' });
         if (result.status === 'cancelled') return;
-        if (!(await register(result.path))) {
-          setRootPath(result.path);
-          setManualPath(true);
-        }
+        // A refused folder shows the reason on the chooser; the next choice
+        // opens the dialog again.
+        if (!(await register(result.path))) setChangingFolder(true);
       } catch (error) {
-        if (!controller.signal.aborted) setPicker({ status: 'error', error });
+        if (controller.signal.aborted) return;
+        setPicker({ status: 'error', error });
+        setChangingFolder(true);
       }
     });
   }
@@ -275,14 +270,14 @@ export function SourceStep({
         setInvalid((errors) => ({ ...errors, rootPath: false }));
       }}
       onPick={pickFolder}
-      onManual={() => setManualPath(true)}
       onSubmit={chooseTyped}
       onReload={source.refresh}
       onCancel={
-        registered
+        registered?.status === 'ready'
           ? () => {
               setChangingFolder(false);
               setManualPath(false);
+              setPicker({ status: 'idle' });
             }
           : null
       }
@@ -298,7 +293,8 @@ export function SourceStep({
           chooser={chooser}
           starting={saving}
           onStart={scan}
-          onChangeFolder={demo ? null : () => setChangingFolder(true)}
+          onChangeFolder={demo ? null : pickFolder}
+          picking={picker.status === 'pending'}
           onOpenResults={onOpenResults}
         />
         <ProjectInfoPanel
@@ -401,8 +397,8 @@ export function ProjectInfoPanel({
   );
 }
 
-// Folder choice on the scan card: the OS folder dialog (UI05), or an
-// absolute path typed by the user when asked for or when no dialog exists.
+// Folder choice on the scan card: the OS folder dialog (UI05). An absolute
+// path can be typed only when this machine has no dialog (`manual`).
 export function FolderChooser({
   value,
   manual,
@@ -412,7 +408,6 @@ export function FolderChooser({
   error,
   onChange,
   onPick,
-  onManual,
   onSubmit,
   onReload,
   onCancel,
@@ -425,7 +420,6 @@ export function FolderChooser({
   error: unknown;
   onChange: (value: string) => void;
   onPick: () => void;
-  onManual: () => void;
   onSubmit: () => void;
   onReload: () => void;
   onCancel: (() => void) | null;
@@ -447,16 +441,6 @@ export function FolderChooser({
           >
             <FolderIcon />
             {picking ? copy.picking : copy.pick}
-          </button>
-        )}
-        {!manual && (
-          <button
-            className="button large"
-            type="button"
-            disabled={pending}
-            onClick={onManual}
-          >
-            {copy.typePath}
           </button>
         )}
         {onCancel && (

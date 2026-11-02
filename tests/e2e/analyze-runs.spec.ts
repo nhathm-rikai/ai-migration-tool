@@ -21,16 +21,15 @@ test(
         });
     });
 
-    // UI04: an existing project is opened from "Xem tất cả".
     await page.goto('/');
-    await page.getByRole('button', { name: 'Xem tất cả' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Tất cả dự án' });
-    await dialog.getByLabel('Tìm dự án theo tên').fill(seedName);
-    await dialog
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await recent
       .getByRole('link', { name: new RegExp(seedName) })
       .first()
       .click();
-    await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     await expect(
       page.getByRole('heading', { name: 'Đã chọn thư mục' }),

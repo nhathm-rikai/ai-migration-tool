@@ -15,7 +15,16 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Kiểm chứng: lint, typecheck, web 227 test, adapter picker 9 test, `npm run e2e` 11/11.
 - Dự án mới và “Xem tất cả” (người dùng đồng ý đề xuất, bỏ phần dự án demo khỏi giao diện): bỏ trang `/projects` (danh sách + form tạo, `ProjectsPage`/`CreateProjectForm`). `/`, `/projects` chuyển tới `/projects/new` = bước 1 của dự án chưa tồn tại (`new-project-step.tsx`): chọn thư mục (hộp thoại hoặc gõ) chỉ giữ trong bộ nhớ, tên dự án tự điền bằng tên thư mục tới khi người dùng sửa, chọn VB6; “Quét source” mới tạo dự án (POST local) → PUT source (mapping `unconfigured`) → Start run → mở bước 1 của dự án đó (theo dõi run rồi tự sang bước 2). Chọn thư mục mà không quét thì không tạo gì; PUT bị từ chối thì giữ dự án đã tạo, quét lại không tạo dự án thứ hai; double click một dự án. Sidebar: lựa chọn “+ Dự án mới”; panel Dự án gần đây có “+ Dự án mới” và nút “Xem tất cả” mở dialog (`projects-dialog.tsx`: đọc đủ các trang API, tìm theo tên, 8 dự án/trang, mới nhất trước, bấm để mở, Esc/nền để đóng, focus trong dialog như modal graph; không có chỗ tạo dự án). UI không còn chỗ tạo dự án demo; dự án demo đã có vẫn mở được (nhãn DEMO). Trang “không tìm thấy” dẫn về `/projects/new`. Catalog bỏ các khóa của trang cũ.
 - E2E: dự án demo tạo qua API bằng credential của chính trang (`tests/e2e/demo-project.ts`); `analyze-local` và `source-registration` tạo dự án từ bước 1 mới (không tạo gì trước khi quét, lỗi đường dẫn không tạo dự án thứ hai, đổi revision đồng thời trên bước 1 của dự án); `projects.spec` mở dự án qua “Xem tất cả”. Kiểm chứng: lint, typecheck, web 226 test, `npm run e2e` 11/11.
-- Còn lại: CSS của trang `/projects` cũ chưa dọn (không còn dùng); dialog đọc tối đa 2000 dự án.
+- Còn lại: CSS của trang `/projects` cũ chưa dọn (không còn dùng).
+
+## 02/11/2026 — UI04: phản hồi người dùng vòng 4
+
+- “File đang đọc” đứng ở file đầu với corpus lớn: `buildSourceInventory` báo `onFile` cho mọi file ngay lúc decode, nhưng phần chậm là bước dò lời gọi chéo (`findReferences`) sau đó, nên chỉ có một báo cáo đầu rồi im tới cuối. Giờ file code đã phân tích chỉ được báo sau khi dò xong (file khác báo lúc decode); test thứ tự báo cáo; đo trên corpus tổng hợp 700 module: báo cáo trải đều tới cuối thay vì dừng giữa chừng.
+- Lỗi “Chọn ngôn ngữ phân tích” không còn đè lên chip (margin âm chỉ cho lỗi tên). Sidebar rộng cố định 260px, tên dự án dài cắt “…”, `position: sticky` cao bằng màn hình (cuộn riêng nếu dài).
+- “Dự án gần đây”: bỏ “Xem tất cả” và dialog; panel đọc mọi dự án (tối đa 500) + run hiện tại của từng dự án, ô tìm theo tên, danh sách cuộn riêng, nút “+ Dự án mới” kiểu button của portal (ẩn khi đang ở dự án mới).
+- Ngôn ngữ: VB6 (chọn được), COBOL, PHP, C#, Java (sắp hỗ trợ); bỏ PL/SQL, JavaScript.
+- Chọn thư mục chỉ bằng hộp thoại: bỏ nút “Nhập đường dẫn”; ô đường dẫn chỉ hiện khi máy không có hộp thoại (`unavailable`), để vẫn dùng được. “Đổi thư mục” mở hộp thoại ngay (dự án đã có: đăng ký luôn; dự án mới: thay thư mục), hủy thì giữ thư mục cũ; thư mục bị từ chối hiện lý do trên thẻ và lần chọn sau mở lại hộp thoại.
+- E2E chọn thư mục qua route hộp thoại được stub; mở dự án cũ bằng ô tìm của “Dự án gần đây”. Kiểm chứng: lint, typecheck, web 226 test, API (inventory) test, `npm run e2e` 11/11.
 
 ## 02/11/2026 — PF08: SSE và tiến độ theo file cho thẻ quét
 

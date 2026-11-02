@@ -13,14 +13,13 @@ import {
 } from '@portal/contracts/fixtures';
 import type { LocalProject, Project, Run } from '@portal/contracts';
 import { RecentProjects } from './recent-projects';
-import type { ProjectListControl } from './use-project-list';
-import { createRunsApi } from '../../shared/api/runs-api';
 import { createProjectsApi } from '../../shared/api/projects-api';
+import { createRunsApi } from '../../shared/api/runs-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { json, requestUrl, testCredentials } from '../../testing/fixtures';
 
 const at = (id: number, createdAt: string): LocalProject => ({
-  id: `00000000-0000-4000-8000-00000000001${id}`,
+  id: `00000000-0000-4000-8000-0000000000${String(id).padStart(2, '0')}`,
   name: `Dự án ${id}`,
   mode: 'local',
   createdAt,
@@ -28,7 +27,7 @@ const at = (id: number, createdAt: string): LocalProject => ({
 const projects: Project[] = [
   at(1, '2026-10-01T00:00:00.000Z'),
   at(2, '2026-10-02T00:00:00.000Z'),
-  at(3, '2026-10-03T00:00:00.000Z'),
+  { ...at(3, '2026-10-03T00:00:00.000Z'), name: 'Payroll' },
   at(4, '2026-10-04T00:00:00.000Z'),
   at(5, '2026-10-05T00:00:00.000Z'),
 ];
@@ -50,134 +49,108 @@ const runs: Record<string, Run | null | 'error'> = {
   [projects[4]!.id]: null,
 };
 
-function list(items: Project[]): ProjectListControl {
-  return {
-    state: { status: 'ready', page: { items, nextCursor: null } },
-    cursor: null,
-    refresh: () => undefined,
-    retry: () => undefined,
-    next: () => undefined,
-  };
-}
-
-describe('Recent projects (UI04)', () => {
-  it('orders by last activity, shows the real last-run state and reads only', async () => {
-    const fetcher = vi.fn<typeof fetch>((input, init) => {
-      const url = requestUrl(input);
-      expect(init?.method ?? 'GET').toBe('GET');
-      const id = /projects\/([^/]+)\/runs\/current$/.exec(url)?.[1] ?? '';
-      const run = runs[id];
+// The API pages by ID: two pages here, both read.
+function backend() {
+  return vi.fn<typeof fetch>((input, init) => {
+    expect(init?.method ?? 'GET').toBe('GET');
+    const url = requestUrl(input);
+    const current = /projects\/([^/]+)\/runs\/current$/.exec(url)?.[1];
+    if (current !== undefined) {
+      const run = runs[current];
       if (run === 'error') return Promise.resolve(json({ error: 'x' }, 500));
       return Promise.resolve(json({ run: run ?? null }));
-    });
-    render(
-      <LocaleProvider>
-        <RecentProjects
-          list={list(projects)}
-          api={createProjectsApi(fetcher, testCredentials)}
-          runsApi={createRunsApi(fetcher, testCredentials)}
-          openProjectId={projects[0]!.id}
-          version=""
-        />
-      </LocaleProvider>,
+    }
+    return Promise.resolve(
+      url.includes('cursor=')
+        ? json({ items: projects.slice(3), nextCursor: null })
+        : json({ items: projects.slice(0, 3), nextCursor: projects[2]!.id }),
     );
-    const aside = await screen.findByRole('complementary', {
-      name: 'Dự án gần đây',
-    });
-    await waitFor(() =>
-      expect(within(aside).getAllByRole('link')).toHaveLength(5),
-    );
-    // 4 cards plus "Xem tất cả".
-    const cards = within(aside)
-      .getAllByRole('link')
-      .filter((link) => link.classList.contains('recent-card'));
+  });
+}
+
+function show(openProjectId: string | null) {
+  const fetcher = backend();
+  render(
+    <LocaleProvider>
+      <RecentProjects
+        api={createProjectsApi(fetcher, testCredentials)}
+        runsApi={createRunsApi(fetcher, testCredentials)}
+        openProjectId={openProjectId}
+        version=""
+      />
+    </LocaleProvider>,
+  );
+  return fetcher;
+}
+
+const cards = () =>
+  within(screen.getByRole('complementary', { name: 'Dự án gần đây' }))
+    .getAllByRole('link')
+    .filter((link) => link.classList.contains('recent-card'));
+
+describe('Recent projects (UI04)', () => {
+  it('lists every project by last activity with the real last-run state, read only', async () => {
+    const fetcher = show(projects[0]!.id);
+    await waitFor(() => expect(cards()).toHaveLength(5));
     expect(
-      cards.map((card) => card.querySelector('.recent-name')?.textContent),
-    ).toEqual(['Dự án 2', 'Dự án 1', 'Dự án 3', 'Dự án 5']);
+      cards().map((card) => card.querySelector('.recent-title')?.textContent),
+    ).toEqual(['Dự án 2', 'Dự án 1', 'Payroll', 'Dự án 5', 'Dự án 4']);
     expect(
-      cards.map((card) => card.querySelector('.recent-status')?.textContent),
-    ).toEqual(['Đang phân tích', 'Đã phân tích', 'Thất bại', 'Chưa phân tích']);
-    expect(cards[1]?.getAttribute('aria-current')).toBe('page');
-    expect(cards[0]?.getAttribute('href')).toBe(
+      cards().map((card) => card.querySelector('.recent-status')?.textContent),
+    ).toEqual([
+      'Đang phân tích',
+      'Đã phân tích',
+      'Thất bại',
+      'Chưa phân tích',
+      'Không đọc được trạng thái',
+    ]);
+    expect(cards()[1]?.getAttribute('aria-current')).toBe('page');
+    expect(cards()[0]?.getAttribute('href')).toBe(
       `/projects/${projects[1]!.id}/source`,
     );
-    expect(fetcher).toHaveBeenCalledTimes(5);
+    // Two list pages and one current run per project.
+    expect(fetcher).toHaveBeenCalledTimes(7);
+    // "+ Dự án mới" is a button-styled link to a new project.
+    expect(
+      screen.getByRole('link', { name: '+ Dự án mới' }).getAttribute('href'),
+    ).toBe('/projects/new');
+    expect(screen.queryByText('Xem tất cả')).toBeNull();
   });
 
-  it('says when a run state cannot be read instead of showing it unanalysed', async () => {
-    const fetcher = vi.fn<typeof fetch>(() =>
-      Promise.resolve(json({ error: 'x' }, 500)),
-    );
-    render(
-      <LocaleProvider>
-        <RecentProjects
-          list={list([projects[3]!])}
-          api={createProjectsApi(fetcher, testCredentials)}
-          runsApi={createRunsApi(fetcher, testCredentials)}
-          openProjectId="none"
-          version=""
-        />
-      </LocaleProvider>,
-    );
-    expect(await screen.findByText('Không đọc được trạng thái')).toBeTruthy();
-    expect(screen.queryByText('Chưa phân tích')).toBeNull();
-  });
-
-  it('"Xem tất cả" lists every project page by page, searches, opens one and closes', async () => {
-    const many: Project[] = Array.from({ length: 11 }, (_, index) => ({
-      id: `00000000-0000-4000-8000-0000000002${String(index).padStart(2, '0')}`,
-      name: index === 10 ? 'Payroll' : `Dự án ${index}`,
-      mode: 'local',
-      createdAt: `2026-10-${String(index + 10)}T00:00:00.000Z`,
-    }));
-    const fetcher = vi.fn<typeof fetch>((input, init) => {
-      expect(init?.method ?? 'GET').toBe('GET');
-      const url = requestUrl(input);
-      if (url.includes('/runs/current'))
-        return Promise.resolve(json({ run: null }));
-      // Two pages of the API, read in full by the dialog.
-      return Promise.resolve(
-        url.includes('cursor=')
-          ? json({ items: many.slice(6), nextCursor: null })
-          : json({ items: many.slice(0, 6), nextCursor: many[5]!.id }),
-      );
+  it('searches by name', async () => {
+    show(null);
+    await waitFor(() => expect(cards()).toHaveLength(5));
+    fireEvent.change(screen.getByLabelText('Tìm dự án theo tên'), {
+      target: { value: 'payroll' },
     });
+    expect(cards()).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Tìm dự án theo tên'), {
+      target: { value: 'không có' },
+    });
+    expect(screen.getByText('Không có dự án nào khớp.')).toBeTruthy();
+    // On a new project's step there is no "+ Dự án mới".
+    expect(screen.queryByRole('link', { name: '+ Dự án mới' })).toBeNull();
+  });
+
+  it('says when the list cannot be read', async () => {
     render(
       <LocaleProvider>
         <RecentProjects
-          list={list(many.slice(0, 3))}
-          api={createProjectsApi(fetcher, testCredentials)}
-          runsApi={createRunsApi(fetcher, testCredentials)}
+          api={createProjectsApi(
+            () => Promise.resolve(json({ error: 'x' }, 500)),
+            testCredentials,
+          )}
+          runsApi={createRunsApi(
+            () => Promise.reject(new Error('x')),
+            testCredentials,
+          )}
           openProjectId={null}
           version=""
         />
       </LocaleProvider>,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Tất cả dự án' });
-    await within(dialog).findByText('Trang 1 / 2');
-    // Newest first, eight per page.
-    expect(within(dialog).getAllByRole('link')).toHaveLength(8);
-    expect(within(dialog).getAllByRole('link')[0]?.textContent).toContain(
-      'Payroll',
-    );
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Sau' }));
-    expect(within(dialog).getAllByRole('link')).toHaveLength(3);
-    fireEvent.change(within(dialog).getByLabelText('Tìm dự án theo tên'), {
-      target: { value: 'payroll' },
-    });
-    const found = within(dialog).getAllByRole('link');
-    expect(found).toHaveLength(1);
-    expect(found[0]?.getAttribute('href')).toBe(
-      `/projects/${many[10]!.id}/source`,
-    );
-    // No way to create a project in the dialog.
-    expect(within(dialog).queryByRole('textbox', { name: /Tên/ })).toBeNull();
-    fireEvent.click(found[0]!);
-    expect(screen.queryByRole('dialog')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Xem tất cả' }));
-    await screen.findByRole('dialog');
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      await screen.findByText('Không tải được danh sách dự án.'),
+    ).toBeTruthy();
   });
 });

@@ -61,11 +61,14 @@ test(
     // UI04: step 1 of a new project. Nothing is stored until "Quét source";
     // then the project is created once, the folder registered and the first
     // run started. The native dialog (UI05) is not opened here; paths are
-    // typed.
+    // stubbed (no window in a headless run) and answers `nextFolder`.
     await page.goto('/');
     await expect(page).toHaveURL(/\/projects\/new$/);
     const card = page.getByRole('region', { name: /thư mục/ });
-    const folder = page.getByLabel('Đường dẫn thư mục source (tuyệt đối)');
+    let nextFolder = '';
+    await page.route('**/api/v1/local/folder-picker', (route) =>
+      route.fulfill({ json: { status: 'selected', path: nextFolder } }),
+    );
     const scan = page.getByRole('button', { name: 'Quét source' });
     const chosen = page.getByRole('heading', { name: 'Đã chọn thư mục' });
     await expect(
@@ -74,12 +77,13 @@ test(
     await expect(scan).toHaveCount(0);
     await page.getByLabel('Tên dự án').fill(projectName);
 
+    // "Chọn thư mục", or "Đổi thư mục" once one is chosen: both open the
+    // folder dialog.
     const typeFolder = async (path: string) => {
+      nextFolder = path;
       const change = page.getByRole('button', { name: 'Đổi thư mục' });
       if (await change.isVisible()) await change.click();
-      await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
-      await folder.fill(path);
-      await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+      else await page.getByRole('button', { name: 'Chọn thư mục' }).click();
     };
     const checked = async (pending: Promise<Response>, status: number) => {
       const response = await pending;
@@ -172,16 +176,14 @@ test(
       },
     });
     expect(concurrent.status()).toBe(200);
-    await page.getByRole('button', { name: 'Đổi thư mục' }).click();
-    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
-    await folder.fill(sourceRoot);
+    // "Đổi thư mục" opens the dialog and registers its answer at once.
+    nextFolder = sourceRoot;
     let pending = nextPut();
-    await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+    await page.getByRole('button', { name: 'Đổi thư mục' }).click();
     await checked(pending, 409);
     await expect(card.getByRole('alert')).toContainText(
       'Mã nguồn vừa được cập nhật',
     );
-    await expect(folder).toHaveValue(sourceRoot);
     const refreshed = page.waitForResponse(
       (response) =>
         response.request().method() === 'GET' &&
@@ -193,7 +195,7 @@ test(
         ?.revision,
     ).toBe(2);
     pending = nextPut();
-    await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
+    await page.getByRole('button', { name: 'Chọn thư mục' }).click();
     const updated = await payload(
       await checked(pending, 200),
       ProjectSourceResponseSchema,

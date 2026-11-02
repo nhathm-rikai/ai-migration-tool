@@ -391,3 +391,28 @@ it('keeps recursive calls in the program call graph', () => {
     },
   ]);
 });
+
+// PF08: progress per file, reported once each; analyzed code only after its
+// cross-file reference scan, so the slow part is not one silent step.
+it('reports every file once, analyzed code after the other files', () => {
+  const files = readFixtureFiles();
+  const reported: string[] = [];
+  const inventory = buildSourceInventory({
+    profile: profile(),
+    files,
+    onFile: (path) => reported.push(path),
+  });
+  expect([...reported].sort()).toEqual(
+    files.map((file) => file.relativePath).sort(),
+  );
+  const analyzed = new Set(
+    inventory.files
+      .filter((file) => file.analysis?.status === 'analyzed')
+      .map((file) => file.manifest.relativePath),
+  );
+  const firstCode = reported.findIndex((path) => analyzed.has(path));
+  expect(firstCode).toBeGreaterThan(-1);
+  expect(reported.slice(firstCode).every((path) => analyzed.has(path))).toBe(
+    true,
+  );
+});

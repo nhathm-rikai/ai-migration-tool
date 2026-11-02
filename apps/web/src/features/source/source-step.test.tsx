@@ -132,22 +132,10 @@ const errorBody = (code: string, status: number) =>
   );
 
 const FOLDER = 'Đường dẫn thư mục source (tuyệt đối)';
+const PICKER = '/api/v1/local/folder-picker';
 const scanButton = () => screen.getByRole('button', { name: 'Quét source' });
-// The typed-path form (shown on request): its submit registers the path.
-const chooseButton = () =>
-  screen.getByRole('button', { name: 'Dùng thư mục này' });
-async function folderField() {
-  // Either the field is open already or the button opens it.
-  const opener = await waitFor(() => {
-    const field = screen.queryByLabelText(FOLDER);
-    if (field) return null;
-    const button = screen.queryByRole('button', { name: 'Nhập đường dẫn' });
-    if (!button) throw new Error('No folder form yet');
-    return button;
-  });
-  if (opener) fireEvent.click(opener);
-  return screen.findByLabelText(FOLDER);
-}
+// The folder dialog (stubbed by the fake backend) is the only way to choose.
+const pickButton = () => screen.findByRole('button', { name: 'Chọn thư mục' });
 const chosen = () => screen.findByText('Đã chọn thư mục');
 const vb6Chosen = () =>
   waitFor(() =>
@@ -156,6 +144,10 @@ const vb6Chosen = () =>
       true,
     ),
   );
+const selected =
+  (path = ROOT) =>
+  () =>
+    json({ status: 'selected', path });
 
 afterEach(() => {
   vi.useRealTimers();
@@ -163,25 +155,22 @@ afterEach(() => {
 });
 
 describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
-  it('asks for a folder first; nothing can be scanned without one', async () => {
+  it('asks for a folder first with the dialog only; nothing can be scanned without one', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
     });
     render(step(server));
     expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Chọn thư mục' })).toBeTruthy();
-    await folderField();
-    fireEvent.click(chooseButton());
-    expect(
-      await screen.findByText('Nhập đường dẫn thư mục mã nguồn.'),
-    ).toBeTruthy();
-    expect((await folderField()).getAttribute('aria-invalid')).toBe('true');
+    expect(await pickButton()).toBeTruthy();
+    // No path field while a dialog exists.
+    expect(screen.queryByLabelText(FOLDER)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Nhập đường dẫn/ })).toBeNull();
     expect(server.puts()).toEqual([]);
     expect(screen.queryByText('DEMO')).toBeNull();
   });
 
-  it('offers VB6 only, not chosen yet for a new source; other languages are coming', async () => {
+  it('offers VB6, COBOL, PHP, C#, Java; only VB6 can be chosen and none is chosen for a new source', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
     });
@@ -189,21 +178,22 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     const vb6 = await screen.findByRole('radio', { name: 'VB6' });
     expect(vb6).toHaveProperty('checked', false);
     const others = screen.getAllByRole('radio').filter((chip) => chip !== vb6);
-    expect(others).toHaveLength(6);
+    expect(others).toHaveLength(4);
     for (const chip of others) expect(chip).toHaveProperty('disabled', true);
-    expect(screen.getAllByText('Sắp hỗ trợ')).toHaveLength(6);
+    for (const language of ['COBOL', 'PHP', 'C#', 'Java'])
+      expect(screen.getByText(language)).toBeTruthy();
+    expect(screen.queryByText('PL/SQL')).toBeNull();
+    expect(screen.queryByText('JavaScript')).toBeNull();
   });
 
-  it('registers the folder, keeps the path out of URLs and shows the chosen folder', async () => {
+  it('registers the chosen folder, keeps the path out of URLs and shows it', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: () => json(registered()),
     });
     render(step(server));
-    fireEvent.change(await folderField(), {
-      target: { value: `  ${ROOT}  ` },
-    });
-    fireEvent.click(chooseButton());
+    fireEvent.click(await pickButton());
     await chosen();
     expect(server.puts().map((call) => call.body)).toEqual([
       {
@@ -215,7 +205,6 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     ]);
     expect(screen.getByText('order-module')).toBeTruthy();
     expect(scanButton()).toHaveProperty('disabled', false);
-    expect(screen.queryByLabelText(FOLDER)).toBeNull();
     for (const call of server.calls) expect(call.url).not.toContain('work');
     expect(JSON.stringify({ ...window.localStorage })).not.toContain('work');
     expect(server.starts()).toEqual([]);
@@ -230,31 +219,29 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     ],
     ['INVALID_INPUT', 400, /đường dẫn phải là đường dẫn tuyệt đối/],
   ])(
-    'F01-AC02 keeps the input and shows a safe message for %s',
+    'F01-AC02 shows a safe message for %s and lets another folder be chosen',
     async (code, status, message) => {
       const server = createServer({
         [`GET ${sourceUrl()}`]: () => json({ source: null }),
+        [`POST ${PICKER}`]: selected(),
         [`PUT ${sourceUrl()}`]: () => errorBody(code, status),
       });
       render(step(server));
-      const field = await folderField();
-      fireEvent.change(field, { target: { value: ROOT } });
-      fireEvent.click(chooseButton());
+      fireEvent.click(await pickButton());
       expect(await screen.findByText(message)).toBeTruthy();
       expect(screen.queryByText('raw server text')).toBeNull();
-      expect(field).toHaveProperty('value', ROOT);
-      // A backend refusal is not a field error.
-      expect(field.getAttribute('aria-invalid')).toBe('false');
       expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
+      expect(await pickButton()).toHaveProperty('disabled', false);
       expect(server.puts()).toHaveLength(1);
     },
   );
 
-  it('F01-AC02 a stale save keeps the input and reloads on request before saving again', async () => {
+  it('F01-AC02 "Đổi thư mục" opens the dialog; a stale save reloads on request before saving again', async () => {
     let reads = 0;
     const server = createServer({
       [`GET ${sourceUrl()}`]: () =>
         json(registered({ revision: reads++ === 0 ? 1 : 2 })),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: (call) =>
         (call.body as { expectedSourceRevision: number })
           .expectedSourceRevision === 1
@@ -264,18 +251,14 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     render(step(server));
     await chosen();
     fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
-    fireEvent.change(await folderField(), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(chooseButton());
     expect(
       await screen.findByText(/vừa được cập nhật ở nơi khác/),
     ).toBeTruthy();
-    expect(await folderField()).toHaveProperty('value', ROOT);
     fireEvent.click(screen.getByRole('button', { name: 'Tải lại mã nguồn' }));
     await waitFor(() => expect(reads).toBe(2));
-    fireEvent.click(chooseButton());
+    fireEvent.click(await pickButton());
     await chosen();
+    expect(server.calls.filter((call) => call.url === PICKER)).toHaveLength(2);
     expect(server.puts().map((call) => call.body)).toMatchObject([
       { expectedSourceRevision: 1 },
       {
@@ -289,13 +272,11 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
   it('F01-AC02 asks to reload before resending when the save outcome is unknown', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: () => Promise.reject(new TypeError('offline')),
     });
     render(step(server));
-    fireEvent.change(await folderField(), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(chooseButton());
+    fireEvent.click(await pickButton());
     expect(
       await screen.findByText(/Chưa xác nhận được backend đã lưu mã nguồn/),
     ).toBeTruthy();
@@ -306,6 +287,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () =>
         json(registered({ status: 'unreadable', revision: 3 })),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: () => json(registered({ revision: 4 })),
     });
     render(step(server));
@@ -313,10 +295,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
       await screen.findByText(/Không đọc được thư mục đã chọn/),
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
-    fireEvent.change(await folderField(), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(chooseButton());
+    fireEvent.click(await pickButton());
     await chosen();
     expect(server.puts()[0]?.body).toMatchObject({
       expectedSourceRevision: 3,
@@ -325,16 +304,18 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     expect(scanButton()).toHaveProperty('disabled', false);
   });
 
-  it('changes the folder on request and can go back without saving', async () => {
+  it('a dialog cancelled from "Đổi thư mục" keeps the chosen folder', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json(registered()),
+      [`POST ${PICKER}`]: () => json({ status: 'cancelled' }),
     });
     render(step(server));
     await chosen();
     fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
-    expect(await folderField()).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
-    await chosen();
+    await waitFor(() =>
+      expect(server.calls.some((call) => call.url === PICKER)).toBe(true),
+    );
+    expect(await chosen()).toBeTruthy();
     expect(server.puts()).toEqual([]);
   });
 
@@ -360,10 +341,11 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
   });
 
-  it('F01-AC03 keeps the input and the pending save when the locale changes', async () => {
+  it('F01-AC03 keeps a pending save when the locale changes', async () => {
     let finish: (() => void) | undefined;
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: () =>
         new Promise((resolve) => {
           finish = () => resolve(errorBody('SOURCE_UNREADABLE', 422));
@@ -379,20 +361,16 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
         {step(server)}
       </>,
     );
-    fireEvent.change(await folderField(), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(chooseButton());
-    expect(
-      await screen.findByRole('button', { name: 'Đang kiểm tra…' }),
-    ).toHaveProperty('disabled', true);
+    fireEvent.click(await pickButton());
+    await waitFor(() => expect(finish).toBeDefined());
+    expect(screen.getByRole('button', { name: 'Chọn thư mục' })).toHaveProperty(
+      'disabled',
+      true,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     expect(
-      await screen.findByRole('button', { name: '確認中…' }),
+      await screen.findByRole('button', { name: 'フォルダーを選択' }),
     ).toHaveProperty('disabled', true);
-    expect(
-      screen.getByLabelText('ソースフォルダーのパス（絶対パス）'),
-    ).toHaveProperty('value', ROOT);
     await act(async () => {
       finish?.();
       await Promise.resolve();
@@ -401,8 +379,6 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     expect(server.puts()).toHaveLength(1);
   });
 });
-
-const PICKER = '/api/v1/local/folder-picker';
 
 describe('Native folder dialog on the scan card (UI05)', () => {
   it('registers the folder chosen in the dialog', async () => {
@@ -467,7 +443,7 @@ describe('Native folder dialog on the scan card (UI05)', () => {
     },
   );
 
-  it('a chosen folder the backend refuses goes into the path field', async () => {
+  it('a chosen folder the backend refuses shows why; no path field appears', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
       [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
@@ -478,7 +454,7 @@ describe('Native folder dialog on the scan card (UI05)', () => {
       await screen.findByRole('button', { name: 'Chọn thư mục' }),
     );
     expect(await screen.findByText(/Không được dùng thư mục này/)).toBeTruthy();
-    expect(screen.getByLabelText(FOLDER)).toHaveProperty('value', ROOT);
+    expect(screen.queryByLabelText(FOLDER)).toBeNull();
   });
 
   it('says when another dialog is already open', async () => {
@@ -575,14 +551,12 @@ describe('Scan card (UI04)', () => {
   it('needs a project name and a language before scanning', async () => {
     const server = createServer({
       [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: selected(),
       [`PUT ${sourceUrl()}`]: () => json(registered()),
       [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(step(server));
-    fireEvent.change(await folderField(), {
-      target: { value: ROOT },
-    });
-    fireEvent.click(chooseButton());
+    fireEvent.click(await pickButton());
     await chosen();
     fireEvent.change(screen.getByLabelText('Tên dự án'), {
       target: { value: '  ' },

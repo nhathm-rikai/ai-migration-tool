@@ -66,25 +66,14 @@ it('shows a bootstrap failure, sends no POST on submit and recovers by explicit 
       'Không khởi tạo được phiên làm việc với backend cục bộ. Chưa có dữ liệu nào được gửi.',
     ),
   ).toBeTruthy();
-  // The first scan of a new project needs the session.
-  fireEvent.click(screen.getByRole('button', { name: 'Nhập đường dẫn' }));
-  fireEvent.change(
-    screen.getByLabelText('Đường dẫn thư mục source (tuyệt đối)'),
-    { target: { value: 'D:/work/order-module' } },
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Dùng thư mục này' }));
-  fireEvent.change(screen.getByLabelText('Tên dự án'), {
-    target: { value: 'Không được gửi' },
-  });
-  fireEvent.click(screen.getByRole('radio', { name: 'VB6' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
+  // Opening the folder dialog needs the session: nothing is sent.
+  fireEvent.click(screen.getByRole('button', { name: 'Chọn thư mục' }));
   expect(
     await screen.findByText(
       'Chưa kết nối được phiên làm việc với backend nên yêu cầu chưa được gửi. Thử kết nối lại.',
     ),
   ).toBeTruthy();
   expect(app.posts()).toHaveLength(0);
-  expect(screen.getByDisplayValue('Không được gửi')).toBeTruthy();
   const bootstrapsBeforeRetry = app.sessionCalls().length;
   online = true;
   fireEvent.click(screen.getByRole('button', { name: 'Thử kết nối lại' }));

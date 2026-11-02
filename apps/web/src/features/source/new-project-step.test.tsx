@@ -126,6 +126,7 @@ describe('Step 1 of a new project (UI04)', () => {
     let attempts = 0;
     const created = vi.fn();
     const server = createServer({
+      [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
       'POST /api/v1/projects': () =>
         json({ ...localProject, name: 'order-module' }, 201),
       [`PUT ${sourceUrl}`]: () =>
@@ -144,12 +145,7 @@ describe('Step 1 of a new project (UI04)', () => {
       [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
     });
     render(<NewProjectStep {...server.props} onCreated={created} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Nhập đường dẫn' }));
-    fireEvent.change(
-      screen.getByLabelText('Đường dẫn thư mục source (tuyệt đối)'),
-      { target: { value: ROOT } },
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Dùng thư mục này' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn thư mục' }));
     fireEvent.click(await screen.findByRole('radio', { name: 'VB6' }));
     scan();
     expect(await screen.findByText(/Không được dùng thư mục này/)).toBeTruthy();

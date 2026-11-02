@@ -112,11 +112,16 @@ export function NewProjectStep({
         if (result.status === 'selected') acceptFolder(result.path);
         else if (result.status === 'cancelled') setPicker({ status: 'idle' });
         else {
+          // No dialog on this machine: back to the chooser with the path
+          // field.
           setPicker({ status: 'unavailable', reason: result.reason });
           setManual(true);
+          setFolder(null);
         }
       } catch (failure) {
-        if (!signal.aborted) setPicker({ status: 'error', error: failure });
+        if (signal.aborted) return;
+        setPicker({ status: 'error', error: failure });
+        setFolder(null);
       }
     });
   }
@@ -247,7 +252,6 @@ export function NewProjectStep({
                 setInvalid((errors) => ({ ...errors, rootPath: false }));
               }}
               onPick={pickFolder}
-              onManual={() => setManual(true)}
               onSubmit={chooseTyped}
               onReload={() => undefined}
               onCancel={null}
@@ -272,12 +276,11 @@ export function NewProjectStep({
               <button
                 className="button large"
                 disabled={saving}
-                onClick={() => {
-                  setFolder(null);
-                  setError(null);
-                }}
+                onClick={pickFolder}
               >
-                {copy.hero.changeFolder}
+                {picker.status === 'pending'
+                  ? copy.form.picking
+                  : copy.hero.changeFolder}
               </button>
             </div>
           )}

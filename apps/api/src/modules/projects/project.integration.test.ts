@@ -201,6 +201,134 @@ describe('Projects HTTP -> service -> real SQLite', () => {
     }
   });
 
+  // UI04-AC04: the customer is stored, survives a restart, can be changed and
+  // removed; a project without one stays valid.
+  it('stores, updates and clears the optional customer across a restart', async () => {
+    const created = await context.inject({
+      method: 'POST',
+      url: '/api/v1/projects',
+      payload: {
+        name: 'Payroll',
+        customerName: '  Sample Corp ',
+        mode: 'local',
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const project = created.json<Project>();
+    expect(project).toMatchObject({
+      name: 'Payroll',
+      customerName: 'Sample Corp',
+    });
+    const plain = (
+      await context.inject({
+        method: 'POST',
+        url: '/api/v1/projects',
+        payload: { name: 'Plain', fixtureId: 'sample-vb6' },
+      })
+    ).json<Project>();
+    expect(plain).not.toHaveProperty('customerName');
+
+    const renamed = await context.inject({
+      method: 'PATCH',
+      url: `/api/v1/projects/${project.id}`,
+      payload: { name: ' Payroll v2 ', customerName: 'Other Corp' },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json()).toEqual({
+      ...project,
+      name: 'Payroll v2',
+      customerName: 'Other Corp',
+    });
+    // A field not given keeps its value.
+    const onlyName = await context.inject({
+      method: 'PATCH',
+      url: `/api/v1/projects/${project.id}`,
+      payload: { name: 'Payroll v3' },
+    });
+    expect(onlyName.json()).toMatchObject({ customerName: 'Other Corp' });
+
+    await context.app.close();
+    const reopened = buildApp(context.config);
+    try {
+      const inject = createTrustedInject(reopened, context.config);
+      expect(
+        (await inject(`/api/v1/projects/${project.id}`)).json<Project>(),
+      ).toEqual({ ...project, name: 'Payroll v3', customerName: 'Other Corp' });
+      expect(
+        (await inject(`/api/v1/projects/${plain.id}`)).json<Project>(),
+      ).toEqual(plain);
+      const cleared = await inject({
+        method: 'PATCH',
+        url: `/api/v1/projects/${project.id}`,
+        payload: { customerName: null },
+      });
+      expect(cleared.statusCode).toBe(200);
+      expect(cleared.json()).not.toHaveProperty('customerName');
+    } finally {
+      await reopened.close();
+    }
+  });
+
+  it.each([
+    { customerName: 'x'.repeat(121) },
+    { customerName: '   ' },
+    { customerName: 12 },
+    { name: ' ' },
+    {},
+    { fixtureId: 'sample-vb6' },
+  ])(
+    'rejects an invalid update without changing the project: %j',
+    async (payload) => {
+      const project = (
+        await context.inject({
+          method: 'POST',
+          url: '/api/v1/projects',
+          payload: {
+            name: 'Keep',
+            customerName: 'Corp',
+            fixtureId: 'sample-vb6',
+          },
+        })
+      ).json<Project>();
+      const response = await context.inject({
+        method: 'PATCH',
+        url: `/api/v1/projects/${project.id}`,
+        payload,
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: 'INVALID_INPUT' },
+      });
+      expect(
+        (await context.inject(`/api/v1/projects/${project.id}`)).json(),
+      ).toEqual(project);
+    },
+  );
+
+  it('rejects a too long customer on create and 404s an update of an absent project', async () => {
+    const tooLong = await context.inject({
+      method: 'POST',
+      url: '/api/v1/projects',
+      payload: { name: 'P', customerName: '😀'.repeat(121), mode: 'local' },
+    });
+    expect(tooLong.statusCode).toBe(400);
+    const longest = await context.inject({
+      method: 'POST',
+      url: '/api/v1/projects',
+      payload: { name: 'P', customerName: '😀'.repeat(120), mode: 'local' },
+    });
+    expect(longest.statusCode).toBe(201);
+    const missing = await context.inject({
+      method: 'PATCH',
+      url: `/api/v1/projects/${randomUUID()}`,
+      payload: { customerName: 'Corp' },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toMatchObject({
+      error: { code: 'PROJECT_NOT_FOUND' },
+    });
+  });
+
   it('returns bounded errors for malformed JSON, oversized input and unknown routes', async () => {
     const malformed = await context.inject({
       method: 'POST',

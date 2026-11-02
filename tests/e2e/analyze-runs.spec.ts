@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 // PF03 flow on the fixture runtime: an explicit Start is accepted (202) and
-// reaches a terminal state; reloading reads the run back without starting
-// another one; a second run can be cancelled.
+// reaches a terminal state and opens the analysis step (UI04); reloading
+// reads the run back without starting another one; a second run can be
+// cancelled and stays on the source step.
 test(
   'start, finish, reload and cancel an analyze run',
   { tag: '@smoke' },
@@ -24,34 +25,48 @@ test(
     const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
     await projects.getByRole('link', { name: seedName }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await expect(panel.getByText('Chưa có lượt chạy nào')).toBeVisible();
+    const history = page.getByRole('region', { name: /Lịch sử lượt chạy/ });
+    await expect(history.getByText('Chưa có lượt chạy nào')).toBeVisible();
     expect(runMutations).toEqual([]);
 
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    // The stage is shown instead of a percentage while it runs.
-    await expect(panel.getByText('Bước hiện tại')).toBeVisible();
+    const start = page.getByRole('button', { name: 'Bắt đầu phân tích' });
+    await start.click();
+    // UI04: the scan card follows the run, then the analysis step opens.
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+      page.getByRole('heading', { name: 'Tiến trình' }),
     ).toBeVisible();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     expect(runMutations).toHaveLength(1);
     expect(runMutations[0]?.status).toBe(202);
     expect(runMutations[0]?.key).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
 
-    // Reload stays on the project's source step and reads the run back.
+    // Back on the source step and after a reload the run is read back; a run
+    // that already finished never opens the analysis step by itself.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     await page.reload();
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+      history.locator('.run-history .run-status', {
+        hasText: 'Hoàn tất (demo)',
+      }),
     ).toBeVisible();
-    await expect(panel.locator('.run-history > li')).toHaveCount(1);
+    await expect(history.locator('.run-history > li')).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Xem kết quả lần phân tích gần nhất' }),
+    ).toBeVisible();
+    await page.waitForTimeout(2_000);
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     expect(runMutations).toHaveLength(1);
 
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await panel.getByRole('button', { name: 'Hủy lượt chạy' }).click();
+    await start.click();
+    await page.getByRole('button', { name: 'Hủy lượt chạy' }).click();
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Đã hủy' }),
+      page.getByRole('heading', { name: 'Đã hủy lượt chạy' }),
     ).toBeVisible();
-    await expect(panel.locator('.run-history > li')).toHaveCount(2);
+    await expect(history.locator('.run-history > li')).toHaveCount(2);
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const [first, second, ...cancels] = runMutations;
     expect([first?.status, second?.status]).toEqual([202, 202]);
     // A cancel sent with the version shown right after Start may meet a run

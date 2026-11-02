@@ -81,6 +81,8 @@ describe('SQLite migration guard', () => {
           mode: 'demo',
           fixture_id: 'sample-vb6',
           created_at: '2026-10-15T00:00:00.000Z',
+          // 0005 (UI04): projects stored before have no customer.
+          customer_name: null,
         },
       ]);
       expect(

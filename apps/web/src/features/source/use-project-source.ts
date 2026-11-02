@@ -18,8 +18,16 @@ export type SaveState =
   | { status: 'saved' }
   | { status: 'error'; error: unknown };
 
-export function useProjectSource(api: SourcesApi, projectId: string) {
-  const [state, setState] = useState<SourceState>({ status: 'loading' });
+// `enabled` false (demo project): no source to read; the state is an empty
+// registration and nothing is requested.
+export function useProjectSource(
+  api: SourcesApi,
+  projectId: string,
+  enabled = true,
+) {
+  const [state, setState] = useState<SourceState>(
+    enabled ? { status: 'loading' } : { status: 'ready', source: null },
+  );
   const [save, setSave] = useState<SaveState>({ status: 'idle' });
   const [reload, setReload] = useState(0);
   const mutation = useRef<AbortController | null>(null);
@@ -28,6 +36,7 @@ export function useProjectSource(api: SourcesApi, projectId: string) {
   useEffect(() => () => mutation.current?.abort(), []);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     reading.current = controller;
     const startedAt = generation.current;
@@ -48,7 +57,7 @@ export function useProjectSource(api: SourcesApi, projectId: string) {
       controller.abort();
       if (reading.current === controller) reading.current = null;
     };
-  }, [api, projectId, reload]);
+  }, [api, projectId, reload, enabled]);
 
   const refresh = useCallback(() => setReload((value) => value + 1), []);
 
@@ -56,26 +65,26 @@ export function useProjectSource(api: SourcesApi, projectId: string) {
     state,
     save,
     refresh,
-    // Resolves true when saved. A second call while one is pending is
-    // ignored; a failed save is never retried automatically.
-    async put(input: PutProjectSourceInput): Promise<boolean> {
-      if (mutation.current) return false;
+    // Resolves the saved source, or null when not saved. A second call while
+    // one is pending is ignored; a failed save is never retried automatically.
+    async put(input: PutProjectSourceInput): Promise<ProjectSource | null> {
+      if (mutation.current) return null;
       const controller = new AbortController();
       mutation.current = controller;
       setSave({ status: 'pending' });
       try {
         const response = await api.put(projectId, input, controller.signal);
-        if (controller.signal.aborted) return false;
+        if (controller.signal.aborted) return null;
         // Invalidate every read started before this save completed, including
         // refreshes requested while PUT was pending. Late errors are stale too.
         generation.current++;
         reading.current?.abort();
         setState({ status: 'ready', source: response.source });
         setSave({ status: 'saved' });
-        return true;
+        return response.source;
       } catch (error) {
         if (!controller.signal.aborted) setSave({ status: 'error', error });
-        return false;
+        return null;
       } finally {
         if (mutation.current === controller) mutation.current = null;
       }

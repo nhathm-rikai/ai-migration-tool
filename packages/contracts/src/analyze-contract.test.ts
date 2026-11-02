@@ -28,6 +28,7 @@ import {
   SourceInventorySchema,
   StartRunHeadersSchema,
   StartRunSchema,
+  UpdateProjectSchema,
   cancelRunSuccessStatus,
 } from './index.js';
 import * as fixtures from './fixtures/index.js';
@@ -585,5 +586,34 @@ describe('C01 operation table', () => {
         ANALYZE_API_OPERATIONS[id as keyof typeof ANALYZE_API_OPERATIONS];
       expectValid(operation.response, sample);
     }
+  });
+});
+
+describe('UI04 project customer', () => {
+  const project = {
+    id: '00000000-0000-4000-8000-000000000001',
+    name: 'Sample',
+    mode: 'local',
+    createdAt: '2026-11-02T00:00:00.000Z',
+  };
+  it('keeps projects without a customer valid and bounds the customer', () => {
+    expectValid(ProjectSchema, project);
+    expectValid(ProjectSchema, { ...project, customerName: 'Corp' });
+    expectValid(ProjectSchema, { ...project, customerName: 'x'.repeat(120) });
+    expectInvalid(ProjectSchema, { ...project, customerName: 'x'.repeat(121) });
+    expectInvalid(ProjectSchema, { ...project, customerName: null });
+    expectValid(CreateProjectSchema, {
+      name: 'Sample',
+      customerName: 'Corp',
+      mode: 'local',
+    });
+  });
+  it('updates at least one field; null clears the customer', () => {
+    expectValid(UpdateProjectSchema, { customerName: null });
+    expectValid(UpdateProjectSchema, { name: 'Sample', customerName: 'Corp' });
+    expectInvalid(UpdateProjectSchema, {});
+    expectInvalid(UpdateProjectSchema, { customerName: ' ' });
+    expectInvalid(UpdateProjectSchema, { name: null });
+    expectInvalid(UpdateProjectSchema, { mode: 'demo' });
   });
 });

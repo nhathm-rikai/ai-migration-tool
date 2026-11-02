@@ -64,8 +64,12 @@ test(
     await page.getByLabel('Tên dự án').fill(projectName);
     await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const source = page.getByRole('region', { name: 'Mã nguồn LOCAL' });
-    await source.getByLabel('Đường dẫn thư mục (tuyệt đối)').fill(sourceRoot);
+    // UI04: path and mapping in the project information form.
+    const source = page.getByRole('form', { name: 'Thông tin dự án' });
+    await source
+      .getByLabel('Thư mục source (đường dẫn tuyệt đối)')
+      .fill(sourceRoot);
+    await source.getByText('Ánh xạ tên bảng (tùy chọn)').click();
     await source
       .getByLabel('Schema mặc định của tên bảng')
       .selectOption('assumed');
@@ -75,23 +79,17 @@ test(
         response.request().method() === 'PUT' &&
         /\/source$/.test(response.url()),
     );
-    await source.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+    await source.getByRole('button', { name: 'Lưu thông tin' }).click();
     const registration = await registered;
     expect(registration.status()).toBe(200);
     const authorization = registration.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
 
-    const runPanel = page.getByRole('region', {
-      name: 'Phân tích',
-      exact: true,
+    // Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
     });
-    await runPanel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      runPanel.getByRole('status').filter({ hasText: 'Hoàn tất' }),
-    ).toBeVisible({ timeout: 20_000 });
-    await runPanel
-      .getByRole('button', { name: 'Xem kết quả phân tích' })
-      .click();
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(

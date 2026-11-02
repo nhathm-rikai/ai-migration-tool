@@ -64,17 +64,15 @@ test(
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     const project = await payload(await created, ProjectSchema);
     expect(project.mode).toBe('local');
-    const source = page.getByRole('region', { name: 'Mã nguồn LOCAL' });
-    const runPanel = page.getByRole('region', {
-      name: 'Phân tích',
-      exact: true,
+    // UI04: the source step has the scan card (Start) and the project
+    // information form (folder, mapping, Save).
+    const source = page.getByRole('form', { name: 'Thông tin dự án' });
+    const folder = source.getByLabel('Thư mục source (đường dẫn tuyệt đối)');
+    const start = page.getByRole('button', { name: 'Bắt đầu phân tích' });
+    const noSource = page.getByRole('heading', {
+      name: 'Chưa có thư mục source',
     });
-    const start = runPanel.getByRole('button', { name: 'Bắt đầu phân tích' });
-    await expect(start).toBeDisabled();
-    await source.getByRole('button', { name: 'Đăng ký', exact: true }).click();
-    await expect(source.getByRole('alert')).toHaveText(
-      'Nhập đường dẫn thư mục mã nguồn.',
-    );
+    await expect(noSource).toBeVisible();
     await expect(start).toBeDisabled();
 
     const save = async (expectedStatus: number) => {
@@ -83,9 +81,7 @@ test(
           response.request().method() === 'PUT' &&
           /\/source$/.test(response.url()),
       );
-      await source
-        .getByRole('button', { name: /^(Đăng ký|Lưu thay đổi)$/ })
-        .click();
+      await source.getByRole('button', { name: 'Lưu thông tin' }).click();
       const response = await pending;
       expect(response.status()).toBe(expectedStatus);
       const text = await response.text();
@@ -94,30 +90,25 @@ test(
       return response;
     };
 
-    // Both rejected writes keep the input and leave Start blocked.
-    await source
-      .getByLabel('Đường dẫn thư mục (tuyệt đối)')
-      .fill('relative/source');
+    // Rejected writes keep the input and register nothing.
+    await folder.fill('relative/source');
     await save(400);
-    await expect(
-      source.getByLabel('Đường dẫn thư mục (tuyệt đối)'),
-    ).toHaveValue('relative/source');
+    await expect(folder).toHaveValue('relative/source');
     for (const forbidden of [required('E2E_REPOSITORY_ROOT'), dataDir]) {
-      await source.getByLabel('Đường dẫn thư mục (tuyệt đối)').fill(forbidden);
+      await folder.fill(forbidden);
       await save(422);
       await expect(source.getByRole('alert')).toContainText(
         'Không được dùng thư mục này',
       );
-      await expect(start).toBeDisabled();
+      await expect(noSource).toBeVisible();
     }
-    await source
-      .getByLabel('Đường dẫn thư mục (tuyệt đối)')
-      .fill(sourceRoot + '-missing');
+    await folder.fill(sourceRoot + '-missing');
     await save(422);
     await expect(source.getByRole('alert')).toContainText(
       'Thư mục không tồn tại',
     );
-    await source.getByLabel('Đường dẫn thư mục (tuyệt đối)').fill(sourceRoot);
+    await folder.fill(sourceRoot);
+    await source.getByText('Ánh xạ tên bảng (tùy chọn)').click();
     await source
       .getByLabel('Schema mặc định của tên bảng')
       .selectOption('assumed');
@@ -134,11 +125,11 @@ test(
     const headers = { authorization };
     const url = `/api/v1/projects/${project.id}/source`;
     await expect(start).toBeEnabled();
+    await expect(folder).toHaveValue('');
     expect(starts).toBe(0);
 
-    // Another client advances the revision while this edit form is open.
-    await source.getByRole('button', { name: 'Đổi mã nguồn' }).click();
-    await source.getByLabel('Đường dẫn thư mục (tuyệt đối)').fill(sourceRoot);
+    // Another client advances the revision while this edit is open.
+    await folder.fill(sourceRoot);
     await source
       .getByLabel('Schema mặc định của tên bảng')
       .selectOption('confirmed');
@@ -156,9 +147,7 @@ test(
     await expect(source.getByRole('alert')).toContainText(
       'Mã nguồn vừa được cập nhật',
     );
-    await expect(
-      source.getByLabel('Đường dẫn thư mục (tuyệt đối)'),
-    ).toHaveValue(sourceRoot);
+    await expect(folder).toHaveValue(sourceRoot);
     await expect(source.getByLabel('Schema mặc định của tên bảng')).toHaveValue(
       'confirmed',
     );
@@ -178,10 +167,12 @@ test(
       tableNameMapping: { defaultSchema: 'APP', status: 'confirmed' },
     });
 
+    // UI04-AC04: the customer is saved with the project before Start.
+    await source.getByLabel('Khách hàng').fill('Khách hàng mẫu');
     await start.click();
-    await expect(
-      runPanel.getByRole('status').filter({ hasText: 'Hoàn tất' }),
-    ).toBeVisible();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const currentResponse = await page.request.get(
       `/api/v1/projects/${project.id}/runs/current`,
       { headers },
@@ -238,6 +229,12 @@ test(
         ),
       ),
     ).toEqual(before);
+    // Back on the source step: the run is in the history.
+    await page.goBack();
+    const done = page.locator('.run-history .run-status', {
+      hasText: 'Hoàn tất',
+    });
+    await expect(done).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: testInfo.outputPath('pf05-desktop-vi.png'),
@@ -245,9 +242,10 @@ test(
     });
 
     await page.getByRole('radio', { name: '日本語' }).check();
-    await expect(
-      page.getByRole('status').filter({ hasText: '完了' }),
-    ).toBeVisible();
+    const doneJa = page.locator('.run-history .run-status', {
+      hasText: '完了',
+    });
+    await expect(doneJa).toBeVisible();
     // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(
       await page.evaluate(
@@ -256,9 +254,8 @@ test(
     ).toBe(true);
     // Reload stays on the project's source step.
     await page.reload();
-    await expect(
-      page.getByRole('status').filter({ hasText: '完了' }),
-    ).toBeVisible();
+    await expect(doneJa).toBeVisible();
+    await expect(page.getByLabel('顧客')).toHaveValue('Khách hàng mẫu');
     // The run ID is technical information, folded by default.
     await page.locator('.run-detail details.technical > summary').click();
     await expect(page.getByText(run.id, { exact: true }).first()).toBeVisible();

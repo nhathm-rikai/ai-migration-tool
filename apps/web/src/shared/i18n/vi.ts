@@ -1,6 +1,7 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  PROJECT_CUSTOMER_NAME_MAX_LENGTH,
 } from '@portal/contracts';
 import type {
   AnalyzeApiErrorCode,
@@ -8,7 +9,6 @@ import type {
   ApiErrorCode,
   RunErrorCode,
   RunStatus,
-  SourceProfileId,
   TableNameMapping,
 } from '@portal/contracts';
 import type { ApiFailureKind } from '../api/api-error';
@@ -143,38 +143,10 @@ export const viMessages = {
       savedLocally:
         'Dự án được lưu trên máy này. Chọn dự án trong cây bên trái để mở lại thông tin.',
     },
-    detail: {
-      title: 'Chi tiết dự án',
-      close: 'Đóng chi tiết',
-      loading: 'Đang tải chi tiết…',
-      retry: 'Thử lại chi tiết',
-      description: 'Thông tin dự án đã lưu trên máy này.',
-      id: 'Mã dự án',
-      data: 'Dữ liệu',
-      createdAt: 'Ngày tạo',
-      ready: 'Sẵn sàng quản lý dự án',
-      technical: 'Thông tin kỹ thuật',
-      unavailable:
-        'Phân tích mã nguồn thật, rà soát và tạo báo cáo chưa khả dụng trong bản này; lượt chạy phân tích bên dưới là demo.',
-    },
   },
   source: {
-    title: 'Mã nguồn',
-    technical: 'Thông tin kỹ thuật',
     loading: 'Đang tải thông tin mã nguồn…',
     reload: 'Tải lại mã nguồn',
-    unregistered:
-      'Dự án chưa đăng ký thư mục mã nguồn. Đăng ký trước khi chạy phân tích.',
-    fixture: (fixtureId: string) =>
-      `Dự án demo dùng bộ mẫu ${fixtureId} đi kèm ứng dụng; không đăng ký được thư mục khác.`,
-    fields: {
-      folder: 'Thư mục',
-      revision: 'Lần đăng ký',
-      profile: 'Hồ sơ phân tích',
-      defaultSchema: 'Schema mặc định',
-      status: 'Trạng thái',
-      checkedAt: 'Kiểm tra lúc',
-    },
     status: {
       ready: 'Đọc được (mới kiểm tra thư mục, chưa đọc nội dung)',
       unreadable:
@@ -185,28 +157,17 @@ export const viMessages = {
       assumed: 'Giả định, chưa xác nhận',
       confirmed: 'Đã được người quản lý DB xác nhận',
     } satisfies Record<TableNameMapping['status'], string>,
-    profiles: {
-      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
-    } satisfies Record<SourceProfileId, string>,
     form: {
-      titleNew: 'Đăng ký mã nguồn',
-      titleEdit: 'Đổi mã nguồn',
       rootPath: 'Đường dẫn thư mục (tuyệt đối)',
       rootPathHelp:
         'Ví dụ C:\\work\\order-module hoặc /home/dev/order-module. Backend kiểm tra thư mục và quyền đọc; nội dung chỉ được đọc khi chạy phân tích.',
       rootPathInvalid: 'Nhập đường dẫn thư mục mã nguồn.',
-      profile: 'Hồ sơ phân tích',
       mappingStatus: 'Schema mặc định của tên bảng',
       defaultSchema: 'Tên schema',
       defaultSchemaHelp:
         'Schema mà tên bảng không có tiền tố trỏ tới (ví dụ user đăng nhập). Chỉ chọn “đã xác nhận” khi người quản lý DB đã xác nhận.',
       defaultSchemaInvalid:
         'Nhập tên schema bắt đầu bằng chữ cái hoặc “_”, chỉ gồm chữ, số, _, $, #.',
-      submit: 'Đăng ký',
-      update: 'Lưu thay đổi',
-      pending: 'Đang kiểm tra…',
-      edit: 'Đổi mã nguồn',
-      cancelEdit: 'Hủy',
       saved: 'Đã lưu mã nguồn.',
     },
     errors: {
@@ -225,9 +186,84 @@ export const viMessages = {
     startBlocked:
       'Cần đăng ký một thư mục mã nguồn đọc được trước khi chạy phân tích.',
   },
+  sourceStep: {
+    lead: 'Chọn thư mục chứa source cũ. Mọi xử lý chạy trên máy này, source không rời khỏi máy của bạn.',
+    hero: {
+      readyTitle: 'Sẵn sàng phân tích',
+      readyHelp: (folder: string) =>
+        `Thư mục ${folder} đọc được. Bấm “Bắt đầu phân tích” để quét.`,
+      demoHelp:
+        'Dự án demo phân tích bộ mẫu đi kèm ứng dụng, không đọc thư mục nào trên máy.',
+      noSourceTitle: 'Chưa có thư mục source',
+      noSourceHelp:
+        'Nhập đường dẫn thư mục source ở mục Thông tin dự án bên dưới rồi bấm “Bắt đầu phân tích”.',
+      unreadableHelp:
+        'Không đọc được thư mục đã đăng ký. Nhập lại đường dẫn bên dưới rồi bắt đầu.',
+      queuedTitle: 'Đang chờ bắt đầu…',
+      scanningTitle: 'Đang quét thư mục…',
+      cancellingTitle: 'Đang hủy lượt chạy…',
+      progressLabel: 'Đang quét, chưa biết tổng số file',
+      stage: (stage: string) => `Bước hiện tại: ${stage}`,
+      doneTitle: 'Quét xong · đang chuyển sang Phân tích…',
+      goNow: 'Xem kết quả ngay',
+      endedTitle: {
+        failed: 'Phân tích thất bại',
+        cancelled: 'Đã hủy lượt chạy',
+        interrupted: 'Lượt chạy bị gián đoạn',
+      },
+      cancelledHelp: 'Lượt chạy đã dừng theo yêu cầu, chưa có kết quả mới.',
+      lastResult: 'Xem kết quả lần phân tích gần nhất',
+    },
+    steps: {
+      title: 'Tiến trình',
+      items: [
+        'Đọc cây thư mục',
+        'Chụp & băm nội dung',
+        'Phân tích (decode, SQL, call graph)',
+        'Lưu kết quả',
+      ],
+      state: { done: 'đã xong', active: 'đang làm', todo: 'chưa làm' },
+    },
+    form: {
+      title: 'Thông tin dự án',
+      name: 'Tên dự án',
+      customer: 'Khách hàng',
+      customerHelp: `Không bắt buộc, tối đa ${PROJECT_CUSTOMER_NAME_MAX_LENGTH} ký tự.`,
+      customerInvalid: `Tên khách hàng tối đa ${PROJECT_CUSTOMER_NAME_MAX_LENGTH} ký tự, không chỉ chứa khoảng trắng.`,
+      folder: 'Thư mục source (đường dẫn tuyệt đối)',
+      registered: 'Đang dùng',
+      keepFolder: 'Để trống để giữ thư mục đang dùng.',
+      folderRequired: 'Nhập đường dẫn thư mục source.',
+      folderReenter:
+        'Nhập lại đường dẫn thư mục để lưu thay đổi ánh xạ tên bảng.',
+      demoFolder: (fixtureId: string) => `Bộ mẫu ${fixtureId} đi kèm ứng dụng`,
+      language: 'Ngôn ngữ phân tích (chọn 1)',
+      comingSoon: 'Sắp hỗ trợ',
+      mapping: 'Ánh xạ tên bảng (tùy chọn)',
+      save: 'Lưu thông tin',
+      saving: 'Đang lưu…',
+      saved: 'Đã lưu thông tin dự án.',
+    },
+    recent: {
+      title: 'Dự án gần đây',
+      all: 'Xem tất cả',
+      loading: 'Đang tải dự án gần đây…',
+      failed: 'Không tải được danh sách dự án.',
+      empty: 'Chưa có dự án nào.',
+      open: 'Đang mở',
+      noCustomer: 'Chưa ghi khách hàng',
+      status: {
+        none: 'Chưa phân tích',
+        active: 'Đang phân tích',
+        succeeded: 'Đã phân tích',
+        failed: 'Thất bại',
+        cancelled: 'Đã hủy',
+        interrupted: 'Bị gián đoạn',
+        unknown: 'Không đọc được trạng thái',
+      },
+    },
+  },
   runs: {
-    title: 'Phân tích (demo)',
-    titleLocal: 'Phân tích',
     demoNotice:
       'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: không đọc mã nguồn, chỉ công bố kết quả kiểm kê mẫu đi kèm ứng dụng.',
     localNotice:
@@ -762,6 +798,8 @@ export const viMessages = {
       get: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',
       list: 'Tham số tải danh sách không hợp lệ. Làm mới danh sách rồi thử lại.',
       runs: 'Yêu cầu lượt chạy không hợp lệ. Tải lại lượt chạy rồi thử lại.',
+      update:
+        'Thông tin dự án không hợp lệ. Kiểm tra tên dự án và khách hàng rồi thử lại.',
       source:
         'Thông tin mã nguồn không hợp lệ: đường dẫn phải là đường dẫn tuyệt đối trên máy này.',
     },

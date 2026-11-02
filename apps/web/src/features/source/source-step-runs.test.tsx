@@ -4,6 +4,7 @@ import {
   render as renderWithLibrary,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { StrictMode, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,12 +15,19 @@ import {
   runningRunFixture,
 } from '@portal/contracts/fixtures';
 import type { Run } from '@portal/contracts';
-import { AnalyzeRunPanel } from './analyze-run-panel';
-import { newerRun, RUN_POLL_INTERVAL_MS } from './use-analyze-runs';
+import { SourceStep } from './source-step';
+import { newerRun, RUN_POLL_INTERVAL_MS } from '../jobs/use-analyze-runs';
+import { createProjectsApi } from '../../shared/api/projects-api';
 import { createRunsApi } from '../../shared/api/runs-api';
+import { createSourcesApi } from '../../shared/api/sources-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { useLocale } from '../../shared/i18n/locale-context';
-import { json, requestUrl, testCredentials } from '../../testing/fixtures';
+import {
+  json,
+  project,
+  requestUrl,
+  testCredentials,
+} from '../../testing/fixtures';
 
 const projectId = FIXTURE_IDS.project;
 const otherProjectId = FIXTURE_IDS.otherProject;
@@ -46,6 +54,8 @@ function createServer(routes: Record<string, Handler>) {
   });
   return {
     api: createRunsApi(fetcher, testCredentials),
+    projectsApi: createProjectsApi(fetcher, testCredentials),
+    sourcesApi: createSourcesApi(fetcher, testCredentials),
     calls,
     mutations: () => calls.filter((call) => call.method !== 'GET'),
   };
@@ -57,6 +67,25 @@ function render(ui: ReactElement) {
   return renderWithLibrary(ui, { wrapper: LocaleProvider });
 }
 
+// Step 1 of a demo project: runs lock the bundled fixture (revision 1).
+function step(server: ReturnType<typeof createServer>, id: string = projectId) {
+  return (
+    <SourceStep
+      key={id}
+      project={{ ...project, id }}
+      api={server.projectsApi}
+      runsApi={server.api}
+      sourcesApi={server.sourcesApi}
+      onProjectChange={() => undefined}
+      onProgress={() => undefined}
+      onOpenResults={() => undefined}
+    />
+  );
+}
+
+const history = () =>
+  within(screen.getByRole('list', { name: 'Lịch sử lượt chạy' }));
+
 function startRoute(run: Run): Handler {
   return () => json(run, 202);
 }
@@ -67,7 +96,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe('Analyze run panel (F02)', () => {
+describe('Runs of the source step (F02)', () => {
   it('only reads on open, re-render, StrictMode and locale change', async () => {
     const server = createServer({
       [`GET ${base}/current`]: () => json({ run: succeeded }),
@@ -80,12 +109,7 @@ describe('Analyze run panel (F02)', () => {
     const view = render(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel
-          api={server.api}
-          projectId={projectId}
-          demo
-          sourceRevision={1}
-        />
+        {step(server)}
       </StrictMode>,
     );
     expect(await screen.findAllByText('Hoàn tất (demo)')).not.toHaveLength(0);
@@ -94,12 +118,7 @@ describe('Analyze run panel (F02)', () => {
     view.rerender(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel
-          api={server.api}
-          projectId={projectId}
-          demo
-          sourceRevision={1}
-        />
+        {step(server)}
       </StrictMode>,
     );
     expect(server.mutations()).toEqual([]);
@@ -118,14 +137,7 @@ describe('Analyze run panel (F02)', () => {
         return json(queuedRunFixture, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     const start = await screen.findByRole('button', {
       name: 'Bắt đầu phân tích',
     });
@@ -174,14 +186,7 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
     );
@@ -223,14 +228,7 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
     );
@@ -269,14 +267,7 @@ describe('Analyze run panel (F02)', () => {
         return json(cancelling, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
@@ -294,9 +285,11 @@ describe('Analyze run panel (F02)', () => {
     detail = cancelled;
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS * 2));
     expect(await screen.findAllByText('Đã hủy')).not.toHaveLength(0);
+    // The ended run is offered again from the scan card (UI04-AC02).
+    expect(await screen.findByText('Đã hủy lượt chạy')).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Bắt đầu phân tích' }),
-    ).toBeTruthy();
+      screen.getAllByRole('button', { name: 'Chạy lại' }),
+    ).not.toHaveLength(0);
     expect(server.mutations()).toHaveLength(1);
   });
 
@@ -330,14 +323,7 @@ describe('Analyze run panel (F02)', () => {
           : json(cancelling, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
@@ -360,14 +346,7 @@ describe('Analyze run panel (F02)', () => {
         return json(runningRunFixture);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     expect(await screen.findAllByText('Đang chạy')).not.toHaveLength(0);
     online = false;
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS + 10));
@@ -402,25 +381,9 @@ describe('Analyze run panel (F02)', () => {
         json({ items: [runB], nextCursor: null }),
     };
     const server = createServer(routes);
-    const view = render(
-      <AnalyzeRunPanel
-        key={projectId}
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    const view = render(step(server));
     await waitFor(() => expect(releaseA).toBeDefined());
-    view.rerender(
-      <AnalyzeRunPanel
-        key={otherProjectId}
-        api={server.api}
-        projectId={otherProjectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    view.rerender(step(server, otherProjectId));
     expect(await screen.findAllByText('Thất bại')).not.toHaveLength(0);
     await act(async () => {
       releaseA?.();
@@ -446,18 +409,16 @@ describe('Analyze run panel (F02)', () => {
       [`GET ${base}/${retried.id}`]: () => json(retried),
       [`POST ${base}`]: startRoute(retried),
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
+    // UI04-AC02: the scan card names the reason; nothing opens by itself.
+    expect(await screen.findByText('Phân tích thất bại')).toBeTruthy();
     expect(
-      await screen.findByText('Mã nguồn đã thay đổi trong lúc chạy.'),
-    ).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Chạy lại' }));
+      screen.getAllByText('Mã nguồn đã thay đổi trong lúc chạy.'),
+    ).not.toHaveLength(0);
+    // The scan card offers the re-run of the ended run.
+    fireEvent.click(
+      (await screen.findAllByRole('button', { name: 'Chạy lại' }))[0]!,
+    );
     await waitFor(() => expect(server.mutations()).toHaveLength(1));
     expect(server.mutations()[0]?.body).toEqual({
       kind: 'analyze',
@@ -466,7 +427,7 @@ describe('Analyze run panel (F02)', () => {
     });
     expect(await screen.findAllByText('Đang chờ')).not.toHaveLength(0);
     // Both runs stay in the history.
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(history().getAllByRole('listitem')).toHaveLength(2);
   });
 });
 

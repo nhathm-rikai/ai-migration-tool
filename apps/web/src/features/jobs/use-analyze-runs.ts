@@ -223,21 +223,23 @@ export function useAnalyzeRuns(
     uncertainStart,
     refresh,
     // New run, or the same intent again while its outcome is unknown.
-    async start() {
+    // `revision` names a source just saved by the caller, before this hook
+    // has re-rendered with it.
+    async start(revision: number | null = sourceRevision) {
       // An intent whose outcome is unknown is resent exactly as it was.
       if (intent.current) return sendStart(intent.current);
-      if (sourceRevision === null) return;
+      if (revision === null) return;
       return sendStart({
         key: newKey(),
-        input: startInput(sourceRevision, null),
+        input: startInput(revision, null),
       });
     },
     // Business retry: always a new run with a new key.
-    async retry(runId: string) {
-      if (sourceRevision === null) return;
+    async retry(runId: string, revision: number | null = sourceRevision) {
+      if (revision === null) return;
       return sendStart({
         key: newKey(),
-        input: startInput(sourceRevision, runId),
+        input: startInput(revision, runId),
       });
     },
     async cancel(run: Run) {
@@ -295,3 +297,5 @@ export function visibleHistory(current: Run | null, history: Run[]): Run[] {
     ? merged
     : [current, ...merged];
 }
+
+export type AnalyzeRunsControl = ReturnType<typeof useAnalyzeRuns>;

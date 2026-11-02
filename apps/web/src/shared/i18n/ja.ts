@@ -1,6 +1,7 @@
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  PROJECT_CUSTOMER_NAME_MAX_LENGTH,
 } from '@portal/contracts';
 import type { ProgramState } from '../../features/assessment/assessment-summary';
 import type { Messages } from './vi';
@@ -125,38 +126,10 @@ export const jaMessages = {
       savedLocally:
         'プロジェクトはこの端末に保存されます。プロジェクトツリーから選択して情報を開けます。',
     },
-    detail: {
-      title: 'プロジェクト詳細',
-      close: '詳細を閉じる',
-      loading: '詳細を読み込み中…',
-      retry: '詳細を再読み込み',
-      description: 'ローカル環境に保存されたプロジェクト情報です。',
-      id: 'プロジェクトID',
-      data: 'データ',
-      createdAt: '作成日時',
-      ready: 'プロジェクトを管理できます',
-      technical: '技術情報',
-      unavailable:
-        'このバージョンでは、実際のソース解析、レビュー、レポート作成は未対応です。下の解析実行はデモです。',
-    },
   },
   source: {
-    title: 'ソースコード',
-    technical: '技術情報',
     loading: 'ソース情報を読み込み中…',
     reload: 'ソースを再読み込み',
-    unregistered:
-      'ソースフォルダーが登録されていません。解析の前に登録してください。',
-    fixture: (fixtureId: string) =>
-      `デモプロジェクトはアプリ同梱のサンプル ${fixtureId} を使用します。別のフォルダーは登録できません。`,
-    fields: {
-      folder: 'フォルダー',
-      revision: '登録リビジョン',
-      profile: '解析プロファイル',
-      defaultSchema: 'デフォルトスキーマ',
-      status: '状態',
-      checkedAt: '確認日時',
-    },
     status: {
       ready: '読み取り可能（フォルダーのみ確認、内容は未読）',
       unreadable:
@@ -167,28 +140,17 @@ export const jaMessages = {
       assumed: '仮定（未確認）',
       confirmed: 'DB管理者が確認済み',
     },
-    profiles: {
-      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
-    },
     form: {
-      titleNew: 'ソースを登録',
-      titleEdit: 'ソースを変更',
       rootPath: 'フォルダーのパス（絶対パス）',
       rootPathHelp:
         '例：C:\\work\\order-module、/home/dev/order-module。バックエンドがフォルダーと読み取り権限を確認します。内容は解析の実行時にのみ読み込まれます。',
       rootPathInvalid: 'ソースフォルダーのパスを入力してください。',
-      profile: '解析プロファイル',
       mappingStatus: 'テーブル名のデフォルトスキーマ',
       defaultSchema: 'スキーマ名',
       defaultSchemaHelp:
         '修飾なしのテーブル名が指すスキーマ（例：ログインユーザー）。DB管理者が確認した場合のみ「確認済み」を選択してください。',
       defaultSchemaInvalid:
         'スキーマ名は英字または「_」で始め、英数字・_・$・# のみで入力してください。',
-      submit: '登録する',
-      update: '変更を保存',
-      pending: '確認中…',
-      edit: 'ソースを変更',
-      cancelEdit: 'キャンセル',
       saved: 'ソースを保存しました。',
     },
     errors: {
@@ -208,9 +170,84 @@ export const jaMessages = {
     startBlocked:
       '解析の前に、読み取り可能なソースフォルダーを登録してください。',
   },
+  sourceStep: {
+    lead: '旧システムのソースフォルダーを選択します。処理はすべてこの端末で行われ、ソースが端末の外に出ることはありません。',
+    hero: {
+      readyTitle: '解析の準備ができました',
+      readyHelp: (folder: string) =>
+        `フォルダー ${folder} を読み込めます。「解析を開始」を押してスキャンします。`,
+      demoHelp:
+        'デモプロジェクトはアプリ同梱のサンプルを解析します。端末のフォルダーは読み込みません。',
+      noSourceTitle: 'ソースフォルダーが未設定です',
+      noSourceHelp:
+        '下の「プロジェクト情報」でソースフォルダーのパスを入力し、「解析を開始」を押してください。',
+      unreadableHelp:
+        '登録済みのフォルダーを読み込めません。下でパスを入力し直してから開始してください。',
+      queuedTitle: '開始を待っています…',
+      scanningTitle: 'フォルダーをスキャンしています…',
+      cancellingTitle: '実行をキャンセルしています…',
+      progressLabel: 'スキャン中（ファイル総数は未確定）',
+      stage: (stage: string) => `現在の工程：${stage}`,
+      doneTitle: 'スキャン完了・解析画面へ移動します…',
+      goNow: 'すぐに結果を見る',
+      endedTitle: {
+        failed: '解析に失敗しました',
+        cancelled: '実行をキャンセルしました',
+        interrupted: '実行が中断されました',
+      },
+      cancelledHelp: '要求により実行を停止しました。新しい結果はありません。',
+      lastResult: '前回の解析結果を見る',
+    },
+    steps: {
+      title: '進行状況',
+      items: [
+        'フォルダー構成の読み込み',
+        'スナップショットとハッシュ',
+        '解析（デコード・SQL・コールグラフ）',
+        '結果の保存',
+      ],
+      state: { done: '完了', active: '処理中', todo: '未着手' },
+    },
+    form: {
+      title: 'プロジェクト情報',
+      name: 'プロジェクト名',
+      customer: '顧客',
+      customerHelp: `任意。最大${PROJECT_CUSTOMER_NAME_MAX_LENGTH}文字。`,
+      customerInvalid: `顧客名は最大${PROJECT_CUSTOMER_NAME_MAX_LENGTH}文字で入力してください。空白のみは使用できません。`,
+      folder: 'ソースフォルダー（絶対パス）',
+      registered: '使用中',
+      keepFolder: '空欄のままにすると使用中のフォルダーを維持します。',
+      folderRequired: 'ソースフォルダーのパスを入力してください。',
+      folderReenter:
+        'テーブル名マッピングの変更を保存するには、フォルダーのパスを入力し直してください。',
+      demoFolder: (fixtureId: string) => `アプリ同梱のサンプル ${fixtureId}`,
+      language: '解析言語（1つ選択）',
+      comingSoon: '対応予定',
+      mapping: 'テーブル名マッピング（任意）',
+      save: '情報を保存',
+      saving: '保存中…',
+      saved: 'プロジェクト情報を保存しました。',
+    },
+    recent: {
+      title: '最近のプロジェクト',
+      all: 'すべて表示',
+      loading: '最近のプロジェクトを読み込んでいます…',
+      failed: 'プロジェクト一覧を読み込めませんでした。',
+      empty: 'プロジェクトはまだありません。',
+      open: '表示中',
+      noCustomer: '顧客未設定',
+      status: {
+        none: '未解析',
+        active: '解析中',
+        succeeded: '解析済み',
+        failed: '失敗',
+        cancelled: 'キャンセル済み',
+        interrupted: '中断',
+        unknown: '状態を取得できません',
+      },
+    },
+  },
   runs: {
-    title: '解析（デモ）',
-    titleLocal: '解析',
     demoNotice:
       'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、アプリ同梱のサンプルインベントリ結果のみを公開します。',
     localNotice:
@@ -743,6 +780,8 @@ export const jaMessages = {
       get: 'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',
       list: '一覧の取得条件が正しくありません。一覧を再読み込みして再試行してください。',
       runs: '実行リクエストが正しくありません。実行を再読み込みしてから再試行してください。',
+      update:
+        'プロジェクト情報が正しくありません。プロジェクト名と顧客を確認して再試行してください。',
       source:
         'ソース情報が正しくありません。パスはこの端末の絶対パスで入力してください。',
     },

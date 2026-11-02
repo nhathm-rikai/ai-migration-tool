@@ -187,7 +187,10 @@ describe('reload at a step URL (UI01-AC01)', () => {
     const server = renderAt(`${page}/source`, baseRoutes());
     await screen.findByText(`Bước 1 / 5 · ${local.name}`);
     expect(
-      await screen.findByRole('region', { name: 'Mã nguồn LOCAL' }),
+      await screen.findByRole('form', { name: 'Thông tin dự án' }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole('complementary', { name: 'Dự án gần đây' }),
     ).toBeTruthy();
     expect(step(/Nạp source/).getAttribute('aria-current')).toBe('step');
     expect(server.mutations()).toEqual([]);
@@ -349,7 +352,7 @@ describe('analysis progress (review fixes)', () => {
           }),
       }),
     );
-    await screen.findByRole('region', { name: 'Mã nguồn LOCAL' });
+    await screen.findByRole('form', { name: 'Thông tin dự án' });
     fireEvent.click(step(/Phân tích/));
     expect(
       await screen.findByRole('heading', { name: 'Chưa có kết quả phân tích' }),

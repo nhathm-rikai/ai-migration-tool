@@ -29,12 +29,11 @@ test(
     await page.getByLabel('Tên dự án').fill(`UI03-EXT01 graph ${Date.now()}`);
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByLabel('Tìm program').fill('F000000');
     await assessment.getByRole('button', { name: 'F000000' }).click();

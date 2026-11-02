@@ -141,7 +141,10 @@ it('preserves a pending create, then selection, success notice and dates when sw
     finish?.(json(project, 201));
     await Promise.resolve();
   });
-  await screen.findByText(project.id);
+  expect(await screen.findByLabelText('プロジェクト名')).toHaveProperty(
+    'value',
+    project.name,
+  );
   expect(screen.getByText('プロジェクトを作成しました。')).toBeTruthy();
   expect(screen.getByText(`ステップ 1 / 5 · ${project.name}`)).toBeTruthy();
   expect(
@@ -151,10 +154,18 @@ it('preserves a pending create, then selection, success notice and dates when sw
     dateStyle: 'medium',
     timeStyle: 'medium',
   }).format(new Date(project.createdAt));
-  expect(screen.getByText(formatted)).toBeTruthy();
+  // The recent projects card shows the creation date.
+  expect(
+    await screen.findByText((text) => text.includes(formatted), {
+      selector: '.recent-meta',
+    }),
+  ).toBeTruthy();
   const requestsBeforeSwitch = fetcher.mock.calls.length;
   fireEvent.click(screen.getByRole('radio', { name: 'Tiếng Việt' }));
-  expect(screen.getByText(project.id)).toBeTruthy();
+  expect(screen.getByLabelText('Tên dự án')).toHaveProperty(
+    'value',
+    project.name,
+  );
   expect(screen.getByText('Đã tạo dự án.')).toBeTruthy();
   expect(fetcher).toHaveBeenCalledTimes(requestsBeforeSwitch);
 });

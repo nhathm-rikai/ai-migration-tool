@@ -35,12 +35,11 @@ test(
     await page.getByLabel('Tên dự án').fill(`UI03 graph ${Date.now()}`);
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(assessment.getByTestId('unique-code-lines')).toBeVisible();
 
@@ -170,12 +169,11 @@ test(
     await page.getByLabel('Tên dự án').fill(`UI03 fallback ${Date.now()}`);
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByRole('tab', { name: /^Call graph/ }).click();
     const canvas = assessment.getByRole('group', {
@@ -214,12 +212,11 @@ test(
     await page.getByLabel('Tên dự án').fill(`UI03 full ${Date.now()}`);
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByRole('tab', { name: /^Call graph/ }).click();
     await assessment.getByRole('button', { name: 'Xem toàn màn hình' }).click();

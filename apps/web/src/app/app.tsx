@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Project } from '@portal/contracts';
 import { branding } from './branding';
 import { ProjectsPage } from '../features/projects/projects-page';
-import { ProjectDetail } from '../features/projects/project-detail';
+import { SourceStep } from '../features/source/source-step';
+import { RecentProjects } from '../features/projects/recent-projects';
 import { AssessmentOverview } from '../features/assessment/assessment-overview';
 import {
   useProjectList,
@@ -198,6 +199,11 @@ function AppShell({
               onRetryProgress={progress.refresh}
               created={created?.path === pathname}
               apis={apis}
+              list={list}
+              onProjectChange={(next) => {
+                project.replace(next);
+                list.retry();
+              }}
             />
           ) : (
             <p role="status" className="page">
@@ -393,6 +399,8 @@ function StepPage({
   onRetryProgress,
   created,
   apis,
+  list,
+  onProjectChange,
 }: {
   project: Project;
   step: StepId;
@@ -402,6 +410,8 @@ function StepPage({
   onRetryProgress: () => void;
   created: boolean;
   apis: Apis;
+  list: ProjectListControl;
+  onProjectChange: (project: Project) => void;
 }) {
   const { messages } = useLocale();
   const copy = messages.shell;
@@ -419,6 +429,9 @@ function StepPage({
           )}
         </span>
         <h1 id="page-title">{copy.pageTitles[step]}</h1>
+        {step === 'source' && (
+          <p className="page-lead">{messages.sourceStep.lead}</p>
+        )}
       </header>
       {created && (
         <p role="status" className="success">
@@ -426,16 +439,22 @@ function StepPage({
         </p>
       )}
       {step === 'source' ? (
-        <ProjectDetail
-          id={project.id}
+        <SourceStep
           project={project}
           api={apis.api}
           runsApi={apis.runsApi}
           sourcesApi={apis.sourcesApi}
-          artifactsApi={apis.artifactsApi}
-          onOpenResults={(id) => navigate(stepPath(project.id, 'analysis', id))}
+          onProjectChange={onProjectChange}
           onProgress={onProgress}
-          onClose={() => navigate('/projects')}
+          onOpenResults={(id) => navigate(stepPath(project.id, 'analysis', id))}
+          aside={
+            <RecentProjects
+              list={list}
+              runsApi={apis.runsApi}
+              openProjectId={project.id}
+              version={progressVersion(progress)}
+            />
+          }
         />
       ) : step === 'analysis' ? (
         <AnalysisStep
@@ -450,6 +469,13 @@ function StepPage({
       )}
     </div>
   );
+}
+
+// Re-read recent projects when a run of the open project starts or ends.
+function progressVersion(progress: ProjectProgress): string {
+  return progress.status === 'ready'
+    ? `${progress.activeRunId ?? ''}/${progress.analysisRunId ?? ''}`
+    : progress.status;
 }
 
 function AnalysisStep({

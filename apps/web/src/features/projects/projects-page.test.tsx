@@ -8,7 +8,6 @@ import {
 } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectsPage } from './projects-page';
-import { ProjectDetail } from './project-detail';
 import { useProjectList } from './use-project-list';
 import {
   createProjectsApi,
@@ -175,47 +174,6 @@ describe('Projects UI', () => {
     expect(fetcher.mock.calls[2]?.[0]).toBe(
       '/api/v1/projects?cursor=' + project.id,
     );
-  });
-  it('ignores late detail responses after switching projects', async () => {
-    let finishOld: ((value: Response) => void) | undefined;
-    const second: Project = {
-      ...project,
-      id: '00000000-0000-4000-8000-000000000002',
-      name: 'Dự án mới',
-    };
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            finishOld = resolve;
-          }),
-      )
-      .mockResolvedValueOnce(json(second));
-    const api = createProjectsApi(fetcher, testCredentials);
-    const view = render(
-      <ProjectDetail
-        key={project.id}
-        id={project.id}
-        api={api}
-        onClose={() => undefined}
-      />,
-    );
-    view.rerender(
-      <ProjectDetail
-        key={second.id}
-        id={second.id}
-        api={api}
-        onClose={() => undefined}
-      />,
-    );
-    await screen.findByText(second.id);
-    await act(async () => {
-      finishOld?.(json(project));
-      await Promise.resolve();
-    });
-    expect(screen.queryByText(project.id)).toBeNull();
-    expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
   });
   it('keeps the input after a create failure and permits explicit retry', async () => {
     const fetcher = vi

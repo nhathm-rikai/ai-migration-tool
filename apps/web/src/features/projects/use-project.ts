@@ -41,5 +41,15 @@ export function useProject(api: ProjectsApi, projectId: string | null) {
   return {
     state,
     retry: useCallback(() => setRetry((value) => value + 1), []),
+    // A newer copy saved by the page (PATCH answer): shown without a re-read,
+    // so the open step keeps its state.
+    replace: useCallback(
+      (project: Project) =>
+        setTagged({
+          projectId: project.id,
+          state: { status: 'ready', project },
+        }),
+      [],
+    ),
   };
 }

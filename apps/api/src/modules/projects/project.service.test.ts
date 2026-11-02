@@ -6,7 +6,12 @@ import { PROJECT_NAME_MAX_LENGTH, PROJECT_FIXTURE_ID } from '@portal/contracts';
 it('applies the shared name policy to direct service calls before persistence, including Unicode', () => {
   const create = vi.fn<ProjectRepository['create']>((project) => project);
   const service = createProjectService({
-    repository: { create, findById: () => undefined, listAfter: () => [] },
+    repository: {
+      create,
+      findById: () => undefined,
+      update: () => undefined,
+      listAfter: () => [],
+    },
     nextId: () => 'id',
     now: () => new Date(0),
   });
@@ -26,6 +31,7 @@ it('rejects invalid page parameters from a direct service caller before persiste
     repository: {
       create: (project) => project,
       findById: () => undefined,
+      update: () => undefined,
       listAfter,
     },
     nextId: () => 'id',
@@ -43,6 +49,7 @@ it('does not report success if persistence fails', () => {
       throw new Error('Disk unavailable');
     },
     findById: () => undefined,
+    update: () => undefined,
     listAfter: () => [],
   };
   const service = createProjectService({
@@ -60,6 +67,7 @@ it('rejects a blank normalized name before touching persistence', () => {
   const repository: ProjectRepository = {
     create,
     findById: () => undefined,
+    update: () => undefined,
     listAfter: () => [],
   };
   const service = createProjectService({

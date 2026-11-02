@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { syntheticCorpusFixture } from '@portal/contracts/fixtures';
 
-// UI04: the call graph tab of one program's detail lays out its procedures,
+// UI03-EXT01: the call graph tab of one program's detail lays out its procedures,
 // the shared procedures they call and the tables they access with ELK in a
 // Web Worker (no fallback), and focusing a procedure lists its relations.
 // The demo run's inventory is swapped for a synthetic corpus (generated,
@@ -26,7 +26,7 @@ test(
     page.on('worker', (worker) => workers.push(worker.url()));
 
     await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI04 graph ${Date.now()}`);
+    await page.getByLabel('Tên dự án').fill(`UI03-EXT01 graph ${Date.now()}`);
     await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
     const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
@@ -134,8 +134,22 @@ test(
     const frame = await dialog.boundingBox();
     if (!viewport || !frame) throw new Error('no box');
     expect(frame.width).toBeGreaterThan(viewport.width - 40);
+    // A modal: focus moves in and stays in; the page behind is inert.
+    await expect(dialog.getByLabel('Tìm procedure, API, bảng')).toBeFocused();
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+Tab');
+    expect(
+      await page.evaluate(
+        () => document.activeElement?.closest('[role="dialog"]') !== null,
+      ),
+    ).toBe(true);
+    expect(
+      await page.evaluate(() => document.getElementById('root')?.inert),
+    ).toBe(true);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
+    await expect(
+      detail.getByRole('button', { name: 'Xem toàn màn hình' }),
+    ).toBeFocused();
   },
 );

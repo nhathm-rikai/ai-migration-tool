@@ -15,7 +15,7 @@ import {
 import { ProgramDetail } from './program-detail';
 import { ProcedureGraphView } from './procedure-graph-view';
 
-// UI04: the call graph tab of the program detail opens lazily, says what
+// UI03-EXT01: the call graph tab of the program detail opens lazily, says what
 // it draws, and the side card lists callers, callees and tables as
 // buttons usable by keyboard; VI/JA.
 
@@ -35,7 +35,7 @@ function render(ui: ReactElement) {
 
 afterEach(() => window.localStorage.clear());
 
-describe('UI04 procedure call graph tab', () => {
+describe('UI03-EXT01 procedure call graph tab', () => {
   it('opens from the program detail and summarises the graph', async () => {
     render(
       <ProgramDetail
@@ -46,7 +46,7 @@ describe('UI04 procedure call graph tab', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Sơ đồ gọi' }));
     const summary = await screen.findByTestId('procedure-graph-summary');
     expect(summary.textContent).toBe(
-      '4 procedure riêng · 4 procedure dùng chung gọi tới được · 10 liên kết · Bảng theo tên sau ánh xạ',
+      '4 procedure riêng · 2 procedure dùng chung gọi tới được · 10 liên kết · Bảng theo tên sau ánh xạ',
     );
     expect(
       screen.getByLabelText('Hiện 1 procedure không gọi và không được gọi'),
@@ -143,6 +143,8 @@ describe('UI04 procedure call graph tab', () => {
     });
     expect(dialog.parentElement?.parentElement).toBe(document.body);
     expect(document.body.style.overflow).toBe('hidden');
+    // A modal: focus moved into it.
+    expect(dialog.contains(document.activeElement)).toBe(true);
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.body.style.overflow).toBe('');

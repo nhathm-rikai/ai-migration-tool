@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-// Pieces shared by the project graph (UI03) and the procedure graph (UI04):
+// Pieces shared by the project graph (UI03) and the procedure graph (UI03-EXT01):
 // the full-screen host and its modal focus, and the square toolbar button.
 
 // The graph is rendered into one element that stays in the page, or moves

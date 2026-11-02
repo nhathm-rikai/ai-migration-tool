@@ -2614,7 +2614,7 @@ details.technical[open] > summary {
 .dep-search-item:focus-visible {
   background: var(--brand-soft);
 }
-/* Procedure call graph of the program detail (UI04): a narrower side card
+/* Procedure call graph of the program detail (UI03-EXT01): a narrower side card
    so the canvas keeps most of the detail card. */
 .proc-graph-tab {
   grid-template-columns: minmax(0, 1fr) 260px;

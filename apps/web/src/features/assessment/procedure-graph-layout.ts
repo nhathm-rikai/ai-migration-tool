@@ -10,7 +10,7 @@ import {
   type ProcedureNode,
 } from './procedure-graph';
 
-// Layout of a program's procedure graph (UI04) for the same ELK worker and
+// Layout of a program's procedure graph (UI03-EXT01) for the same ELK worker and
 // lane fallback as the project graph (`useGraphLayout`): one node per
 // procedure, API and table, layered left to right in four partitions (own
 // procedures → shared procedures → APIs → tables). Calls inside a lane add

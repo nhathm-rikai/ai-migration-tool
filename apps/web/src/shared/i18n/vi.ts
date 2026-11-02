@@ -697,6 +697,9 @@ export const viMessages = {
         uses: (count: string) => `${count} lần`,
         dynamicSql: (count: string) => `${count} SQL động`,
         ambiguous: 'chưa xác định',
+        candidate: 'Ứng viên',
+        candidateNote:
+          'Chỉ là ứng viên của một lời gọi chưa xác định (nhiều procedure trùng tên): chưa chắc program gọi tới, nên những gì nó gọi hoặc truy cập không được vẽ tiếp.',
         focusedTitle: 'Procedure đang chọn',
         clearFocus: 'Bỏ chọn',
         codeLines: 'LoC',

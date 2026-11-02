@@ -23,7 +23,7 @@ import {
 // or after table name mapping, calls and external dependencies of the
 // program selected in the overview, one tab each. Lists and tables only;
 // every value is rendered as text (React escapes it), never as HTML or a
-// link guessed from a name. The call graph tab (UI04) draws the same calls
+// link guessed from a name. The call graph tab (UI03-EXT01) draws the same calls
 // per procedure; it loads with its libraries when first opened.
 
 const ProcedureGraphView = lazy(() =>

@@ -676,6 +676,9 @@ export const jaMessages = {
         uses: (count: string) => `${count} 回`,
         dynamicSql: (count: string) => `動的SQL ${count} 件`,
         ambiguous: '未特定',
+        candidate: '候補',
+        candidateNote:
+          '特定できない呼び出し（同名のプロシージャが複数）の候補にすぎません。呼び出されるとは限らないため、その先の呼び出しやテーブルアクセスは描画しません。',
         focusedTitle: '選択中のプロシージャ',
         clearFocus: '選択解除',
         codeLines: 'LoC',

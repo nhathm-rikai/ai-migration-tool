@@ -6,7 +6,7 @@ import {
   normalizeTableName,
 } from './table-mapping';
 
-// Procedure call graph of one program (UI04), merged in the browser from the
+// Procedure call graph of one program (UI03-EXT01), merged in the browser from the
 // inventory already loaded; nothing is analysed again. Nodes: every
 // procedure of the program's own files (and the code outside procedures of
 // a file, when it calls or touches something), the procedures of shared
@@ -56,6 +56,9 @@ export type ProcedureNode = {
   // Distinct nodes calling this one / called or accessed by it.
   callers: number;
   callees: number;
+  // Only a candidate of an ambiguous call (several procedures share the
+  // name): drawn, but what it calls or accesses is not followed.
+  candidate: boolean;
 };
 
 export type ProcedureEdge = {
@@ -82,7 +85,9 @@ export type ProcedureGraph = {
 
 const OPERATION_ORDER: SqlOperation[] = ['C', 'R', 'U', 'D', 'X'];
 
-export const apiNodeId = (name: string) => `api:${name.toLowerCase()}`;
+// One node per resolved declaration (`<file>#declare:<name>`): two files
+// declaring the same name from different libraries stay apart.
+export const apiNodeId = (declarationId: string) => `api:${declarationId}`;
 export const procedureTableNodeId = (table: string) => `table:${table}`;
 // Code outside procedures, as the analyzer names it in `calls[].from`.
 export const fileOwnerId = (relativePath: string) => `${relativePath}#file`;
@@ -164,10 +169,15 @@ export function buildProcedureGraph(
     reached.add(next);
     queue.push(...(outgoing.get(next) ?? []));
   }
+  // The candidates of an ambiguous call are drawn, marked as candidates,
+  // but are not a confirmed dependency: nothing they call or access is
+  // followed, so the graph does not depend on the order of `calls[]`.
+  const candidates = new Set<string>();
   for (const call of analysis.calls)
     if (call.resolution === 'ambiguous' && reached.has(call.from))
       for (const target of call.targets)
-        if (procedures.has(target)) reached.add(target);
+        if (procedures.has(target) && !reached.has(target))
+          candidates.add(target);
 
   const nodes = new Map<string, ProcedureNode>();
   const edges = new Map<string, ProcedureEdge>();
@@ -175,7 +185,7 @@ export function buildProcedureGraph(
     const existing = nodes.get(id);
     if (existing) return existing;
     const value = procedures.get(id);
-    if (!value || !reached.has(id)) return null;
+    if (!value || (!reached.has(id) && !candidates.has(id))) return null;
     const { relativePath, shared, procedure } = value;
     const file = files.get(relativePath)?.analysis;
     const created: ProcedureNode = {
@@ -196,6 +206,7 @@ export function buildProcedureGraph(
         ).length ?? 0,
       callers: 0,
       callees: 0,
+      candidate: candidates.has(id),
     };
     nodes.set(id, created);
     return created;
@@ -232,10 +243,11 @@ export function buildProcedureGraph(
   for (const id of reached)
     if (procedures.get(id)?.procedure) procedureNode(id);
 
-  const libraries = new Map<string, string>();
-  for (const [, file] of files)
+  // Declarations by the ID the analyzer resolves calls to.
+  const declarations = new Map<string, { name: string; library: string }>();
+  for (const [relativePath, file] of files)
     for (const declared of file.analysis.externalDeclarations)
-      libraries.set(declared.name.toLowerCase(), declared.library);
+      declarations.set(`${relativePath}#declare:${declared.name}`, declared);
 
   for (const call of analysis.calls) {
     if (!reached.has(call.from)) continue;
@@ -248,14 +260,15 @@ export function buildProcedureGraph(
     for (const target of call.targets) {
       let to: string | null = null;
       if (kind === 'api') {
-        const name = declaration(target) ?? call.name;
-        to = apiNodeId(name);
+        const declared = declarations.get(target);
+        const name = declared?.name ?? declaration(target) ?? call.name;
+        to = apiNodeId(target);
         if (!nodes.has(to))
           nodes.set(to, {
             id: to,
             kind: 'api',
             label: name,
-            detail: libraries.get(name.toLowerCase()) ?? '',
+            detail: declared?.library ?? '',
             file: null,
             relativePath: null,
             procedureKind: null,
@@ -264,6 +277,7 @@ export function buildProcedureGraph(
             dynamicSql: 0,
             callers: 0,
             callees: 0,
+            candidate: false,
           });
       } else if (procedureNode(target)) to = target;
       if (to === null || !procedureNode(call.from)) continue;
@@ -297,6 +311,7 @@ export function buildProcedureGraph(
           dynamicSql: 0,
           callers: 0,
           callees: 0,
+          candidate: false,
         });
       const tableEdge = edge('table', from, to, access.line);
       tableEdge.count += 1;
@@ -322,8 +337,10 @@ export function buildProcedureGraph(
     edges: [...edges.values()],
     tableView,
     ownProcedures: list.filter((node) => node.kind === 'own-procedure').length,
-    sharedProcedures: list.filter((node) => node.kind === 'shared-procedure')
-      .length,
+    // Reached through a resolved call; ambiguous candidates are not counted.
+    sharedProcedures: list.filter(
+      (node) => node.kind === 'shared-procedure' && !node.candidate,
+    ).length,
   };
 }
 

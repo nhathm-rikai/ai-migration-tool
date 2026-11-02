@@ -41,9 +41,14 @@ import {
 } from './procedure-graph';
 import { procedureLayoutRequest } from './procedure-graph-layout';
 import { useGraphLayout } from './use-graph-layout';
-import { ICON, IconButton, useFloatingHost } from './graph-frame';
+import {
+  ICON,
+  IconButton,
+  useFloatingHost,
+  useModalFocus,
+} from './graph-frame';
 
-// Call graph tab of the program detail (UI04): the program's procedures,
+// Call graph tab of the program detail (UI03-EXT01): the program's procedures,
 // the shared procedures they reach, the native APIs they call and the
 // tables they access, on the same React Flow canvas and ELK worker as the
 // project graph (UI03). Clicking a procedure (or picking it in the search or
@@ -244,6 +249,10 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
     if (event.key === 'Escape' && !expanded) setFocus(null);
   };
 
+  // Before useFloatingHost: the focused element is noted before the host
+  // moves (moving it drops the focus).
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus(expanded, dialogRef);
   const { slot, host } = useFloatingHost(expanded);
   const content = (
     <>
@@ -255,6 +264,8 @@ function GraphTab({ graph }: { graph: ProcedureGraph }) {
         />
       )}
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`dep-graph-tab proc-graph-tab${expanded ? ' dep-graph-expanded' : ''}`}
         onKeyDown={onKeyDown}
         {...(expanded
@@ -531,6 +542,9 @@ const ProcedureFlowNode = memo(function ProcedureFlowNode({
         <span className="dep-node-type">
           {nodeType(node, copy)}
           {shared && <span className="dep-node-state">{copy.shared}</span>}
+          {node.candidate && (
+            <span className="dep-node-state">{copy.candidate}</span>
+          )}
           {(node.file ?? (node.kind === 'api' ? node.detail : '')) && (
             <span className="proc-node-file mono">
               {node.file ?? node.detail}
@@ -703,6 +717,7 @@ function FocusCard({
           <dd>{number(node.callers)}</dd>
         </div>
       </dl>
+      {node.candidate && <p className="notice">{copy.candidateNote}</p>}
       {node.dynamicSql > 0 && (
         <p className="notice">{copy.dynamicSql(number(node.dynamicSql))}</p>
       )}

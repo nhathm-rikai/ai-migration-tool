@@ -9,3 +9,5 @@ docs/
 .cursor/
 AGENTS.md
 CLAUDE.md
+# License texts are copied verbatim.
+apps/web/public/licenses/

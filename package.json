@@ -15,7 +15,7 @@
   "packageManager": "npm@12.0.2",
   "scripts": {
     "dev": "npm run build -w @portal/contracts && npm run dev -w @portal/api",
-    "build": "npm run build -w @portal/contracts && npm run build -w @portal/api && npm run build -w @portal/web",
+    "build": "npm run build -w @portal/contracts && npm run build -w @portal/api && npm run build -w @portal/web && node scripts/check-build-notices.mjs",
     "start": "npm run start -w @portal/api",
     "typecheck": "npm run build -w @portal/contracts && npm run typecheck --workspaces && tsc -p tests/e2e",
     "lint": "npm run build -w @portal/contracts && eslint apps/api packages/contracts apps/web tests/e2e",

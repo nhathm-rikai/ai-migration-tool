@@ -399,6 +399,14 @@ describe('C01-AC03 inventory compatibility', () => {
     ['mapped', fixtures.mappedInventoryFixture],
     ['unmapped (written before mapping)', fixtures.unmappedInventoryFixture],
     ['partial', fixtures.partialInventoryFixture],
+    [
+      'synthetic corpus',
+      fixtures.syntheticCorpusFixture({
+        programs: 300,
+        sharedModules: 30,
+        tables: 200,
+      }),
+    ],
   ])('accepts the %s inventory', (_name, inventory) => {
     expectValid(SourceInventorySchema, inventory);
   });

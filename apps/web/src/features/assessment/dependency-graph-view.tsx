@@ -356,6 +356,10 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     setFocus(null);
   };
 
+  // Before useFloatingHost: the focused element is noted before the host
+  // moves (moving it drops the focus).
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus(expanded, dialogRef);
   const { slot, host } = useFloatingHost(expanded);
   const content = (
     <>
@@ -367,6 +371,8 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
         />
       )}
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`dep-graph-tab${expanded ? ' dep-graph-expanded' : ''}`}
         onKeyDown={onKeyDown}
         {...(expanded
@@ -505,7 +511,12 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
               onClear={() => setFocus(null)}
             />
           )}
-          <CommonPanel graph={graph} copy={copy} onFocus={reveal} />
+          <CommonPanel
+            graph={graph}
+            copy={copy}
+            showCommon={showCommon}
+            onFocus={reveal}
+          />
         </aside>
       </div>
     </>
@@ -592,7 +603,7 @@ function IconButton({
 // to <body> for full screen (a fixed overlay inside the page would be
 // clipped by the panels around it). Moving the element, not the React
 // tree, keeps the canvas and its layout mounted.
-function useFloatingHost(floating: boolean) {
+export function useFloatingHost(floating: boolean) {
   const slot = useRef<HTMLDivElement>(null);
   const [host] = useState(() => document.createElement('div'));
   useLayoutEffect(() => {
@@ -601,6 +612,65 @@ function useFloatingHost(floating: boolean) {
   }, [floating, host]);
   useLayoutEffect(() => () => host.remove(), [host]);
   return { slot, host };
+}
+
+const FOCUSABLE =
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+// A full-screen graph is a modal dialog: focus moves into it, Tab and
+// Shift+Tab stay inside, the page behind is inert (no clicks, no focus, not
+// read out), and focus returns to where it was when it closes. Call it
+// before useFloatingHost, whose move of the host drops the focus.
+export function useModalFocus(
+  active: boolean,
+  dialog: { readonly current: HTMLElement | null },
+) {
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (active)
+      opener.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+  }, [active]);
+  useEffect(() => {
+    const element = dialog.current;
+    if (!active || !element) return;
+    const back = opener.current;
+    const root = document.getElementById('root');
+    root?.setAttribute('inert', '');
+    const focusables = () =>
+      // Elements in a hidden panel cannot take focus.
+      [...element.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (item) => !item.closest('[hidden]'),
+      );
+    (focusables()[0] ?? element).focus();
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const items = focusables();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
+      const current = document.activeElement;
+      const outside = !(current instanceof Node) || !element.contains(current);
+      if (event.shiftKey && (current === first || outside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (current === last || outside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      root?.removeAttribute('inert');
+      if (back?.isConnected) back.focus();
+    };
+  }, [active, dialog]);
 }
 
 // Boxes that have members in this graph (no table box without tables).
@@ -1157,10 +1227,13 @@ const COMMON_SHOWN = 8;
 function CommonPanel({
   graph,
   copy,
+  showCommon,
   onFocus,
 }: {
   graph: DependencyGraph;
   copy: Copy;
+  // Common modules are drawn: none of them is hidden.
+  showCommon: boolean;
   onFocus: (id: string) => void;
 }) {
   const number = useNumber();
@@ -1187,7 +1260,7 @@ function CommonPanel({
                   <span className="mono">{node.label}</span>
                   <span className="mono muted">
                     {number(node.fanIn)}
-                    {node.common && <> · {copy.commonHidden}</>}
+                    {node.common && !showCommon && <> · {copy.commonHidden}</>}
                   </span>
                 </span>
                 <span className="dep-common-bar" aria-hidden="true">

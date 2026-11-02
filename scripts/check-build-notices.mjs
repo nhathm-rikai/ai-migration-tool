@@ -59,6 +59,21 @@ const assets = existsSync(join(dist, 'assets'))
   : [];
 if (!assets.some((file) => /^elk-worker\.min-.*\.js$/.test(file)))
   problems.push('The ELK worker named in the notice is not in the build.');
+// The elkjs API sits in its own chunk (vite.config.ts) and only there.
+const apiChunks = assets.filter((file) => /^elk-api-.*\.js$/.test(file));
+if (apiChunks.length !== 1)
+  problems.push('The elk-api chunk named in the notice is not in the build.');
+if (notice && !notice.includes('assets/elk-api-*.js'))
+  problems.push('The notice does not name the elk-api chunk.');
+for (const file of assets.filter(
+  (name) => name.endsWith('.js') && !/^elk-(api|worker\.min)-/.test(name),
+))
+  if (
+    readFileSync(join(dist, 'assets', file), 'utf8').includes(
+      'Missing mandatory parameter',
+    )
+  )
+    problems.push(`elkjs API code is in ${file}, not in the elk-api chunk.`);
 
 if (problems.length > 0) {
   for (const problem of problems) console.error(`[notices] ${problem}`);

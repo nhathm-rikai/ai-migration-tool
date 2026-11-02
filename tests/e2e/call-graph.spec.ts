@@ -225,6 +225,26 @@ test(
     await assessment.getByRole('button', { name: 'Xem toàn màn hình' }).click();
     const dialog = page.getByRole('dialog', { name: 'Call graph toàn dự án' });
     await expect(dialog).toBeVisible();
+    // A modal: focus moves in, Tab and Shift+Tab stay inside, the page
+    // behind is inert.
+    await expect(dialog.getByLabel('Tìm program, module, bảng')).toBeFocused();
+    const insideDialog = () =>
+      page.evaluate(
+        () =>
+          document.activeElement?.closest('[role="dialog"]') !== null &&
+          document.activeElement !== document.body,
+      );
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await insideDialog()).toBe(true);
+    }
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Tab');
+      expect(await insideDialog()).toBe(true);
+    }
+    expect(
+      await page.evaluate(() => document.getElementById('root')?.inert),
+    ).toBe(true);
     const viewport = page.viewportSize();
     const box = await dialog.boundingBox();
     if (!viewport || !box) throw new Error('no box');
@@ -346,6 +366,10 @@ test(
     expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(2);
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
+    // Focus is given back to the button that opened full screen.
+    await expect(
+      assessment.getByRole('button', { name: 'Xem toàn màn hình' }),
+    ).toBeFocused();
     await expect(
       assessment.getByRole('group', { name: 'Call graph toàn dự án' }),
     ).toBeVisible();

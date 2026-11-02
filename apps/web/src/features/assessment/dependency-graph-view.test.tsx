@@ -313,4 +313,61 @@ describe('UI03 call graph tab', () => {
     ).toHaveLength(2);
     expect(screen.queryByRole('list', { name: 'Đang mở' })).toBeNull();
   });
+
+  it('keeps focus inside full screen and gives it back on close', () => {
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.append(root);
+    try {
+      renderWithLibrary(
+        <LocaleProvider>
+          <button>outside</button>
+          <DependencyGraphView inventory={corpus} />
+        </LocaleProvider>,
+        { container: root },
+      );
+      const open = screen.getByRole('button', { name: 'Xem toàn màn hình' });
+      open.focus();
+      fireEvent.click(open);
+      const dialog = screen.getByRole('dialog', {
+        name: 'Call graph toàn dự án',
+      });
+      // Focus moved in, the page behind is inert.
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).toBe(
+        within(dialog).getByLabelText('Tìm program, module, bảng'),
+      );
+      expect(root.hasAttribute('inert')).toBe(true);
+      // Shift+Tab from the first control wraps to the last one, Tab back.
+      fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement).not.toBe(
+        within(dialog).getByLabelText('Tìm program, module, bảng'),
+      );
+      fireEvent.keyDown(document, { key: 'Tab' });
+      expect(document.activeElement).toBe(
+        within(dialog).getByLabelText('Tìm program, module, bảng'),
+      );
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(root.hasAttribute('inert')).toBe(false);
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Xem toàn màn hình' }),
+      );
+    } finally {
+      root.remove();
+    }
+  });
+
+  it('no longer marks common modules hidden once they are shown', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    const panel = screen.getByRole('complementary', {
+      name: 'Common module (fan-in)',
+    });
+    expect(within(panel).getAllByText(/đang ẩn/).length).toBeGreaterThan(0);
+    fireEvent.click(
+      screen.getByLabelText('Hiện module hầu hết program đều dùng (2)'),
+    );
+    expect(within(panel).queryByText(/đang ẩn/)).toBeNull();
+  });
 });

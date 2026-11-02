@@ -20,8 +20,8 @@ Full license text: EPL-2.0.md (in this folder), as shipped in the elkjs
 https://www.eclipse.org/legal/epl-2.0/
 
 Files of this build that contain elkjs: assets/elk-worker.min-*.js (ELK
-layout worker) and the elkjs API code inside
-assets/dependency-graph-view-*.js. They are used unmodified, as published.
+layout worker) and assets/elk-api-*.js (elkjs API). They are used
+unmodified, as published.
 
 The Program is provided "AS IS", without warranties or conditions of any
 kind (EPL-2.0 section 5), and the Contributors have no liability for it

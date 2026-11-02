@@ -896,7 +896,8 @@ describe('Scan progress per file (PF08)', () => {
     expect(screen.getByText('3 / 10 file')).toBeTruthy();
     expect(screen.getByText('3.0 MB')).toBeTruthy();
     expect(screen.getByText('File đang đọc')).toBeTruthy();
-    expect(screen.getByText('programs/A/FORM1.FRM')).toBeTruthy();
+    // Lines of a report come in one after the other.
+    expect(await screen.findByText('programs/A/FORM1.FRM')).toBeTruthy();
   });
 
   it('F05-AC04 shows no number while the folder is still being listed', async () => {

@@ -10,8 +10,8 @@ import type { FolderPicker } from '../../ports/folder-picker.js';
 // argv: nothing from a request reaches the command line, there is no shell,
 // and the chosen path is neither logged nor written anywhere.
 //
-// - Windows: Windows PowerShell in STA mode, WinForms FolderBrowserDialog
-//   owned by a topmost form so it opens in front. The path goes back as
+// - Windows: Windows PowerShell in STA mode, the Explorer folder dialog
+//   (IFileOpenDialog) owned by a topmost form so it opens in front. The path goes back as
 //   base64 of UTF-8 so console code pages cannot change it.
 // - macOS: osascript `choose folder` (cancel exits 1 with error -128).
 // - Linux: zenity, else kdialog (cancel exits 1).
@@ -31,25 +31,91 @@ export type DialogCommand = {
 type DialogOutcome =
   { status: 'selected'; path: string } | { status: 'cancelled' };
 
+// The Explorer-style folder dialog of Windows Vista+ (IFileOpenDialog with
+// FOS_PICKFOLDERS: address bar, search, navigation pane), declared through
+// COM interop because Windows PowerShell 5.1 has no managed wrapper for it.
+// Only the methods up to GetResult are declared, in vtable order.
+const WINDOWS_DIALOG_TYPE = `
+using System;
+using System.Runtime.InteropServices;
+public static class PortalFolderDialog {
+  [ComImport, Guid("DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7")]
+  private class FileOpenDialog {}
+  [ComImport, Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE"),
+   InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  private interface IShellItem {
+    void BindToHandler(IntPtr pbc, ref Guid bhid, ref Guid riid, out IntPtr ppv);
+    void GetParent(out IShellItem parent);
+    void GetDisplayName(uint sigdn, [MarshalAs(UnmanagedType.LPWStr)] out string name);
+  }
+  [ComImport, Guid("42f85136-db7e-439c-85f1-e4075d135fc8"),
+   InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+  private interface IFileDialog {
+    [PreserveSig] int Show(IntPtr owner);
+    void SetFileTypes(uint count, IntPtr types);
+    void SetFileTypeIndex(uint index);
+    void GetFileTypeIndex(out uint index);
+    void Advise(IntPtr events, out uint cookie);
+    void Unadvise(uint cookie);
+    void SetOptions(uint options);
+    void GetOptions(out uint options);
+    void SetDefaultFolder(IShellItem item);
+    void SetFolder(IShellItem item);
+    void GetFolder(out IShellItem item);
+    void GetCurrentSelection(out IShellItem item);
+    void SetFileName([MarshalAs(UnmanagedType.LPWStr)] string name);
+    void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string name);
+    void SetTitle([MarshalAs(UnmanagedType.LPWStr)] string title);
+    void SetOkButtonLabel([MarshalAs(UnmanagedType.LPWStr)] string label);
+    void SetFileNameLabel([MarshalAs(UnmanagedType.LPWStr)] string label);
+    void GetResult(out IShellItem item);
+  }
+  private const uint FOS_PICKFOLDERS = 0x20;
+  private const uint FOS_FORCEFILESYSTEM = 0x40;
+  private const uint FOS_PATHMUSTEXIST = 0x800;
+  private const uint SIGDN_FILESYSPATH = 0x80058000;
+  private const int ERROR_CANCELLED = unchecked((int)0x800704C7);
+  // The chosen folder, or null when the dialog was cancelled.
+  public static string Pick(IntPtr owner) {
+    IFileDialog dialog = (IFileDialog)new FileOpenDialog();
+    uint options;
+    dialog.GetOptions(out options);
+    dialog.SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST);
+    int result = dialog.Show(owner);
+    if (result == ERROR_CANCELLED) return null;
+    Marshal.ThrowExceptionForHR(result);
+    IShellItem item;
+    dialog.GetResult(out item);
+    string path;
+    item.GetDisplayName(SIGDN_FILESYSPATH, out path);
+    return path;
+  }
+}
+`;
+
 const WINDOWS_SCRIPT = [
   "$ErrorActionPreference = 'Stop'",
   'Add-Type -AssemblyName System.Windows.Forms',
+  "Add-Type -TypeDefinition @'",
+  WINDOWS_DIALOG_TYPE.trim(),
+  "'@",
+  // A topmost owner window keeps the dialog in front of the browser.
   '$owner = New-Object System.Windows.Forms.Form',
   '$owner.TopMost = $true',
   '$owner.ShowInTaskbar = $false',
-  '$dialog = New-Object System.Windows.Forms.FolderBrowserDialog',
-  '$dialog.ShowNewFolderButton = $false',
-  'if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) {',
-  "  'OK:' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($dialog.SelectedPath))",
+  '$path = [PortalFolderDialog]::Pick($owner.Handle)',
+  '$owner.Dispose()',
+  'if ($path) {',
+  "  'OK:' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($path))",
   '} else {',
   "  'CANCEL'",
   '}',
-  '$owner.Dispose()',
 ].join('\n');
 
 function windowsCommand(): DialogCommand {
   return {
     file: 'powershell.exe',
+    // The script goes as UTF-16LE base64: no quoting of the C# source.
     args: [
       '-NoLogo',
       '-NoProfile',
@@ -57,8 +123,8 @@ function windowsCommand(): DialogCommand {
       '-STA',
       '-ExecutionPolicy',
       'Bypass',
-      '-Command',
-      WINDOWS_SCRIPT,
+      '-EncodedCommand',
+      Buffer.from(WINDOWS_SCRIPT, 'utf16le').toString('base64'),
     ],
     parse({ code, stdout }) {
       const line = stdout.trim();

@@ -8,6 +8,12 @@ Nhật ký độc lập của repo sản phẩm. Sau implement/quyết định k
 - Đã có [FE Projects](../../apps/web/README.md) gọi API thật, demo/local và source registration/snapshot PF05; bảo vệ HTTP local + credential UI theo [local-http-security](specs/local-http-security.md), instance lock PF04. Demo run dùng executor fixture; local run đọc revision đã khóa để chụp nguồn. Artifact store/read API và Assessment overview/program list có từ PF06 (B07/F03); demo run công bố inventory mẫu. Từ PF07 local run chạy thư viện Analyze tĩnh trên snapshot trong worker thread và công bố inventory (B08); chi tiết program LoC/CRUD/calls (F04). Chưa Understand, Claude CLI, nghiệm thu LIVE/MS1 hoặc conversion.
 - Runtime mục tiêu Windows/macOS/Linux; hiện chỉ kiểm native trên Windows x64, Node 24.16.0/npm 12.0.2.
 
+## 02/11/2026 — UI04/UI05/PF08: phản hồi người dùng vòng 3
+
+- Hộp thoại chọn thư mục trên Windows đổi từ `FolderBrowserDialog` kiểu cây sang hộp thoại Explorer (`IFileOpenDialog` + `FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM | FOS_PATHMUSTEXIST`, khai báo COM qua `Add-Type`; script gửi bằng `-EncodedCommand` UTF-16LE). Nút là “Select Folder”, không upload. Smoke native Windows 11 x64: Esc → `cancelled`, Enter → `selected` path tuyệt đối, abort → đóng hộp thoại, không còn process; ảnh chụp hộp thoại thật. `Add-Type` biên dịch mỗi lần mở (~1–2 s).
+- “File đang đọc” không còn giật: `use-file-feed.ts` lấy các đường dẫn mới của mỗi báo cáo (≤ 5 lần/giây) và hiện từng dòng trong khoảng giữa hai báo cáo, mỗi dòng giữ key nên chỉ dòng mới trượt vào, tối đa 6 dòng; chỉ hiện đường dẫn backend báo, không bịa. Test: tách đường dẫn mới, hiện lần lượt/giữ key/tối đa 6, đổi run thì làm lại.
+- Kiểm chứng: lint, typecheck, web 227 test, adapter picker 9 test, `npm run e2e` 11/11.
+
 ## 02/11/2026 — PF08: SSE và tiến độ theo file cho thẻ quét
 
 - Hướng B của người dùng (thread UI04), nhánh `feat/ui04-source-step` sau UI05 `364a063`. Không thêm dependency.

@@ -13,6 +13,7 @@ import {
   type AnalyzeRunsControl,
   type RunAction,
 } from './use-analyze-runs';
+import { useFileFeed } from './use-file-feed';
 
 // Scan card of the source step, as the demo02 drop zone without drag and
 // drop: choose a folder → folder chosen (Quét source / Đổi thư mục) →
@@ -318,16 +319,7 @@ export function ScanStage({
                   </span>
                 )}
               </h3>
-              <ul>
-                {progress.recentPaths.map((path, index) => (
-                  <li key={`${index}:${path}`}>
-                    <span className={`file-ext ext-${extensionOf(path)}`}>
-                      {extensionOf(path)}
-                    </span>
-                    <span className="file-path">{path}</span>
-                  </li>
-                ))}
-              </ul>
+              <FileFeed runId={current.id} paths={progress.recentPaths} />
             </section>
           ) : (
             <section
@@ -398,6 +390,29 @@ function extensionOf(path: string): string {
   const name = path.split('/').pop() ?? path;
   const dot = name.lastIndexOf('.');
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : 'file';
+}
+
+// The latest files read, one line after the other (see use-file-feed.ts).
+function FileFeed({
+  runId,
+  paths,
+}: {
+  runId: string;
+  paths: readonly string[];
+}) {
+  const lines = useFileFeed(runId, paths);
+  return (
+    <ul>
+      {lines.map(({ key, path }) => (
+        <li key={key}>
+          <span className={`file-ext ext-${extensionOf(path)}`}>
+            {extensionOf(path)}
+          </span>
+          <span className="file-path">{path}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function FolderChip({ name }: { name: string }) {

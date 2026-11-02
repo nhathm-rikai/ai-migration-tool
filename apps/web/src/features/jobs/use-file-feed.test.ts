@@ -1,10 +1,32 @@
 import { act, renderHook } from '@testing-library/react';
+import { createElement, StrictMode, type PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FILE_FEED_SIZE, newPaths, useFileFeed } from './use-file-feed';
 
 describe('file feed of the scan card (PF08)', () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('continues draining after StrictMode replays effects and receives later reports', async () => {
+    vi.useFakeTimers();
+    let paths = ['first.bas', 'second.bas', 'third.bas'];
+    const view = renderHook(() => useFileFeed('run-1', paths), {
+      wrapper: ({ children }: PropsWithChildren) =>
+        createElement(StrictMode, null, children),
+    });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(view.result.current.map((line) => line.path)).toEqual(paths);
+    paths = ['fourth.bas', 'fifth.bas', 'sixth.bas', 'seventh.bas'];
+    view.rerender();
+    await act(() => vi.advanceTimersByTimeAsync(400));
+    expect(view.result.current.map((line) => line.path)).toEqual([
+      'second.bas',
+      'third.bas',
+      ...paths,
+    ]);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('finds the paths a report adds after the last one shown', () => {
@@ -18,6 +40,7 @@ describe('file feed of the scan card (PF08)', () => {
     vi.useFakeTimers();
     let paths = ['a', 'b', 'c'];
     const { result, rerender } = renderHook(() => useFileFeed('run-1', paths));
+    await act(() => vi.advanceTimersByTimeAsync(0));
     // The first line at once, the others within the next interval.
     expect(result.current.map((line) => line.path)).toEqual(['a']);
     await act(() => vi.advanceTimersByTimeAsync(70));

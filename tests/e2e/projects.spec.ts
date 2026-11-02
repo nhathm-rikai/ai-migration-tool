@@ -39,6 +39,38 @@ test(
     // name).
     const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
     await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    const firstCard = recent
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.hover();
+    // The hover lift must stay inside the scrolling list (including its
+    // top border), rather than being clipped at the first row.
+    await expect
+      .poll(async () =>
+        firstCard.evaluate((card) => {
+          const list = card.closest('.recent-list');
+          if (!list) return false;
+          return (
+            card.getBoundingClientRect().top >= list.getBoundingClientRect().top
+          );
+        }),
+      )
+      .toBe(true);
+    // Wait for the hover transition before checking the final geometry too.
+    await expect(firstCard).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
+    expect(
+      await firstCard.evaluate((card) => {
+        const list = card.closest('.recent-list');
+        return (
+          list !== null &&
+          card.getBoundingClientRect().top >= list.getBoundingClientRect().top
+        );
+      }),
+    ).toBe(true);
+    await page.screenshot({
+      path: `${process.env.E2E_OUTPUT_DIR}/ui04-recent-hover.png`,
+    });
     await recent
       .getByRole('link', { name: new RegExp(seedName) })
       .first()

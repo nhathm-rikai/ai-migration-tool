@@ -3383,10 +3383,10 @@ details.technical[open] > summary {
   border-radius: 10px;
   background: var(--surface);
 }
-.recent-list {
+.recent-projects .recent-list {
   max-height: calc(100vh - 260px);
   overflow-y: auto;
-  padding: 2px 4px 2px 0;
+  padding: 4px;
 }
 .recent-heading .button {
   flex: none;

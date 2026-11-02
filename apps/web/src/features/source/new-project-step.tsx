@@ -6,6 +6,7 @@ import {
   UpdateProjectSchema,
   type Project,
   type ProjectSource,
+  type StartRunInput,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
 import type { ProjectsApi } from '../../shared/api/projects-api';
@@ -19,6 +20,8 @@ import {
   type PickerState,
 } from './source-step';
 import { sourceErrorMessage } from './source-messages';
+import { ApiError } from '../../shared/api/api-error';
+import { runRequestErrorMessage } from '../jobs/run-messages';
 
 // Step 1 of a new project (UI04): the same scan card and project
 // information as an existing project, with nothing stored until "Quét
@@ -70,7 +73,7 @@ export function NewProjectStep({
     rootPath: false,
   });
   const [error, setError] = useState<{
-    on: 'project' | 'source';
+    on: 'project' | 'source' | 'start';
     error: unknown;
   } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,6 +81,8 @@ export function NewProjectStep({
   const registered = useRef<ProjectSource | null>(null);
   const busy = useRef(false);
   const mutation = useRef<AbortController | null>(null);
+  const intent = useRef<{ key: string; input: StartRunInput } | null>(null);
+  const [uncertainStart, setUncertainStart] = useState(false);
   useEffect(() => () => mutation.current?.abort(), []);
 
   function acceptFolder(path: string) {
@@ -136,6 +141,13 @@ export function NewProjectStep({
   }
 
   function scan() {
+    // An unconfirmed Start must be retried before any project/source edits;
+    // these would otherwise change the body or create another revision.
+    if (intent.current && created.current) {
+      const project = created.current;
+      void exclusive((signal) => start(project, signal));
+      return;
+    }
     const trimmed = name.trim();
     const errors: FieldErrors = {
       name: !Check(UpdateProjectSchema, { name: trimmed }),
@@ -184,26 +196,40 @@ export function NewProjectStep({
         if (!signal.aborted) setError({ on: 'source', error: failure });
         return;
       }
-      // The first run; its step 1 follows it (or offers "Quét source" again
-      // if it could not start).
-      if (source.kind === 'local' && source.status === 'ready')
-        await runsApi
-          .start(
-            project.id,
-            newKey(),
-            {
-              kind: 'analyze',
-              source: {
-                strategy: 'current-source',
-                expectedSourceRevision: source.revision,
-              },
-              retryOfRunId: null,
+      if (source.kind === 'local' && source.status === 'ready') {
+        intent.current = {
+          key: newKey(),
+          input: {
+            kind: 'analyze',
+            source: {
+              strategy: 'current-source',
+              expectedSourceRevision: source.revision,
             },
-            signal,
-          )
-          .catch(() => undefined);
-      if (!signal.aborted) onCreated(project);
+            retryOfRunId: null,
+          },
+        };
+        await start(project, signal);
+      } else if (!signal.aborted) onCreated(project);
     });
+  }
+
+  async function start(project: Project, signal: AbortSignal) {
+    const next = intent.current;
+    if (!next) return;
+    setError(null);
+    try {
+      await runsApi.start(project.id, next.key, next.input, signal);
+      if (signal.aborted) return;
+      intent.current = null;
+      setUncertainStart(false);
+      onCreated(project);
+    } catch (failure) {
+      if (signal.aborted) return;
+      const unknown = failure instanceof ApiError && failure.outcomeUnknown;
+      if (!unknown) intent.current = null;
+      setUncertainStart(unknown);
+      setError({ on: 'start', error: failure });
+    }
   }
 
   const choosing = folder === null;
@@ -271,11 +297,15 @@ export function NewProjectStep({
                   <circle cx="11" cy="11" r="7" />
                   <path d="M20 20l-3.5-3.5" />
                 </svg>
-                {saving ? messages.runs.starting : copy.hero.scan}
+                {saving
+                  ? messages.runs.starting
+                  : uncertainStart
+                    ? messages.runs.resend
+                    : copy.hero.scan}
               </button>
               <button
                 className="button large"
-                disabled={saving}
+                disabled={saving || uncertainStart}
                 onClick={pickFolder}
               >
                 {picker.status === 'pending'
@@ -289,12 +319,19 @@ export function NewProjectStep({
               {sourceErrorMessage(error.error, messages)}
             </p>
           )}
+          {error?.on === 'start' && (
+            <p role="alert" className="error">
+              {uncertainStart
+                ? messages.runs.startUncertain
+                : runRequestErrorMessage(error.error, messages)}
+            </p>
+          )}
         </section>
         <ProjectInfoPanel
           name={name}
           language={language}
           invalid={invalid}
-          disabled={saving}
+          disabled={saving || uncertainStart}
           error={error?.on === 'project' ? error.error : null}
           onName={(value) => {
             setName(value);

@@ -4,6 +4,7 @@ import {
   RunSchema,
   type Run,
   type RunEvent,
+  type RunProgress,
   type RunStatus,
   type StartRunInput,
 } from '@portal/contracts';
@@ -20,6 +21,25 @@ export const RUN_POLL_INTERVAL_MS = 1000;
 export const RUN_POLL_MAX_INTERVAL_MS = 8000;
 // Reconnects of a broken event stream before polling alone remains.
 export const RUN_EVENT_MAX_RECONNECTS = 5;
+const PROGRESS_PHASES: readonly RunProgress['phase'][] = [
+  'listing',
+  'snapshot',
+  'inventory',
+  'publish',
+];
+
+function progressRegresses(previous: RunProgress, next: RunProgress): boolean {
+  const from = PROGRESS_PHASES.indexOf(previous.phase);
+  const to = PROGRESS_PHASES.indexOf(next.phase);
+  return (
+    to < from ||
+    (to === from &&
+      (next.filesSnapshotted < previous.filesSnapshotted ||
+        next.filesAnalyzed < previous.filesAnalyzed ||
+        next.bytesDone < previous.bytesDone ||
+        (previous.filesTotal !== null && next.filesTotal === null)))
+  );
+}
 
 export function isActiveRun(status: RunStatus): boolean {
   return (ACTIVE_RUN_STATUSES as readonly RunStatus[]).includes(status);
@@ -36,6 +56,14 @@ export function newerRun(existing: Run | null, incoming: Run): Run {
       : existing;
   if (existing.stateVersion !== incoming.stateVersion)
     return incoming.stateVersion > existing.stateVersion ? incoming : existing;
+  // Progress changes do not increment stateVersion/updatedAt. Retain the
+  // whole report together so phase, counts, paths and percentage agree.
+  if (
+    existing.progress &&
+    (!incoming.progress ||
+      progressRegresses(existing.progress, incoming.progress))
+  )
+    return existing;
   return Date.parse(incoming.updatedAt) >= Date.parse(existing.updatedAt)
     ? incoming
     : existing;
@@ -98,6 +126,7 @@ export function useAnalyzeRuns(
   const intent = useRef<StartIntent | null>(null);
   // The event stream of the active run is open (polling slows down).
   const streaming = useRef(false);
+  const eventGeneration = useRef(0);
   // The current run as last shown, for comparing incoming events.
   const latest = useRef<Run | null>(null);
   useEffect(() => {
@@ -109,17 +138,40 @@ export function useAnalyzeRuns(
   useEffect(() => () => mutation.current?.abort(), []);
 
   const refresh = useCallback(() => setReload((value) => value + 1), []);
-  const apply = useCallback((run: Run) => {
-    setState((previous) =>
-      previous.status === 'ready'
-        ? { ...previous, current: newerRun(previous.current, run) }
-        : previous,
-    );
-  }, []);
+  const merge = useCallback(
+    (known: Run | null, run: Run, readGeneration?: number) => {
+      // A GET captured before an accepted event cannot replace that report,
+      // even when all timestamps/counters tie. New state versions still win
+      // (in particular a terminal GET after a stream interruption).
+      if (
+        known?.id === run.id &&
+        known.stateVersion === run.stateVersion &&
+        readGeneration !== undefined &&
+        readGeneration !== eventGeneration.current
+      )
+        return known;
+      return newerRun(known, run);
+    },
+    [],
+  );
+  const apply = useCallback(
+    (run: Run, readGeneration?: number) => {
+      setState((previous) =>
+        previous.status === 'ready'
+          ? {
+              ...previous,
+              current: merge(previous.current, run, readGeneration),
+            }
+          : previous,
+      );
+    },
+    [merge],
+  );
 
   // Current run + first history page; again after every explicit reload.
   useEffect(() => {
     const controller = new AbortController();
+    const readGeneration = eventGeneration.current;
     setState((previous) =>
       previous.status === 'ready' ? previous : { status: 'loading' },
     );
@@ -135,7 +187,9 @@ export function useAnalyzeRuns(
           const known = previous.status === 'ready' ? previous.current : null;
           return {
             status: 'ready',
-            current: current.run ? newerRun(known, current.run) : known,
+            current: current.run
+              ? merge(known, current.run, readGeneration)
+              : known,
             history: page.items,
             nextCursor: page.nextCursor,
           };
@@ -149,7 +203,7 @@ export function useAnalyzeRuns(
       },
     );
     return () => controller.abort();
-  }, [api, projectId, reload]);
+  }, [api, projectId, reload, merge]);
 
   // Bounded polling of the active run: GET only, backoff on failure, stops at
   // a terminal state and on unmount/project switch.
@@ -168,12 +222,13 @@ export function useAnalyzeRuns(
       // While the event stream is open, polling is only a slow safety net.
       const wait = streaming.current ? RUN_POLL_MAX_INTERVAL_MS : delay;
       timer = setTimeout(() => {
+        const readGeneration = eventGeneration.current;
         api.get(projectId, tracked, controller.signal).then(
           (run) => {
             if (controller.signal.aborted) return;
             setConnectionLost(false);
             delay = RUN_POLL_INTERVAL_MS;
-            apply(run);
+            apply(run, readGeneration);
             if (isActiveRun(run.status)) schedule();
             // Terminal: refresh the history once.
             else refresh();
@@ -204,15 +259,18 @@ export function useAnalyzeRuns(
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
-    const resync = () =>
-      api.get(projectId, tracked, controller.signal).then(
+    const resync = () => {
+      const readGeneration = eventGeneration.current;
+      return api.get(projectId, tracked, controller.signal).then(
         (run) => {
           if (controller.signal.aborted) return;
-          apply(run);
+          apply(run, readGeneration);
           if (!isActiveRun(run.status)) refresh();
         },
         () => undefined,
       );
+    };
+    let connection = 0;
     const onEvent = (event: RunEvent) => {
       if (controller.signal.aborted || event.runId !== tracked) return;
       streaming.current = true;
@@ -221,6 +279,7 @@ export function useAnalyzeRuns(
       const shown = latest.current;
       if (!shown || shown.id !== event.runId) return;
       if (event.stateVersion < shown.stateVersion) return;
+      eventGeneration.current++;
       if (event.stateVersion > shown.stateVersion) {
         void resync();
         return;
@@ -229,13 +288,30 @@ export function useAnalyzeRuns(
       if (patched) apply(patched);
     };
     const connect = () => {
-      api.events(projectId, tracked, controller.signal, onEvent).then(
+      const activeConnection = ++connection;
+      // The backend resets sequence when its last subscriber disconnects.
+      let sequence = 0;
+      const receive = (event: RunEvent) => {
+        if (
+          activeConnection !== connection ||
+          event.runId !== tracked ||
+          event.sequence <= sequence
+        )
+          return;
+        sequence = event.sequence;
+        onEvent(event);
+      };
+      api.events(projectId, tracked, controller.signal, receive).then(
         () => {
+          if (activeConnection !== connection) return;
+          connection++;
           // Ended by the server: the run ended or the backend stops.
           streaming.current = false;
           if (!controller.signal.aborted) void resync();
         },
         () => {
+          if (activeConnection !== connection) return;
+          connection++;
           streaming.current = false;
           if (controller.signal.aborted) return;
           attempts++;

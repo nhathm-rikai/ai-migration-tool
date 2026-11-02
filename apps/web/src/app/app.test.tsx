@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { localSourceResponseFixture } from '@portal/contracts/fixtures';
+import {
+  localSourceResponseFixture,
+  queuedRunFixture,
+} from '@portal/contracts/fixtures';
 import { App } from './app';
 import {
   json,
@@ -152,7 +155,7 @@ it('keeps a pending first scan across a language switch, then opens the created 
       }),
     [`PUT /api/v1/projects/${localProject.id}/source`]: () =>
       json(localSourceResponseFixture),
-    [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
+    [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     [`GET /api/v1/projects/${localProject.id}`]: () => json(localProject),
   });
   render(<TestApp fetcher={fetcher} />);

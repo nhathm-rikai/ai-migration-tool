@@ -37,23 +37,20 @@ export function useFileFeed(
   });
   const queue = useRef<string[]>([]);
   const counter = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const previous = received.current;
     const sameRun = previous.runId === runId;
-    if (sameRun && previous.paths === paths) return;
     const fresh = sameRun ? newPaths(previous.paths, paths) : [...paths];
     received.current = { runId, paths };
     if (!sameRun) {
       queue.current = [];
-      clearTimeout(timer.current);
-      timer.current = undefined;
       setLines([]);
     }
-    if (fresh.length === 0) return;
     // A backlog longer than the list is never shown: keep the latest.
     queue.current = [...queue.current, ...fresh].slice(-FILE_FEED_SIZE);
+    if (queue.current.length === 0) return;
+    let timer: ReturnType<typeof setTimeout>;
     const step = Math.max(
       FEED_MIN_STEP_MS,
       Math.floor(FEED_SPREAD_MS / queue.current.length),
@@ -61,17 +58,19 @@ export function useFileFeed(
     const drain = () => {
       const path = queue.current.shift();
       if (path === undefined) {
-        timer.current = undefined;
         return;
       }
       counter.current += 1;
       const line = { key: counter.current, path };
       setLines((shown) => [...shown, line].slice(-FILE_FEED_SIZE));
-      timer.current = setTimeout(drain, step);
+      timer = setTimeout(drain, step);
     };
-    if (!timer.current) drain();
+    // Defer the first line too: StrictMode's setup → cleanup → setup must
+    // cancel only the timer, not consume the queue and leave a stale handle.
+    // Every setup resumes remaining real paths; each cleanup owns its timer.
+    timer = setTimeout(drain, 0);
+    return () => clearTimeout(timer);
   }, [runId, paths]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
   return lines;
 }

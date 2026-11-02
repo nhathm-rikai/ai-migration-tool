@@ -23,7 +23,7 @@ const TERMINAL: readonly RunStatus[] = TERMINAL_RUN_STATUSES;
 
 export function registerRunEventRoutes(
   instance: FastifyInstance,
-  service: JobService,
+  service: Pick<JobService, 'get'>,
   hub: RunEventHub,
 ): void {
   const app = instance.withTypeProvider<TypeBoxTypeProvider>();
@@ -36,23 +36,32 @@ export function registerRunEventRoutes(
       const raw = reply.raw;
       let open = true;
       let heartbeat: NodeJS.Timeout | undefined = undefined;
-      const finish = () => {
+      const finish = (slow = false) => {
         if (!open) return;
         open = false;
         clearInterval(heartbeat);
         unsubscribe?.();
-        raw.end();
+        if (slow) raw.destroy();
+        else raw.end();
+      };
+      // Do not enqueue another frame after write reports a full buffer.
+      // Drop this subscriber; the job continues and the UI can GET/reconnect.
+      const write = (frame: string) => {
+        if (open && !raw.write(frame)) finish(true);
       };
       const send = (event: RunEvent) => {
         if (!open) return;
-        raw.write(
+        write(
           `event: ${RUN_EVENT_NAME}\nid: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`,
         );
         if (TERMINAL.includes(event.status)) finish();
       };
       // Subscribed before the first event, so no commit falls in between;
       // hub events arrive on a later tick, after the headers below.
-      const unsubscribe = hub.subscribe(run.id, { event: send, end: finish });
+      const unsubscribe = hub.subscribe(run.id, {
+        event: send,
+        end: () => finish(),
+      });
       if (!unsubscribe) throw new AppError('RUN_EVENTS_LIMIT');
       reply.hijack();
       raw.writeHead(200, {
@@ -61,9 +70,9 @@ export function registerRunEventRoutes(
         Connection: 'keep-alive',
         'X-Content-Type-Options': 'nosniff',
       });
-      raw.on('close', finish);
+      raw.on('close', () => finish());
       heartbeat = setInterval(() => {
-        if (open) raw.write(': keep-alive\n\n');
+        write(': keep-alive\n\n');
       }, HEARTBEAT_MS);
       send(hub.snapshot(run));
     },

@@ -6,7 +6,10 @@ import {
 } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { localSourceResponseFixture } from '@portal/contracts/fixtures';
+import {
+  localSourceResponseFixture,
+  queuedRunFixture,
+} from '@portal/contracts/fixtures';
 import { NewProjectStep, folderName } from './new-project-step';
 import { createProjectsApi } from '../../shared/api/projects-api';
 import { createRunsApi } from '../../shared/api/runs-api';
@@ -63,6 +66,40 @@ const scan = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
 
 describe('Step 1 of a new project (UI04)', () => {
+  it('keeps the first Start intent after the backend accepts it but its response is lost', async () => {
+    let received = 0;
+    const created = vi.fn();
+    const server = createServer({
+      [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
+      'POST /api/v1/projects': () => json(localProject, 201),
+      [`PUT ${sourceUrl}`]: () => json(localSourceResponseFixture),
+      [`POST ${runsUrl}`]: () => {
+        if (++received === 1) throw new TypeError('response lost after commit');
+        return json(queuedRunFixture, 202);
+      },
+    });
+    render(<NewProjectStep {...server.props} onCreated={created} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Chọn thư mục' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'VB6' }));
+    scan();
+    expect(
+      await screen.findByText(
+        /Chưa xác nhận được backend đã nhận yêu cầu chạy/,
+      ),
+    ).toBeTruthy();
+    expect(created).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi lại yêu cầu' }));
+    await waitFor(() => expect(created).toHaveBeenCalledTimes(1));
+    const posts = server.of('POST', runsUrl);
+    expect(posts).toHaveLength(2);
+    expect(posts[1]?.key).toBe(posts[0]?.key);
+    expect(posts[1]?.body).toEqual(posts[0]?.body);
+    expect(server.of('POST', '/api/v1/projects')).toHaveLength(1);
+    expect(server.of('PUT', sourceUrl)).toHaveLength(1);
+    expect(
+      server.of('PATCH', `/api/v1/projects/${localProject.id}`),
+    ).toHaveLength(0);
+  });
   it('names the project after the folder', () => {
     expect(folderName('D:\\work\\order-module')).toBe('order-module');
     expect(folderName('/home/dev/legacy/')).toBe('legacy');
@@ -89,7 +126,7 @@ describe('Step 1 of a new project (UI04)', () => {
       [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
       'POST /api/v1/projects': () => json(localProject, 201),
       [`PUT ${sourceUrl}`]: () => json(localSourceResponseFixture),
-      [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
+      [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(<NewProjectStep {...server.props} onCreated={created} />);
     fireEvent.click(screen.getByRole('button', { name: 'Chọn thư mục' }));
@@ -142,7 +179,7 @@ describe('Step 1 of a new project (UI04)', () => {
               422,
             )
           : json(localSourceResponseFixture),
-      [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
+      [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(<NewProjectStep {...server.props} onCreated={created} />);
     fireEvent.click(screen.getByRole('button', { name: 'Chọn thư mục' }));
@@ -165,7 +202,7 @@ describe('Step 1 of a new project (UI04)', () => {
       [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
       'POST /api/v1/projects': () => json(localProject, 201),
       [`PUT ${sourceUrl}`]: () => json(localSourceResponseFixture),
-      [`POST ${runsUrl}`]: () => json({ error: 'not under test' }, 500),
+      [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     const created = vi.fn();
     render(<NewProjectStep {...server.props} onCreated={created} />);

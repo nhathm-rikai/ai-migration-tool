@@ -2,12 +2,18 @@ import { readdirSync } from 'node:fs';
 import {
   FolderPickerResultSchema,
   LOCAL_FOLDER_PICKER_PATH,
+  LOCAL_SESSION_PATH,
+  type LocalSession,
   type FolderPickerResult,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FolderPicker } from '../../ports/folder-picker.js';
-import { createTestApp, trustedHeaders } from '../../testing/test-app.js';
+import {
+  createTestApp,
+  freeLoopbackPort,
+  trustedHeaders,
+} from '../../testing/test-app.js';
 
 // UI05 over HTTP with a fake dialog: the route only relays what the picker
 // answers, one dialog at a time, behind the local credential and Origin.
@@ -37,12 +43,53 @@ function dataDirEntries(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: 'utf8' }).sort();
 }
 
-describe('folder picker HTTP (UI05)', () => {
+// Native SQLite startup can be cold; the actual shutdown-abort assertion
+// below still has its own two-second bound, independent of this test budget.
+describe('folder picker HTTP (UI05)', { timeout: 20_000 }, () => {
   let context: ReturnType<typeof createTestApp> | undefined;
   afterEach(async () => {
     await context?.cleanup();
     context = undefined;
   });
+
+  it('UI05-AC03 aborts a dialog over a real socket before shutdown waits for requests', async () => {
+    const { picker, calls } = controlledPicker();
+    context = createTestApp(
+      { PORTAL_PORT: String(await freeLoopbackPort()) },
+      { folderPicker: picker },
+    );
+    const base = await context.app.listen({
+      host: context.config.host,
+      port: context.config.port,
+    });
+    const headers = trustedHeaders(context.config);
+    const session = await context.app.inject({
+      method: 'POST',
+      url: LOCAL_SESSION_PATH,
+      headers,
+    });
+    const { token } = session.json<LocalSession>();
+    const request = fetch(`${base}${LOCAL_FOLDER_PICKER_PATH}`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        authorization: `Bearer ${token}`,
+        connection: 'close',
+      },
+    });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    const closing = context.app.close();
+    try {
+      await vi.waitFor(() => expect(calls[0]?.signal.aborted).toBe(true), {
+        timeout: 2000,
+      });
+      expect(await (await request).json()).toEqual({ status: 'cancelled' });
+    } finally {
+      calls[0]?.resolve({ status: 'cancelled' });
+      await request;
+      await closing;
+    }
+  }, 20_000);
 
   it.each<FolderPickerResult>([
     { status: 'selected', path: 'C:\\work\\order-module' },
@@ -53,7 +100,9 @@ describe('folder picker HTTP (UI05)', () => {
   ])(
     'UI05-AC01 relays %j without caching it or touching the data directory',
     async (answer) => {
-      const picker: FolderPicker = { pick: vi.fn(() => Promise.resolve(answer)) };
+      const picker: FolderPicker = {
+        pick: vi.fn(() => Promise.resolve(answer)),
+      };
       context = createTestApp({}, { folderPicker: picker });
       await context.app.ready();
       const before = dataDirEntries(context.config.dataDir);

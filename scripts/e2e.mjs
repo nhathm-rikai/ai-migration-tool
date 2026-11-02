@@ -1,10 +1,11 @@
 // One-command browser E2E on fixture data (T00). Builds the workspaces,
-// starts the compiled API and the Vite preview of the built UI on free
+// starts the compiled API and Vite preview (or development with --dev-web) on free
 // loopback ports with a temporary SQLite data directory, seeds a demo project,
 // runs Playwright headless and always tears everything down.
 //
 //   npm run e2e               smoke suite; exit code = test result
 //   npm run e2e:self-check    proves the harness fails loudly and cleans up
+//   npm run e2e -- --dev-web --grep=@file-feed  development/StrictMode regression
 //
 // No Claude/AI call, no customer source, no personal data directory.
 import { spawn } from 'node:child_process';
@@ -49,6 +50,9 @@ const STOP_TIMEOUT_MS = 10_000;
 
 const selfCheck = process.argv.includes('--self-check');
 const skipBuild = process.argv.includes('--skip-build');
+const devWeb = process.argv.includes('--dev-web');
+const smokeGrep =
+  process.argv.find((arg) => arg.startsWith('--grep='))?.slice(7) ?? '@smoke';
 
 function log(message) {
   console.log(`[e2e] ${message}`);
@@ -256,7 +260,7 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
 
     const web = startOwned(
       'web',
-      [viteBin, 'preview', '--strictPort'],
+      [viteBin, ...(devWeb ? [] : ['preview']), '--strictPort'],
       {
         cwd: webDir,
         env: {
@@ -268,8 +272,14 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
       owned,
     );
     const baseURL = `http://127.0.0.1:${webPort}`;
-    await waitFor(`${baseURL}/api/v1/health`, web, 'Web preview');
-    log(`API ${apiBase}, UI ${baseURL}, data ${directory}`);
+    await waitFor(
+      `${baseURL}/api/v1/health`,
+      web,
+      devWeb ? 'Web development' : 'Web preview',
+    );
+    log(
+      `API ${apiBase}, UI ${baseURL} (${devWeb ? 'development/StrictMode' : 'preview'}), data ${directory}`,
+    );
 
     if (crashApiBeforeTests) {
       api.child.kill('SIGKILL');
@@ -294,6 +304,7 @@ async function harness({ grep, crashApiBeforeTests = false, env = {} }) {
         env: {
           ...process.env,
           E2E_BASE_URL: baseURL,
+          E2E_WEB_MODE: devWeb ? 'development' : 'preview',
           E2E_SEED_PROJECT_NAME: seedName,
           E2E_OUTPUT_DIR: outputDir,
           E2E_REPORT_DIR: reportDir,
@@ -502,7 +513,7 @@ async function main() {
   }
 
   if (!selfCheck) {
-    const result = await harness({ grep: '@smoke' });
+    const result = await harness({ grep: smokeGrep });
     for (const leak of result.leaks) console.error(`[e2e] LEAK: ${leak}`);
     log(
       `tests exit ${result.testExit}; report ${result.reportDir}; ` +
@@ -519,7 +530,8 @@ async function main() {
   // no server) fails the self-check instead of passing as an expected
   // failure. Each injected failure is then judged on the JSON report: the
   // right test failed for the injected reason, with trace/report, no leaks.
-  const smoke = 'create, list and reopen a project';
+  const smoke =
+    'open a project from recent projects, reload it and go back to a new one';
   const scenarios = [
     {
       name: 'control smoke',

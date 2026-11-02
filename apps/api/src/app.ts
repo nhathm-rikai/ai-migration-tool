@@ -56,11 +56,11 @@ export function buildApp(
   app.addHook('onReady', async () => {
     await dependencies.start();
   });
-  // Open event streams keep their connections busy; end them before the
-  // server waits for connections to close.
-  app.addHook('preClose', (done) => {
+  // Both a picker request and SSE keep sockets busy. Abort/end them before
+  // the server waits for in-flight requests; onClose runs after that wait.
+  app.addHook('preClose', async () => {
     dependencies.runEvents.close();
-    done();
+    await dependencies.folderPicker.close();
   });
   app.addHook('onClose', async () => {
     await dependencies.close();

@@ -41,8 +41,12 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export function startRunFingerprint(input: StartRunInput): string {
+export function requestFingerprint(input: unknown): string {
   return createHash('sha256').update(canonicalJson(input)).digest('hex');
+}
+
+export function startRunFingerprint(input: StartRunInput): string {
+  return requestFingerprint(input);
 }
 
 // The history cursor is the opaque base64url of the last item's position.

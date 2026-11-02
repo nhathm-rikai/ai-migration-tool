@@ -75,6 +75,14 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.RUNTIME_RECOVERY_REQUIRED,
     message: 'The runtime needs recovery before it can start runs.',
   },
+  ANALYSIS_REQUIRED: {
+    status: S.ANALYSIS_REQUIRED,
+    message: 'A succeeded analysis with a published inventory is required.',
+  },
+  DOCUMENT_NOT_FOUND: {
+    status: S.DOCUMENT_NOT_FOUND,
+    message: 'Document not found.',
+  },
 } as const satisfies Record<
   AnalyzeApiErrorCode,
   { status: number; message: string }

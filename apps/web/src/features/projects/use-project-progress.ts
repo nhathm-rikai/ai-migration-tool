@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Project } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
+import type { DocumentsApi } from '../../shared/api/documents-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import type { SourcesApi } from '../../shared/api/sources-api';
 import {
@@ -13,6 +14,7 @@ import {
 // - source: a demo project has its bundled fixture; a local one needs a saved
 //   source registration.
 // - analysis: the newest succeeded run that published an inventory.
+// - documents: the project's latest document run succeeded.
 // Lives in the app shell, so an active run is followed to its end whichever
 // step is open. Reads only (GET); never starts or changes anything.
 
@@ -24,6 +26,7 @@ export type ProjectProgress =
       sourceSaved: boolean;
       // Run whose inventory the analysis step shows; null = none yet.
       analysisRunId: string | null;
+      documentsWritten: boolean;
       // Queued/running run being followed; null = none.
       activeRunId: string | null;
     };
@@ -60,9 +63,10 @@ export function useProjectProgress(
     runsApi?: RunsApi | undefined;
     sourcesApi?: SourcesApi | undefined;
     artifactsApi?: ArtifactsApi | undefined;
+    documentsApi?: DocumentsApi | undefined;
   },
 ) {
-  const { runsApi, sourcesApi, artifactsApi } = apis;
+  const { runsApi, sourcesApi, artifactsApi, documentsApi } = apis;
   // Tagged with its project so a switch never shows the previous marks.
   const [tagged, setTagged] = useState<{
     projectId: string | null;
@@ -103,8 +107,15 @@ export function useProjectProgress(
           .current(projectId, controller.signal)
           .then(({ run }) => (run && isActiveRun(run.status) ? run.id : null))
       : Promise.resolve(null);
-    void Promise.all([source, analysis, active]).then(
-      ([sourceSaved, analysisRunId, activeRunId]) => {
+    // Only a mark: an unreadable document run must not fail the other steps.
+    const documents = documentsApi
+      ? documentsApi.current(projectId, controller.signal).then(
+          ({ run }) => run?.status === 'succeeded',
+          () => false,
+        )
+      : Promise.resolve(false);
+    void Promise.all([source, analysis, active, documents]).then(
+      ([sourceSaved, analysisRunId, activeRunId, documentsWritten]) => {
         if (!controller.signal.aborted)
           setTagged({
             projectId,
@@ -112,6 +123,7 @@ export function useProjectProgress(
               status: 'ready',
               sourceSaved,
               analysisRunId,
+              documentsWritten,
               activeRunId,
             },
           });
@@ -122,7 +134,15 @@ export function useProjectProgress(
       },
     );
     return () => controller.abort();
-  }, [projectId, demo, runsApi, sourcesApi, artifactsApi, reload]);
+  }, [
+    projectId,
+    demo,
+    runsApi,
+    sourcesApi,
+    artifactsApi,
+    documentsApi,
+    reload,
+  ]);
 
   // Follow the active run (GET with backoff) and read the marks again once
   // it ends, even after the run panel has been closed.

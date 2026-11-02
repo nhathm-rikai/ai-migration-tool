@@ -115,13 +115,21 @@ function subscribe(onChange: () => void) {
 }
 
 const readPath = () => window.location.pathname;
+const readSearch = () => window.location.search;
 
 export function usePathname(): string {
   return useSyncExternalStore(subscribe, readPath);
 }
 
+// One query parameter of the current URL (e.g. the program a step works
+// on); null when absent. Re-read on every navigation like the pathname.
+export function useQueryParam(name: string): string | null {
+  const search = useSyncExternalStore(subscribe, readSearch);
+  return new URLSearchParams(search).get(name);
+}
+
 export function navigate(path: string, options: { replace?: boolean } = {}) {
-  if (path === window.location.pathname) return;
+  if (path === window.location.pathname + window.location.search) return;
   if (options.replace) window.history.replaceState(null, '', path);
   else window.history.pushState(null, '', path);
   window.dispatchEvent(new Event(NAVIGATE_EVENT));

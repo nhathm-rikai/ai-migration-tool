@@ -20,6 +20,10 @@ const ERROR_DEFINITIONS = {
     status: 401,
     message: 'A valid local credential is required.',
   },
+  FOLDER_PICKER_BUSY: {
+    status: 409,
+    message: 'A folder dialog is already open.',
+  },
 } as const satisfies Record<ApiErrorCode, { status: number; message: string }>;
 
 // Analyze codes produced by the source (B03), run (B04) and artifact (B07)

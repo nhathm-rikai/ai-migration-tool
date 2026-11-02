@@ -5,6 +5,7 @@ import {
 import type {
   AnalyzeApiErrorCode,
   AnalyzeStage,
+  FolderPickerUnavailableReason,
   ApiErrorCode,
   RunErrorCode,
   RunStatus,
@@ -211,7 +212,20 @@ export const viMessages = {
       title: 'Thông tin dự án',
       name: 'Tên dự án',
       folder: 'Đường dẫn thư mục source (tuyệt đối)',
-      choose: 'Chọn thư mục',
+      pick: 'Chọn thư mục',
+      picking: 'Đang mở hộp thoại…',
+      pickingHelp:
+        'Hộp thoại chọn thư mục đã mở trên máy này. Chọn thư mục rồi bấm OK.',
+      typePath: 'Nhập đường dẫn',
+      useFolder: 'Dùng thư mục này',
+      pickerUnavailable: {
+        'no-tool':
+          'Máy này không có hộp thoại chọn thư mục. Nhập đường dẫn thư mục bên dưới.',
+        failed:
+          'Không mở được hộp thoại chọn thư mục. Nhập đường dẫn thư mục bên dưới.',
+        timeout:
+          'Hộp thoại đã đóng vì quá lâu không chọn. Bấm lại hoặc nhập đường dẫn bên dưới.',
+      } satisfies Record<FolderPickerUnavailableReason, string>,
       cancel: 'Hủy',
       saving: 'Đang kiểm tra…',
       demoFolder: (fixtureId: string) => `${fixtureId} (bộ mẫu)`,
@@ -757,6 +771,8 @@ export const viMessages = {
         'Backend từ chối trang gửi yêu cầu. Mở ứng dụng bằng địa chỉ đã cấu hình.',
       CREDENTIAL_INVALID:
         'Phiên làm việc đã hết hạn nên yêu cầu chưa được xử lý. Vui lòng thử lại.',
+      FOLDER_PICKER_BUSY:
+        'Hộp thoại chọn thư mục đang mở. Chọn thư mục trong hộp thoại đó hoặc đóng nó rồi thử lại.',
     } satisfies Record<ApiErrorCode, string>,
     failure: {
       http: 'Không thể hoàn tất yêu cầu. Kiểm tra backend rồi thử lại.',

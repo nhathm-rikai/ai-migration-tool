@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { FOLDER_PICKER_TIMEOUT_MS } from '@portal/contracts';
 import { join } from 'node:path';
 import { openDatabase } from './db/database.js';
 import { createFixtureRunExecutor } from './adapters/fake/fixture-run.executor.js';
@@ -10,6 +11,12 @@ import {
 } from './adapters/local/source-run.executor.js';
 import { createFilesystemArtifactStore } from './adapters/local/filesystem-artifact.store.js';
 import { createWorkerInventoryBuilder } from './adapters/local/worker-inventory.builder.js';
+import {
+  createNativeFolderPicker,
+  dialogCommands,
+} from './adapters/local/native-folder-picker.js';
+import { createFolderPickerService } from './modules/local-picker/folder-picker.service.js';
+import type { FolderPicker } from './ports/folder-picker.js';
 import { APPLICATION_ROOT } from './platform/data-directory.js';
 import type { RunLimits } from './modules/jobs/analyze-run-config.js';
 import {
@@ -67,6 +74,8 @@ export function createDependencies(
     log: DispatcherLog;
     jobs?: JobOptions;
     recovery?: StartupRecovery;
+    // Tests replace the OS folder dialog (UI05).
+    folderPicker?: FolderPicker;
   },
 ) {
   const db = openDatabase(dataDir);
@@ -159,12 +168,21 @@ export function createDependencies(
       now,
     });
     late.jobs = jobs;
+    const folderPicker = createFolderPickerService({
+      picker:
+        options.folderPicker ??
+        createNativeFolderPicker({
+          commands: dialogCommands(process.platform),
+          timeoutMs: FOLDER_PICKER_TIMEOUT_MS,
+        }),
+    });
     return {
       projects,
       sources,
       jobs,
       snapshots,
       artifacts,
+      folderPicker,
       // Staging copies a previous process left are app-owned and never
       // public; remove them, then start queued runs from a previous process.
       async start() {
@@ -174,6 +192,8 @@ export function createDependencies(
       },
       async close() {
         try {
+          // An open folder dialog is closed (its process killed) first.
+          await folderPicker.close();
           await dispatcher.close();
         } finally {
           db.close();

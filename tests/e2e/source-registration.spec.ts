@@ -71,6 +71,8 @@ test(
     const choose = page.getByRole('heading', { name: 'Chọn thư mục source' });
     await expect(choose).toBeVisible();
     await expect(scan).toHaveCount(0);
+    // The native dialog (UI05) is not opened here; the typed path is.
+    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
 
     const save = async (expectedStatus: number) => {
       const pending = page.waitForResponse(
@@ -78,7 +80,7 @@ test(
           response.request().method() === 'PUT' &&
           /\/source$/.test(response.url()),
       );
-      await page.getByRole('button', { name: 'Chọn thư mục' }).click();
+      await page.getByRole('button', { name: 'Dùng thư mục này' }).click();
       const response = await pending;
       expect(response.status()).toBe(expectedStatus);
       const text = await response.text();
@@ -127,6 +129,7 @@ test(
 
     // Another client advances the revision while the folder is being changed.
     await page.getByRole('button', { name: 'Đổi thư mục' }).click();
+    await page.getByRole('button', { name: 'Nhập đường dẫn' }).click();
     await folder.fill(sourceRoot);
     const concurrent = await page.request.put(url, {
       headers,

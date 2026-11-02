@@ -64,10 +64,18 @@ test(
     await page.getByLabel('Tên dự án').fill(projectName);
     await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
     await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    // UI04: the folder is chosen on the scan card.
-    await page
-      .getByLabel('Đường dẫn thư mục source (tuyệt đối)')
-      .fill(sourceRoot);
+    // UI04/UI05: "Chọn thư mục" asks the backend for its folder dialog; the
+    // dialog's answer is stubbed here (no window in a headless run), the
+    // registration that follows is real.
+    let picks = 0;
+    await page.route('**/api/v1/local/folder-picker', async (route) => {
+      picks++;
+      expect(route.request().headers()['authorization']).toMatch(/^Bearer /);
+      await route.fulfill({
+        json: { status: 'selected', path: sourceRoot },
+        headers: { 'cache-control': 'no-store' },
+      });
+    });
     const registered = page.waitForResponse(
       (response) =>
         response.request().method() === 'PUT' &&
@@ -76,6 +84,10 @@ test(
     await page.getByRole('button', { name: 'Chọn thư mục' }).click();
     const registration = await registered;
     expect(registration.status()).toBe(200);
+    expect(picks).toBe(1);
+    expect(
+      (registration.request().postDataJSON() as { rootPath: string }).rootPath,
+    ).toBe(sourceRoot);
     const authorization = registration.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
     // The table-name mapping has no UI on this step (02/11/2026): the

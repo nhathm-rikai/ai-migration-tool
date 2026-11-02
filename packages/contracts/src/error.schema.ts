@@ -12,6 +12,8 @@ export const ApiErrorCodeSchema = Type.Union([
   Type.Literal('HOST_NOT_ALLOWED'),
   Type.Literal('ORIGIN_NOT_ALLOWED'),
   Type.Literal('CREDENTIAL_INVALID'),
+  // Native folder dialog (UI05): another dialog is already open.
+  Type.Literal('FOLDER_PICKER_BUSY'),
 ]);
 export type ApiErrorCode = Static<typeof ApiErrorCodeSchema>;
 

@@ -24,6 +24,8 @@ import {
   registerLocalSecurity,
 } from './plugins/local-security.js';
 import { registerLocalSessionRoutes } from './modules/local-session/local-session.routes.js';
+import { registerFolderPickerRoutes } from './modules/local-picker/folder-picker.routes.js';
+import type { FolderPicker } from './ports/folder-picker.js';
 
 // loggerStream lets tests read the structured log; production logs to stdout.
 export function buildApp(
@@ -32,6 +34,7 @@ export function buildApp(
     loggerStream?: Writable;
     jobs?: JobOptions;
     recovery?: StartupRecovery;
+    folderPicker?: FolderPicker;
   } = {},
 ) {
   const app = Fastify({
@@ -47,6 +50,7 @@ export function buildApp(
     log: app.log,
     ...(options.jobs ? { jobs: options.jobs } : {}),
     ...(options.recovery ? { recovery: options.recovery } : {}),
+    ...(options.folderPicker ? { folderPicker: options.folderPicker } : {}),
   });
   app.addHook('onReady', async () => {
     await dependencies.start();
@@ -74,5 +78,6 @@ export function buildApp(
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
   registerArtifactRoutes(app, dependencies.artifacts);
+  registerFolderPickerRoutes(app, dependencies.folderPicker);
   return app;
 }

@@ -131,7 +131,21 @@ const errorBody = (code: string, status: number) =>
 
 const FOLDER = 'Đường dẫn thư mục source (tuyệt đối)';
 const scanButton = () => screen.getByRole('button', { name: 'Quét source' });
-const chooseButton = () => screen.getByRole('button', { name: 'Chọn thư mục' });
+// The typed-path form (shown on request): its submit registers the path.
+const chooseButton = () =>
+  screen.getByRole('button', { name: 'Dùng thư mục này' });
+async function folderField() {
+  // Either the field is open already or the button opens it.
+  const opener = await waitFor(() => {
+    const field = screen.queryByLabelText(FOLDER);
+    if (field) return null;
+    const button = screen.queryByRole('button', { name: 'Nhập đường dẫn' });
+    if (!button) throw new Error('No folder form yet');
+    return button;
+  });
+  if (opener) fireEvent.click(opener);
+  return screen.findByLabelText(FOLDER);
+}
 const chosen = () => screen.findByText('Đã chọn thư mục');
 const vb6Chosen = () =>
   waitFor(() =>
@@ -154,13 +168,13 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     render(step(server));
     expect(await screen.findByText('Chọn thư mục source')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Chọn thư mục' })).toBeTruthy();
+    await folderField();
     fireEvent.click(chooseButton());
     expect(
       await screen.findByText('Nhập đường dẫn thư mục mã nguồn.'),
     ).toBeTruthy();
-    expect(screen.getByLabelText(FOLDER).getAttribute('aria-invalid')).toBe(
-      'true',
-    );
+    expect((await folderField()).getAttribute('aria-invalid')).toBe('true');
     expect(server.puts()).toEqual([]);
     expect(screen.queryByText('DEMO')).toBeNull();
   });
@@ -184,7 +198,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
       [`PUT ${sourceUrl()}`]: () => json(registered()),
     });
     render(step(server));
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: `  ${ROOT}  ` },
     });
     fireEvent.click(chooseButton());
@@ -221,7 +235,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
         [`PUT ${sourceUrl()}`]: () => errorBody(code, status),
       });
       render(step(server));
-      const field = await screen.findByLabelText(FOLDER);
+      const field = await folderField();
       fireEvent.change(field, { target: { value: ROOT } });
       fireEvent.click(chooseButton());
       expect(await screen.findByText(message)).toBeTruthy();
@@ -248,14 +262,14 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     render(step(server));
     await chosen();
     fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
-    fireEvent.change(screen.getByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: ROOT },
     });
     fireEvent.click(chooseButton());
     expect(
       await screen.findByText(/vừa được cập nhật ở nơi khác/),
     ).toBeTruthy();
-    expect(screen.getByLabelText(FOLDER)).toHaveProperty('value', ROOT);
+    expect(await folderField()).toHaveProperty('value', ROOT);
     fireEvent.click(screen.getByRole('button', { name: 'Tải lại mã nguồn' }));
     await waitFor(() => expect(reads).toBe(2));
     fireEvent.click(chooseButton());
@@ -276,7 +290,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
       [`PUT ${sourceUrl()}`]: () => Promise.reject(new TypeError('offline')),
     });
     render(step(server));
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: ROOT },
     });
     fireEvent.click(chooseButton());
@@ -297,7 +311,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
       await screen.findByText(/Không đọc được thư mục đã chọn/),
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
-    fireEvent.change(screen.getByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: ROOT },
     });
     fireEvent.click(chooseButton());
@@ -316,7 +330,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     render(step(server));
     await chosen();
     fireEvent.click(screen.getByRole('button', { name: 'Đổi thư mục' }));
-    expect(screen.getByLabelText(FOLDER)).toBeTruthy();
+    expect(await folderField()).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
     await chosen();
     expect(server.puts()).toEqual([]);
@@ -363,7 +377,7 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
         {step(server)}
       </>,
     );
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: ROOT },
     });
     fireEvent.click(chooseButton());
@@ -383,6 +397,101 @@ describe('Choosing the source folder (F01 on the UI04 scan card)', () => {
     });
     expect(await screen.findByText(/フォルダーが存在しないか/)).toBeTruthy();
     expect(server.puts()).toHaveLength(1);
+  });
+});
+
+const PICKER = '/api/v1/local/folder-picker';
+
+describe('Native folder dialog on the scan card (UI05)', () => {
+  it('registers the folder chosen in the dialog', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
+      [`PUT ${sourceUrl()}`]: () => json(registered()),
+    });
+    render(step(server));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chọn thư mục' }),
+    );
+    await chosen();
+    expect(server.puts().map((call) => call.body)).toMatchObject([
+      { rootPath: ROOT, expectedSourceRevision: null },
+    ]);
+    expect(
+      server.calls
+        .filter((call) => call.url === PICKER)
+        .map((call) => call.body),
+    ).toEqual([undefined]);
+    expect(screen.getByText('order-module')).toBeTruthy();
+  });
+
+  it('a cancelled dialog changes nothing', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: () => json({ status: 'cancelled' }),
+    });
+    render(step(server));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chọn thư mục' }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Chọn thư mục' }),
+      ).toHaveProperty('disabled', false),
+    );
+    expect(screen.getByText('Chọn thư mục source')).toBeTruthy();
+    expect(server.puts()).toEqual([]);
+  });
+
+  it.each([
+    ['no-tool', /không có hộp thoại chọn thư mục/],
+    ['failed', /Không mở được hộp thoại/],
+    ['timeout', /quá lâu không chọn/],
+  ])(
+    'an unavailable dialog (%s) leaves the path field only',
+    async (reason, message) => {
+      const server = createServer({
+        [`GET ${sourceUrl()}`]: () => json({ source: null }),
+        [`POST ${PICKER}`]: () => json({ status: 'unavailable', reason }),
+      });
+      render(step(server));
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Chọn thư mục' }),
+      );
+      expect(await screen.findByText(message)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Chọn thư mục' })).toBeNull();
+      expect(screen.getByLabelText(FOLDER)).toBeTruthy();
+      expect(server.puts()).toEqual([]);
+    },
+  );
+
+  it('a chosen folder the backend refuses goes into the path field', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: () => json({ status: 'selected', path: ROOT }),
+      [`PUT ${sourceUrl()}`]: () => errorBody('SOURCE_FORBIDDEN', 422),
+    });
+    render(step(server));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chọn thư mục' }),
+    );
+    expect(await screen.findByText(/Không được dùng thư mục này/)).toBeTruthy();
+    expect(screen.getByLabelText(FOLDER)).toHaveProperty('value', ROOT);
+  });
+
+  it('says when another dialog is already open', async () => {
+    const server = createServer({
+      [`GET ${sourceUrl()}`]: () => json({ source: null }),
+      [`POST ${PICKER}`]: () => errorBody('FOLDER_PICKER_BUSY', 409),
+    });
+    render(step(server));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chọn thư mục' }),
+    );
+    expect(
+      await screen.findByText(/Hộp thoại chọn thư mục đang mở/),
+    ).toBeTruthy();
+    expect(screen.queryByText('raw server text')).toBeNull();
   });
 });
 
@@ -468,7 +577,7 @@ describe('Scan card (UI04)', () => {
       [`POST ${runsUrl}`]: () => json(queuedRunFixture, 202),
     });
     render(step(server));
-    fireEvent.change(await screen.findByLabelText(FOLDER), {
+    fireEvent.change(await folderField(), {
       target: { value: ROOT },
     });
     fireEvent.click(chooseButton());

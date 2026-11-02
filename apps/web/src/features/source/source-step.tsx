@@ -4,6 +4,7 @@ import {
   PutProjectSourceSchema,
   SOURCE_PROFILE_IDS,
   UpdateProjectSchema,
+  type FolderPickerUnavailableReason,
   type Project,
   type TableNameMapping,
 } from '@portal/contracts';
@@ -29,6 +30,12 @@ import { startableRevision, useProjectSource } from './use-project-source';
 // and only then starts a run on the registered revision. Nothing here runs
 // on open, reload or locale change. Table-name mapping and run history are
 // kept in the API but not shown here (user request, 02/11/2026).
+
+type PickerState =
+  | { status: 'idle' }
+  | { status: 'pending' }
+  | { status: 'unavailable'; reason: FolderPickerUnavailableReason }
+  | { status: 'error'; error: unknown };
 
 type FieldErrors = { name: boolean; language: boolean; rootPath: boolean };
 const NO_ERRORS: FieldErrors = {
@@ -121,6 +128,9 @@ export function SourceStep({
   const chosenLanguage = language;
   const [rootPath, setRootPath] = useState('');
   const [changingFolder, setChangingFolder] = useState(false);
+  // The path field is shown on request or when the dialog is unavailable.
+  const [manualPath, setManualPath] = useState(false);
+  const [picker, setPicker] = useState<PickerState>({ status: 'idle' });
   const [invalid, setInvalid] = useState<FieldErrors>(NO_ERRORS);
   const [infoError, setInfoError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
@@ -140,25 +150,59 @@ export function SourceStep({
     }
   }
 
-  // Registers the folder typed on the scan card; the table-name mapping
-  // stays as registered (unconfigured for a new source).
-  function chooseFolder() {
+  // Registers a folder (chosen in the dialog or typed); the table-name
+  // mapping stays as registered (unconfigured for a new source).
+  async function register(path: string): Promise<boolean> {
+    const saved = await source.put({
+      rootPath: path,
+      profileId: SOURCE_PROFILE_IDS[0],
+      tableNameMapping: registered?.tableNameMapping ?? UNCONFIGURED,
+      // The revision this page read; a newer one answers 409.
+      expectedSourceRevision: registered?.revision ?? null,
+    });
+    if (!saved) return false;
+    setRootPath('');
+    setManualPath(false);
+    setChangingFolder(false);
+    return true;
+  }
+
+  function chooseTyped() {
     const path = rootPath.trim();
     if (!Check(PutProjectSourceSchema.properties.rootPath, path)) {
       setInvalid((errors) => ({ ...errors, rootPath: true }));
       return;
     }
     void exclusive(async () => {
-      const saved = await source.put({
-        rootPath: path,
-        profileId: SOURCE_PROFILE_IDS[0],
-        tableNameMapping: registered?.tableNameMapping ?? UNCONFIGURED,
-        // The revision this page read; a newer one answers 409.
-        expectedSourceRevision: registered?.revision ?? null,
-      });
-      if (!saved) return;
-      setRootPath('');
-      setChangingFolder(false);
+      await register(path);
+    });
+  }
+
+  // Opens the OS folder dialog on the backend machine (UI05). A path the
+  // backend then refuses is put in the path field to correct it; an
+  // unavailable dialog leaves the path field only.
+  function pickFolder() {
+    void exclusive(async () => {
+      setPicker({ status: 'pending' });
+      const controller = new AbortController();
+      mutation.current = controller;
+      try {
+        const result = await sourcesApi.pickFolder(controller.signal);
+        if (controller.signal.aborted) return;
+        if (result.status === 'unavailable') {
+          setPicker({ status: 'unavailable', reason: result.reason });
+          setManualPath(true);
+          return;
+        }
+        setPicker({ status: 'idle' });
+        if (result.status === 'cancelled') return;
+        if (!(await register(result.path))) {
+          setRootPath(result.path);
+          setManualPath(true);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) setPicker({ status: 'error', error });
+      }
     });
   }
 
@@ -215,8 +259,10 @@ export function SourceStep({
   const chooser = choosing ? (
     <FolderChooser
       value={rootPath}
+      manual={manualPath}
       invalid={invalid.rootPath}
       pending={saving || source.save.status === 'pending'}
+      picker={picker}
       error={
         source.state.status === 'error'
           ? source.state.error
@@ -228,9 +274,18 @@ export function SourceStep({
         setRootPath(value);
         setInvalid((errors) => ({ ...errors, rootPath: false }));
       }}
-      onSubmit={chooseFolder}
+      onPick={pickFolder}
+      onManual={() => setManualPath(true)}
+      onSubmit={chooseTyped}
       onReload={source.refresh}
-      onCancel={registered ? () => setChangingFolder(false) : null}
+      onCancel={
+        registered
+          ? () => {
+              setChangingFolder(false);
+              setManualPath(false);
+            }
+          : null
+      }
     />
   ) : null;
 
@@ -313,23 +368,31 @@ export function SourceStep({
   );
 }
 
-// Folder form on the scan card while UI05 (native folder dialog) is not
-// available: an absolute path typed by the user.
+// Folder choice on the scan card: the OS folder dialog (UI05), or an
+// absolute path typed by the user when asked for or when no dialog exists.
 function FolderChooser({
   value,
+  manual,
   invalid,
   pending,
+  picker,
   error,
   onChange,
+  onPick,
+  onManual,
   onSubmit,
   onReload,
   onCancel,
 }: {
   value: string;
+  manual: boolean;
   invalid: boolean;
   pending: boolean;
+  picker: PickerState;
   error: unknown;
   onChange: (value: string) => void;
+  onPick: () => void;
+  onManual: () => void;
   onSubmit: () => void;
   onReload: () => void;
   onCancel: (() => void) | null;
@@ -338,38 +401,31 @@ function FolderChooser({
   const copy = messages.sourceStep.form;
   const stale =
     error instanceof ApiError && error.code === 'SOURCE_REVISION_CONFLICT';
+  const picking = picker.status === 'pending';
   return (
-    <form
-      className="folder-chooser"
-      noValidate
-      aria-busy={pending}
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit();
-      }}
-    >
-      <label htmlFor="source-root">{copy.folder}</label>
-      <div className="folder-row">
-        <input
-          id="source-root"
-          autoComplete="off"
-          spellCheck={false}
-          className="mono"
-          value={value}
-          disabled={pending}
-          aria-invalid={invalid}
-          aria-describedby={
-            invalid ? 'source-root-help source-root-error' : 'source-root-help'
-          }
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <button
-          className="button primary large"
-          type="submit"
-          disabled={pending}
-        >
-          {pending ? copy.saving : copy.choose}
-        </button>
+    <div className="folder-chooser">
+      <div className="scan-actions">
+        {picker.status !== 'unavailable' && (
+          <button
+            className="button primary large"
+            type="button"
+            disabled={pending}
+            onClick={onPick}
+          >
+            <FolderIcon />
+            {picking ? copy.picking : copy.pick}
+          </button>
+        )}
+        {!manual && (
+          <button
+            className="button large"
+            type="button"
+            disabled={pending}
+            onClick={onManual}
+          >
+            {copy.typePath}
+          </button>
+        )}
         {onCancel && (
           <button
             className="button large"
@@ -381,13 +437,60 @@ function FolderChooser({
           </button>
         )}
       </div>
-      <p className="field-help" id="source-root-help">
-        {messages.source.form.rootPathHelp}
-      </p>
-      {invalid && (
-        <p id="source-root-error" role="alert" className="error">
-          {messages.source.form.rootPathInvalid}
+      {picking && (
+        <p role="status" className="field-help">
+          {copy.pickingHelp}
         </p>
+      )}
+      {picker.status === 'unavailable' && (
+        <p role="status" className="notice">
+          {copy.pickerUnavailable[picker.reason]}
+        </p>
+      )}
+      {picker.status === 'error' && (
+        <p role="alert" className="error">
+          {projectErrorMessage(picker.error, 'source', messages.errors)}
+        </p>
+      )}
+      {manual && (
+        <form
+          noValidate
+          aria-busy={pending}
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label htmlFor="source-root">{copy.folder}</label>
+          <div className="folder-row">
+            <input
+              id="source-root"
+              autoComplete="off"
+              spellCheck={false}
+              className="mono"
+              value={value}
+              disabled={pending}
+              aria-invalid={invalid}
+              aria-describedby={
+                invalid
+                  ? 'source-root-help source-root-error'
+                  : 'source-root-help'
+              }
+              onChange={(event) => onChange(event.target.value)}
+            />
+            <button className="button large" type="submit" disabled={pending}>
+              {pending && !picking ? copy.saving : copy.useFolder}
+            </button>
+          </div>
+          <p className="field-help" id="source-root-help">
+            {messages.source.form.rootPathHelp}
+          </p>
+          {invalid && (
+            <p id="source-root-error" role="alert" className="error">
+              {messages.source.form.rootPathInvalid}
+            </p>
+          )}
+        </form>
       )}
       {error !== null && error !== undefined && (
         <div role="alert" className="error">
@@ -399,6 +502,14 @@ function FolderChooser({
           )}
         </div>
       )}
-    </form>
+    </div>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg className="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    </svg>
   );
 }

@@ -101,11 +101,12 @@ test(
   },
 );
 
-// UI01: every step has a URL, steps 3–5 say why they are unavailable, an
-// unknown project gets a not-found page, keyboard opens steps and reduced
-// motion turns the entrance animation off. Desktop only (D7).
+// UI01: every step has a URL, an unknown project gets a not-found page,
+// keyboard opens steps and reduced motion turns the entrance animation off.
+// Steps 3–5 are implemented now, so each opens its own page. Desktop only
+// (D7).
 test(
-  'step URLs, unavailable steps, not-found and reduced motion',
+  'step URLs, keyboard, not-found and reduced motion',
   { tag: '@smoke' },
   async ({ page }) => {
     const seedName = process.env.E2E_SEED_PROJECT_NAME ?? '';
@@ -134,14 +135,16 @@ test(
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/quote$/);
     await expect(
-      page.getByRole('heading', { name: 'Chưa khả dụng' }),
+      page.getByRole('heading', { level: 1, name: 'Báo giá' }),
     ).toBeVisible();
-    await expect(steps.getByRole('link', { name: /Báo giá/ })).toContainText(
-      'Chưa khả dụng',
+    await expect(steps.getByRole('link', { name: /Báo giá/ })).toHaveAttribute(
+      'aria-current',
+      'step',
     );
+    // Reload stays on the step.
     await page.reload();
     await expect(
-      page.getByRole('heading', { name: 'Chưa khả dụng' }),
+      page.getByRole('heading', { level: 1, name: 'Báo giá' }),
     ).toBeVisible();
     expect(
       await page
@@ -152,7 +155,7 @@ test(
 
     await page.getByRole('radio', { name: '日本語' }).check();
     await expect(
-      page.getByRole('heading', { name: 'まだ利用できません' }),
+      page.getByRole('heading', { level: 1, name: '見積' }),
     ).toBeVisible();
     // Desktop only (D7): Japanese labels do not overflow at 1280px.
     expect(

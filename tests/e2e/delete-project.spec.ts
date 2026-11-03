@@ -43,3 +43,42 @@ test(
     expect(status).toBe(404);
   },
 );
+
+// The delete button has its own column inside the card: it never covers the status chip, in
+// either language and at the narrowest desktop width.
+for (const locale of ['vi', 'ja'] as const) {
+  test(
+    `delete button does not overlap the status chip (${locale})`,
+    { tag: '@smoke' },
+    async ({ page }) => {
+      await page.addInitScript((code) => {
+        window.localStorage.setItem('portal.locale', code);
+      }, locale);
+      await openNewDemoProject(page, `E2E bố cục ${locale} ${Date.now()}`);
+      await page.goto('/projects/new');
+      for (const width of [1280, 1024]) {
+        await page.setViewportSize({ width, height: 800 });
+        const item = page.locator('.recent-item').first();
+        await expect(item).toBeVisible();
+        const [button, chip, card] = await Promise.all(
+          ['.recent-delete', '.recent-status', '.recent-card'].map(
+            async (selector) => item.locator(selector).boundingBox(),
+          ),
+        );
+        expect(button && chip && card).toBeTruthy();
+        // Inside the card border, right of every piece of content.
+        expect(button!.x).toBeGreaterThan(card!.x);
+        expect(button!.x + button!.width).toBeLessThanOrEqual(
+          card!.x + card!.width,
+        );
+        expect(button!.x).toBeGreaterThanOrEqual(chip!.x + chip!.width);
+      }
+      await page
+        .locator('.recent-item')
+        .first()
+        .screenshot({
+          path: `${process.env.E2E_OUTPUT_DIR}/recent-delete-${locale}.png`,
+        });
+    },
+  );
+}

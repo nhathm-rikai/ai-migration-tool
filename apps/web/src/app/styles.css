@@ -5089,28 +5089,49 @@ fieldset.doc-card {
   --status: var(--warn-fg);
   --status-bg: var(--warn-bg);
 }
+/* The delete button sits inside the card border in its own column, split
+   from the content by a divider; the card reserves that column as padding so
+   the content (avatar, name, status chip, bar) never reaches it. */
 .recent-item {
+  --delete-zone: 56px;
   position: relative;
+}
+.recent-item > .recent-card {
+  padding-right: calc(var(--delete-zone) + 16px);
 }
 .recent-delete {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: var(--delete-zone);
   border: 0;
-  border-radius: 8px;
+  border-left: 1px solid var(--line);
+  border-radius: 0 13px 13px 0;
   background: transparent;
   color: var(--fg-3);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--dur-fast);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast),
+    color var(--dur-fast);
 }
-.recent-item:hover .recent-delete,
+.recent-delete-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 0 auto;
+}
+/* The card lifts on hover of the whole item, button included. */
+.recent-item:hover > .recent-card {
+  transform: translateY(-2px);
+  border-color: var(--line-hover);
+}
+.recent-item:hover > .recent-delete {
+  transform: translateY(-2px);
+}
+.recent-delete:hover,
 .recent-delete:focus-visible {
-  opacity: 1;
-}
-.recent-delete:hover {
   background: var(--high-bg);
   color: var(--high);
 }

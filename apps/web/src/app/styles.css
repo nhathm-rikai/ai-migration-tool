@@ -5089,6 +5089,75 @@ fieldset.doc-card {
   --status: var(--warn-fg);
   --status-bg: var(--warn-bg);
 }
+.recent-item {
+  position: relative;
+}
+.recent-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.recent-item:hover .recent-delete,
+.recent-delete:focus-visible {
+  opacity: 1;
+}
+.recent-delete:hover {
+  background: var(--high-bg);
+  color: var(--high);
+}
+.recent-delete:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 34, 54, 0.45);
+}
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.modal h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.modal p {
+  margin: 0 0 16px;
+  color: var(--fg-body);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.button.danger {
+  background: var(--high);
+  border-color: var(--high);
+  color: var(--on-brand);
+}
+.button.danger:hover:not(:disabled) {
+  background: #a8332e;
+  border-color: #a8332e;
+}
 .recent-row {
   display: flex;
   align-items: center;

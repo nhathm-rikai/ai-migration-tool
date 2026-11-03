@@ -30,6 +30,8 @@ import { createJobService } from './modules/jobs/job.service.js';
 import { createRunRepository } from './modules/jobs/run.repository.js';
 import { createRunEventHub, withRunEvents } from './modules/jobs/run-events.js';
 import { createProjectRepository } from './modules/projects/project.repository.js';
+import { createProjectDeletionRepository } from './modules/projects/project-deletion.repository.js';
+import { createProjectDeletionService } from './modules/projects/project-deletion.service.js';
 import { createProjectService } from './modules/projects/project.service.js';
 import { createSourceRegistrationRepository } from './modules/projects/source-registration.repository.js';
 import { createSourceRegistrationService } from './modules/projects/source-registration.service.js';
@@ -381,9 +383,20 @@ export function createDependencies(
       nextId: randomUUID,
       now,
     });
+    const projectDeletion = createProjectDeletionService({
+      repository: createProjectDeletionRepository(db),
+      cleanup: {
+        discardSnapshot: (id) => workspace.discardSnapshot(id),
+        discardArtifact: (id, version) => artifactStore.discard(id, version),
+        discardPackageFile: (id, version) => documentStore.discard(id, version),
+        removeDocumentWorkspace: (runId) => specWorkspace.remove(runId),
+      },
+      log: options.log,
+    });
     return {
       reviews,
       projects,
+      projectDeletion,
       sources,
       jobs,
       snapshots,

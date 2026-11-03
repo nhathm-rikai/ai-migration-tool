@@ -89,7 +89,11 @@ export function buildApp(
     },
     () => ({ status: 'ok' as const, mode: config.mode, runner: config.runner }),
   );
-  registerProjectRoutes(app, dependencies.projects);
+  registerProjectRoutes(
+    app,
+    dependencies.projects,
+    dependencies.projectDeletion,
+  );
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
   registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);

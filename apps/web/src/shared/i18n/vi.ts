@@ -213,6 +213,16 @@ export const viMessages = {
       failed: 'Không tải được danh sách dự án.',
       empty: 'Chưa có dự án nào.',
       open: 'Đang mở',
+      delete: {
+        action: (name: string) => `Xóa dự án ${name}`,
+        title: 'Xóa dự án này?',
+        body: (name: string) =>
+          `Dự án "${name}" sẽ bị xóa vĩnh viễn cùng toàn bộ lượt chạy, kết quả phân tích, tài liệu, nhận xét và bản chụp mã nguồn của dự án. Thư mục mã nguồn gốc của bạn không bị ảnh hưởng. Không thể hoàn tác.`,
+        confirm: 'Xóa vĩnh viễn',
+        deleting: 'Đang xóa…',
+        cancel: 'Hủy',
+        busy: 'Dự án đang có lượt chạy. Hủy hoặc chờ lượt chạy kết thúc rồi xóa lại.',
+      },
       updated: (date: string) => `Cập nhật ${date}`,
       status: {
         none: 'Chưa phân tích',
@@ -1087,6 +1097,7 @@ export const viMessages = {
         'Chưa kết nối được phiên làm việc với backend nên yêu cầu chưa được gửi. Thử kết nối lại.',
     } satisfies Record<ApiFailureKind, string>,
     invalidInput: {
+      remove: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',
       create:
         'Thông tin tạo dự án không hợp lệ. Kiểm tra dữ liệu và phiên bản ứng dụng rồi thử lại.',
       get: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',

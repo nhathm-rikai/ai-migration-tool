@@ -153,4 +153,101 @@ describe('Recent projects (UI04)', () => {
       await screen.findByText('Không tải được danh sách dự án.'),
     ).toBeTruthy();
   });
+
+  describe('delete', () => {
+    const doomed = projects[2]!;
+
+    // A backend that lists the projects until one is deleted.
+    function deletingBackend(
+      remove: () => Response = () => json({ id: doomed.id }),
+    ) {
+      let deleted = false;
+      const fetcher = vi.fn<typeof fetch>((input, init) => {
+        const url = requestUrl(input);
+        if (init?.method === 'DELETE') {
+          const response = remove();
+          deleted = response.ok;
+          return Promise.resolve(response);
+        }
+        if (url.endsWith('/runs/current'))
+          return Promise.resolve(json({ run: null }));
+        return Promise.resolve(
+          json({
+            items: projects.filter((p) => !(deleted && p.id === doomed.id)),
+            nextCursor: null,
+          }),
+        );
+      });
+      render(
+        <LocaleProvider>
+          <RecentProjects
+            api={createProjectsApi(fetcher, testCredentials)}
+            runsApi={createRunsApi(fetcher, testCredentials)}
+            openProjectId={null}
+            version=""
+          />
+        </LocaleProvider>,
+      );
+      return fetcher;
+    }
+
+    const open = async () => {
+      await waitFor(() => expect(cards()).toHaveLength(5));
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Xóa dự án Payroll' }),
+      );
+      return screen.getByRole('alertdialog');
+    };
+    const deleteCalls = (fetcher: ReturnType<typeof deletingBackend>) =>
+      fetcher.mock.calls.filter(([, init]) => init?.method === 'DELETE');
+
+    it('asks first and deletes nothing when cancelled', async () => {
+      const fetcher = deletingBackend();
+      const dialog = await open();
+      expect(within(dialog).getByText('Xóa dự án này?')).toBeTruthy();
+      expect(dialog.textContent).toContain('"Payroll"');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(deleteCalls(fetcher)).toHaveLength(0);
+      expect(cards()).toHaveLength(5);
+    });
+
+    it('closes on Escape without deleting', async () => {
+      const fetcher = deletingBackend();
+      const dialog = await open();
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(deleteCalls(fetcher)).toHaveLength(0);
+    });
+
+    it('deletes after confirmation and reloads the list', async () => {
+      const fetcher = deletingBackend();
+      const dialog = await open();
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }),
+      );
+      await waitFor(() => expect(cards()).toHaveLength(4));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(deleteCalls(fetcher)).toHaveLength(1);
+      expect(requestUrl(deleteCalls(fetcher)[0]![0])).toBe(
+        `/api/v1/projects/${doomed.id}`,
+      );
+      expect(screen.queryByText('Payroll')).toBeNull();
+    });
+
+    it('says the project is busy and keeps it', async () => {
+      deletingBackend(() =>
+        json(
+          { error: { code: 'PROJECT_BUSY', message: 'x', requestId: 'r' } },
+          409,
+        ),
+      );
+      const dialog = await open();
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }),
+      );
+      expect(await within(dialog).findByText(/đang có lượt chạy/)).toBeTruthy();
+      expect(cards()).toHaveLength(5);
+    });
+  });
 });

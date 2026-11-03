@@ -33,3 +33,4 @@ Thumbs.db
 playwright-report/
 test-results/
 .claude/settings.local.json
+!tests/fixtures/vb6-sample/programs/SAMPLE/BUILD.LOG

@@ -9,9 +9,11 @@ import {
 import type { AppConfig } from './config.js';
 import {
   createDependencies,
+  type DocumentOptions,
   type JobOptions,
   type StartupRecovery,
 } from './composition.js';
+import { registerDocumentRoutes } from './modules/documents/document.routes.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
@@ -34,6 +36,7 @@ export function buildApp(
   options: {
     loggerStream?: Writable;
     jobs?: JobOptions;
+    documents?: Partial<DocumentOptions>;
     recovery?: StartupRecovery;
     folderPicker?: FolderPicker;
   } = {},
@@ -50,6 +53,11 @@ export function buildApp(
   const dependencies = createDependencies(config.dataDir, {
     log: app.log,
     ...(options.jobs ? { jobs: options.jobs } : {}),
+    documents: {
+      runner: config.runner,
+      agentExecutable: config.agentExecutable,
+      ...options.documents,
+    },
     ...(options.recovery ? { recovery: options.recovery } : {}),
     ...(options.folderPicker ? { folderPicker: options.folderPicker } : {}),
   });
@@ -87,5 +95,6 @@ export function buildApp(
   registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);
   registerArtifactRoutes(app, dependencies.artifacts);
   registerFolderPickerRoutes(app, dependencies.folderPicker);
+  registerDocumentRoutes(app, dependencies.documents);
   return app;
 }

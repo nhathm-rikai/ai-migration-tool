@@ -12,6 +12,7 @@ describe('configuration', () => {
       port: 4310,
       mode: 'fixture',
       runner: 'fake',
+      agentExecutable: undefined,
       webPorts: [5173, 4173],
     });
     expect(isAbsolute(config.dataDir)).toBe(true);
@@ -27,6 +28,7 @@ describe('configuration', () => {
     { PORTAL_DATA_DIR: './runtime' },
     { PORTAL_MODE: 'live' },
     { PORTAL_RUNNER: 'claude' },
+    { PORTAL_RUNNER: 'claude-cli', PORTAL_AGENT_CLI: 'claude.exe' },
     { PORTAL_LOG_LEVEL: 'verbose' },
   ])('rejects unsupported configuration %j', (env) => {
     expect(() => loadConfig(env)).toThrow();
@@ -50,6 +52,7 @@ describe('configuration', () => {
       dataDir: realpathSync.native(existingData),
       mode: 'fixture',
       runner: 'fake',
+      agentExecutable: undefined,
       logLevel: 'warn',
     });
   });

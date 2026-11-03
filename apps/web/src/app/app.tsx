@@ -36,7 +36,12 @@ import {
   artifactsApi as defaultArtifactsApi,
   type ArtifactsApi,
 } from '../shared/api/artifacts-api';
+import {
+  documentsApi as defaultDocumentsApi,
+  type DocumentsApi,
+} from '../shared/api/documents-api';
 import { Icon } from '../shared/ui/icon';
+import { DocumentsStep } from '../features/documents/documents-step';
 import { SessionStatus } from './session-status';
 import {
   Link,
@@ -46,6 +51,7 @@ import {
   NEW_PROJECT_PATH,
   stepPath,
   usePathname,
+  useQueryParam,
   type Route,
   type StepId,
 } from './router';
@@ -55,6 +61,7 @@ type AppProps = {
   runsApi?: RunsApi;
   sourcesApi?: SourcesApi;
   artifactsApi?: ArtifactsApi;
+  documentsApi?: DocumentsApi;
   session?: LocalSessionClient;
 };
 
@@ -63,6 +70,7 @@ type Apis = {
   runsApi: RunsApi;
   sourcesApi: SourcesApi;
   artifactsApi: ArtifactsApi;
+  documentsApi: DocumentsApi;
 };
 
 // `api`, `runsApi`, `sourcesApi` and `artifactsApi` must use `session` as their credential source; tests
@@ -75,14 +83,15 @@ export function App(props: AppProps) {
   );
 }
 
-// Steps 3–5 have no implementation yet; their pages say why.
-const UNAVAILABLE_STEPS: readonly StepId[] = ['documents', 'review', 'quote'];
+// Steps 4–5 have no implementation yet; their pages say why.
+const UNAVAILABLE_STEPS: readonly StepId[] = ['review', 'quote'];
 
 function AppShell({
   api = projectsApi,
   runsApi = defaultRunsApi,
   sourcesApi = defaultSourcesApi,
   artifactsApi = defaultArtifactsApi,
+  documentsApi = defaultDocumentsApi,
   session = localSession,
 }: AppProps) {
   const { messages } = useLocale();
@@ -118,9 +127,10 @@ function AppShell({
     runsApi,
     sourcesApi,
     artifactsApi,
+    documentsApi,
   });
 
-  const apis = { api, runsApi, sourcesApi, artifactsApi };
+  const apis = { api, runsApi, sourcesApi, artifactsApi, documentsApi };
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -245,6 +255,8 @@ function Sidebar({
     if (UNAVAILABLE_STEPS.includes(step)) return 'unavailable';
     if (progress.status !== 'ready') return 'todo';
     if (step === 'source') return progress.sourceSaved ? 'done' : 'todo';
+    if (step === 'documents')
+      return progress.documentsWritten ? 'done' : 'todo';
     return progress.analysisRunId ? 'done' : 'todo';
   };
   return (
@@ -399,6 +411,8 @@ function StepPage({
   const { messages } = useLocale();
   const copy = messages.shell;
   const index = STEP_IDS.indexOf(step) + 1;
+  // Step 3 works on the program picked on the analysis screen.
+  const program = useQueryParam('program');
   return (
     <div className="page">
       <header className="page-header">
@@ -414,6 +428,9 @@ function StepPage({
         <h1 id="page-title">{copy.pageTitles[step]}</h1>
         {step === 'source' && (
           <p className="page-lead">{messages.sourceStep.lead}</p>
+        )}
+        {step === 'documents' && (
+          <p className="page-lead">{messages.documents.lead}</p>
         )}
       </header>
       {step === 'source' ? (
@@ -440,6 +457,25 @@ function StepPage({
           runId={runId}
           progress={progress}
           onRetry={onRetryProgress}
+          artifactsApi={apis.artifactsApi}
+        />
+      ) : step === 'documents' ? (
+        <DocumentsStep
+          key={project.id}
+          projectId={project.id}
+          program={program}
+          projectMode={project.mode}
+          analysis={
+            progress.status === 'ready'
+              ? { status: 'ready', runId: progress.analysisRunId }
+              : { status: progress.status }
+          }
+          onRetryAnalysis={onRetryProgress}
+          documentsWritten={
+            progress.status === 'ready' && progress.documentsWritten
+          }
+          onDocumentsChanged={onProgress}
+          api={apis.documentsApi}
           artifactsApi={apis.artifactsApi}
         />
       ) : (

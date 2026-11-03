@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Project, Run } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
@@ -241,47 +242,51 @@ export function RecentProjects({
           ))}
         </ul>
       )}
-      {pending && (
-        <div className="modal-backdrop">
-          <div
-            className="modal"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-project-title"
-            aria-describedby="delete-project-body"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape' && !deleting) closeDelete();
-            }}
-          >
-            <h3 id="delete-project-title">{copy.delete.title}</h3>
-            <p id="delete-project-body">{copy.delete.body(pending.name)}</p>
-            {deleteError && (
-              <p role="alert" className="error">
-                {deleteError}
-              </p>
-            )}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="button small"
-                autoFocus
-                disabled={deleting}
-                onClick={closeDelete}
-              >
-                {copy.delete.cancel}
-              </button>
-              <button
-                type="button"
-                className="button small danger"
-                disabled={deleting}
-                onClick={() => void confirmDelete(pending)}
-              >
-                {deleting ? copy.delete.deleting : copy.delete.confirm}
-              </button>
+      {/* On the body: an ancestor with a transform or overflow would clip a
+          fixed overlay to its own box. */}
+      {pending &&
+        createPortal(
+          <div className="modal-backdrop">
+            <div
+              className="modal"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-project-title"
+              aria-describedby="delete-project-body"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && !deleting) closeDelete();
+              }}
+            >
+              <h3 id="delete-project-title">{copy.delete.title}</h3>
+              <p id="delete-project-body">{copy.delete.body(pending.name)}</p>
+              {deleteError && (
+                <p role="alert" className="error">
+                  {deleteError}
+                </p>
+              )}
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button small"
+                  autoFocus
+                  disabled={deleting}
+                  onClick={closeDelete}
+                >
+                  {copy.delete.cancel}
+                </button>
+                <button
+                  type="button"
+                  className="button small danger"
+                  disabled={deleting}
+                  onClick={() => void confirmDelete(pending)}
+                >
+                  {deleting ? copy.delete.deleting : copy.delete.confirm}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </aside>
   );
 }

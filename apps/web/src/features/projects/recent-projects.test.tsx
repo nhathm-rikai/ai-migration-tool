@@ -206,6 +206,10 @@ describe('Recent projects (UI04)', () => {
       const dialog = await open();
       expect(within(dialog).getByText('Xóa dự án này?')).toBeTruthy();
       expect(dialog.textContent).toContain('"Payroll"');
+      // A viewport-level overlay: a child of the body, not of the panel (an
+      // ancestor with a transform would clip a fixed overlay to its box).
+      const backdrop = dialog.closest('.modal-backdrop');
+      expect(backdrop?.parentElement).toBe(document.body);
       fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }));
       expect(screen.queryByRole('alertdialog')).toBeNull();
       expect(deleteCalls(fetcher)).toHaveLength(0);

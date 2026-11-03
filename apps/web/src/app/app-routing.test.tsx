@@ -251,11 +251,10 @@ describe('step marks (UI01-AC02)', () => {
     expect(within(step(/Tạo tài liệu/)).queryByText(/Chưa khả dụng/)).toBe(
       null,
     );
-    for (const name of [/Review & duyệt/, /Báo giá/]) {
-      expect(done(name)).toBe(false);
-      expect(within(step(name)).getByText(/Chưa khả dụng/)).toBeTruthy();
-    }
-    // Steps 4–5 say why they are not available.
+    expect(done(/Review & duyệt/)).toBe(false);
+    expect(done(/Báo giá/)).toBe(false);
+    expect(within(step(/Báo giá/)).getByText(/Chưa khả dụng/)).toBeTruthy();
+    // Step 5 says why it is not available.
     expect(screen.getByRole('heading', { name: 'Chưa khả dụng' })).toBeTruthy();
     expect(
       screen.getByText(/mô hình ước tính chưa được cấu hình/),

@@ -869,6 +869,43 @@ export const jaMessages = {
         'このファイルは存在しないか、一式がまだ完了していません。',
     },
   },
+  review: {
+    loading: 'ドキュメントを読み込み中…',
+    emptyTitle: 'レビューするドキュメントがありません',
+    emptyHelp:
+      'ステップ 3 でプログラムのドキュメントを作成すると、ここに表示されます。',
+    emptyAction: 'ドキュメント作成へ',
+    createQuote: '見積を作成',
+    previewQuote: '見積をプレビュー',
+    listLabel: 'ドキュメント一覧',
+    preview: 'ドキュメントのプレビュー',
+    reviewLabel: '評価',
+    noDocuments: 'この状態のドキュメントはありません。',
+    filters: { all: 'すべて', pending: '承認待ち', approved: '承認済み' },
+    status: { pending: '承認待ち', approved: '承認済み' },
+    setOf: (total: number) => `ドキュメント一式 · ${total} 件`,
+    downloadSet: (name: string) => `${name} のドキュメント一式をダウンロード`,
+    approvedOf: (done: number, total: number) => `${done}/${total} 承認済み`,
+    unresolved: (count: number) =>
+      `このドキュメントには未確定事項が ${count} 件あります。`,
+    seeUnresolved: '表示',
+    docNames: {
+      'business-rules': '業務ルール',
+      'basic-design': '基本設計',
+      'detail-design': '詳細設計',
+      'db-design': 'DB設計',
+      'security-audit': 'セキュリティ監査',
+    },
+    comments: 'コメント',
+    noComments: 'コメントはありません。',
+    commentPlaceholder: 'コメントを入力…',
+    send: '送信',
+    approve: 'ドキュメントを承認',
+    errors: {
+      REVIEW_STALE:
+        'このドキュメントには新しいバージョンがあります。ページを再読み込みしてください。',
+    },
+  },
   errors: {
     unexpected: '処理中にエラーが発生しました。もう一度お試しください。',
     outcomeUnknown:

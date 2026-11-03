@@ -1,6 +1,6 @@
 # Specification design — security audit
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.11.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md), [template](../templates/security-audit.md).
 
@@ -44,7 +44,7 @@ SD-SA-07: độ tin cậy từ 0.0 đến 1.0, do Agent tự đánh giá và kh�
 
 - Từ 0.8: luồng khai thác rõ trong source.
 - 0.7 đến dưới 0.8: mẫu đáng ngờ, cần điều kiện cụ thể.
-- Dưới 0.7: không ghi là phát hiện; nếu đáng kiểm tra thì ghi ở mục "Cần xác minh" kèm câu hỏi.
+- Dưới 0.7: không ghi là phát hiện; nếu đáng kiểm tra thì ghi ở mục "Cần xác minh" kèm việc cần kiểm tra.
 
 ## Lọc false positive
 

@@ -1,6 +1,6 @@
 # Bộ tài liệu specification-design từ source đa ngôn ngữ
 
-**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.10.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.9.0-draft` cho cả bảy template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
+**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.11.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.10.0-draft` cho cả bảy template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
 
 ## Thứ tự đọc
 
@@ -18,7 +18,7 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 
 Source ngôn ngữ nào trong allowlist thì phân tích ngôn ngữ đó; không có profile theo ngôn ngữ và người vận hành không bắt buộc khai báo ngôn ngữ. Agent tự nhận diện ngôn ngữ/runtime có căn cứ ở bước 0, ghi vào coverage, rồi áp cùng quy trình, checklist semantics chung và template trung lập theo [quy trình phân tích](analysis-method.md). Quy trình này cũng quy định cách xử lý khi thiếu parser, encoding chưa decode được hoặc gặp binary/generated code. Chưa tuyên bố parser Portal hỗ trợ mọi ngôn ngữ.
 
-Giữ bảy file template output (năm tài liệu + hai report section), thứ tự section và packaging tối đa năm Markdown (TL chọn tài liệu cần tạo). Từ 0.9.0 không còn `coverage.md`/`open-questions.md` riêng: đây là phân tích source hiện trạng, trạng thái sinh, phạm vi đã đọc và câu hỏi mở nằm ngay trong từng tài liệu. Gói KUNO0020 đã sinh giữ version cũ; chưa có calibration ngoài VB6.
+Giữ bảy file template output (năm tài liệu + hai report section), thứ tự section và packaging tối đa năm Markdown (TL chọn tài liệu cần tạo). Từ 0.9.0 không còn `coverage.md`/`open-questions.md` riêng: đây là phân tích source hiện trạng, trạng thái sinh, phạm vi đã đọc và điểm chưa xác định nằm ngay trong từng tài liệu. Gói KUNO0020 đã sinh giữ version cũ; chưa có calibration ngoài VB6.
 
 ## Flow nghiệp vụ trên Portal
 
@@ -55,12 +55,11 @@ Chọn tường minh một chế độ:
 
 Phần đầu chung cho mỗi template (bảng ngay dưới tiêu đề): unit/program, project/entrypoint path và alias, snapshot và version đã được cung cấp, ngôn ngữ/runtime phát hiện ở bước 0 (có căn cứ), phạm vi đã đọc (file đã/chưa đọc, excluded/missing/unsupported kèm lý do), giới hạn, nhãn Draft, và dòng **Trạng thái sinh** (`đang sinh` kèm đơn vị dừng gần nhất, hoặc `hoàn tất` khi không còn đơn vị "chưa phân tích" trong phạm vi của tài liệu, theo [SD-CT-08](rules/artifacts.md)). AI chỉ chép định danh đã cung cấp; không cấp artifact/run ID, hash, thời điểm, reviewer hoặc review state. Thiếu metadata ghi “chưa được cung cấp”. Nhãn Draft không phải quyền ghi envelope.
 
-Phần cuối chung: **câu hỏi mở** của tài liệu đó, đặt trong section questions sẵn có của template (Basic §8, DB §6, Detail §7, Security audit §7) hoặc mục "Câu hỏi mở" cuối tài liệu (Business rules), theo bảng:
+Phần cuối chung: mục **Điểm chưa xác định** là section cuối cùng của mọi tài liệu. Đây là source cũ nên agent không đặt câu hỏi và không có trạng thái blocking; mục này chỉ ghi nhận những gì source không đủ căn cứ để kết luận, người review đọc trước khi duyệt:
 
-| Q-ID   | Câu hỏi/thiếu gì | Related BR/DS/section | Blocking đề xuất | Phần ảnh hưởng | Evidence/context cần thêm |
-| ------ | ---------------- | --------------------- | ---------------- | -------------- | ------------------------- |
+- **U-01** — <điểm chưa xác định> · Liên quan: <BR/DS/section> · Căn cứ: <E-ref hoặc lý do>
 
-Q-ID đánh số trong cả gói của program, không trùng giữa các tài liệu; tài liệu khác dẫn Q-ID của tài liệu đã mở nó. Không có câu hỏi thì ghi "Không có". Resolution do người có quyền ghi riêng, append-only theo [contract](../engineering/specs/understanding-contract.md); AI không điền reviewer/UTC/quyết định hoặc xóa câu hỏi. Số đo coverage/LoC/KPI lấy từ công cụ và hồ sơ review, không do agent điền ([SD-EV-08](rules/context-evidence.md)).
+U-ID đánh số trong cả gói của program, không trùng giữa các tài liệu; tài liệu khác dẫn U-ID của tài liệu đã ghi nó. Không có điểm nào thì ghi "Không có". Không suy đoán để lấp chỗ thiếu; không biến điểm chưa xác định thành yêu cầu người đọc phải trả lời. Số đo coverage/LoC/KPI lấy từ công cụ và hồ sơ review, không do agent điền ([SD-EV-08](rules/context-evidence.md)).
 
 ## Nguồn chuẩn
 

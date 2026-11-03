@@ -91,6 +91,10 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.DOCUMENT_NOT_FOUND,
     message: 'Document not found.',
   },
+  REVIEW_STALE: {
+    status: S.REVIEW_STALE,
+    message: 'This document version is no longer the one under review.',
+  },
 } as const satisfies Record<
   AnalyzeApiErrorCode,
   { status: number; message: string }

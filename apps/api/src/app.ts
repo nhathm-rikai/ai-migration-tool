@@ -95,6 +95,6 @@ export function buildApp(
   registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);
   registerArtifactRoutes(app, dependencies.artifacts);
   registerFolderPickerRoutes(app, dependencies.folderPicker);
-  registerDocumentRoutes(app, dependencies.documents);
+  registerDocumentRoutes(app, dependencies.documents, dependencies.reviews);
   return app;
 }

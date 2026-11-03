@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Project } from '@portal/contracts';
 import { branding } from './branding';
 import { SourceStep } from '../features/source/source-step';
@@ -41,6 +41,7 @@ import {
   type DocumentsApi,
 } from '../shared/api/documents-api';
 import { Icon } from '../shared/ui/icon';
+import { ReviewStep } from '../features/review/review-step';
 import { DocumentsStep } from '../features/documents/documents-step';
 import { SessionStatus } from './session-status';
 import {
@@ -84,7 +85,7 @@ export function App(props: AppProps) {
 }
 
 // Steps 4–5 have no implementation yet; their pages say why.
-const UNAVAILABLE_STEPS: readonly StepId[] = ['review', 'quote'];
+const UNAVAILABLE_STEPS: readonly StepId[] = ['quote'];
 
 function AppShell({
   api = projectsApi,
@@ -257,6 +258,7 @@ function Sidebar({
     if (step === 'source') return progress.sourceSaved ? 'done' : 'todo';
     if (step === 'documents')
       return progress.documentsWritten ? 'done' : 'todo';
+    if (step === 'review') return 'todo';
     return progress.analysisRunId ? 'done' : 'todo';
   };
   return (
@@ -413,6 +415,7 @@ function StepPage({
   const index = STEP_IDS.indexOf(step) + 1;
   // Step 3 works on the program picked on the analysis screen.
   const program = useQueryParam('program');
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   return (
     <div className="page">
       <header className="page-header">
@@ -425,7 +428,10 @@ function StepPage({
             </>
           )}
         </span>
-        <h1 id="page-title">{copy.pageTitles[step]}</h1>
+        <div className="page-title-row">
+          <h1 id="page-title">{copy.pageTitles[step]}</h1>
+          <div ref={setHeaderSlot} />
+        </div>
         {step === 'source' && (
           <p className="page-lead">{messages.sourceStep.lead}</p>
         )}
@@ -477,6 +483,13 @@ function StepPage({
           onDocumentsChanged={onProgress}
           api={apis.documentsApi}
           artifactsApi={apis.artifactsApi}
+        />
+      ) : step === 'review' ? (
+        <ReviewStep
+          projectId={project.id}
+          program={program}
+          headerSlot={headerSlot}
+          api={apis.documentsApi}
         />
       ) : (
         <UnavailableStep projectId={project.id} step={step} />

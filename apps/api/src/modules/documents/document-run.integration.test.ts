@@ -176,7 +176,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       ],
       runner: 'fake',
       effort: 'medium',
-      promptVersion: 'spec-design-task-v5',
+      promptVersion: 'spec-design-task-v6',
     });
     expect(queued.config.specPack).toMatch(
       /^spec-design-rules-.+ \+ spec-design-templates-/,
@@ -196,7 +196,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       ),
     );
     // Sections come from the templates of the pack copy.
-    expect(done.items[0]?.documents?.[2]?.sections?.total).toBe(10);
+    expect(done.items[0]?.documents?.[2]?.sections?.total).toBe(11);
     expect(done.items[0]?.reading?.done).toBe(done.items[0]?.reading?.total);
     expect(done.items[0]?.files.map((file) => file.name)).toEqual([
       'business-rules.md',

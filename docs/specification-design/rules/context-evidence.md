@@ -1,6 +1,6 @@
 # Specification design — đầu vào và chứng cứ
 
-**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.10.0-draft.
+**DRAFT — chờ duyệt.** Pack: spec-design-rules-0.11.0-draft.
 
 [Thứ tự đọc và nguồn quy định](../README.md).
 
@@ -26,7 +26,7 @@ SD-EV-02: quote phải khớp các dòng của normalized view, nối bằng LF,
 
 SD-EV-03: claim phụ thuộc nhiều đoạn cần đủ evidence cho các đoạn quyết định. Chỉ dẫn dòng tên function không đủ chứng minh công thức hay điều kiện bên trong.
 
-SD-EV-04: phân biệt `observed` (thấy trực tiếp), `hypothesis` (suy luận), `unknown` (chưa biết). Trong payload hiện hữu, unknown biểu diễn bằng câu hỏi, không thêm giá trị enum mới. Code cho biết hành vi; comment cho biết ý định. Nếu mâu thuẫn, ghi cả hai và mở câu hỏi.
+SD-EV-04: phân biệt `observed` (thấy trực tiếp), `hypothesis` (suy luận), `unknown` (chưa biết). Trong tài liệu, unknown ghi ở mục Điểm chưa xác định; trong payload hiện hữu biểu diễn bằng `questions`, không thêm giá trị enum mới. Code cho biết hành vi; comment cho biết ý định. Nếu mâu thuẫn, ghi cả hai và ghi một điểm chưa xác định.
 
 SD-EV-05: không bịa tên bảng, khóa, quan hệ, kiểu dữ liệu, nghiệp vụ hoặc kết quả chạy. Không biến "chưa tìm thấy" thành "không tồn tại". Không tự sửa lỗi legacy trong phần mô tả hiện trạng.
 

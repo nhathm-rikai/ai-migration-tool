@@ -38,6 +38,7 @@ export const AnalyzeApiErrorCodeSchema = Type.Union([
   // Document runs (step 3).
   Type.Literal('ANALYSIS_REQUIRED'),
   Type.Literal('DOCUMENT_NOT_FOUND'),
+  Type.Literal('REVIEW_STALE'),
 ]);
 export type AnalyzeApiErrorCode = Static<typeof AnalyzeApiErrorCodeSchema>;
 // HTTP status of each code; the BE error catalog reuses it.
@@ -58,6 +59,7 @@ export const ANALYZE_API_ERROR_HTTP_STATUS = {
   RUN_EVENTS_LIMIT: 429,
   ANALYSIS_REQUIRED: 409,
   DOCUMENT_NOT_FOUND: 404,
+  REVIEW_STALE: 409,
 } as const satisfies Record<AnalyzeApiErrorCode, number>;
 
 export const ErrorResponseSchema = Type.Object(

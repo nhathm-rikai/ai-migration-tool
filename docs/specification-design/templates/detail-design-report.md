@@ -1,12 +1,12 @@
 # Detail Design Report/Export — <PROGRAM> / <REPORT-ID> / <MODE>
 
-**DRAFT TEMPLATE — spec-design-templates-0.9.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
+**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** Phần mở rộng [Detail Design](detail-design.md), kết hợp [Basic report](basic-design-report.md) theo [hướng dẫn report](../report-templates.md). Giữ evidence, inventory/coverage và contract hiện có. Đây là mẫu cấu trúc, không phải report nghiệp vụ đã sinh.
 
-REPORT-ID/MODE và query/region/field IDs là tham chiếu Markdown, không thêm schema. Mọi mục có nội dung hoặc lý do không áp dụng hoặc chưa xác định + Q-ID. Không kế thừa session/web/DB/rounding từ mẫu tham khảo.
+REPORT-ID/MODE và query/region/field IDs là tham chiếu Markdown, không thêm schema. Mọi mục có nội dung hoặc lý do không áp dụng hoặc chưa xác định + U-ID. Không kế thừa session/web/DB/rounding từ mẫu tham khảo.
 
 ## 0. Thuật ngữ và nguồn
 
-| Nhãn/identifier gốc | Diễn giải Việt | Đơn vị/ngữ cảnh | Basic ref | Evidence/provenance/Q-ID |
+| Nhãn/identifier gốc | Diễn giải Việt | Đơn vị/ngữ cảnh | Basic ref | Evidence/provenance/U-ID |
 | ------------------------ | -------------- | --------------- | --------- | ------------------------ |
 
 ## 1. Tổng quan report — 帳票概要
@@ -21,17 +21,17 @@ REPORT-ID/MODE và query/region/field IDs là tham chiếu Markdown, không thê
 | Input ID | Biến/control/tham số | Kiểu/format | Nguồn | Required/default | Validation/cutoff/biến đổi | Evidence |
 | -------- | -------------------- | ----------- | ----- | ---------------- | -------------------------- | -------- |
 
-| Mode | Điều kiện chọn | Query/nhánh/group | Layout/file contract áp dụng | Key cấu hình đích | Evidence/Q-ID |
+| Mode | Điều kiện chọn | Query/nhánh/group | Layout/file contract áp dụng | Key cấu hình đích | Evidence/U-ID |
 | ---- | -------------- | ----------------- | ---------------------------- | ----------------- | ------------- |
 
 Ghi đầy đủ các mode chi tiết/tổng hợp/SQL lựa chọn nếu thấy, không tự áp chúng cho mọi report.
 
 ## 3. Output — アウトプット
 
-| Output/Basic field-region ref | Kiểu file thực tế | Template/sheet/record | Đơn vị/số lượng/giới hạn | Trường hợp rỗng/overflow | Evidence/Q-ID |
+| Output/Basic field-region ref | Kiểu file thực tế | Template/sheet/record | Đơn vị/số lượng/giới hạn | Trường hợp rỗng/overflow | Evidence/U-ID |
 | ----------------------------- | ----------------- | --------------------- | ------------------------ | ------------------------ | ------------- |
 
-Basic sở hữu layout/format người dùng; Detail tham chiếu và ghi cách tạo. Nếu mâu thuẫn mở Q-ID, không tự sửa một phía.
+Basic sở hữu layout/format người dùng; Detail tham chiếu và ghi cách tạo. Nếu mâu thuẫn mở U-ID, không tự sửa một phía.
 
 ## 4. Nguồn dữ liệu và query — 使用テーブル
 
@@ -78,10 +78,10 @@ Ghi rõ tổng trước hay sau làm tròn, giá trị số hay công thức Exc
 | Field ID / Basic ref | Sheet/cell/range hoặc ordinal/header/record type | Query/biến nguồn | Conversion/calculation ref | Repeat/điều kiện ghi | Null/0/blank | Value/text/formula | Format owner | Evidence |
 | -------------------- | ------------------------------------------------ | ---------------- | -------------------------- | -------------------- | ------------ | ------------------ | ------------ | -------- |
 
-| Formula region | Biểu thức nguyên dạng/nguồn template | Tham chiếu relative/absolute | Quy tắc copy/offset khi lặp | Recalculation/consumer | Evidence/provenance/Q-ID |
+| Formula region | Biểu thức nguyên dạng/nguồn template | Tham chiếu relative/absolute | Quy tắc copy/offset khi lặp | Recalculation/consumer | Evidence/provenance/U-ID |
 | -------------- | ------------------------------------ | ---------------------------- | --------------------------- | ---------------------- | ------------------------ |
 
-CSV/text có bảng tuần tự record/cột; ghi call site API/thư viện ghi file thực tế và chứng cứ quoting/escape/newline, không suy từ đuôi file. Dữ liệu có delimiter, quote, xuống dòng, số 0 đầu và ký tự Nhật cần được mô tả nếu source xử lý; thiếu thì Q-ID.
+CSV/text có bảng tuần tự record/cột; ghi call site API/thư viện ghi file thực tế và chứng cứ quoting/escape/newline, không suy từ đuôi file. Dữ liệu có delimiter, quote, xuống dòng, số 0 đầu và ký tự Nhật cần được mô tả nếu source xử lý; thiếu thì U-ID.
 
 ## 8. Layout và format — レイアウト・書式
 
@@ -92,7 +92,7 @@ Chỉ ghi cách áp dụng/ghi đè, không nhân bản đặc tả layout. Help
 
 ## 9. File output và consumer — ファイル出力
 
-| Thuộc tính              | Hành vi hiện trạng                                                                      | Call site/Evidence/Q-ID |
+| Thuộc tính              | Hành vi hiện trạng                                                                      | Call site/Evidence/U-ID |
 | ----------------------- | --------------------------------------------------------------------------------------- | ----------------------- |
 | Resolve đích            | <config key/hàm đọc, precedence/default, dialog, relative base; không lộ path nhạy cảm> |                         |
 | Tên file                | <SQL name/mode/kỳ/timestamp/extension theo source>                                      |                         |
@@ -102,11 +102,11 @@ Chỉ ghi cách áp dụng/ghi đè, không nhân bản đặc tả layout. Help
 | Hoàn tất / ghi dở       | <temp/rename nếu có, file partial và khi báo thành công>                                |                         |
 | Consumer/RPA            | <cột/format/thứ tự phải giữ; provenance xác nhận>                                       |                         |
 
-Comment về tương thích là bằng chứng ý định; đối chiếu code, nếu mâu thuẫn mở Q-ID. Không tự thêm cột/escape/chống formula injection vào hành vi legacy; tài liệu review vẫn lưu trích dẫn như text theo policy specification-design.
+Comment về tương thích là bằng chứng ý định; đối chiếu code, nếu mâu thuẫn mở U-ID. Không tự thêm cột/escape/chống formula injection vào hành vi legacy; tài liệu review vẫn lưu trích dẫn như text theo policy specification-design.
 
 ## 10. Transaction và lỗi — トランザクション・例外処理
 
-| Tình huống/điều kiện                 | Boundary transaction nếu có | Cơ chế lỗi/nhánh | Dữ liệu/file đã thay đổi | Message nguyên văn | Close/cleanup/retry | Evidence/Q-ID |
+| Tình huống/điều kiện                 | Boundary transaction nếu có | Cơ chế lỗi/nhánh | Dữ liệu/file đã thay đổi | Message nguyên văn | Close/cleanup/retry | Evidence/U-ID |
 | ------------------------------------ | --------------------------- | --------------------- | ------------------------ | ------------------ | ------------------- | ------------- |
 | Không có dữ liệu/giới hạn vượt       |                             |                       |                          |                    |                     |               |
 | Thiếu/sai config hoặc template       |                             |                       |                          |                    |                     |               |
@@ -118,7 +118,7 @@ Không khẳng định không transaction hoặc cleanup an toàn nếu chỉ ch
 
 ## 11. Common và dependency — 共通詳細設計参照
 
-| Canonical common/dependency | Input | Output sử dụng | Điều kiện gọi/mode | Tác động kết quả/lỗi | Mục chuẩn/version | Evidence/Q-ID |
+| Canonical common/dependency | Input | Output sử dụng | Điều kiện gọi/mode | Tác động kết quả/lỗi | Mục chuẩn/version | Evidence/U-ID |
 | --------------------------- | ----- | -------------- | ------------------ | -------------------- | ----------------- | ------------- |
 
 Giữ canonical BR/reference, không copy common thành nhiều rule. Inventory/procedure/file-level coverage, câu hỏi và registry evidence nối về Detail Design của program; mọi mode/query/field/loop phải có trace hoặc khoảng trống được ghi rõ. Không thêm reference cross-artifact bất hợp schema v1.

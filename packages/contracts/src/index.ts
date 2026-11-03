@@ -11,3 +11,4 @@ export * from './artifact.schema.js';
 export * from './analyze-api.js';
 export * from './documents.schema.js';
 export * from './documents-api.js';
+export * from './reviews.schema.js';

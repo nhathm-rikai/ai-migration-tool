@@ -1,6 +1,6 @@
 # Phiếu đầu vào một run specification-design
 
-**DRAFT INPUT — spec-design-templates-0.9.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
+**DRAFT INPUT — spec-design-templates-0.10.0-draft.** [Cách dùng](../README.md), [flow Portal](../README.md#flow-nghiệp-vụ-trên-portal). Phiếu thủ công đề xuất, không phải schema/context builder đã triển khai.
 
 Input chỉ gồm hai nhóm: **source legacy** và **output của P1**. Lựa chọn program và tài liệu cần tạo là phạm vi run do TL chọn trên Portal (mục 3); tài liệu đã duyệt từ run trước do Portal đưa kèm nếu có (mục 4). Snapshot/hash, decode, quyền đọc/ghi và phiên bản CLI do Portal/công cụ quản lý, không do người điền. Ngôn ngữ/runtime do agent tự nhận diện theo [quy trình phân tích](../analysis-method.md).
 
@@ -19,7 +19,7 @@ Input chỉ gồm hai nhóm: **source legacy** và **output của P1**. Lựa ch
 | 1.2    | LoC report — LoC theo function (Physical/Exe/Comment/Blank/SQL)                     | Số đo LoC/coverage trong tài liệu; agent không tự đếm ([SD-EV-08](../rules/context-evidence.md)) | <điền>            |
 | 1.3    | Dependency — dependency graph và DB access                                          | Caller/callee, module dùng chung, bảng/SQL theo call site; thứ tự phân tích                   | <điền>            |
 
-Thiếu mục P1 nào thì ghi "chưa được cung cấp" và phần liên quan ghi "chưa đo"/Q-ID; không để agent tự dựng inventory, LoC hoặc dependency thay parser. Thiếu 1.1 là blocking vì không xác định được program và file thuộc program.
+Thiếu mục P1 nào thì ghi "chưa được cung cấp" và phần liên quan ghi "chưa đo"/U-ID; không để agent tự dựng inventory, LoC hoặc dependency thay parser. Thiếu 1.1 là blocking vì không xác định được program và file thuộc program.
 
 ## 3. Phạm vi run (TL chọn trên Portal)
 

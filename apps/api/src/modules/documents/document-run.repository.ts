@@ -46,6 +46,8 @@ export interface DocumentRunRepository {
   ): { run: DocumentRun; requestFingerprint: string } | undefined;
   findActive(projectId: string): DocumentRun | undefined;
   findLatest(projectId: string): DocumentRun | undefined;
+  // Runs that ended, newest first.
+  listEnded(projectId: string): DocumentRun[];
   findExecuting(): DocumentRun[];
   // queued -> running for the oldest queued run, only while nothing executes.
   claimNextQueued(now: string): DocumentRun | undefined;
@@ -184,6 +186,11 @@ export function createDocumentRunRepository(
   const findActive = db.prepare<[string], Row>(
     `SELECT ${COLUMNS} FROM document_runs WHERE project_id = ?
        AND status IN ('queued', 'running', 'cancelling')`,
+  );
+  const listEnded = db.prepare<[string], Row>(
+    `SELECT ${COLUMNS} FROM document_runs WHERE project_id = ?
+       AND status NOT IN ('queued', 'running', 'cancelling')
+     ORDER BY created_at DESC, id DESC`,
   );
   const findLatest = db.prepare<[string], Row>(
     `SELECT ${COLUMNS} FROM document_runs WHERE project_id = ?
@@ -367,6 +374,7 @@ export function createDocumentRunRepository(
       const row = findLatest.get(projectId);
       return row ? toRun(row) : undefined;
     },
+    listEnded: (projectId) => listEnded.all(projectId).map(toRun),
     findExecuting: () => findExecuting.all().map(toRun),
     claimNextQueued: (now) => checkedUpdate(() => claim.get(now, now)),
     transition: (runId, expected, patch, now) =>

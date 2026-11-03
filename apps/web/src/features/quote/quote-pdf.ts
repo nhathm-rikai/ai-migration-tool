@@ -50,8 +50,10 @@ async function dataUrl(url: string): Promise<string> {
   const blob = await response.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
+    reader.onload = () =>
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () =>
+      reject(reader.error ?? new Error('The image could not be read.'));
     reader.readAsDataURL(blob);
   });
 }
@@ -200,7 +202,7 @@ export async function renderQuotePdf(
     await loaded;
     const frameDocument = frame.contentDocument;
     if (!frameDocument) throw new Error('The quote could not be laid out.');
-    const root = frameDocument.importNode(source, true) as HTMLElement;
+    const root = frameDocument.importNode(source, true);
     root.classList.add('qd-export');
     const logo = root.querySelector('img');
     if (logo) logo.setAttribute('src', await dataUrl(branding.logoUrl));
@@ -268,7 +270,7 @@ export async function renderQuotePdf(
         height: canvas.height,
       });
     }
-    return pdf(rendered) as Uint8Array<ArrayBuffer>;
+    return pdf(rendered);
   } finally {
     frame.remove();
   }

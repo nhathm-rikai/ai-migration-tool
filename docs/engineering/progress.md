@@ -1,5 +1,12 @@
 # Tiến độ kỹ thuật Portal
 
+## 03/11/2026 — Xóa dự án cũ
+
+- `DELETE /api/v1/projects/:projectId` (200 `{ id }`): một transaction xóa mọi dòng của dự án (review, tiến trình agent, log và lượt chạy tài liệu, artifact, lượt chạy phân tích, bản chụp, đăng ký nguồn và các revision), rồi xóa dự án; sau commit mới xóa file app sở hữu (bản chụp, payload inventory, file gói tài liệu, workspace spec). Lỗi xóa file chỉ ghi log vì dòng công bố đã mất nên file mồ côi không bao giờ được đọc. Thư mục mã nguồn gốc của người dùng không bị đụng tới.
+- Dự án còn lượt chạy queued/running/cancelling bị từ chối `PROJECT_BUSY` (409), không xóa gì; phải hủy hoặc chờ xong. Mã mới nằm trong `AnalyzeApiErrorCodeSchema`.
+- UI: nút xóa trên mỗi thẻ "Dự án gần đây" (hiện khi rê chuột hoặc focus), hộp thoại xác nhận `alertdialog` (Hủy có focus mặc định, Esc đóng), tải lại danh sách sau khi xóa, về "Dự án mới" nếu xóa dự án đang mở. Chuỗi vi/ja (repo chưa có en).
+- Kiểm chứng: test repository (mọi bảng, FK, dự án khác giữ nguyên, từng trạng thái active), test tích hợp API, test web (hủy, Esc, xác nhận, PROJECT_BUSY) và E2E `delete-project.spec.ts` (@smoke). Chưa kiểm xóa dự án rất lớn hay xóa khi process khác dùng chung data dir.
+
 ## 03/11/2026 — Báo giá theo BSN_Estimation_v1.0
 
 - Yêu cầu của người phụ trách: effort tính từ complexity, không nhân LoC với hệ số (điểm complexity đã chứa size 30 điểm nên nhân là tính trùng); công thức khác WBS ở điểm này. Thay quyết định 02/11 về LoC × hệ số 0.8/1.0/1.3/1.4 và năng suất 1.100 LoC/MM.

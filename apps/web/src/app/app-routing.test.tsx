@@ -253,12 +253,7 @@ describe('step marks (UI01-AC02)', () => {
     );
     expect(done(/Review & duyệt/)).toBe(false);
     expect(done(/Báo giá/)).toBe(false);
-    expect(within(step(/Báo giá/)).getByText(/Chưa khả dụng/)).toBeTruthy();
-    // Step 5 says why it is not available.
-    expect(screen.getByRole('heading', { name: 'Chưa khả dụng' })).toBeTruthy();
-    expect(
-      screen.getByText(/mô hình ước tính chưa được cấu hình/),
-    ).toBeTruthy();
+    expect(within(step(/Báo giá/)).queryByText(/Chưa khả dụng/)).toBeNull();
   });
 
   it('leaves both steps open without a source, and analysis open when no succeeded run has an inventory', async () => {

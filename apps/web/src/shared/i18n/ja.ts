@@ -531,7 +531,7 @@ export const jaMessages = {
       columnHints: {
         codeLines:
           '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
-        complexity: '参考の複雑度。工数の算出には使いません',
+        complexity: '参考の複雑度。見積ドラフトではこのレベルを係数に使います',
       },
       state: {
         complete: '完全',
@@ -905,6 +905,89 @@ export const jaMessages = {
       REVIEW_STALE:
         'このドキュメントには新しいバージョンがあります。ページを再読み込みしてください。',
     },
+  },
+  quote: {
+    title: (project: string) => `${project} 移行見積`,
+    loading: '見積データを読み込み中…',
+    loadFailed: '見積に必要な解析結果を読み込めませんでした。',
+    emptyTitle: '解析結果がありません',
+    emptyHelp: '見積は最新の解析の全プログラムを対象とします。',
+    emptyAction: '解析へ',
+    lead: (programs: number, loc: number, skipped: number) =>
+      `最新の解析の全 ${programs} プログラム、${loc.toLocaleString('en-US')} LoC に基づく` +
+      (skipped > 0 ? ` · 解析できなかった ${skipped} プログラムは未計上` : ''),
+    draft:
+      '参考用のドラフトです。複雑度係数と生産性は実案件で検証されていません。顧客へ送付する前に担当者が確認してください。',
+    exportPdf: 'PDF 出力',
+    exportExcel: 'Excel 出力',
+    send: '顧客へ送付',
+    sendLater: 'このバージョンでは未対応です',
+    totalCost: '総費用',
+    costNote: '税抜 · AI 支援適用済み',
+    totalEffort: '総工数',
+    effortNote: (dev: string, mgmt: string) =>
+      `Dev ${dev} MM + PM/BrSE/Comtor ${mgmt} MM`,
+    duration: '想定期間',
+    months: (months: number) => `${months} か月`,
+    durationNote: (devs: number, saved: string) =>
+      `チーム ${devs} 名 · AI 削減 ${saved} MM`,
+    paramsTitle: 'パラメータ',
+    validity: (days: number) => `有効期限 ${days} 日`,
+    quoteNumber: '見積番号',
+    validityDays: '有効期限（日）',
+    scopeTitle: '作業項目',
+    scopeHelp: 'コーディング（100%）に対する工数比率',
+    aiTitle: 'AI 支援',
+    aiHelp: 'フェーズ別に工数を削減',
+    aiCode: 'DD・コーディング',
+    aiTest: 'テスト（QA / QC）',
+    saved: (saved: string) => `${saved} MM 削減 · BD は削減対象外`,
+    devs: '開発者数',
+    devsHelp: 'スケジュールの計算に使用',
+    devsLess: '開発者を減らす',
+    devsMore: '開発者を増やす',
+    rolesTitle: '役割と単価',
+    role: '役割',
+    rate: '単価',
+    roles: { pm: 'PM', brse: 'BrSE', comtor: 'Comtor', dev: 'Dev / QA / QC' },
+    rolesHelp:
+      'PM / BrSE / Comtor の % は開発工数（ドキュメント + コーディング + テスト）に対する比率です。Dev、QA、QC は同一単価です。',
+    formulaTitle: '計算式',
+    formula: [
+      '基準工数 = Σ (LoC × 複雑度係数) / 生産性',
+      'Dev = BD + (DD + コーディング) × (1 - AI) + テスト × (1 - AI test)',
+      'PM / BrSE / Comtor = % × Dev',
+      '費用 = Σ 役割別工数 × 役割別単価',
+      '期間 = Dev / 開発者数（月単位で切り上げ）',
+    ],
+    phaseTitle: 'フェーズ別工数',
+    phases: {
+      doc: 'ドキュメント',
+      code: 'コーディング（移行）',
+      test: 'テスト',
+      mgmt: 'PM / BrSE / Comtor',
+    },
+    scheduleTitle: '想定スケジュール',
+    scheduleNote: (devs: number, months: number) =>
+      `チーム ${devs} 名 · ${months} か月`,
+    moduleTitle: 'モジュール別明細',
+    factorNote:
+      '複雑度レベル別係数: 低 (<45) ×0.8 · 中 (45–59) ×1.0 · 高 (60–69) ×1.3 · 非常に高 (≥70) ×1.4',
+    module: 'モジュール',
+    programCount: 'プログラム',
+    complexity: '平均複雑度',
+    factor: '係数',
+    effort: '工数 (MM)',
+    cost: '費用',
+    shareColumn: '比率',
+    total: '合計',
+    assumptionsTitle: '前提と範囲',
+    assumptions: (productivity: number) => [
+      `標準生産性 ${productivity.toLocaleString('en-US')} LoC / MM（AI 支援適用前）。プログラム固有のコードで計算し、共通モジュールは含みません。`,
+      '最新の解析の全プログラムを対象とし、ドキュメントの状態には依存しません。',
+      'AI 支援は DD、コーディング、テストの工数を削減し、BD の工数は変わりません。',
+      '業務変更は含まず、機能同等の移行のみです。',
+    ],
   },
   errors: {
     unexpected: '処理中にエラーが発生しました。もう一度お試しください。',

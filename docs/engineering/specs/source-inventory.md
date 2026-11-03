@@ -86,7 +86,7 @@ Mức, so trên điểm đã làm tròn: `low` < 45 ≤ `medium` < 60 ≤ `high`
 
 Ngưỡng 45/60 chọn trên VB6 pilot (28/10/2026, `sql-access-v5`): thêm SQL ghép làm điểm cả corpus tăng khoảng 5, nên giữ 40/55 thì 15 program pilot chỉ khớp 9/15; với 45/60 khớp 15/15 và 10 program holdout khớp 7/10. Phân bố 284 program: Low 122, Medium 101, High 52, Very High 9 (điểm 70–79). Đổi công thức phải tăng `complexityVersion`.
 
-**Phạm vi dùng:** chỉ là phân loại tham khảo. Không dùng điểm để tự động tính effort hoặc báo giá. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback.
+**Phạm vi dùng:** phân loại tham khảo. Theo quyết định của người phụ trách (02/11/2026), báo giá nháp ở bước 5 dùng mức complexity làm hệ số effort, người phụ trách rà soát kết quả; không dùng làm số cam kết tự động. Model không đo xử lý file, ghi DB nhiều bảng và transaction/rollback.
 
 v1 không gắn cờ review (`reviewFlags`, mức cao hoặc gần ngưỡng) như v0; trường đó chỉ còn trong inventory v0 và không được report/UI dùng (quyết định của người dùng 28/10/2026).
 

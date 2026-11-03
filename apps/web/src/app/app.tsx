@@ -11,6 +11,7 @@ import {
 } from '../features/projects/use-project-list';
 import { useProject } from '../features/projects/use-project';
 import {
+  isReviewDone,
   useProjectProgress,
   type ProjectProgress,
 } from '../features/projects/use-project-progress';
@@ -41,6 +42,7 @@ import {
   type DocumentsApi,
 } from '../shared/api/documents-api';
 import { Icon } from '../shared/ui/icon';
+import { QuoteStep } from '../features/quote/quote-step';
 import { ReviewStep } from '../features/review/review-step';
 import { DocumentsStep } from '../features/documents/documents-step';
 import { SessionStatus } from './session-status';
@@ -85,7 +87,6 @@ export function App(props: AppProps) {
 }
 
 // Steps 4–5 have no implementation yet; their pages say why.
-const UNAVAILABLE_STEPS: readonly StepId[] = ['quote'];
 
 function AppShell({
   api = projectsApi,
@@ -252,13 +253,17 @@ function Sidebar({
     project && !listed.some((item) => item.id === project.id)
       ? [project, ...listed]
       : listed;
-  const stepState = (step: StepId): 'done' | 'todo' | 'unavailable' => {
-    if (UNAVAILABLE_STEPS.includes(step)) return 'unavailable';
+  const selectedProgram = useQueryParam('program');
+  const stepState = (step: StepId): 'done' | 'todo' => {
     if (progress.status !== 'ready') return 'todo';
     if (step === 'source') return progress.sourceSaved ? 'done' : 'todo';
     if (step === 'documents')
       return progress.documentsWritten ? 'done' : 'todo';
-    if (step === 'review') return 'todo';
+    if (step === 'review')
+      return isReviewDone(progress.reviewPrograms, selectedProgram)
+        ? 'done'
+        : 'todo';
+    if (step === 'quote') return 'todo';
     return progress.analysisRunId ? 'done' : 'todo';
   };
   return (
@@ -416,11 +421,13 @@ function StepPage({
   // Step 3 works on the program picked on the analysis screen.
   const program = useQueryParam('program');
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  const [eyebrowSlot, setEyebrowSlot] = useState<HTMLElement | null>(null);
   return (
     <div className="page">
       <header className="page-header">
         <span className="eyebrow">
           {copy.stepEyebrow(index)} · {project.name}
+          <span ref={setEyebrowSlot} />
           {project.mode === 'demo' && (
             <>
               {' '}
@@ -429,7 +436,11 @@ function StepPage({
           )}
         </span>
         <div className="page-title-row">
-          <h1 id="page-title">{copy.pageTitles[step]}</h1>
+          <h1 id="page-title">
+            {step === 'quote'
+              ? messages.quote.title(project.name)
+              : copy.pageTitles[step]}
+          </h1>
           <div ref={setHeaderSlot} />
         </div>
         {step === 'source' && (
@@ -489,10 +500,20 @@ function StepPage({
           projectId={project.id}
           program={program}
           headerSlot={headerSlot}
+          onReviewChanged={onProgress}
           api={apis.documentsApi}
         />
       ) : (
-        <UnavailableStep projectId={project.id} step={step} />
+        <QuoteStep
+          projectId={project.id}
+          projectName={project.name}
+          analysisRunId={
+            progress.status === 'ready' ? progress.analysisRunId : null
+          }
+          headerSlot={headerSlot}
+          eyebrowSlot={eyebrowSlot}
+          artifactsApi={apis.artifactsApi}
+        />
       )}
     </div>
   );
@@ -602,35 +623,6 @@ function AnalysisStep({
         projectId={project.id}
         runId={shown}
       />
-    </section>
-  );
-}
-
-function UnavailableStep({
-  projectId,
-  step,
-}: {
-  projectId: string;
-  step: StepId;
-}) {
-  const { messages } = useLocale();
-  const copy = messages.shell.unavailable;
-  const reason =
-    step === 'documents' || step === 'review' || step === 'quote'
-      ? copy.reasons[step]
-      : null;
-  return (
-    <section
-      className="panel unavailable-panel"
-      aria-labelledby="step-unavailable"
-    >
-      <h2 id="step-unavailable">{copy.title}</h2>
-      {reason && <p className="muted">{reason}</p>}
-      <div className="form-actions">
-        <Link className="button" to={stepPath(projectId, 'analysis')}>
-          {copy.back}
-        </Link>
-      </div>
     </section>
   );
 }

@@ -512,7 +512,6 @@ function StepPage({
           }
           headerSlot={headerSlot}
           eyebrowSlot={eyebrowSlot}
-          documentsApi={apis.documentsApi}
           artifactsApi={apis.artifactsApi}
         />
       )}

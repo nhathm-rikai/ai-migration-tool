@@ -75,6 +75,22 @@ describe('computeQuote', () => {
   });
 });
 
+describe('duration', () => {
+  it('is dev effort over developers, phases one after another', () => {
+    const quote = computeQuote(
+      [program('a/A.vbp', 4000, 'medium', 50)],
+      { ...params, aiCode: 0, devs: 1 },
+      base,
+    );
+    // Dev 4.0 MM with one developer: 4 months, management adds none.
+    expect(quote.months).toBe(4);
+    expect(quote.schedule.find((row) => row.id === 'test')?.end).toBeCloseTo(4);
+    expect(quote.schedule.find((row) => row.id === 'code')?.start).toBeCloseTo(
+      0.8,
+    );
+  });
+});
+
 describe('quote scope', () => {
   const programs = [program('a/A.vbp', 1000, 'medium', 50)];
 

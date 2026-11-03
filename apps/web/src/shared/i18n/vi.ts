@@ -926,12 +926,14 @@ export const viMessages = {
     title: (project: string) => `Báo giá chuyển đổi ${project}`,
     loading: 'Đang tải dữ liệu báo giá…',
     loadFailed: 'Không đọc được kết quả phân tích để lập báo giá.',
-    emptyTitle: 'Chưa có tài liệu đã duyệt',
-    emptyHelp:
-      'Báo giá chỉ tính các program có tài liệu đã duyệt ở bước Review.',
-    emptyAction: 'Sang Review & duyệt',
-    lead: (programs: number, loc: number, documents: number) =>
-      `Dựa trên ${programs} program, ${loc.toLocaleString('en-US')} LoC, ${documents} tài liệu đã duyệt`,
+    emptyTitle: 'Chưa có kết quả phân tích',
+    emptyHelp: 'Báo giá tính trên toàn bộ program của lần phân tích mới nhất.',
+    emptyAction: 'Sang Phân tích',
+    lead: (programs: number, loc: number, skipped: number) =>
+      `Dựa trên toàn bộ ${programs} program, ${loc.toLocaleString('en-US')} LoC của lần phân tích mới nhất` +
+      (skipped > 0
+        ? ` · ${skipped} program không phân tích được, chưa tính`
+        : ''),
     draft:
       'Bản nháp để tham khảo: hệ số complexity và năng suất chưa được kiểm chứng trên dự án thực tế. Người phụ trách cần rà soát trước khi gửi khách hàng.',
     exportPdf: 'Xuất PDF',
@@ -974,6 +976,7 @@ export const viMessages = {
       'Dev = BD + (DD + Coding) × (1 - AI) + Kiểm thử × (1 - AI test)',
       'PM / BrSE / Comtor = % × Dev',
       'Chi phí = Σ effort vai trò × đơn giá vai trò',
+      'Thời gian = Dev / số dev, làm tròn lên tháng',
     ],
     phaseTitle: 'Effort theo giai đoạn',
     phases: {
@@ -999,7 +1002,7 @@ export const viMessages = {
     assumptionsTitle: 'Giả định & phạm vi',
     assumptions: (productivity: number) => [
       `Năng suất chuẩn ${productivity.toLocaleString('en-US')} LoC / MM (trước khi áp dụng AI assistance), tính trên code riêng của program; module dùng chung chưa được tính.`,
-      'Chỉ gồm các program có tài liệu đã duyệt, không phải toàn bộ hệ thống.',
+      'Gồm toàn bộ program của lần phân tích mới nhất, không phụ thuộc trạng thái tài liệu.',
       'AI assistance giảm effort DD, Coding và Kiểm thử; BD giữ nguyên effort.',
       'Không bao gồm thay đổi nghiệp vụ, chỉ chuyển đổi tương đương chức năng.',
     ],

@@ -910,12 +910,12 @@ export const jaMessages = {
     title: (project: string) => `${project} 移行見積`,
     loading: '見積データを読み込み中…',
     loadFailed: '見積に必要な解析結果を読み込めませんでした。',
-    emptyTitle: '承認済みドキュメントがありません',
-    emptyHelp:
-      '見積はレビューで承認済みのドキュメントがあるプログラムのみを対象とします。',
-    emptyAction: 'レビュー・承認へ',
-    lead: (programs: number, loc: number, documents: number) =>
-      `${programs} プログラム、${loc.toLocaleString('en-US')} LoC、承認済みドキュメント ${documents} 件に基づく`,
+    emptyTitle: '解析結果がありません',
+    emptyHelp: '見積は最新の解析の全プログラムを対象とします。',
+    emptyAction: '解析へ',
+    lead: (programs: number, loc: number, skipped: number) =>
+      `最新の解析の全 ${programs} プログラム、${loc.toLocaleString('en-US')} LoC に基づく` +
+      (skipped > 0 ? ` · 解析できなかった ${skipped} プログラムは未計上` : ''),
     draft:
       '参考用のドラフトです。複雑度係数と生産性は実案件で検証されていません。顧客へ送付する前に担当者が確認してください。',
     exportPdf: 'PDF 出力',
@@ -958,6 +958,7 @@ export const jaMessages = {
       'Dev = BD + (DD + コーディング) × (1 - AI) + テスト × (1 - AI test)',
       'PM / BrSE / Comtor = % × Dev',
       '費用 = Σ 役割別工数 × 役割別単価',
+      '期間 = Dev / 開発者数（月単位で切り上げ）',
     ],
     phaseTitle: 'フェーズ別工数',
     phases: {
@@ -983,7 +984,7 @@ export const jaMessages = {
     assumptionsTitle: '前提と範囲',
     assumptions: (productivity: number) => [
       `標準生産性 ${productivity.toLocaleString('en-US')} LoC / MM（AI 支援適用前）。プログラム固有のコードで計算し、共通モジュールは含みません。`,
-      '承認済みドキュメントがあるプログラムのみを対象とし、システム全体ではありません。',
+      '最新の解析の全プログラムを対象とし、ドキュメントの状態には依存しません。',
       'AI 支援は DD、コーディング、テストの工数を削減し、BD の工数は変わりません。',
       '業務変更は含まず、機能同等の移行のみです。',
     ],

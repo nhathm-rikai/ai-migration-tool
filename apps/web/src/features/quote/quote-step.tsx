@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ReviewBoard, SourceInventoryDocument } from '@portal/contracts';
+import type { SourceInventoryDocument } from '@portal/contracts';
 import { Link, stepPath } from '../../app/router';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
-import type { DocumentsApi } from '../../shared/api/documents-api';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { useRunAssessment } from '../assessment/use-run-assessment';
-import { runRequestErrorMessage } from '../jobs/run-messages';
 import {
   computeQuote,
   DEFAULT_QUOTE_PARAMS,
@@ -20,8 +18,8 @@ import {
 } from './quote-model';
 import { buildXlsx, type Cell } from './xlsx';
 
-// Step 5 (prototype tpl-Quote). A draft estimate of the programs that have
-// approved documents; every number comes from stored analysis data and the
+// Step 5 (prototype tpl-Quote). A draft estimate of every program of the
+// latest analysis; every number comes from stored analysis data and the
 // parameters on this screen. Parameters and the quote number stay in this
 // browser only.
 
@@ -82,23 +80,14 @@ function saveFile(name: string, bytes: Uint8Array<ArrayBuffer>) {
   URL.revokeObjectURL(url);
 }
 
-export function quotePrograms(
-  inventory: SourceInventoryDocument,
-  board: ReviewBoard,
-): { programs: QuoteProgram[]; approvedDocuments: number } {
-  const approved = new Map(
-    board.programs
-      .map(
-        (program) =>
-          [
-            program.program,
-            program.documents.filter((doc) => doc.status === 'approved').length,
-          ] as const,
-      )
-      .filter(([, count]) => count > 0),
-  );
+// Every program of the latest analysis; one without analysis data (parse
+// failure) cannot be estimated and is counted apart.
+export function quotePrograms(inventory: SourceInventoryDocument): {
+  programs: QuoteProgram[];
+  skipped: number;
+} {
   const programs = inventory.programs.flatMap((program): QuoteProgram[] => {
-    if (!approved.has(program.projectPath) || !program.analysis) return [];
+    if (!program.analysis) return [];
     const complexity =
       program.analysis.normalizedComplexity ?? program.analysis.complexity;
     return [
@@ -111,13 +100,7 @@ export function quotePrograms(
       },
     ];
   });
-  const included = new Set(programs.map((program) => program.projectPath));
-  return {
-    programs,
-    approvedDocuments: [...approved.entries()]
-      .filter(([key]) => included.has(key))
-      .reduce((sum, [, count]) => sum + count, 0),
-  };
+  return { programs, skipped: inventory.programs.length - programs.length };
 }
 
 function NumberField({
@@ -153,7 +136,6 @@ export function QuoteStep({
   analysisRunId,
   headerSlot = null,
   eyebrowSlot = null,
-  documentsApi,
   artifactsApi,
 }: {
   projectId: string;
@@ -161,7 +143,6 @@ export function QuoteStep({
   analysisRunId: string | null;
   headerSlot?: HTMLElement | null;
   eyebrowSlot?: HTMLElement | null;
-  documentsApi: DocumentsApi;
   artifactsApi: ArtifactsApi;
 }) {
   const { messages } = useLocale();
@@ -171,24 +152,9 @@ export function QuoteStep({
     projectId,
     analysisRunId ?? '',
   );
-  const [board, setBoard] = useState<ReviewBoard | null>(null);
-  const [boardError, setBoardError] = useState<unknown>(null);
   const [params, setParams] = useState<QuoteParams>(() =>
     readParams(projectId),
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    documentsApi.reviewBoard(projectId, controller.signal).then(
-      (result) => {
-        if (!controller.signal.aborted) setBoard(result);
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted) setBoardError(error);
-      },
-    );
-    return () => controller.abort();
-  }, [documentsApi, projectId]);
 
   useEffect(() => {
     try {
@@ -203,10 +169,10 @@ export function QuoteStep({
 
   const scope = useMemo(
     () =>
-      board && inventory.state.status === 'ready'
-        ? quotePrograms(inventory.state.artifact.payload, board)
+      inventory.state.status === 'ready'
+        ? quotePrograms(inventory.state.artifact.payload)
         : null,
-    [board, inventory.state],
+    [inventory.state],
   );
   const result = useMemo(
     () => (scope ? computeQuote(scope.programs, params) : null),
@@ -218,12 +184,6 @@ export function QuoteStep({
     if (hasQuote) setQuoteNumber(issueQuoteNumber(projectId));
   }, [hasQuote, projectId]);
 
-  if (boardError !== null)
-    return (
-      <p role="alert" className="error">
-        {runRequestErrorMessage(boardError, messages)}
-      </p>
-    );
   if (analysisRunId !== null && inventory.state.status === 'error')
     return (
       <p role="alert" className="error">
@@ -238,7 +198,7 @@ export function QuoteStep({
         <h2 id="quote-empty">{copy.emptyTitle}</h2>
         <p className="muted">{copy.emptyHelp}</p>
         <div className="form-actions">
-          <Link className="button primary" to={stepPath(projectId, 'review')}>
+          <Link className="button primary" to={stepPath(projectId, 'analysis')}>
             {copy.emptyAction}
           </Link>
         </div>
@@ -357,7 +317,7 @@ export function QuoteStep({
           headerSlot,
         )}
       <p className="page-lead">
-        {copy.lead(result.programs, result.codeLines, scope.approvedDocuments)}
+        {copy.lead(result.programs, result.codeLines, scope.skipped)}
       </p>
       <p role="note" className="generate-note">
         {copy.draft}

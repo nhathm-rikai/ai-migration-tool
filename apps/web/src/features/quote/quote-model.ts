@@ -155,19 +155,15 @@ export function computeQuote(
   const totalMM = devMM + mgmtMM;
   const totalCost = devMM * params.rate.dev + mgmtCost;
 
-  // Phases overlap as on the prototype: coding starts when 70% of the
-  // documents is done, tests when 75% of the coding is done.
+  // Duration = dev effort / devs. The team works on one phase at a time, so
+  // the schedule never needs more developers than entered.
   const devs = Math.max(1, params.devs);
   const docMonths = docMM / devs;
   const codeMonths = codeMM / devs;
   const testMonths = testMM / devs;
-  const codeStart = docMonths * 0.7;
-  const testStart = codeStart + codeMonths * 0.75;
-  const end = Math.max(
-    docMonths,
-    codeStart + codeMonths,
-    testStart + testMonths,
-  );
+  const codeStart = docMonths;
+  const testStart = codeStart + codeMonths;
+  const end = devMM / devs;
 
   const groups = new Map<string, QuoteProgram[]>();
   for (const program of programs) {

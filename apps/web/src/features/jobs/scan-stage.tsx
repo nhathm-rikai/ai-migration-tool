@@ -25,6 +25,10 @@ import { useFileFeed } from './use-file-feed';
 // and the steps follow `stage`; nothing advances on a timer, and the share
 // shown never goes down within a run.
 
+// The spinning arc in the icon while scanning is hidden for now (user
+// request, 03/11/2026): the folder icon stays. Set to true to bring it back.
+const SHOW_SCAN_SPINNER = false;
+
 // Pause on "scan done" before the analysis step opens by itself.
 export const AUTO_OPEN_DELAY_MS = 1500;
 
@@ -175,7 +179,7 @@ export function ScanStage({
           <span className="scan-ring" />
           <span className="scan-ring late" />
           <span className="scan-box">
-            {phase === 'scanning' ? (
+            {SHOW_SCAN_SPINNER && phase === 'scanning' ? (
               <svg viewBox="0 0 24 24" className="scan-spinner">
                 <path d="M12 3a9 9 0 109 9" />
               </svg>

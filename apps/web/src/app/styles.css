@@ -5522,3 +5522,18 @@ fieldset.doc-card {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Step 1 scan card: two animations hidden for now (user request,
+   03/11/2026): (1) the pulsing rings and the floating of the icon, and (3)
+   the sweeping scan line. The rules stay above; delete this block to bring
+   them back. The progress bar and the spinner of the step list still run; the
+   spinner in the icon is switched off in scan-stage.tsx (SHOW_SCAN_SPINNER). */
+.scan-ring {
+  display: none;
+}
+.scan-box {
+  animation: none;
+}
+.scan-line {
+  display: none;
+}

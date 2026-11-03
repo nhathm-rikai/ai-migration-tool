@@ -108,12 +108,16 @@ function step(name: RegExp) {
 describe('routes', () => {
   it('parses every page and canonicalizes short or trailing paths', () => {
     expect(parseRoute('/')).toEqual({
-      route: { name: 'projects' },
-      redirect: '/projects',
+      route: { name: 'new' },
+      redirect: '/projects/new',
     });
     expect(parseRoute('/projects/')).toEqual({
-      route: { name: 'projects' },
-      redirect: '/projects',
+      route: { name: 'new' },
+      redirect: '/projects/new',
+    });
+    expect(parseRoute('/projects/new')).toEqual({
+      route: { name: 'new' },
+      redirect: null,
     });
     expect(parseRoute('/projects/a%20b')).toEqual({
       route: { name: 'step', projectId: 'a b', step: 'source', runId: null },
@@ -143,10 +147,11 @@ describe('routes', () => {
     ).toBe('/projects/a%2Fb/analysis/r');
   });
 
-  it('redirects the root address to the project list', async () => {
-    renderAt('/', baseRoutes());
-    await screen.findByRole('heading', { level: 1, name: 'Dự án của bạn' });
-    expect(window.location.pathname).toBe('/projects');
+  it('opens step 1 of a new project at the root address', async () => {
+    const server = renderAt('/', baseRoutes());
+    await screen.findByText('Bước 1 / 5 · Dự án mới');
+    expect(window.location.pathname).toBe('/projects/new');
+    expect(server.mutations()).toEqual([]);
     // Without a project the steps are shown but cannot be opened.
     expect(within(steps()).queryAllByRole('link')).toHaveLength(0);
     expect(
@@ -189,7 +194,10 @@ describe('reload at a step URL (UI01-AC01)', () => {
     const server = renderAt(`${page}/source`, baseRoutes());
     await screen.findByText(`Bước 1 / 5 · ${local.name}`);
     expect(
-      await screen.findByRole('region', { name: 'Mã nguồn LOCAL' }),
+      await screen.findByRole('region', { name: 'Thông tin dự án' }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole('complementary', { name: 'Dự án gần đây' }),
     ).toBeTruthy();
     expect(step(/Nạp source/).getAttribute('aria-current')).toBe('step');
     expect(server.mutations()).toEqual([]);
@@ -206,9 +214,9 @@ describe('reload at a step URL (UI01-AC01)', () => {
         name: 'Không tìm thấy dự án',
       }),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole('link', { name: 'Về danh sách dự án' }));
-    expect(window.location.pathname).toBe('/projects');
-    await screen.findByRole('heading', { level: 1, name: 'Dự án của bạn' });
+    fireEvent.click(screen.getByRole('link', { name: 'Về trang Nạp source' }));
+    expect(window.location.pathname).toBe('/projects/new');
+    await screen.findByText('Bước 1 / 5 · Dự án mới');
   });
 
   it('shows a not-found page for an unknown address', () => {
@@ -354,7 +362,7 @@ describe('analysis progress (review fixes)', () => {
           }),
       }),
     );
-    await screen.findByRole('region', { name: 'Mã nguồn LOCAL' });
+    await screen.findByRole('region', { name: 'Thông tin dự án' });
     fireEvent.click(step(/Phân tích/));
     expect(
       await screen.findByRole('heading', { name: 'Chưa có kết quả phân tích' }),

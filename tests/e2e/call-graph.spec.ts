@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openNewDemoProject } from './demo-project.js';
 import { syntheticCorpusFixture } from '@portal/contracts/fixtures';
 
 // UI03-AC03/AC04: the call graph of a synthetic corpus (~300 programs, 30
@@ -31,16 +32,12 @@ test(
     const workers: string[] = [];
     page.on('worker', (worker) => workers.push(worker.url()));
 
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 graph ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    await openNewDemoProject(page, `UI03 graph ${Date.now()}`);
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await expect(assessment.getByTestId('unique-code-lines')).toBeVisible();
 
@@ -166,16 +163,12 @@ test(
     await page
       .context()
       .route(/elk-worker[^/]*\.js/, (route) => route.abort('failed'));
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 fallback ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    await openNewDemoProject(page, `UI03 fallback ${Date.now()}`);
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByRole('tab', { name: /^Call graph/ }).click();
     const canvas = assessment.getByRole('group', {
@@ -210,16 +203,12 @@ test(
       if (typeof body !== 'object' || body === null) throw new Error('body');
       await route.fulfill({ response, json: { ...body, payload: corpus } });
     });
-    await page.goto('/');
-    await page.getByLabel('Tên dự án').fill(`UI03 full ${Date.now()}`);
-    await page.getByRole('radio', { name: /Demo với dữ liệu mẫu/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
-    ).toBeVisible();
-    await panel.getByRole('button', { name: 'Xem kết quả phân tích' }).click();
+    await openNewDemoProject(page, `UI03 full ${Date.now()}`);
+    // UI04: Start on the scan card; the analysis step opens by itself.
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByRole('tab', { name: /^Call graph/ }).click();
     await assessment.getByRole('button', { name: 'Xem toàn màn hình' }).click();
@@ -318,6 +307,22 @@ test(
     expect(toolbar.height).toBeLessThan(60);
     await page.screenshot({
       path: testInfo.outputPath('ui03-full-screen.png'),
+    });
+    // The reveal outline of the opened folder must disappear as soon as
+    // attention moves to another folder; only the new selection is lit.
+    const otherFolder = canvas.getByRole('button', {
+      name: /^Làm nổi bật đường nối của F02 /,
+    });
+    await otherFolder.click();
+    await expect(otherFolder).toHaveAttribute('aria-pressed', 'true');
+    await expect(canvas.locator('.react-flow__node.recent')).toHaveCount(0);
+    await expect(dialog.locator('.dep-open-box.recent')).toHaveCount(0);
+    await expect(folderNode.locator('.dep-folder')).toHaveCSS(
+      'box-shadow',
+      'none',
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('ui03-folder-focus-transferred.png'),
     });
     // A program inside the open folder: its edges are drawn over the boxes
     // (resting edges stay under them), so they can be followed.

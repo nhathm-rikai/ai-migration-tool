@@ -21,8 +21,8 @@ export const jaMessages = {
   },
   shell: {
     project: 'プロジェクト',
-    allProjects: 'すべてのプロジェクト',
-    chooseProject: 'プロジェクトを選択してください',
+    newProject: '新規プロジェクト',
+    chooseProject: 'ソースフォルダーを選択して開始',
     projectDetail: {
       demo: 'VB6 · サンプルデータ',
       local: 'VB6 · このPC上のソース',
@@ -79,118 +79,26 @@ export const jaMessages = {
       help: 'このアドレスはアプリにありません。',
       projectTitle: 'プロジェクトが見つかりません',
       projectHelp: 'アドレスのプロジェクトは存在しないか、削除されています。',
-      back: 'プロジェクト一覧へ',
+      back: 'ソース取込へ戻る',
     },
   },
   projects: {
-    workspace: 'ワークスペース',
-    title: 'プロジェクト一覧',
-    refresh: 'プロジェクトを再読み込み',
-    createNew: '新規プロジェクト',
-    listTitle: 'プロジェクト一覧',
-    loading: 'プロジェクトを読み込み中…',
-    retryList: '一覧を再読み込み',
-    noMore: 'このページにプロジェクトはありません',
-    empty: 'プロジェクトはまだありません',
-    emptyHelp: 'プロジェクトを作成して、作業を開始してください。',
     results: '解析結果',
-    pageCount: (count: number) => `このページのプロジェクト数：${count}件`,
-    firstPage: '最初のページ',
-    nextPage: '次のページ',
     fixture: 'サンプルデータ',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
-    localData: 'このPC上のソースコード',
     assessmentSteps: 'アセスメントの手順',
-    created: 'プロジェクトを作成しました。',
-    footer:
-      'プロジェクトと結果はこのPCに保存されます。対応済み：ソース登録と静的解析。今後対応：AIによる業務理解、レビュー、レポート出力。',
     create: {
-      eyebrow: 'ワークスペース',
-      description:
-        'プロジェクトを作成して情報を管理し、レガシーシステムの評価を準備します。',
-      name: 'プロジェクト名',
-      placeholder: '例：販売管理システム',
       nameInvalid: `プロジェクト名は${PROJECT_NAME_MIN_LENGTH}～${PROJECT_NAME_MAX_LENGTH}文字で入力してください。空白のみの名前は使用できません。`,
-      nameHelp: `最大${PROJECT_NAME_MAX_LENGTH}文字。`,
-      sample: 'VB6サンプルデータ',
-      sampleDescription:
-        'プロジェクト情報のみを保存します。ソースコードは読み込みません。',
-      kind: 'プロジェクトの種類',
-      kindDemo: 'サンプルデータのデモ',
-      kindLocal: 'この端末のソースコード',
-      kindLocalDescription:
-        '作成後にソースフォルダーを登録します。ソースは解析の実行時にのみ読み込まれます。',
-      submit: '作成する',
-      pending: '作成中…',
-      savedLocally:
-        'プロジェクトはこの端末に保存されます。プロジェクトツリーから選択して情報を開けます。',
-    },
-    detail: {
-      title: 'プロジェクト詳細',
-      close: '詳細を閉じる',
-      loading: '詳細を読み込み中…',
-      retry: '詳細を再読み込み',
-      description: 'ローカル環境に保存されたプロジェクト情報です。',
-      id: 'プロジェクトID',
-      data: 'データ',
-      createdAt: '作成日時',
-      ready: 'プロジェクトを管理できます',
-      technical: '技術情報',
-      unavailable:
-        'このバージョンでは、実際のソース解析、レビュー、レポート作成は未対応です。下の解析実行はデモです。',
     },
   },
   source: {
-    title: 'ソースコード',
-    technical: '技術情報',
     loading: 'ソース情報を読み込み中…',
     reload: 'ソースを再読み込み',
-    unregistered:
-      'ソースフォルダーが登録されていません。解析の前に登録してください。',
-    fixture: (fixtureId: string) =>
-      `デモプロジェクトはアプリ同梱のサンプル ${fixtureId} を使用します。別のフォルダーは登録できません。`,
-    fields: {
-      folder: 'フォルダー',
-      revision: '登録リビジョン',
-      profile: '解析プロファイル',
-      defaultSchema: 'デフォルトスキーマ',
-      status: '状態',
-      checkedAt: '確認日時',
-    },
-    status: {
-      ready: '読み取り可能（フォルダーのみ確認、内容は未読）',
-      unreadable:
-        '登録したフォルダーを読み取れません。フォルダーを確認して再登録してください。',
-    },
-    mappingStatus: {
-      unconfigured: '未設定',
-      assumed: '仮定（未確認）',
-      confirmed: 'DB管理者が確認済み',
-    },
-    profiles: {
-      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
-    },
     form: {
-      titleNew: 'ソースを登録',
-      titleEdit: 'ソースを変更',
-      rootPath: 'フォルダーのパス（絶対パス）',
       rootPathHelp:
         '例：C:\\work\\order-module、/home/dev/order-module。バックエンドがフォルダーと読み取り権限を確認します。内容は解析の実行時にのみ読み込まれます。',
       rootPathInvalid: 'ソースフォルダーのパスを入力してください。',
-      profile: '解析プロファイル',
-      mappingStatus: 'テーブル名のデフォルトスキーマ',
-      defaultSchema: 'スキーマ名',
-      defaultSchemaHelp:
-        '修飾なしのテーブル名が指すスキーマ（例：ログインユーザー）。DB管理者が確認した場合のみ「確認済み」を選択してください。',
-      defaultSchemaInvalid:
-        'スキーマ名は英字または「_」で始め、英数字・_・$・# のみで入力してください。',
-      submit: '登録する',
-      update: '変更を保存',
-      pending: '確認中…',
-      edit: 'ソースを変更',
-      cancelEdit: 'キャンセル',
-      saved: 'ソースを保存しました。',
     },
     errors: {
       SOURCE_FORBIDDEN:
@@ -206,12 +114,101 @@ export const jaMessages = {
     },
     outcomeUnknown:
       'バックエンドがソースを保存したか確認できませんでした。再送信する前にソースを再読み込みして確認してください。',
-    startBlocked:
-      '解析の前に、読み取り可能なソースフォルダーを登録してください。',
+  },
+  sourceStep: {
+    lead: '旧システムのソースフォルダーを選択します。処理はすべてこの端末で行われ、ソースが端末の外に出ることはありません。',
+    hero: {
+      chooseTitle: 'ソースフォルダーを選択',
+      chosenTitle: 'フォルダーを選択しました',
+      chosenHelp:
+        '下のプロジェクト情報を確認して「ソースをスキャン」を押してください。',
+      demoHelp:
+        'デモプロジェクトはアプリ同梱のサンプルをスキャンします。端末のフォルダーは読み込みません。',
+      unreadableHelp:
+        '選択したフォルダーを読み込めません。フォルダーを確認するか、別のフォルダーを選択してください。',
+      scan: 'ソースをスキャン',
+      changeFolder: 'フォルダーを変更',
+      queuedTitle: '開始を待っています…',
+      scanningTitle: 'フォルダーをスキャンしています…',
+      cancellingTitle: 'スキャンをキャンセルしています…',
+      progressDone: 'スキャンの進捗',
+      files: (done: number, total: number) => `${done} / ${total} ファイル`,
+      megabytes: (value: string) => `${value} MB`,
+      readingFiles: '読み込み中のファイル',
+      progressLabel: 'スキャン中（ファイル総数は未確定）',
+      stage: (stage: string) => `現在の工程：${stage}`,
+      doneTitle: 'スキャン完了・解析画面へ移動します…',
+      goNow: 'すぐに結果を見る',
+      endedTitle: {
+        failed: 'スキャンに失敗しました',
+        cancelled: 'スキャンをキャンセルしました',
+        interrupted: 'スキャンが中断されました',
+      },
+      cancelledHelp:
+        '要求によりスキャンを停止しました。新しい結果はありません。',
+      lastResult: '前回のスキャン結果を見る',
+      target: 'スキャン対象',
+      targetFolder: 'フォルダー',
+      targetLanguage: '言語',
+      noFileCount:
+        'ファイル数と進捗率は、バックエンドがファイル単位の進捗を報告すると表示されます。',
+    },
+    steps: {
+      title: '進行状況',
+      items: [
+        'フォルダー構成の読み込み',
+        'スナップショットとハッシュ',
+        '解析（デコード・SQL・コールグラフ）',
+        '結果の保存',
+      ],
+      state: { done: '完了', active: '処理中', todo: '未着手' },
+    },
+    form: {
+      title: 'プロジェクト情報',
+      name: 'プロジェクト名',
+      folder: 'ソースフォルダーのパス（絶対パス）',
+      pick: 'フォルダーを選択',
+      picking: 'ダイアログを開いています…',
+      pickingHelp:
+        'この端末でフォルダー選択ダイアログが開いています。フォルダーを選んで OK を押してください。',
+      useFolder: 'このフォルダーを使用',
+      pickerUnavailable: {
+        'no-tool':
+          'この端末にはフォルダー選択ダイアログがありません。下にフォルダーのパスを入力してください。',
+        failed:
+          'フォルダー選択ダイアログを開けませんでした。下にフォルダーのパスを入力してください。',
+        timeout:
+          '選択されないまま時間が経過したため、ダイアログを閉じました。もう一度押すか、下にパスを入力してください。',
+      },
+      cancel: 'キャンセル',
+      saving: '確認中…',
+      demoFolder: (fixtureId: string) => `${fixtureId}（サンプル）`,
+      language: '解析言語（1つ選択）',
+      languageRequired: 'スキャンする前に解析言語を選択してください。',
+      comingSoon: '対応予定',
+    },
+    recent: {
+      title: '最近のプロジェクト',
+      search: '名前でプロジェクトを検索',
+      noMatch: '一致するプロジェクトはありません。',
+      new: '+ 新規プロジェクト',
+      loading: '最近のプロジェクトを読み込んでいます…',
+      failed: 'プロジェクト一覧を読み込めませんでした。',
+      empty: 'プロジェクトはまだありません。',
+      open: '表示中',
+      updated: (date: string) => `更新 ${date}`,
+      status: {
+        none: '未解析',
+        active: '解析中',
+        succeeded: '解析済み',
+        failed: '失敗',
+        cancelled: 'キャンセル済み',
+        interrupted: '中断',
+        unknown: '状態を取得できません',
+      },
+    },
   },
   runs: {
-    title: '解析（デモ）',
-    titleLocal: '解析',
     demoNotice:
       'デモ実行はサンプルデータ上の模擬エグゼキューターを使用します。ソースコードは読み込まず、アプリ同梱のサンプルインベントリ結果のみを公開します。',
     localNotice:
@@ -293,6 +290,8 @@ export const jaMessages = {
       SOURCE_PROFILE_UNSUPPORTED:
         'このバージョンはソースプロファイルに対応していません。',
       SOURCE_NOT_REGISTERED: 'プロジェクトのソースが登録されていません。',
+      RUN_EVENTS_LIMIT:
+        '実行を監視するストリームが多すぎます。状態は定期的に更新されます。',
       RUNTIME_RECOVERY_REQUIRED:
         '停止を確認できなかった実行があるため、バックエンドの再起動が必要です。新しい実行は作成されていません。',
     },
@@ -339,7 +338,6 @@ export const jaMessages = {
       },
       histogramTitle: '複雑度の分布',
       histogramPrograms: (count: string) => `${count} プログラム`,
-      histogramNote: (version: string) => `参考 · ${version}`,
       notAnalyzed: (count: string) => `未解析 ${count} プログラム`,
       sectionLabel: '解析の詳細',
       graph: {
@@ -929,6 +927,8 @@ export const jaMessages = {
         'バックエンドが送信元ページを拒否しました。設定されたアドレスでアプリを開いてください。',
       CREDENTIAL_INVALID:
         'セッションの有効期限が切れたため、リクエストは処理されていません。もう一度お試しください。',
+      FOLDER_PICKER_BUSY:
+        'フォルダー選択ダイアログがすでに開いています。そのダイアログで選択するか、閉じてから再試行してください。',
     },
     failure: {
       http: 'リクエストを完了できませんでした。バックエンドを確認して再試行してください。',
@@ -947,6 +947,8 @@ export const jaMessages = {
       get: 'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',
       list: '一覧の取得条件が正しくありません。一覧を再読み込みして再試行してください。',
       runs: '実行リクエストが正しくありません。実行を再読み込みしてから再試行してください。',
+      update:
+        'プロジェクト情報が正しくありません。プロジェクト名と顧客を確認して再試行してください。',
       source:
         'ソース情報が正しくありません。パスはこの端末の絶対パスで入力してください。',
     },

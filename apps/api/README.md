@@ -64,11 +64,15 @@ Endpoint đang có:
 
 - `GET /api/v1/health`: 200, nhãn `mode: fixture`, `runner: fake`. Runner là chế độ được hỗ trợ; health không gọi AI. Public nhưng vẫn kiểm Host/Origin.
 - `POST /api/v1/session`: bootstrap credential, cần `Origin` tin cậy; trả `{ token }`. Mọi endpoint khác cần `Authorization: Bearer <token>`; 401 `CREDENTIAL_INVALID`, 403 `HOST_NOT_ALLOWED`/`ORIGIN_NOT_ALLOWED`. Policy đầy đủ, gồm request thiếu Origin và `PORTAL_WEB_PORT`: [local-http-security](../../docs/engineering/specs/local-http-security.md).
-- `POST /api/v1/projects`: 201 và `Location`. Demo dùng `{ name, fixtureId: 'sample-vb6' }`; local dùng `{ name, mode: 'local' }` và đăng ký source bằng endpoint riêng. Name 1–120 Unicode code point, có nội dung sau trim; không nhận `sourcePath` hay field lạ.
+- `POST /api/v1/projects`: 201 và `Location`. Demo dùng `{ name, fixtureId: 'sample-vb6' }`; local dùng `{ name, mode: 'local' }` và đăng ký source bằng endpoint riêng. Name 1–120 Unicode code point, có nội dung sau trim; `customerName` tùy chọn cùng giới hạn (UI04); không nhận `sourcePath` hay field lạ.
 - `GET /api/v1/projects/:projectId`: 200 hoặc 404; ID sai định dạng trả 400.
+- `POST /api/v1/local/folder-picker` (UI05): mở hộp thoại chọn thư mục của OS trên máy chạy backend, trả `selected` + path tuyệt đối, `cancelled` hoặc `unavailable` (`no-tool`/`failed`/`timeout` sau 5 phút). Protected, một hộp thoại một lúc (409 `FOLDER_PICKER_BUSY`), `no-store`, không log path, không ghi data directory; lưu source vẫn bằng PUT source. Shutdown abort picker ở `preClose`, trước khi server chờ các request HTTP kết thúc; `onClose` mới đóng dispatcher/DB. Adapter: [native-folder-picker.ts](src/adapters/local/native-folder-picker.ts) (Windows PowerShell STA + Explorer IFileOpenDialog, macOS osascript, Linux zenity/kdialog; chỉ smoke native trên Windows).
+- `PATCH /api/v1/projects/:projectId` (UI04): `{ name?, customerName? }`, ít nhất một field; field không gửi giữ nguyên, `customerName: null` xóa. Trả project đã lưu; 400 khi rỗng/quá dài/field lạ, 404 khi không có project. Ghi đè theo thứ tự (không CAS): form gửi cả hai field nó hiển thị. Project tạo trước migration `0005-project-customer.sql` không có `customerName`.
 - `GET /api/v1/projects?limit=20&cursor=<nextCursor>`: `{ items, nextCursor }`; limit 1–100, mặc định 20. Dùng nguyên cursor từ response; thứ tự theo UUID tăng dần, **không phải ngày tạo**. Đây không phải snapshot pagination khi có request tạo project đồng thời.
 
 Project demo trả `id`, `name`, `fixtureId`, `mode: demo`, `createdAt` UTC; local trả cùng metadata với `mode: local`, không có `fixtureId`. Name không tự convert từ số; field không khai báo bị từ chối. Body tối đa 16 KiB. Error chung là `{ error: { code, message, requestId } }`: 400 input, 404 không tìm thấy, 409 revision/state conflict, 413 body quá lớn, 415 Content-Type không được hỗ trợ, 422 source không dùng được, 500 lỗi nội bộ. Chưa có update/delete project.
+
+SSE PF08: `GET .../runs/:runId/events` đóng riêng client đọc chậm ngay khi `raw.write()` báo buffer đầy; giải phóng subscription/heartbeat, không hủy run. Client có thể GET/reconnect. Giới hạn subscriber và backpressure cùng áp dụng.
 
 ### Source registration và snapshot (PF05: B03 + B06 + F01)
 
@@ -182,6 +186,6 @@ Tests kiểm API success/input/not-found/pagination (cả limit mặc định), 
 
 Rule trọng tâm: CORE-01..10, BE-01..05/07, DATA-01/02/09, QA-01/02/06/07/09 và AI-01/05 cho fake port. Phạm vi reviewer cần xem: schema/validation trước side effect, ranh giới service/repo, DB lifecycle, containment và nhãn demo.
 
-[UI Projects](../web/README.md), local HTTP security PF02, run lifecycle PF03, instance lock/recovery PF04 và source registration/snapshot PF05 đã có. Analyzer đã nối vào local run và artifact (B08/B07); chưa SSE, Claude process, BR/Design/evidence, review/export hoặc nghiệm thu LIVE/MS1. Process ownership/cleanup của CLI còn ở A03/A04. Không có VB6 → C# conversion trong source này.
+[UI Projects](../web/README.md), local HTTP security PF02, run lifecycle PF03, instance lock/recovery PF04 và source registration/snapshot PF05 đã có. Analyzer đã nối vào local run và artifact (B08/B07); đã có SSE/progress PF08; chưa Claude process, BR/Design/evidence, review/export hoặc nghiệm thu LIVE/MS1. Process ownership/cleanup của CLI còn ở A03/A04. Không có VB6 → C# conversion trong source này.
 
 Tham khảo API gốc khi mở rộng: [Fastify type provider](https://github.com/fastify/fastify-type-provider-typebox), [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [better-sqlite3](https://github.com/WiseLibs/better-sqlite3). Phiên bản thực tế được khóa trong package/lockfile, không copy API từ major khác.

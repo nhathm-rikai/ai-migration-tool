@@ -664,7 +664,7 @@ describe('Assessment overview (F03)', () => {
     expect(within(kpi('tables')).getByText('Sau ánh xạ tên bảng')).toBeTruthy();
     expect(screen.getByTestId('loc-code').textContent).toBe('6');
     expect(screen.queryByTestId('loc-unclassified')).toBeNull();
-    expect(screen.getByText(/Tham khảo · complexity-v0-draft/)).toBeTruthy();
+    expect(screen.queryByText(/Tham khảo · complexity-/)).toBeNull();
     // Empty levels cannot be picked; a bar opens the list filtered on it.
     expect(
       screen

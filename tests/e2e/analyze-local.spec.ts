@@ -60,40 +60,61 @@ test(
     });
 
     const projectName = `PF07 local ${Date.now()}`;
+    // UI04: step 1 of a new project. "Chọn thư mục" asks the backend for
+    // its folder dialog; the dialog's answer is stubbed (no window in a
+    // headless run). Nothing is stored until "Quét source": then the project
+    // is created, the folder registered and the first run started.
+    let picks = 0;
+    await page.route('**/api/v1/local/folder-picker', async (route) => {
+      picks++;
+      expect(route.request().headers()['authorization']).toMatch(/^Bearer /);
+      await route.fulfill({
+        json: { status: 'selected', path: sourceRoot },
+        headers: { 'cache-control': 'no-store' },
+      });
+    });
+    let creates = 0;
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && /\/projects$/.test(request.url()))
+        creates++;
+    });
     await page.goto('/');
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await page.getByRole('button', { name: 'Chọn thư mục' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
+    ).toBeVisible();
+    expect(picks).toBe(1);
+    expect(creates).toBe(0);
     await page.getByLabel('Tên dự án').fill(projectName);
-    await page.getByRole('radio', { name: /Mã nguồn trên máy này/ }).check();
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    const source = page.getByRole('region', { name: 'Mã nguồn LOCAL' });
-    await source.getByLabel('Đường dẫn thư mục (tuyệt đối)').fill(sourceRoot);
-    await source
-      .getByLabel('Schema mặc định của tên bảng')
-      .selectOption('assumed');
-    await source.getByLabel('Tên schema', { exact: true }).fill('APP');
+    await page.getByRole('radio', { name: 'VB6' }).check();
     const registered = page.waitForResponse(
       (response) =>
         response.request().method() === 'PUT' &&
         /\/source$/.test(response.url()),
     );
-    await source.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+    await page.getByRole('button', { name: 'Quét source' }).click();
     const registration = await registered;
     expect(registration.status()).toBe(200);
+    expect(creates).toBe(1);
+    expect(
+      (registration.request().postDataJSON() as { rootPath: string }).rootPath,
+    ).toBe(sourceRoot);
     const authorization = registration.request().headers()['authorization'];
     if (!authorization) throw new Error('Source mutation has no credential.');
-
-    const runPanel = page.getByRole('region', {
-      name: 'Phân tích',
-      exact: true,
+    // The created project's step 1 follows the run; the analysis step opens
+    // by itself.
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
     });
-    await runPanel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await expect(
-      runPanel.getByRole('status').filter({ hasText: 'Hoàn tất' }),
-    ).toBeVisible({ timeout: 20_000 });
-    await runPanel
-      .getByRole('button', { name: 'Xem kết quả phân tích' })
-      .click();
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
+    await expect(assessment.locator('.histogram')).not.toContainText(
+      'complexity-',
+    );
+    await assessment
+      .locator('.histogram')
+      .screenshot({ path: testInfo.outputPath('complexity-chart.png') });
     await expect(
       assessment.getByRole('tab', { name: /^Danh sách program/ }),
     ).toBeVisible();
@@ -114,6 +135,12 @@ test(
     const detail = assessment.getByRole('region', {
       name: 'Chi tiết program SAMPLE',
     });
+    await expect(detail.getByTestId('detail-raw-complexity')).not.toContainText(
+      'complexity-',
+    );
+    await detail
+      .getByTestId('detail-raw-complexity')
+      .screenshot({ path: testInfo.outputPath('complexity-score.png') });
     await detail.getByRole('tab', { name: /^File/ }).click();
     await expect(detail.getByText('File của SAMPLE')).toBeVisible();
     await expect(
@@ -130,10 +157,8 @@ test(
     await detail.getByRole('tab', { name: /^Lời gọi/ }).click();
     await expect(detail.getByText('Lời gọi', { exact: true })).toBeVisible();
     await detail.getByRole('tab', { name: /^CRUD/ }).click();
-    // The mapped view opens first; its line names the assumed schema.
-    await expect(
-      detail.getByText(/Giả định, cần người quản lý DB xác nhận/),
-    ).toBeVisible();
+    // A new source has no table-name mapping (no UI for it on step 1).
+    await expect(detail.getByText(/Chưa cấu hình/).first()).toBeVisible();
     await expect(
       detail.getByText('Không phát hiện truy cập bảng.'),
     ).toBeVisible();
@@ -155,8 +180,8 @@ test(
       complete: false,
     });
     expect(first.payload.tableNames).toMatchObject({
-      defaultSchema: 'APP',
-      status: 'assumed',
+      defaultSchema: null,
+      status: 'unconfigured',
     });
     expect(await readdir(join(dataDir, 'artifacts', '.staging'))).toEqual([]);
 

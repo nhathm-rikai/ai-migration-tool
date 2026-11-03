@@ -20,6 +20,10 @@ const ERROR_DEFINITIONS = {
     status: 401,
     message: 'A valid local credential is required.',
   },
+  FOLDER_PICKER_BUSY: {
+    status: 409,
+    message: 'A folder dialog is already open.',
+  },
 } as const satisfies Record<ApiErrorCode, { status: number; message: string }>;
 
 // Analyze codes produced by the source (B03), run (B04) and artifact (B07)
@@ -70,6 +74,10 @@ const RUN_ERROR_DEFINITIONS = {
   ARTIFACT_NOT_FOUND: {
     status: S.ARTIFACT_NOT_FOUND,
     message: 'Artifact version not found.',
+  },
+  RUN_EVENTS_LIMIT: {
+    status: S.RUN_EVENTS_LIMIT,
+    message: 'Too many open run event streams.',
   },
   RUNTIME_RECOVERY_REQUIRED: {
     status: S.RUNTIME_RECOVERY_REQUIRED,

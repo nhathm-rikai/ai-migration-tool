@@ -23,6 +23,7 @@ import {
 import type {
   CreateSnapshotRequest,
   SnapshotLimits,
+  SnapshotProgress,
 } from '../../ports/workspace-provider.js';
 import { createLocalWorkspaceProvider } from './local-workspace.provider.js';
 
@@ -113,6 +114,42 @@ describe('local workspace provider (B06)', () => {
     existsSync(join(snapshotsDir, '.staging'))
       ? readdirSync(join(snapshotsDir, '.staging'))
       : [];
+
+  it('PF08 lists the tree first, then reports each copied file with a known total', async () => {
+    const reports: SnapshotProgress[] = [];
+    const result = await provider.createSnapshot(
+      request({ onProgress: (progress) => reports.push(progress) }),
+    );
+    expect(result.status).toBe('published');
+    if (result.status !== 'published') return;
+    expect(reports[0]).toEqual({ phase: 'listing' });
+    const copies = reports.filter(
+      (report): report is Extract<SnapshotProgress, { phase: 'snapshot' }> =>
+        report.phase === 'snapshot',
+    );
+    // The total is known before the first file is copied.
+    expect(copies[0]).toMatchObject({ filesDone: 0, path: null });
+    expect(copies.map((copy) => copy.filesDone)).toEqual(
+      copies.map((_, index) => index),
+    );
+    const last = copies.at(-1)!;
+    expect(last.filesDone).toBe(last.filesTotal);
+    expect(last.filesTotal).toBe(result.manifest.fileCount);
+    expect(last.bytesDone).toBe(result.manifest.totalBytes);
+    for (const copy of copies) {
+      expect(copy.bytesDone).toBeLessThanOrEqual(copy.bytesTotal);
+      expect(copy.filesTotal).toBe(last.filesTotal);
+    }
+    const paths = copies.flatMap((copy) => (copy.path ? [copy.path] : []));
+    expect(paths).toContain('programs/受注/MAIN.BAS');
+    // Relative, never the root; excluded files are not listed.
+    for (const path of paths) {
+      expect(path.startsWith(source)).toBe(false);
+      expect(path).not.toMatch(/^[A-Za-z]:|^\//);
+    }
+    expect(paths).not.toContain('.claude/settings.json');
+    expect(paths).not.toContain('BUILD.LOG');
+  });
 
   it('B06-AC01 keeps raw bytes and the normalized view with independent hashes and lines', async () => {
     const before = treeHashes(source);

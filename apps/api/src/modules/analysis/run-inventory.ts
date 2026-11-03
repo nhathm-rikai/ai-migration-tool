@@ -58,11 +58,15 @@ function skippedForCoverage(entries: readonly SkippedEntry[]): Skipped[] {
   });
 }
 
-export function buildRunInventory(input: {
-  run: Run;
-  manifest: SnapshotManifest;
-  files: readonly SnapshotFile[];
-}): RunInventoryOutcome {
+export function buildRunInventory(
+  input: {
+    run: Run;
+    manifest: SnapshotManifest;
+    files: readonly SnapshotFile[];
+  },
+  // Per analyzed file (PF08); the worker forwards it as progress.
+  onFile?: (relativePath: string) => void,
+): RunInventoryOutcome {
   const { config } = input.run;
   const profile = findSourceProfile(config.profileId);
   if (!profile)
@@ -89,6 +93,7 @@ export function buildRunInventory(input: {
     profile,
     files: input.files,
     tableNames,
+    ...(onFile ? { onFile } : {}),
   });
   return {
     status: 'built',
@@ -109,8 +114,9 @@ export type PreparedRunInventory =
 // one call the inventory worker runs off the API thread.
 export function prepareRunInventory(
   input: RunInventoryInput,
+  onFile?: (relativePath: string) => void,
 ): PreparedRunInventory {
-  const built = buildRunInventory(input);
+  const built = buildRunInventory(input, onFile);
   if (built.status === 'failed') return built;
   const prepared = prepareInventory(built.inventory, built.contentHash);
   return prepared.status === 'prepared'

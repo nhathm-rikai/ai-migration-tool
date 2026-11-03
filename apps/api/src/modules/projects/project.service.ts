@@ -8,6 +8,8 @@ import {
   type ListProjectsQuery,
   type Project,
   type ProjectList,
+  type UpdateProjectInput,
+  UpdateProjectSchema,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
 import { AppError } from '../../shared/app-error.js';
@@ -21,11 +23,18 @@ export function createProjectService(deps: {
   return {
     create(input: CreateProjectInput): Project {
       const name = input.name.trim();
-      if (!Check(CreateProjectSchema, { ...input, name }))
+      const customerName = input.customerName?.trim();
+      const normalized = {
+        ...input,
+        name,
+        ...(customerName === undefined ? {} : { customerName }),
+      };
+      if (!Check(CreateProjectSchema, normalized))
         throw new AppError('INVALID_INPUT');
       const common = {
         id: deps.nextId(),
         name,
+        ...(customerName === undefined ? {} : { customerName }),
         createdAt: deps.now().toISOString(),
       };
       return deps.repository.create(
@@ -36,6 +45,19 @@ export function createProjectService(deps: {
     },
     get(id: string): Project {
       const project = deps.repository.findById(id);
+      if (!project) throw new AppError('PROJECT_NOT_FOUND');
+      return project;
+    },
+    update(id: string, input: UpdateProjectInput): Project {
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name.trim() }),
+        ...(input.customerName === undefined
+          ? {}
+          : { customerName: input.customerName?.trim() ?? null }),
+      };
+      if (!Check(UpdateProjectSchema, changes))
+        throw new AppError('INVALID_INPUT');
+      const project = deps.repository.update(id, changes);
       if (!project) throw new AppError('PROJECT_NOT_FOUND');
       return project;
     },

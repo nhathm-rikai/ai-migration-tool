@@ -14,12 +14,19 @@ import {
   runningRunFixture,
 } from '@portal/contracts/fixtures';
 import type { Run } from '@portal/contracts';
-import { AnalyzeRunPanel } from './analyze-run-panel';
-import { newerRun, RUN_POLL_INTERVAL_MS } from './use-analyze-runs';
+import { SourceStep } from './source-step';
+import { newerRun, RUN_POLL_INTERVAL_MS } from '../jobs/use-analyze-runs';
+import { createProjectsApi } from '../../shared/api/projects-api';
 import { createRunsApi } from '../../shared/api/runs-api';
+import { createSourcesApi } from '../../shared/api/sources-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { useLocale } from '../../shared/i18n/locale-context';
-import { json, requestUrl, testCredentials } from '../../testing/fixtures';
+import {
+  json,
+  project,
+  requestUrl,
+  testCredentials,
+} from '../../testing/fixtures';
 
 const projectId = FIXTURE_IDS.project;
 const otherProjectId = FIXTURE_IDS.otherProject;
@@ -46,6 +53,8 @@ function createServer(routes: Record<string, Handler>) {
   });
   return {
     api: createRunsApi(fetcher, testCredentials),
+    projectsApi: createProjectsApi(fetcher, testCredentials),
+    sourcesApi: createSourcesApi(fetcher, testCredentials),
     calls,
     mutations: () => calls.filter((call) => call.method !== 'GET'),
   };
@@ -55,6 +64,22 @@ const empty = { items: [], nextCursor: null };
 
 function render(ui: ReactElement) {
   return renderWithLibrary(ui, { wrapper: LocaleProvider });
+}
+
+// Step 1 of a demo project: runs lock the bundled fixture (revision 1).
+function step(server: ReturnType<typeof createServer>, id: string = projectId) {
+  return (
+    <SourceStep
+      key={id}
+      project={{ ...project, id }}
+      api={server.projectsApi}
+      runsApi={server.api}
+      sourcesApi={server.sourcesApi}
+      onProjectChange={() => undefined}
+      onProgress={() => undefined}
+      onOpenResults={() => undefined}
+    />
+  );
 }
 
 function startRoute(run: Run): Handler {
@@ -67,7 +92,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-describe('Analyze run panel (F02)', () => {
+describe('Runs of the source step (F02)', () => {
   it('only reads on open, re-render, StrictMode and locale change', async () => {
     const server = createServer({
       [`GET ${base}/current`]: () => json({ run: succeeded }),
@@ -80,26 +105,22 @@ describe('Analyze run panel (F02)', () => {
     const view = render(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel
-          api={server.api}
-          projectId={projectId}
-          demo
-          sourceRevision={1}
-        />
+        {step(server)}
       </StrictMode>,
     );
-    expect(await screen.findAllByText('Hoàn tất (demo)')).not.toHaveLength(0);
+    expect(
+      await screen.findByRole('button', {
+        name: 'Xem kết quả lần quét gần nhất',
+      }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
-    expect(await screen.findAllByText('完了（デモ）')).not.toHaveLength(0);
+    expect(
+      await screen.findByRole('button', { name: '前回のスキャン結果を見る' }),
+    ).toBeTruthy();
     view.rerender(
       <StrictMode>
         <LocaleSwitch />
-        <AnalyzeRunPanel
-          api={server.api}
-          projectId={projectId}
-          demo
-          sourceRevision={1}
-        />
+        {step(server)}
       </StrictMode>,
     );
     expect(server.mutations()).toEqual([]);
@@ -118,16 +139,9 @@ describe('Analyze run panel (F02)', () => {
         return json(queuedRunFixture, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     const start = await screen.findByRole('button', {
-      name: 'Bắt đầu phân tích',
+      name: 'Quét source',
     });
     // A double click sends one request.
     fireEvent.click(start);
@@ -138,7 +152,7 @@ describe('Analyze run panel (F02)', () => {
       ),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Gửi lại yêu cầu' }));
-    expect(await screen.findAllByText('Đang chờ')).not.toHaveLength(0);
+    expect(await screen.findByText('Đang chờ bắt đầu…')).toBeTruthy();
     const posts = server.mutations();
     expect(posts).toHaveLength(2);
     const [first, second] = posts.map((call) =>
@@ -174,23 +188,14 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
-    );
+    render(step(server));
+    fireEvent.click(await screen.findByRole('button', { name: 'Quét source' }));
     expect(
       await screen.findByText(
         'Mã nguồn của dự án đã thay đổi. Tải lại rồi thử lại.',
       ),
     ).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Bắt đầu phân tích' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quét source' }));
     await waitFor(() => expect(server.mutations()).toHaveLength(2));
     const keys = server
       .mutations()
@@ -223,22 +228,13 @@ describe('Analyze run panel (F02)', () => {
         );
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Bắt đầu phân tích' }),
-    );
+    render(step(server));
+    fireEvent.click(await screen.findByRole('button', { name: 'Quét source' }));
     expect(
       await screen.findByText(/Dự án đang có lượt chạy khác/),
     ).toBeTruthy();
-    expect(await screen.findAllByText('Đang chạy')).not.toHaveLength(0);
-    expect(screen.getByText('Kiểm kê')).toBeTruthy();
+    expect(await screen.findByText('Đang quét thư mục…')).toBeTruthy();
+    expect(screen.getAllByText('Kiểm kê')).not.toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Hủy lượt chạy' })).toBeTruthy();
   });
 
@@ -269,18 +265,11 @@ describe('Analyze run panel (F02)', () => {
         return json(cancelling, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
-    expect(await screen.findAllByText('Đang hủy…')).not.toHaveLength(0);
+    expect(await screen.findByText('Đang hủy lượt quét…')).toBeTruthy();
     expect(server.mutations()).toEqual([
       expect.objectContaining({
         url: `${base}/${runningRunFixture.id}/cancel`,
@@ -288,15 +277,14 @@ describe('Analyze run panel (F02)', () => {
       }),
     ]);
     expect(screen.queryByRole('button', { name: 'Hủy lượt chạy' })).toBeNull();
-    expect(
-      screen.queryByRole('button', { name: 'Bắt đầu phân tích' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Quét source' })).toBeNull();
     detail = cancelled;
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS * 2));
-    expect(await screen.findAllByText('Đã hủy')).not.toHaveLength(0);
+    // The ended run is offered again from the scan card (UI04-AC02).
+    expect(await screen.findByText('Đã hủy lượt quét')).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Bắt đầu phân tích' }),
-    ).toBeTruthy();
+      screen.getAllByRole('button', { name: 'Chạy lại' }),
+    ).not.toHaveLength(0);
     expect(server.mutations()).toHaveLength(1);
   });
 
@@ -330,18 +318,11 @@ describe('Analyze run panel (F02)', () => {
           : json(cancelling, 202);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
     fireEvent.click(
       await screen.findByRole('button', { name: 'Hủy lượt chạy' }),
     );
-    expect(await screen.findAllByText('Đang hủy…')).not.toHaveLength(0);
+    expect(await screen.findByText('Đang hủy lượt quét…')).toBeTruthy();
     expect(versions).toEqual([
       { expectedStateVersion: 1 },
       { expectedStateVersion: runningRunFixture.stateVersion },
@@ -360,20 +341,13 @@ describe('Analyze run panel (F02)', () => {
         return json(runningRunFixture);
       },
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
-    expect(await screen.findAllByText('Đang chạy')).not.toHaveLength(0);
+    render(step(server));
+    expect(await screen.findByText('Đang quét thư mục…')).toBeTruthy();
     online = false;
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS + 10));
     expect(await screen.findByText(/Mất kết nối với backend/)).toBeTruthy();
-    expect(screen.queryByText('Thất bại')).toBeNull();
-    expect(screen.getAllByText('Đang chạy')).not.toHaveLength(0);
+    expect(screen.queryByText('Quét source thất bại')).toBeNull();
+    expect(screen.getByText('Đang quét thư mục…')).toBeTruthy();
     online = true;
     // Backoff: the next poll comes after a longer delay, then recovers.
     await act(() => vi.advanceTimersByTimeAsync(RUN_POLL_INTERVAL_MS * 2 + 10));
@@ -402,32 +376,16 @@ describe('Analyze run panel (F02)', () => {
         json({ items: [runB], nextCursor: null }),
     };
     const server = createServer(routes);
-    const view = render(
-      <AnalyzeRunPanel
-        key={projectId}
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    const view = render(step(server));
     await waitFor(() => expect(releaseA).toBeDefined());
-    view.rerender(
-      <AnalyzeRunPanel
-        key={otherProjectId}
-        api={server.api}
-        projectId={otherProjectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
-    expect(await screen.findAllByText('Thất bại')).not.toHaveLength(0);
+    view.rerender(step(server, otherProjectId));
+    expect(await screen.findByText('Quét source thất bại')).toBeTruthy();
     await act(async () => {
       releaseA?.();
       await Promise.resolve();
     });
-    expect(screen.queryByText('Đang chạy')).toBeNull();
-    expect(screen.getAllByText('Thất bại')).not.toHaveLength(0);
+    expect(screen.queryByText('Đang quét thư mục…')).toBeNull();
+    expect(screen.getByText('Quét source thất bại')).toBeTruthy();
     expect(server.mutations()).toEqual([]);
   });
 
@@ -446,27 +404,23 @@ describe('Analyze run panel (F02)', () => {
       [`GET ${base}/${retried.id}`]: () => json(retried),
       [`POST ${base}`]: startRoute(retried),
     });
-    render(
-      <AnalyzeRunPanel
-        api={server.api}
-        projectId={projectId}
-        demo
-        sourceRevision={1}
-      />,
-    );
+    render(step(server));
+    // UI04-AC02: the scan card names the reason; nothing opens by itself.
+    expect(await screen.findByText('Quét source thất bại')).toBeTruthy();
     expect(
-      await screen.findByText('Mã nguồn đã thay đổi trong lúc chạy.'),
-    ).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Chạy lại' }));
+      screen.getAllByText('Mã nguồn đã thay đổi trong lúc chạy.'),
+    ).not.toHaveLength(0);
+    // The scan card offers the re-run of the ended run.
+    fireEvent.click(
+      (await screen.findAllByRole('button', { name: 'Chạy lại' }))[0]!,
+    );
     await waitFor(() => expect(server.mutations()).toHaveLength(1));
     expect(server.mutations()[0]?.body).toEqual({
       kind: 'analyze',
       source: { strategy: 'current-source', expectedSourceRevision: 1 },
       retryOfRunId: failedRunFixture.id,
     });
-    expect(await screen.findAllByText('Đang chờ')).not.toHaveLength(0);
-    // Both runs stay in the history.
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(await screen.findByText('Đang chờ bắt đầu…')).toBeTruthy();
   });
 });
 

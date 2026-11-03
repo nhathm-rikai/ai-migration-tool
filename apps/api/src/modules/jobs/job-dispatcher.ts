@@ -1,4 +1,8 @@
-import type { Run, RuntimeStatus } from '@portal/contracts';
+import type {
+  Run,
+  RunProgress as FileProgress,
+  RuntimeStatus,
+} from '@portal/contracts';
 import type {
   RunExecutionResult,
   RunExecutor,
@@ -47,6 +51,8 @@ export function createJobDispatcher(deps: {
   // Startup could not account for a previous process (unreadable instance
   // owner record): nothing is dispatched until an operator confirms cleanup.
   recoveryRequired?: boolean;
+  // In-memory per-file progress of the executing run (PF08).
+  progress?: { setProgress(runId: string, progress: FileProgress): void };
 }) {
   const { repository, log } = deps;
   let active: Execution | null = null;
@@ -160,6 +166,10 @@ export function createJobDispatcher(deps: {
         run,
         signal: controller.signal,
         report: (progress) => report(execution, progress),
+        reportFiles: (progress) => {
+          if (execution.controller.signal.aborted || detached) return;
+          deps.progress?.setProgress(run.id, progress);
+        },
       });
     } catch (error) {
       log.error(

@@ -77,6 +77,34 @@ function storagePath(base: string, relativePath: string): string {
   return join(base, ...relativePath.split('/'));
 }
 
+// Settles with `promise`, or rejects with the signal's reason as soon as it
+// is aborted; the abandoned read finishes on its own and is ignored.
+function untilAborted<T>(
+  promise: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () =>
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new Error('Aborted.', { cause: signal.reason }),
+      );
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 export function createLocalWorkspaceProvider(options: {
   // App-owned directory, outside every registered source root.
   snapshotsDir: string;
@@ -140,6 +168,25 @@ export function createLocalWorkspaceProvider(options: {
       stats: BigIntStats;
     }[] = [];
     const projects: { relativePath: string; lines: string[] }[] = [];
+    // Files of the first pass, copied after the whole tree was listed so the
+    // number of files to copy is known before the first copy (PF08).
+    const listed: {
+      absolute: string;
+      relativePath: string;
+      stats: BigIntStats;
+    }[] = [];
+    let filesDone = 0;
+    let filesTotal = 0;
+    let bytesTotal = 0;
+    const progress = (path: string | null) =>
+      request.onProgress?.({
+        phase: 'snapshot',
+        filesDone,
+        filesTotal,
+        bytesDone: totalBytes,
+        bytesTotal,
+        path,
+      });
 
     async function addFile(
       absolute: string,
@@ -268,7 +315,7 @@ export function createLocalWorkspaceProvider(options: {
           });
           continue;
         }
-        await addFile(childPath, relativePath, stats);
+        listed.push({ absolute: childPath, relativePath, stats });
       }
     }
 
@@ -317,9 +364,13 @@ export function createLocalWorkspaceProvider(options: {
       );
       for (const file of excludedFiles) {
         checkpoint();
-        if (declared.has(file.relativePath.toLowerCase()))
+        if (declared.has(file.relativePath.toLowerCase())) {
+          filesTotal++;
+          bytesTotal += Number(file.stats.size);
           await addFile(file.absolute, file.relativePath, file.stats, 'code');
-        else
+          filesDone++;
+          progress(file.relativePath);
+        } else
           skipped.push({
             relativePath: file.relativePath,
             kind: 'file',
@@ -329,7 +380,23 @@ export function createLocalWorkspaceProvider(options: {
       }
     }
 
+    request.onProgress?.({ phase: 'listing' });
     await walk(root, '');
+    for (const file of listed) {
+      if (profile.analyzer.fileRole(file.relativePath) === 'excluded') continue;
+      filesTotal++;
+      bytesTotal += Number(file.stats.size);
+    }
+    progress(null);
+    for (const file of listed) {
+      checkpoint();
+      const counted =
+        profile.analyzer.fileRole(file.relativePath) !== 'excluded';
+      await addFile(file.absolute, file.relativePath, file.stats);
+      if (!counted) continue;
+      filesDone++;
+      progress(file.relativePath);
+    }
     await addDeclaredMembers();
     await verify();
     const coverage = [...skipped]
@@ -450,8 +517,10 @@ export function createLocalWorkspaceProvider(options: {
         for (const entry of manifest.entries) {
           signal?.throwIfAborted();
           if (!isRelativeSourcePath(entry.relativePath)) return undefined;
-          const bytes = await storage.read(
-            storagePath(directory, entry.relativePath),
+          // A slow read (a scanner holding the file) must not delay a stop.
+          const bytes = await untilAborted(
+            storage.read(storagePath(directory, entry.relativePath)),
+            signal,
           );
           if (
             bytes.byteLength !== entry.byteLength ||

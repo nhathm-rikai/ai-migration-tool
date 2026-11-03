@@ -2,6 +2,7 @@ import {
   ProjectListSchema,
   ProjectSchema,
   type CreateProjectInput,
+  type UpdateProjectInput,
 } from '@portal/contracts';
 import { createApiClient } from './api-client';
 import {
@@ -30,6 +31,11 @@ export function createProjectsApi(
     create: (input: CreateProjectInput, signal: AbortSignal) =>
       request('/projects', ProjectSchema, signal, {
         method: 'POST',
+        body: input,
+      }),
+    update: (id: string, input: UpdateProjectInput, signal: AbortSignal) =>
+      request('/projects/' + encodeURIComponent(id), ProjectSchema, signal, {
+        method: 'PATCH',
         body: input,
       }),
   };

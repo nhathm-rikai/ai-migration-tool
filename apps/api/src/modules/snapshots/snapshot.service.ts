@@ -37,6 +37,7 @@ export function createSnapshotService(deps: {
       run: Run,
       signal: AbortSignal,
       afterFileRead?: CreateSnapshotRequest['afterFileRead'],
+      onProgress?: CreateSnapshotRequest['onProgress'],
     ): Promise<SnapshotOutcome> {
       if (run.source.kind !== 'local')
         throw new Error('Only local sources have snapshots.');
@@ -69,6 +70,7 @@ export function createSnapshotService(deps: {
         limits: run.config.limits,
         signal,
         ...(afterFileRead ? { afterFileRead } : {}),
+        ...(onProgress ? { onProgress } : {}),
       });
       if (result.status !== 'published') return result;
       try {

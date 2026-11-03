@@ -1,13 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-// Projects smoke on the fixture API: list the seeded project, create one in
-// the UI, reload on the project's URL, then reopen it from the list.
+// Projects smoke on the fixture API (UI04): the app opens on step 1 of a
+// new project; "Dự án gần đây" finds the seeded project and opens it; reload
+// stays on the project's URL; the sidebar picker goes back to a new project.
 test(
-  'create, list and reopen a project',
+  'open a project from recent projects, reload it and go back to a new one',
   { tag: '@smoke' },
   async ({ page }) => {
     const seedName = process.env.E2E_SEED_PROJECT_NAME ?? '';
-    const name = `E2E project ${Date.now()}`;
     // The UI bootstraps a local credential through the preview proxy and
     // sends it only in the Authorization header.
     const tokens = new Set<string>();
@@ -33,33 +33,62 @@ test(
     });
 
     await page.goto('/');
-    await expect(page).toHaveURL(/\/projects$/);
-    const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
-    await expect(projects.getByRole('link', { name: seedName })).toBeVisible();
-
-    await page.getByLabel('Tên dự án').fill(name);
-    await page.getByRole('button', { name: 'Tạo dự án', exact: true }).click();
-    await expect(page.getByText('Đã tạo dự án.')).toBeVisible();
-    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
-    await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: 'Nạp source code của khách hàng',
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await expect(page.getByText('Bước 1 / 5 · Dự án mới')).toBeVisible();
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    const firstCard = recent
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first();
+    await expect(firstCard).toBeVisible();
+    await firstCard.hover();
+    // The hover lift must stay inside the scrolling list (including its
+    // top border), rather than being clipped at the first row.
+    await expect
+      .poll(async () =>
+        firstCard.evaluate((card) => {
+          const list = card.closest('.recent-list');
+          if (!list) return false;
+          return (
+            card.getBoundingClientRect().top >= list.getBoundingClientRect().top
+          );
+        }),
+      )
+      .toBe(true);
+    // Wait for the hover transition before checking the final geometry too.
+    await expect(firstCard).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, -2)');
+    expect(
+      await firstCard.evaluate((card) => {
+        const list = card.closest('.recent-list');
+        return (
+          list !== null &&
+          card.getBoundingClientRect().top >= list.getBoundingClientRect().top
+        );
       }),
-    ).toBeVisible();
+    ).toBe(true);
+    await page.screenshot({
+      path: `${process.env.E2E_OUTPUT_DIR}/ui04-recent-hover.png`,
+    });
+    await recent
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first()
+      .click();
+    await expect(page.getByText(`Bước 1 / 5 · ${seedName}`)).toBeVisible();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const projectUrl = page.url();
 
     // Reload opens the same project and step.
     await page.reload();
-    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
+    await expect(page.getByText(`Bước 1 / 5 · ${seedName}`)).toBeVisible();
     expect(page.url()).toBe(projectUrl);
 
     await page.getByLabel('Dự án', { exact: true }).selectOption('');
-    await expect(page).toHaveURL(/\/projects$/);
-    await expect(projects.getByRole('link', { name: seedName })).toBeVisible();
-    await projects.getByRole('link', { name }).click();
-    await expect(page.getByText(`Bước 1 / 5 · ${name}`)).toBeVisible();
+    await expect(page).toHaveURL(/\/projects\/new$/);
+    await expect(
+      page.getByRole('heading', { name: 'Chọn thư mục source' }),
+    ).toBeVisible();
 
     expect(tokens.size).toBe(1);
     const [token] = [...tokens];
@@ -87,9 +116,13 @@ test(
     });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/projects');
-    await page
-      .getByRole('navigation', { name: 'Danh sách dự án' })
-      .getByRole('link', { name: seedName })
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await recent
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first()
       .click();
     const steps = page.getByRole('navigation', { name: 'Các bước đánh giá' });
     await expect(
@@ -133,8 +166,8 @@ test(
     await expect(
       page.getByRole('heading', { level: 1, name: 'Không tìm thấy dự án' }),
     ).toBeVisible();
-    await page.getByRole('link', { name: 'Về danh sách dự án' }).click();
-    await expect(page).toHaveURL(/\/projects$/);
+    await page.getByRole('link', { name: 'Về trang Nạp source' }).click();
+    await expect(page).toHaveURL(/\/projects\/new$/);
     expect(starts).toBe(0);
   },
 );

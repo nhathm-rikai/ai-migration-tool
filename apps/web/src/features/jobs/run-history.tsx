@@ -1,81 +1,47 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Run } from '@portal/contracts';
-import type { ArtifactsApi } from '../../shared/api/artifacts-api';
-import type { RunsApi } from '../../shared/api/runs-api';
-import { AssessmentOverview } from '../assessment/assessment-overview';
-import { ApiError } from '../../shared/api/api-error';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { runRequestErrorMessage } from './run-messages';
 import {
   isActiveRun,
-  useAnalyzeRuns,
   visibleHistory,
-  type RunAction,
+  type AnalyzeRunsControl,
 } from './use-analyze-runs';
 
-// Start/cancel/history of the selected project's analyze runs. Opening the
-// panel, reloading or switching locale only reads; nothing starts by itself.
-export function AnalyzeRunPanel({
-  api,
-  artifactsApi,
-  projectId,
+// Run history of the source step (F02): every run of the project, the one
+// picked with its details, a retry for a failed one and a link to the results
+// of a succeeded one. Start and Cancel live on the scan card; both read the
+// same run state, so nothing here starts by itself.
+export function RunHistory({
+  runs,
   demo,
-  sourceRevision,
+  // false while no readable source can be locked by a retry.
+  canStart,
   onOpenResults,
-  onRunChange,
 }: {
-  api: RunsApi;
-  // Without it a succeeded run shows no assessment (run-only tests).
-  artifactsApi?: ArtifactsApi | undefined;
-  // Given: a succeeded run links to its own results page instead of showing
-  // the assessment inline.
-  onOpenResults?: ((runId: string) => void) | undefined;
-  projectId: string;
-  // Demo projects run the fixture executor and say so.
+  runs: AnalyzeRunsControl;
   demo: boolean;
-  // Revision a new run locks; null blocks Start (no readable source).
-  sourceRevision: number | null;
-  // Called when the active run changes (a run starts or ends) after the
-  // first read, so the shell can follow it.
-  onRunChange?: (() => void) | undefined;
+  canStart: boolean;
+  onOpenResults: (runId: string) => void;
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.runs;
-  const runs = useAnalyzeRuns(api, projectId, sourceRevision);
-  // A Start whose outcome is unknown can still be resent as it was.
-  const blocked = sourceRevision === null && !runs.uncertainStart;
-  // `succeeded` of a demo run is labelled as demo; a local run has its own
-  // inventory from the registered source (B08).
-  const statusLabel = (run: Run) =>
-    run.status === 'succeeded' && !demo
-      ? copy.localSucceeded
-      : copy.status[run.status];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const { state, action } = runs;
   const pending = action.status === 'pending';
-  const current = state.status === 'ready' ? state.current : null;
-  const activeRunId =
-    current && isActiveRun(current.status) ? current.id : null;
-  // Undefined until the first read, so loading the panel reports nothing.
-  const lastActive = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (state.status !== 'ready') return;
-    if (lastActive.current !== undefined && lastActive.current !== activeRunId)
-      onRunChange?.();
-    lastActive.current = activeRunId;
-  }, [state.status, activeRunId, onRunChange]);
+  const statusLabel = (run: Run) => runStatusLabel(run, demo, copy);
 
   if (state.status === 'loading')
     return (
       <section className="panel run-panel" aria-labelledby="runs-title">
-        <h2 id="runs-title">{copy.title}</h2>
+        <h2 id="runs-title">{copy.history}</h2>
         <p role="status">{copy.loading}</p>
       </section>
     );
   if (state.status === 'error')
     return (
       <section className="panel run-panel" aria-labelledby="runs-title">
-        <h2 id="runs-title">{copy.title}</h2>
+        <h2 id="runs-title">{copy.history}</h2>
         <p role="alert" className="error">
           {runRequestErrorMessage(state.error, messages)}
         </p>
@@ -89,12 +55,11 @@ export function AnalyzeRunPanel({
   const shown =
     history.find((run) => run.id === selectedId) ?? state.current ?? null;
   const active = state.current && isActiveRun(state.current.status);
-
   return (
     <section className="panel run-panel" aria-labelledby="runs-title">
       <div className="section-heading">
         <h2 id="runs-title">
-          {demo ? copy.title : copy.titleLocal}{' '}
+          {copy.history}{' '}
           {demo && <span className="badge">{messages.projects.demoBadge}</span>}
         </h2>
         <button
@@ -106,45 +71,10 @@ export function AnalyzeRunPanel({
         </button>
       </div>
       <p className="muted">{demo ? copy.demoNotice : copy.localNotice}</p>
-      {blocked && !active && (
-        <p className="notice" id="runs-start-blocked">
-          {messages.source.startBlocked}
-        </p>
-      )}
-      {runs.connectionLost && (
-        <p role="status" className="notice">
-          {copy.connectionLost}
-        </p>
-      )}
-      <ActionMessage
-        action={action}
-        uncertainStart={runs.uncertainStart}
-        onResend={() => void runs.start()}
-      />
-      <div className="form-actions">
-        {!active && (
-          <button
-            className="button primary"
-            disabled={pending || blocked}
-            aria-describedby={blocked ? 'runs-start-blocked' : undefined}
-            onClick={() => void runs.start()}
-          >
-            {pending && action.kind === 'start' ? copy.starting : copy.start}
-          </button>
-        )}
-        {state.current && active && state.current.status !== 'cancelling' && (
-          <CancelButton
-            run={state.current}
-            pending={pending}
-            sending={pending && action.kind === 'cancel'}
-            onCancel={(run) => void runs.cancel(run)}
-          />
-        )}
-      </div>
       {shown ? (
         <RunDetail
           run={shown}
-          canRetry={!active && !pending && !blocked}
+          canRetry={!active && !pending && canStart}
           statusLabel={statusLabel}
           onRetry={(runId) => {
             setSelectedId(null);
@@ -155,29 +85,16 @@ export function AnalyzeRunPanel({
       ) : (
         <p className="empty-state">{copy.noRun}</p>
       )}
-      {shown?.status === 'succeeded' &&
-        artifactsApi &&
-        (onOpenResults ? (
-          <div className="form-actions results-link">
-            <button
-              className="button primary"
-              onClick={() => onOpenResults(shown.id)}
-            >
-              {copy.openResults}
-            </button>
-          </div>
-        ) : (
-          <AssessmentOverview
-            key={shown.id}
-            api={artifactsApi}
-            projectId={projectId}
-            runId={shown.id}
-          />
-        ))}
+      {shown?.status === 'succeeded' && (
+        <div className="form-actions results-link">
+          <button className="button" onClick={() => onOpenResults(shown.id)}>
+            {copy.openResults}
+          </button>
+        </div>
+      )}
       {history.length > 0 && (
         <>
-          <h3>{copy.history}</h3>
-          <ul className="run-history">
+          <ul className="run-history" aria-label={copy.history}>
             {history.map((run) => (
               <li key={run.id}>
                 <button
@@ -212,61 +129,16 @@ export function AnalyzeRunPanel({
   );
 }
 
-function CancelButton({
-  run,
-  pending,
-  sending,
-  onCancel,
-}: {
-  run: Run;
-  pending: boolean;
-  sending: boolean;
-  onCancel: (run: Run) => void;
-}) {
-  const { messages } = useLocale();
-  return (
-    <button className="button" disabled={pending} onClick={() => onCancel(run)}>
-      {sending ? messages.runs.cancelSending : messages.runs.cancel}
-    </button>
-  );
-}
-
-function ActionMessage({
-  action,
-  uncertainStart,
-  onResend,
-}: {
-  action: RunAction;
-  uncertainStart: boolean;
-  onResend: () => void;
-}) {
-  const { messages } = useLocale();
-  const copy = messages.runs;
-  if (action.status !== 'error') return null;
-  if (action.kind === 'start' && uncertainStart)
-    return (
-      <div className="notice" role="alert">
-        <p>{copy.startUncertain}</p>
-        <button className="button small" onClick={onResend}>
-          {copy.resend}
-        </button>
-      </div>
-    );
-  if (
-    action.kind === 'cancel' &&
-    action.error instanceof ApiError &&
-    action.error.outcomeUnknown
-  )
-    return (
-      <p role="alert" className="error">
-        {copy.cancelUncertain}
-      </p>
-    );
-  return (
-    <p role="alert" className="error">
-      {runRequestErrorMessage(action.error, messages)}
-    </p>
-  );
+// `succeeded` of a demo run is labelled as demo; a local run has its own
+// inventory from the registered source (B08).
+export function runStatusLabel(
+  run: Run,
+  demo: boolean,
+  copy: ReturnType<typeof useLocale>['messages']['runs'],
+): string {
+  return run.status === 'succeeded' && !demo
+    ? copy.localSucceeded
+    : copy.status[run.status];
 }
 
 function RunDetail({
@@ -294,7 +166,7 @@ function RunDetail({
         <div>
           <dt>{copy.fields.status}</dt>
           <dd>
-            <span className={`run-status status-${run.status}`} role="status">
+            <span className={`run-status status-${run.status}`}>
               {statusLabel(run)}
             </span>
           </dd>

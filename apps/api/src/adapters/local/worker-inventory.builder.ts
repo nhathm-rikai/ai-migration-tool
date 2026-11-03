@@ -16,9 +16,14 @@ const entry = new URL(
   import.meta.url,
 );
 
+// What the worker posts: progress any number of times, then one result.
+export type InventoryWorkerMessage =
+  | { kind: 'progress'; analyzed: number; recentPaths: string[] }
+  | { kind: 'result'; result: InventoryBuildResult };
+
 export function createWorkerInventoryBuilder(): InventoryBuilder {
   return {
-    build(input, signal) {
+    build(input, signal, onProgress) {
       if (signal.aborted) return Promise.resolve({ status: 'stopped' });
       return new Promise<InventoryBuildResult>((resolve, reject) => {
         const worker = new Worker(entry, {
@@ -38,8 +43,12 @@ export function createWorkerInventoryBuilder(): InventoryBuilder {
           void worker.terminate();
         };
         signal.addEventListener('abort', onAbort, { once: true });
-        worker.once('message', (result: InventoryBuildResult) => {
-          settle(() => resolve(result));
+        worker.on('message', (message: InventoryWorkerMessage) => {
+          if (message.kind === 'progress') {
+            if (!settled && !signal.aborted) onProgress?.(message);
+            return;
+          }
+          settle(() => resolve(message.result));
           void worker.terminate();
         });
         worker.once('error', (error: Error) => settle(() => reject(error)));

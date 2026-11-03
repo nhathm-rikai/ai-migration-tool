@@ -13,5 +13,10 @@ export interface InventoryBuilder {
   build(
     input: RunInventoryInput,
     signal: AbortSignal,
+    // Files analyzed so far and the latest of them (PF08).
+    onProgress?: (progress: {
+      analyzed: number;
+      recentPaths: string[];
+    }) => void,
   ): Promise<InventoryBuildResult>;
 }

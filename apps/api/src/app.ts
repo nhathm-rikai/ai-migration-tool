@@ -17,6 +17,7 @@ import { registerDocumentRoutes } from './modules/documents/document.routes.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
+import { registerRunEventRoutes } from './modules/jobs/run-events.routes.js';
 import { registerArtifactRoutes } from './modules/artifacts/artifact.routes.js';
 import { registerSourceRegistrationRoutes } from './modules/projects/source-registration.routes.js';
 import { createLoggerOptions } from './plugins/logger.js';
@@ -26,6 +27,8 @@ import {
   registerLocalSecurity,
 } from './plugins/local-security.js';
 import { registerLocalSessionRoutes } from './modules/local-session/local-session.routes.js';
+import { registerFolderPickerRoutes } from './modules/local-picker/folder-picker.routes.js';
+import type { FolderPicker } from './ports/folder-picker.js';
 
 // loggerStream lets tests read the structured log; production logs to stdout.
 export function buildApp(
@@ -35,6 +38,7 @@ export function buildApp(
     jobs?: JobOptions;
     documents?: Partial<DocumentOptions>;
     recovery?: StartupRecovery;
+    folderPicker?: FolderPicker;
   } = {},
 ) {
   const app = Fastify({
@@ -55,9 +59,16 @@ export function buildApp(
       ...options.documents,
     },
     ...(options.recovery ? { recovery: options.recovery } : {}),
+    ...(options.folderPicker ? { folderPicker: options.folderPicker } : {}),
   });
   app.addHook('onReady', async () => {
     await dependencies.start();
+  });
+  // Both a picker request and SSE keep sockets busy. Abort/end them before
+  // the server waits for in-flight requests; onClose runs after that wait.
+  app.addHook('preClose', async () => {
+    dependencies.runEvents.close();
+    await dependencies.folderPicker.close();
   });
   app.addHook('onClose', async () => {
     await dependencies.close();
@@ -81,7 +92,9 @@ export function buildApp(
   registerProjectRoutes(app, dependencies.projects);
   registerSourceRegistrationRoutes(app, dependencies.sources);
   registerJobRoutes(app, dependencies.jobs);
+  registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);
   registerArtifactRoutes(app, dependencies.artifacts);
+  registerFolderPickerRoutes(app, dependencies.folderPicker);
   registerDocumentRoutes(app, dependencies.documents);
   return app;
 }

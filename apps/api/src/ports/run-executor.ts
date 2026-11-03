@@ -1,4 +1,9 @@
-import type { AnalyzeStage, Run, RunErrorCode } from '@portal/contracts';
+import type {
+  AnalyzeStage,
+  Run,
+  RunErrorCode,
+  RunProgress as FileProgress,
+} from '@portal/contracts';
 
 // Progress of one execution: the stage reached and, once the snapshot exists,
 // its ID. Ignored after the run left `running` (cancel/timeout won).
@@ -9,6 +14,9 @@ export type RunExecutionRequest = {
   // Aborted on cancel, timeout and shutdown; the executor must stop and settle.
   signal: AbortSignal;
   report: (progress: RunProgress) => void;
+  // Per-file progress (PF08), kept in memory only. Optional for executors
+  // that cannot count files; ignored once the signal was aborted.
+  reportFiles?: (progress: FileProgress) => void;
 };
 
 // TIMEOUT and STOP_UNCONFIRMED are decided by the dispatcher, not the executor.

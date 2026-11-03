@@ -52,6 +52,48 @@ const pick = (text: string, name: RegExp) => {
 describe('UI03 call graph tab', () => {
   beforeEach(() => window.localStorage.clear());
 
+  it.each(['open', 'closed'])(
+    'clears the last toggled %s folder outline when another folder is focused',
+    (state) => {
+      render(<DependencyGraphView inventory={corpus} />);
+      const canvas = screen.getByRole('group', {
+        name: 'Call graph toàn dự án',
+      });
+      fireEvent.click(
+        within(canvas).getByRole('button', { name: /^Mở thư mục F01 / }),
+      );
+      if (state === 'closed')
+        fireEvent.click(
+          within(canvas).getByRole('button', { name: 'Thu gọn thư mục F01' }),
+        );
+      expect(canvas.querySelector('.react-flow__node.recent')).not.toBeNull();
+      const other = within(canvas).getByRole('button', {
+        name: /^Làm nổi bật đường nối của F00 /,
+      });
+      fireEvent.click(other);
+      expect(other.getAttribute('aria-pressed')).toBe('true');
+      expect(canvas.querySelector('.react-flow__node.recent')).toBeNull();
+      expect(document.querySelector('.dep-open-box.recent')).toBeNull();
+    },
+  );
+
+  it('opening another folder clears the previous node focus and Escape clears the reveal outline', () => {
+    render(<DependencyGraphView inventory={corpus} />);
+    const canvas = screen.getByRole('group', { name: 'Call graph toàn dự án' });
+    const first = within(canvas).getByRole('button', {
+      name: /^Làm nổi bật đường nối của F00 /,
+    });
+    fireEvent.click(first);
+    fireEvent.click(
+      within(canvas).getByRole('button', { name: /^Mở thư mục F01 / }),
+    );
+    expect(canvas.className).not.toContain('has-focus');
+    expect(first.getAttribute('aria-pressed')).toBe('false');
+    expect(canvas.querySelectorAll('.react-flow__node.recent')).toHaveLength(1);
+    fireEvent.keyDown(canvas, { key: 'Escape' });
+    expect(canvas.querySelector('.react-flow__node.recent')).toBeNull();
+  });
+
   it('shows the fan-in and fan-out of a node picked in the search', () => {
     render(<DependencyGraphView inventory={corpus} />);
     const shared = graph.nodes.find(

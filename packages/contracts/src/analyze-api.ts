@@ -166,7 +166,7 @@ export const ANALYZE_API_OPERATIONS = {
     querystring: EmptyQuerySchema,
     response: RunEventSchema,
     contentType: 'text/event-stream',
-    errorCodes: RUN_READ_ERRORS,
+    errorCodes: [...RUN_READ_ERRORS, 'RUN_EVENTS_LIMIT'],
   },
   listRunArtifacts: {
     method: 'GET',

@@ -254,10 +254,7 @@ function Summary({ analysis }: { analysis: Analysis }) {
           <ComplexityTag
             level={analysis.complexity.level}
             score={analysis.complexity.score}
-          />{' '}
-          <span className="mono muted version">
-            {analysis.complexity.version}
-          </span>
+          />
         </dd>
       </div>
       {analysis.mappedComplexity && (

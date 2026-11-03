@@ -6,10 +6,10 @@ import {
 import type {
   AnalyzeApiErrorCode,
   AnalyzeStage,
+  FolderPickerUnavailableReason,
   ApiErrorCode,
   RunErrorCode,
   RunStatus,
-  SourceProfileId,
   TableNameMapping,
 } from '@portal/contracts';
 import type { ApiFailureKind } from '../api/api-error';
@@ -40,8 +40,8 @@ export const viMessages = {
   },
   shell: {
     project: 'Dự án',
-    allProjects: 'Tất cả dự án',
-    chooseProject: 'Chọn dự án để bắt đầu',
+    newProject: 'Dự án mới',
+    chooseProject: 'Chọn thư mục source để bắt đầu',
     projectDetail: {
       demo: 'VB6 · dữ liệu mẫu',
       local: 'VB6 · mã nguồn trên máy này',
@@ -98,117 +98,26 @@ export const viMessages = {
       help: 'Địa chỉ này không có trong ứng dụng.',
       projectTitle: 'Không tìm thấy dự án',
       projectHelp: 'Dự án trong địa chỉ không tồn tại hoặc đã bị xóa.',
-      back: 'Về danh sách dự án',
+      back: 'Về trang Nạp source',
     },
   },
   projects: {
-    workspace: 'Không gian làm việc',
-    title: 'Dự án của bạn',
-    refresh: 'Làm mới dự án',
-    createNew: 'Tạo dự án mới',
-    listTitle: 'Danh sách dự án',
-    loading: 'Đang tải dự án…',
-    retryList: 'Thử lại danh sách',
-    noMore: 'Không còn dự án ở trang này',
-    empty: 'Chưa có dự án',
-    emptyHelp: 'Tạo dự án để bắt đầu không gian làm việc.',
     results: 'Kết quả phân tích',
-    pageCount: (count: number) => `${count} dự án trong trang`,
-    firstPage: 'Về trang đầu',
-    nextPage: 'Trang tiếp',
     fixture: 'Dữ liệu mẫu',
     demoBadge: 'DEMO',
     localBadge: 'LOCAL',
-    localData: 'Mã nguồn trên máy này',
     assessmentSteps: 'Các bước đánh giá',
-    created: 'Đã tạo dự án.',
-    footer:
-      'Dự án và kết quả được lưu trên máy này. Đã có: đăng ký mã nguồn và phân tích tĩnh. Sắp có: hiểu nghiệp vụ bằng AI, rà soát và xuất báo cáo.',
     create: {
-      eyebrow: 'Không gian làm việc',
-      description:
-        'Khởi tạo dự án để quản lý thông tin và chuẩn bị đánh giá hệ thống cũ.',
-      name: 'Tên dự án',
-      placeholder: 'Ví dụ: Hệ thống quản lý bán hàng',
       nameInvalid: `Nhập tên dự án từ ${PROJECT_NAME_MIN_LENGTH} đến ${PROJECT_NAME_MAX_LENGTH} ký tự, không chỉ chứa khoảng trắng.`,
-      nameHelp: `Tối đa ${PROJECT_NAME_MAX_LENGTH} ký tự.`,
-      sample: 'Dữ liệu mẫu VB6',
-      sampleDescription: 'Chỉ lưu thông tin dự án, chưa đọc mã nguồn.',
-      kind: 'Loại dự án',
-      kindDemo: 'Demo với dữ liệu mẫu',
-      kindLocal: 'Mã nguồn trên máy này',
-      kindLocalDescription:
-        'Đăng ký thư mục mã nguồn sau khi tạo dự án. Mã nguồn chỉ được đọc khi chạy phân tích.',
-      submit: 'Tạo dự án',
-      pending: 'Đang tạo…',
-      savedLocally:
-        'Dự án được lưu trên máy này. Chọn dự án trong cây bên trái để mở lại thông tin.',
-    },
-    detail: {
-      title: 'Chi tiết dự án',
-      close: 'Đóng chi tiết',
-      loading: 'Đang tải chi tiết…',
-      retry: 'Thử lại chi tiết',
-      description: 'Thông tin dự án đã lưu trên máy này.',
-      id: 'Mã dự án',
-      data: 'Dữ liệu',
-      createdAt: 'Ngày tạo',
-      ready: 'Sẵn sàng quản lý dự án',
-      technical: 'Thông tin kỹ thuật',
-      unavailable:
-        'Phân tích mã nguồn thật, rà soát và tạo báo cáo chưa khả dụng trong bản này; lượt chạy phân tích bên dưới là demo.',
     },
   },
   source: {
-    title: 'Mã nguồn',
-    technical: 'Thông tin kỹ thuật',
     loading: 'Đang tải thông tin mã nguồn…',
     reload: 'Tải lại mã nguồn',
-    unregistered:
-      'Dự án chưa đăng ký thư mục mã nguồn. Đăng ký trước khi chạy phân tích.',
-    fixture: (fixtureId: string) =>
-      `Dự án demo dùng bộ mẫu ${fixtureId} đi kèm ứng dụng; không đăng ký được thư mục khác.`,
-    fields: {
-      folder: 'Thư mục',
-      revision: 'Lần đăng ký',
-      profile: 'Hồ sơ phân tích',
-      defaultSchema: 'Schema mặc định',
-      status: 'Trạng thái',
-      checkedAt: 'Kiểm tra lúc',
-    },
-    status: {
-      ready: 'Đọc được (mới kiểm tra thư mục, chưa đọc nội dung)',
-      unreadable:
-        'Không đọc được thư mục đã đăng ký. Kiểm tra thư mục rồi đăng ký lại.',
-    },
-    mappingStatus: {
-      unconfigured: 'Chưa cấu hình',
-      assumed: 'Giả định, chưa xác nhận',
-      confirmed: 'Đã được người quản lý DB xác nhận',
-    } satisfies Record<TableNameMapping['status'], string>,
-    profiles: {
-      'vb6-cp932-v1': 'VB6 · CP932 (vb6-cp932-v1)',
-    } satisfies Record<SourceProfileId, string>,
     form: {
-      titleNew: 'Đăng ký mã nguồn',
-      titleEdit: 'Đổi mã nguồn',
-      rootPath: 'Đường dẫn thư mục (tuyệt đối)',
       rootPathHelp:
         'Ví dụ C:\\work\\order-module hoặc /home/dev/order-module. Backend kiểm tra thư mục và quyền đọc; nội dung chỉ được đọc khi chạy phân tích.',
       rootPathInvalid: 'Nhập đường dẫn thư mục mã nguồn.',
-      profile: 'Hồ sơ phân tích',
-      mappingStatus: 'Schema mặc định của tên bảng',
-      defaultSchema: 'Tên schema',
-      defaultSchemaHelp:
-        'Schema mà tên bảng không có tiền tố trỏ tới (ví dụ user đăng nhập). Chỉ chọn “đã xác nhận” khi người quản lý DB đã xác nhận.',
-      defaultSchemaInvalid:
-        'Nhập tên schema bắt đầu bằng chữ cái hoặc “_”, chỉ gồm chữ, số, _, $, #.',
-      submit: 'Đăng ký',
-      update: 'Lưu thay đổi',
-      pending: 'Đang kiểm tra…',
-      edit: 'Đổi mã nguồn',
-      cancelEdit: 'Hủy',
-      saved: 'Đã lưu mã nguồn.',
     },
     errors: {
       SOURCE_FORBIDDEN:
@@ -223,12 +132,99 @@ export const viMessages = {
     } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,
     outcomeUnknown:
       'Chưa xác nhận được backend đã lưu mã nguồn. Tải lại mã nguồn để kiểm tra trước khi gửi lại.',
-    startBlocked:
-      'Cần đăng ký một thư mục mã nguồn đọc được trước khi chạy phân tích.',
+  },
+  sourceStep: {
+    lead: 'Chọn thư mục chứa source cũ. Mọi xử lý chạy trên máy này, source không rời khỏi máy của bạn.',
+    hero: {
+      chooseTitle: 'Chọn thư mục source',
+      chosenTitle: 'Đã chọn thư mục',
+      chosenHelp: 'Kiểm tra thông tin dự án bên dưới rồi bấm “Quét source”.',
+      demoHelp:
+        'Dự án demo quét bộ mẫu đi kèm ứng dụng, không đọc thư mục nào trên máy.',
+      unreadableHelp:
+        'Không đọc được thư mục đã chọn. Kiểm tra thư mục hoặc chọn thư mục khác.',
+      scan: 'Quét source',
+      changeFolder: 'Đổi thư mục',
+      queuedTitle: 'Đang chờ bắt đầu…',
+      scanningTitle: 'Đang quét thư mục…',
+      cancellingTitle: 'Đang hủy lượt quét…',
+      progressDone: 'Tiến độ quét',
+      files: (done: number, total: number) => `${done} / ${total} file`,
+      megabytes: (value: string) => `${value} MB`,
+      readingFiles: 'File đang đọc',
+      progressLabel: 'Đang quét, chưa biết tổng số file',
+      stage: (stage: string) => `Bước hiện tại: ${stage}`,
+      doneTitle: 'Quét xong · đang chuyển sang Phân tích…',
+      goNow: 'Xem kết quả ngay',
+      endedTitle: {
+        failed: 'Quét source thất bại',
+        cancelled: 'Đã hủy lượt quét',
+        interrupted: 'Lượt quét bị gián đoạn',
+      },
+      cancelledHelp: 'Lượt quét đã dừng theo yêu cầu, chưa có kết quả mới.',
+      lastResult: 'Xem kết quả lần quét gần nhất',
+      target: 'Đang quét',
+      targetFolder: 'Thư mục',
+      targetLanguage: 'Ngôn ngữ',
+      noFileCount:
+        'Số file và phần trăm sẽ hiện khi backend báo tiến độ theo file.',
+    },
+    steps: {
+      title: 'Tiến trình',
+      items: [
+        'Đọc cây thư mục',
+        'Chụp & băm nội dung',
+        'Phân tích (decode, SQL, call graph)',
+        'Lưu kết quả',
+      ],
+      state: { done: 'đã xong', active: 'đang làm', todo: 'chưa làm' },
+    },
+    form: {
+      title: 'Thông tin dự án',
+      name: 'Tên dự án',
+      folder: 'Đường dẫn thư mục source (tuyệt đối)',
+      pick: 'Chọn thư mục',
+      picking: 'Đang mở hộp thoại…',
+      pickingHelp:
+        'Hộp thoại chọn thư mục đã mở trên máy này. Chọn thư mục rồi bấm OK.',
+      useFolder: 'Dùng thư mục này',
+      pickerUnavailable: {
+        'no-tool':
+          'Máy này không có hộp thoại chọn thư mục. Nhập đường dẫn thư mục bên dưới.',
+        failed:
+          'Không mở được hộp thoại chọn thư mục. Nhập đường dẫn thư mục bên dưới.',
+        timeout:
+          'Hộp thoại đã đóng vì quá lâu không chọn. Bấm lại hoặc nhập đường dẫn bên dưới.',
+      } satisfies Record<FolderPickerUnavailableReason, string>,
+      cancel: 'Hủy',
+      saving: 'Đang kiểm tra…',
+      demoFolder: (fixtureId: string) => `${fixtureId} (bộ mẫu)`,
+      language: 'Ngôn ngữ phân tích (chọn 1)',
+      languageRequired: 'Chọn ngôn ngữ phân tích trước khi quét.',
+      comingSoon: 'Sắp hỗ trợ',
+    },
+    recent: {
+      title: 'Dự án gần đây',
+      search: 'Tìm dự án theo tên',
+      noMatch: 'Không có dự án nào khớp.',
+      new: '+ Dự án mới',
+      loading: 'Đang tải dự án gần đây…',
+      failed: 'Không tải được danh sách dự án.',
+      empty: 'Chưa có dự án nào.',
+      open: 'Đang mở',
+      updated: (date: string) => `Cập nhật ${date}`,
+      status: {
+        none: 'Chưa phân tích',
+        active: 'Đang phân tích',
+        succeeded: 'Đã phân tích',
+        failed: 'Thất bại',
+        cancelled: 'Đã hủy',
+        interrupted: 'Bị gián đoạn',
+        unknown: 'Không đọc được trạng thái',
+      },
+    },
   },
   runs: {
-    title: 'Phân tích (demo)',
-    titleLocal: 'Phân tích',
     demoNotice:
       'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: không đọc mã nguồn, chỉ công bố kết quả kiểm kê mẫu đi kèm ứng dụng.',
     localNotice:
@@ -308,6 +304,8 @@ export const viMessages = {
       SNAPSHOT_UNAVAILABLE: 'Lượt chạy cũ không có bản chụp nguồn để dùng lại.',
       SOURCE_PROFILE_UNSUPPORTED: 'Hồ sơ mã nguồn không được bản này hỗ trợ.',
       SOURCE_NOT_REGISTERED: 'Dự án chưa đăng ký mã nguồn.',
+      RUN_EVENTS_LIMIT:
+        'Đang mở quá nhiều luồng theo dõi lượt chạy. Trạng thái vẫn được cập nhật định kỳ.',
       RUNTIME_RECOVERY_REQUIRED:
         'Backend cần được khởi động lại sau một lượt chạy chưa dừng hẳn. Chưa có lượt chạy mới nào được tạo.',
     } satisfies Partial<Record<AnalyzeApiErrorCode, string>>,
@@ -355,7 +353,6 @@ export const viMessages = {
       },
       histogramTitle: 'Phân bố complexity',
       histogramPrograms: (count: string) => `${count} program`,
-      histogramNote: (version: string) => `Tham khảo · ${version}`,
       notAnalyzed: (count: string) => `${count} program chưa phân tích`,
       sectionLabel: 'Chi tiết phân tích',
       graph: {
@@ -909,6 +906,8 @@ export const viMessages = {
         'Backend từ chối trang gửi yêu cầu. Mở ứng dụng bằng địa chỉ đã cấu hình.',
       CREDENTIAL_INVALID:
         'Phiên làm việc đã hết hạn nên yêu cầu chưa được xử lý. Vui lòng thử lại.',
+      FOLDER_PICKER_BUSY:
+        'Hộp thoại chọn thư mục đang mở. Chọn thư mục trong hộp thoại đó hoặc đóng nó rồi thử lại.',
     } satisfies Record<ApiErrorCode, string>,
     failure: {
       http: 'Không thể hoàn tất yêu cầu. Kiểm tra backend rồi thử lại.',
@@ -925,6 +924,8 @@ export const viMessages = {
       get: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',
       list: 'Tham số tải danh sách không hợp lệ. Làm mới danh sách rồi thử lại.',
       runs: 'Yêu cầu lượt chạy không hợp lệ. Tải lại lượt chạy rồi thử lại.',
+      update:
+        'Thông tin dự án không hợp lệ. Kiểm tra tên dự án và khách hàng rồi thử lại.',
       source:
         'Thông tin mã nguồn không hợp lệ: đường dẫn phải là đường dẫn tuyệt đối trên máy này.',
     },

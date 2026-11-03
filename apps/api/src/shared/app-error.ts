@@ -95,6 +95,10 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.REVIEW_STALE,
     message: 'This document version is no longer the one under review.',
   },
+  PROJECT_BUSY: {
+    status: S.PROJECT_BUSY,
+    message: 'The project has a run in progress; stop it before deleting.',
+  },
 } as const satisfies Record<
   AnalyzeApiErrorCode,
   { status: number; message: string }

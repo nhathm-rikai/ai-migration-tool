@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Project, Run } from '@portal/contracts';
 import type { ProjectsApi } from '../../shared/api/projects-api';
 import type { RunsApi } from '../../shared/api/runs-api';
 import { useLocale } from '../../shared/i18n/locale-context';
-import { Link, NEW_PROJECT_PATH, stepPath } from '../../app/router';
+import { ApiError } from '../../shared/api/api-error';
+import { Link, NEW_PROJECT_PATH, navigate, stepPath } from '../../app/router';
+import { projectErrorMessage } from './project-messages';
 import { isActiveRun } from '../jobs/use-analyze-runs';
 
 // "Dự án gần đây" of step 1 (UI04): every project with the state of its last
@@ -102,8 +104,37 @@ export function RecentProjects({
 }) {
   const { messages, formatDateTime } = useLocale();
   const copy = messages.sourceStep.recent;
-  const state = useRecentProjects(api, runsApi, version);
+  const [reloads, setReloads] = useState(0);
+  const state = useRecentProjects(api, runsApi, `${version}#${reloads}`);
   const [query, setQuery] = useState('');
+  const [pending, setPending] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteTrigger = useRef<HTMLElement | null>(null);
+  function closeDelete() {
+    setPending(null);
+    setDeleteError(null);
+    deleteTrigger.current?.focus();
+  }
+  async function confirmDelete(project: Project) {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.remove(project.id, new AbortController().signal);
+      setPending(null);
+      setReloads((count) => count + 1);
+      // The open project is gone: its steps would only answer not found.
+      if (project.id === openProjectId) navigate(NEW_PROJECT_PATH);
+    } catch (error) {
+      setDeleteError(
+        error instanceof ApiError && error.code === 'PROJECT_BUSY'
+          ? copy.delete.busy
+          : projectErrorMessage(error, 'remove', messages.errors),
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
   const needle = query.trim().toLocaleLowerCase();
   const items =
     state.status === 'ready'
@@ -146,7 +177,7 @@ export function RecentProjects({
       ) : (
         <ul className="recent-list">
           {items.map(({ project, run, status }) => (
-            <li key={project.id}>
+            <li key={project.id} className="recent-item">
               <Link
                 className={`recent-card lift status-${status}`}
                 to={stepPath(project.id, 'source')}
@@ -180,9 +211,76 @@ export function RecentProjects({
                   <span className="sr-only">, {copy.open}</span>
                 )}
               </Link>
+              <button
+                type="button"
+                className="recent-delete"
+                aria-label={copy.delete.action(project.name)}
+                title={copy.delete.action(project.name)}
+                onClick={(event) => {
+                  deleteTrigger.current = event.currentTarget;
+                  setPending(project);
+                }}
+              >
+                <svg
+                  className="recent-delete-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+              </button>
             </li>
           ))}
         </ul>
+      )}
+      {pending && (
+        <div className="modal-backdrop">
+          <div
+            className="modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-project-title"
+            aria-describedby="delete-project-body"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !deleting) closeDelete();
+            }}
+          >
+            <h3 id="delete-project-title">{copy.delete.title}</h3>
+            <p id="delete-project-body">{copy.delete.body(pending.name)}</p>
+            {deleteError && (
+              <p role="alert" className="error">
+                {deleteError}
+              </p>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button small"
+                autoFocus
+                disabled={deleting}
+                onClick={closeDelete}
+              >
+                {copy.delete.cancel}
+              </button>
+              <button
+                type="button"
+                className="button small danger"
+                disabled={deleting}
+                onClick={() => void confirmDelete(pending)}
+              >
+                {deleting ? copy.delete.deleting : copy.delete.confirm}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </aside>
   );

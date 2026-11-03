@@ -103,6 +103,12 @@ export const ProjectListSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+// DELETE answers the ID it removed; the project and what it owns are gone.
+export const DeletedProjectSchema = Type.Object(
+  { id: ProjectIdSchema },
+  { additionalProperties: false },
+);
+export type DeletedProject = Static<typeof DeletedProjectSchema>;
 export type CreateProjectInput = Static<typeof CreateProjectSchema>;
 export type UpdateProjectInput = Static<typeof UpdateProjectSchema>;
 export type Project = Static<typeof ProjectSchema>;

@@ -4,6 +4,7 @@ import {
   type DocumentRunErrorCode,
 } from '@portal/contracts';
 import type { ProgramState } from '../../features/assessment/assessment-summary';
+import type { QuoteFormulaFacts } from '../../features/quote/quote-model';
 import type { Messages } from './vi';
 
 export const jaMessages = {
@@ -196,6 +197,16 @@ export const jaMessages = {
       failed: 'プロジェクト一覧を読み込めませんでした。',
       empty: 'プロジェクトはまだありません。',
       open: '表示中',
+      delete: {
+        action: (name: string) => `プロジェクト ${name} を削除`,
+        title: 'このプロジェクトを削除しますか？',
+        body: (name: string) =>
+          `プロジェクト「${name}」を、実行履歴・解析結果・ドキュメント・レビューコメント・ソースのスナップショットとともに完全に削除します。元のソースフォルダーには影響しません。この操作は取り消せません。`,
+        confirm: '完全に削除',
+        deleting: '削除しています…',
+        cancel: 'キャンセル',
+        busy: 'このプロジェクトは実行中です。実行を停止するか完了を待ってから、もう一度削除してください。',
+      },
       updated: (date: string) => `更新 ${date}`,
       status: {
         none: '未解析',
@@ -916,8 +927,6 @@ export const jaMessages = {
     lead: (programs: number, loc: number, skipped: number) =>
       `最新の解析の全 ${programs} プログラム、${loc.toLocaleString('en-US')} LoC に基づく` +
       (skipped > 0 ? ` · 解析できなかった ${skipped} プログラムは未計上` : ''),
-    draft:
-      '参考用のドラフトです。複雑度係数と生産性は実案件で検証されていません。顧客へ送付する前に担当者が確認してください。',
     exportPdf: 'PDF 出力',
     exportExcel: 'Excel 出力',
     send: '顧客へ送付',
@@ -949,17 +958,33 @@ export const jaMessages = {
     rolesTitle: '役割と単価',
     role: '役割',
     rate: '単価',
-    roles: { pm: 'PM', brse: 'BrSE', comtor: 'Comtor', dev: 'Dev / QA / QC' },
+    roles: {
+      pm: 'PM',
+      brse: 'BrSE',
+      comtor: 'Comtor',
+      sa: 'SA（BD、DD）',
+      dev: 'Dev / QA / QC',
+    },
     rolesHelp:
-      'PM / BrSE / Comtor の % は開発工数（ドキュメント + コーディング + テスト）に対する比率です。Dev、QA、QC は同一単価です。',
-    formulaTitle: '計算式',
-    formula: [
-      '基準工数 = Σ (LoC × 複雑度係数) / 生産性',
-      'Dev = BD + (DD + コーディング) × (1 - AI) + テスト × (1 - AI test)',
-      'PM / BrSE / Comtor = % × Dev',
-      '費用 = Σ 役割別工数 × 役割別単価',
-      '期間 = Dev / 開発者数（月単位で切り上げ）',
-    ],
+      'PM / BrSE / Comtor の % は開発工数（ドキュメント + コーディング + テスト）に対する比率です。',
+    formulaTitle: '計算方法',
+    formula: (f: QuoteFormulaFacts) => {
+      const n = (value: number) => value.toFixed(2);
+      const w = f.weights;
+      const shared = f.shared
+        ? ` 現在は共通 ${f.shared.lines.toLocaleString('en-US')} 行 ×（プログラムの基準コーディング ${n(f.shared.programMM)} MM ÷ プログラム ${f.shared.programLines.toLocaleString('en-US')} 行）= 基準コーディング ${n(f.shared.mm)} MM。`
+        : '';
+      return [
+        `プログラムの基準コーディング = Σ（各要素の数 × 人日、下の表）÷ ${f.daysPerMM} 日/MM。例: ${f.lines.toLocaleString('en-US')} 行 + ${f.decisions} 分岐 + ${f.tables} テーブル = ${n(f.days)} 日 ÷ ${f.daysPerMM} = ${n(f.coding)} MM。`,
+        `その他の項目は基準コーディングの %: BD ${w.BD}%、DD ${w.DD}%、UT ${w.UT}%、IT ${w.IT}%、UAT ${w['UAT support']}%（計算式の調整で変更可）。`,
+        `AI 支援による削減: DD とコーディングは ${f.aiCode}%、UT / IT / UAT は ${f.aiTest}%（AI の 2 つのスライダー）。BD は削減しません。削減後の BD + DD + コーディング + UT + IT + UAT が Dev 工数です。`,
+        'PM、BrSE、Comtor = 各役割の % × Dev 工数（AI では追加削減しません）。',
+        '費用 = 項目別工数 × 単価（BD、DD は SA、コーディング・UT・IT・UAT は Dev / QA / QC、管理役割は各単価）。',
+        `期間 = Dev 工数 ÷ 開発者数（月単位で切り上げ）。各フェーズは順番に進めます。例: ${n(f.dev)} MM ÷ ${f.devs} 名 = ${n(f.months)} か月 → ${Math.max(1, Math.ceil(f.months))} か月。`,
+        '各モジュール・プログラムの工数と費用は、基準コーディングの比率に応じて合計から按分します。',
+        `共通コードは複数のプログラムが共有するファイル（GLOBAL.BAS など）で、どのプログラムにも属さないため分岐数やテーブル数の個別の数がありません。基準コーディング = 共通行数 × プログラムの LoC あたり平均工数（基準コーディング合計 ÷ 行数合計）。その後は手順 2〜6 をプログラムと同様に適用します。${shared}`,
+      ];
+    },
     phaseTitle: 'フェーズ別工数',
     phases: {
       doc: 'ドキュメント',
@@ -968,24 +993,55 @@ export const jaMessages = {
       mgmt: 'PM / BrSE / Comtor',
     },
     scheduleTitle: '想定スケジュール',
+    monthsShort: (months: number) => `${Math.round(months)}か月`,
+    suggestDevs: (devs: number) =>
+      `期間が長いため、12 か月で完了するには約 ${devs} 名が必要です。`,
     scheduleNote: (devs: number, months: number) =>
       `チーム ${devs} 名 · ${months} か月`,
     moduleTitle: 'モジュール別明細',
-    factorNote:
-      '複雑度レベル別係数: 低 (<45) ×0.8 · 中 (45–59) ×1.0 · 高 (60–69) ×1.3 · 非常に高 (≥70) ×1.4',
+    shareNote:
+      'モジュールをクリックするとプログラム、プログラム（またはモジュール先頭の行）をクリックすると項目別の工数を表示します。複雑度は参考表示で係数には使いません',
+    itemsTitle: '項目別工数',
+    toggleRow: '詳細を開く / 閉じる',
+    items: {
+      BD: 'BD',
+      DD: 'DD',
+      coding: 'コーディング（移行）',
+      UT: 'UT',
+      IT: 'IT',
+      'UAT support': 'UAT support',
+      pm: 'PM',
+      brse: 'BrSE',
+      comtor: 'Comtor',
+    },
+    programFilter: 'プログラム名またはモジュールで絞り込み',
+    programTitle: 'プログラム',
+    sharedModule: '共通（どのプログラムにも属さない）',
     module: 'モジュール',
     programCount: 'プログラム',
     complexity: '平均複雑度',
-    factor: '係数',
     effort: '工数 (MM)',
     cost: '費用',
     shareColumn: '比率',
     total: '合計',
     assumptionsTitle: '前提と範囲',
-    assumptions: (productivity: number) => [
-      `標準生産性 ${productivity.toLocaleString('en-US')} LoC / MM（AI 支援適用前）。プログラム固有のコードで計算し、共通モジュールは含みません。`,
-      '最新の解析の全プログラムを対象とし、ドキュメントの状態には依存しません。',
-      'AI 支援は DD、コーディング、テストの工数を削減し、BD の工数は変わりません。',
+    unitsTitle: '単位あたりの人日（計算の最初のステップ）',
+    adjustTitle: '計算式の調整',
+    unitDaysTitle: '単位あたりの人日',
+    unitDaysHelp: '変換ツール適用後、AI 適用前',
+    resetDefaults: '比率と人日を既定値に戻す',
+    unitColumns: { part: '要素', unit: '単位', days: '人日' },
+    units: {
+      lines: { part: 'プログラム固有のコード行数（LoC）', unit: '100 行' },
+      decisions: { part: '分岐数', unit: '100 分岐' },
+      tables: { part: 'アクセスする DB テーブル', unit: '1 テーブル' },
+      sql: { part: '連結 SQL', unit: '1 文（動的 SQL は ×3）' },
+      components: { part: 'コンポーネント / OCX', unit: '1 コンポーネント' },
+      apis: { part: '外部 API', unit: '1 API' },
+    },
+    assumptions: () => [
+      '要素別の人日単価は仮定であり、実案件では未検証です。',
+      'ドキュメントとテストはコーディングに対する % で計算します。DB 移行、共通基盤、移行運用、バッファは含みません。',
       '業務変更は含まず、機能同等の移行のみです。',
     ],
   },
@@ -1025,6 +1081,8 @@ export const jaMessages = {
         'バックエンドとのセッションに接続できないため、リクエストは送信されていません。再接続してください。',
     },
     invalidInput: {
+      remove:
+        'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',
       create:
         'プロジェクトの作成情報が正しくありません。データとアプリのバージョンを確認して再試行してください。',
       get: 'プロジェクトIDが正しくありません。一覧を再読み込みして選択し直してください。',

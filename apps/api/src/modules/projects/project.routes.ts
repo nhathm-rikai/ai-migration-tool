@@ -9,12 +9,15 @@ import {
   ErrorResponseSchema,
   EmptyQuerySchema,
   UpdateProjectSchema,
+  DeletedProjectSchema,
 } from '@portal/contracts';
 import type { ProjectService } from './project.service.js';
+import type { ProjectDeletionService } from './project-deletion.service.js';
 
 export function registerProjectRoutes(
   instance: FastifyInstance,
   service: ProjectService,
+  deletion: ProjectDeletionService,
 ): void {
   const app = instance.withTypeProvider<TypeBoxTypeProvider>();
   app.post(
@@ -66,5 +69,16 @@ export function registerProjectRoutes(
       },
     },
     (request) => service.update(request.params.projectId, request.body),
+  );
+  app.delete(
+    '/api/v1/projects/:projectId',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        querystring: EmptyQuerySchema,
+        response: { 200: DeletedProjectSchema, default: ErrorResponseSchema },
+      },
+    },
+    (request) => deletion.delete(request.params.projectId),
   );
 }

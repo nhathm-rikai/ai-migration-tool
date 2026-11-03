@@ -1,4 +1,5 @@
 import {
+  DeletedProjectSchema,
   ProjectListSchema,
   ProjectSchema,
   type CreateProjectInput,
@@ -38,6 +39,14 @@ export function createProjectsApi(
         method: 'PATCH',
         body: input,
       }),
+    // Removes the project and everything it owns (runs, artifacts, files).
+    remove: (id: string, signal: AbortSignal) =>
+      request(
+        '/projects/' + encodeURIComponent(id),
+        DeletedProjectSchema,
+        signal,
+        { method: 'DELETE' },
+      ),
   };
 }
 export type ProjectsApi = ReturnType<typeof createProjectsApi>;

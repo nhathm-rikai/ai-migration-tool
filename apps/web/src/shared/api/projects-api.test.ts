@@ -8,6 +8,22 @@ const signal = () => new AbortController().signal;
 const input = { name: project.name, fixtureId: project.fixtureId };
 
 describe('Projects API boundary', () => {
+  it('deletes a project with DELETE and validates the answer', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(json({ id: project.id }));
+    expect(
+      await createProjectsApi(fetcher, testCredentials).remove(
+        project.id,
+        signal(),
+      ),
+    ).toEqual({ id: project.id });
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/projects/${project.id}`,
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
   it('uses the public API and validates its response', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(project));
     expect(

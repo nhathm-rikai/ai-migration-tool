@@ -24,6 +24,7 @@ import type {
   CallResolution,
   CrudView,
 } from '../../features/assessment/program-detail-model';
+import type { QuoteFormulaFacts } from '../../features/quote/quote-model';
 
 export const viMessages = {
   app: {
@@ -212,6 +213,16 @@ export const viMessages = {
       failed: 'Không tải được danh sách dự án.',
       empty: 'Chưa có dự án nào.',
       open: 'Đang mở',
+      delete: {
+        action: (name: string) => `Xóa dự án ${name}`,
+        title: 'Xóa dự án này?',
+        body: (name: string) =>
+          `Dự án "${name}" sẽ bị xóa vĩnh viễn cùng toàn bộ lượt chạy, kết quả phân tích, tài liệu, nhận xét và bản chụp mã nguồn của dự án. Thư mục mã nguồn gốc của bạn không bị ảnh hưởng. Không thể hoàn tác.`,
+        confirm: 'Xóa vĩnh viễn',
+        deleting: 'Đang xóa…',
+        cancel: 'Hủy',
+        busy: 'Dự án đang có lượt chạy. Hủy hoặc chờ lượt chạy kết thúc rồi xóa lại.',
+      },
       updated: (date: string) => `Cập nhật ${date}`,
       status: {
         none: 'Chưa phân tích',
@@ -934,8 +945,6 @@ export const viMessages = {
       (skipped > 0
         ? ` · ${skipped} program không phân tích được, chưa tính`
         : ''),
-    draft:
-      'Bản nháp để tham khảo: hệ số complexity và năng suất chưa được kiểm chứng trên dự án thực tế. Người phụ trách cần rà soát trước khi gửi khách hàng.',
     exportPdf: 'Xuất PDF',
     exportExcel: 'Xuất Excel',
     send: 'Gửi khách hàng',
@@ -967,17 +976,33 @@ export const viMessages = {
     rolesTitle: 'Vai trò & đơn giá',
     role: 'Vai trò',
     rate: 'Đơn giá',
-    roles: { pm: 'PM', brse: 'BrSE', comtor: 'Comtor', dev: 'Dev / QA / QC' },
+    roles: {
+      pm: 'PM',
+      brse: 'BrSE',
+      comtor: 'Comtor',
+      sa: 'SA (BD, DD)',
+      dev: 'Dev / QA / QC',
+    },
     rolesHelp:
-      '% effort của PM / BrSE / Comtor tính trên effort dev (tài liệu + coding + kiểm thử). Dev, QA, QC dùng chung một đơn giá.',
-    formulaTitle: 'Công thức',
-    formula: [
-      'Effort gốc = Σ (LoC × hệ số complexity) / năng suất',
-      'Dev = BD + (DD + Coding) × (1 - AI) + Kiểm thử × (1 - AI test)',
-      'PM / BrSE / Comtor = % × Dev',
-      'Chi phí = Σ effort vai trò × đơn giá vai trò',
-      'Thời gian = Dev / số dev, làm tròn lên tháng',
-    ],
+      '% effort của PM / BrSE / Comtor tính trên effort dev (tài liệu + coding + kiểm thử).',
+    formulaTitle: 'Cách tính',
+    formula: (f: QuoteFormulaFacts) => {
+      const n = (value: number) => value.toFixed(2);
+      const w = f.weights;
+      const shared = f.shared
+        ? ` Hiện có ${f.shared.lines.toLocaleString('en-US')} dòng dùng chung × (${n(f.shared.programMM)} MM Coding gốc ÷ ${f.shared.programLines.toLocaleString('en-US')} dòng của các program) = ${n(f.shared.mm)} MM Coding gốc.`
+        : '';
+      return [
+        `Coding gốc của program = Σ (số lượng từng thành phần × ngày công, xem bảng dưới) ÷ ${f.daysPerMM} ngày/MM. Ví dụ: ${f.lines.toLocaleString('en-US')} dòng + ${f.decisions} nhánh + ${f.tables} bảng = ${n(f.days)} ngày ÷ ${f.daysPerMM} = ${n(f.coding)} MM.`,
+        `Các hạng mục khác là % của Coding gốc: BD ${w.BD}%, DD ${w.DD}%, UT ${w.UT}%, IT ${w.IT}%, UAT ${w['UAT support']}% (chỉnh được ở phần Điều chỉnh công thức).`,
+        `AI assistance giảm công: DD và Coding giảm ${f.aiCode}%, UT / IT / UAT giảm ${f.aiTest}% (hai thanh trượt AI); BD không giảm. Cộng BD + DD + Coding + UT + IT + UAT sau giảm là effort Dev.`,
+        'PM, BrSE, Comtor mỗi vai = % × effort Dev, không bị AI giảm thêm.',
+        'Chi phí = effort từng hạng mục × đơn giá: SA cho BD và DD, Dev / QA / QC cho Coding, UT, IT, UAT; mỗi vai quản lý một đơn giá riêng.',
+        `Thời gian = effort Dev ÷ số dev, làm tròn lên tháng; các giai đoạn làm nối tiếp. Ví dụ: ${n(f.dev)} MM ÷ ${f.devs} dev = ${n(f.months)} tháng, làm tròn thành ${Math.max(1, Math.ceil(f.months))} tháng.`,
+        'Effort và chi phí của mỗi module hoặc program lấy đúng phần của nó trong tổng, theo tỷ lệ Coding gốc của nó.',
+        `Code dùng chung là các file nhiều program cùng dùng (như GLOBAL.BAS), không thuộc program nào nên không có số nhánh, bảng... riêng. Coding gốc = số dòng dùng chung × effort trung bình mỗi dòng của các program (tổng Coding gốc ÷ tổng dòng). Sau đó chạy qua các bước 2 đến 6 như một program.${shared}`,
+      ];
+    },
     phaseTitle: 'Effort theo giai đoạn',
     phases: {
       doc: 'Tài liệu',
@@ -986,24 +1011,55 @@ export const viMessages = {
       mgmt: 'PM / BrSE / Comtor',
     },
     scheduleTitle: 'Lịch triển khai dự kiến',
+    monthsShort: (months: number) => `${Math.round(months)} th`,
+    suggestDevs: (devs: number) =>
+      `Thời gian dài: cần khoảng ${devs} dev để xong trong 12 tháng.`,
     scheduleNote: (devs: number, months: number) =>
       `Team ${devs} dev · ${months} tháng`,
     moduleTitle: 'Chi tiết theo module',
-    factorNote:
-      'Hệ số theo mức complexity: Thấp (<45) ×0.8 · Trung bình (45–59) ×1.0 · Cao (60–69) ×1.3 · Rất cao (≥70) ×1.4',
+    shareNote:
+      'Bấm module để xem các program, bấm program (hoặc dòng đầu trong module) để xem effort theo hạng mục. Complexity chỉ để tham khảo, không làm hệ số',
+    itemsTitle: 'Effort theo hạng mục',
+    toggleRow: 'mở / đóng chi tiết',
+    items: {
+      BD: 'BD',
+      DD: 'DD',
+      coding: 'Coding (migrate)',
+      UT: 'UT',
+      IT: 'IT',
+      'UAT support': 'UAT support',
+      pm: 'PM',
+      brse: 'BrSE',
+      comtor: 'Comtor',
+    },
+    programFilter: 'Lọc theo tên program hoặc module',
+    programTitle: 'Program',
+    sharedModule: 'Dùng chung (chưa thuộc program nào)',
     module: 'Module',
     programCount: 'Program',
     complexity: 'Complexity TB',
-    factor: 'Hệ số',
     effort: 'Effort (MM)',
     cost: 'Chi phí',
     shareColumn: 'Tỷ trọng',
     total: 'Tổng',
     assumptionsTitle: 'Giả định & phạm vi',
-    assumptions: (productivity: number) => [
-      `Năng suất chuẩn ${productivity.toLocaleString('en-US')} LoC / MM (trước khi áp dụng AI assistance), tính trên code riêng của program; module dùng chung chưa được tính.`,
-      'Gồm toàn bộ program của lần phân tích mới nhất, không phụ thuộc trạng thái tài liệu.',
-      'AI assistance giảm effort DD, Coding và Kiểm thử; BD giữ nguyên effort.',
+    unitsTitle: 'Ngày công mỗi đơn vị (bước đầu của cách tính)',
+    adjustTitle: 'Điều chỉnh công thức',
+    unitDaysTitle: 'Ngày công mỗi đơn vị',
+    unitDaysHelp: 'sau công cụ chuyển đổi, trước AI',
+    resetDefaults: 'Đặt lại tỷ lệ và ngày công về mặc định',
+    unitColumns: { part: 'Thành phần', unit: 'Đơn vị', days: 'Ngày công' },
+    units: {
+      lines: { part: 'Dòng code riêng (LoC)', unit: '100 dòng' },
+      decisions: { part: 'Điểm rẽ nhánh', unit: '100 điểm' },
+      tables: { part: 'Bảng DB truy cập', unit: '1 bảng' },
+      sql: { part: 'SQL ghép chuỗi', unit: '1 câu (SQL động tính ×3)' },
+      components: { part: 'Component / OCX', unit: '1 component' },
+      apis: { part: 'API ngoài', unit: '1 API' },
+    },
+    assumptions: () => [
+      'Đơn giá ngày công của từng thành phần (bảng trên) là giả định, chưa được kiểm chứng trên dự án thực tế.',
+      'Hạng mục tài liệu và kiểm thử tính theo % so với Coding. Không gồm di trú CSDL, nền tảng dùng chung, chuyển đổi vận hành hay buffer.',
       'Không bao gồm thay đổi nghiệp vụ, chỉ chuyển đổi tương đương chức năng.',
     ],
   },
@@ -1041,6 +1097,7 @@ export const viMessages = {
         'Chưa kết nối được phiên làm việc với backend nên yêu cầu chưa được gửi. Thử kết nối lại.',
     } satisfies Record<ApiFailureKind, string>,
     invalidInput: {
+      remove: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',
       create:
         'Thông tin tạo dự án không hợp lệ. Kiểm tra dữ liệu và phiên bản ứng dụng rồi thử lại.',
       get: 'Mã dự án không hợp lệ. Làm mới danh sách rồi chọn lại dự án.',

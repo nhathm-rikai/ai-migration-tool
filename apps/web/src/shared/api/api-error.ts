@@ -2,7 +2,7 @@
 // was never sent.
 export type ApiFailureKind =
   'http' | 'network' | 'timeout' | 'invalid-response' | 'credential';
-export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH';
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export class ApiError extends Error {
   readonly outcomeUnknown: boolean;

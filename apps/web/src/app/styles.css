@@ -4311,6 +4311,13 @@ fieldset.doc-card {
   font-size: 11px;
   color: #55657a;
 }
+.quote-months span {
+  white-space: nowrap;
+}
+.quote-suggest {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
 .quote-gantt-row {
   display: contents;
 }
@@ -4326,6 +4333,12 @@ fieldset.doc-card {
   top: 3px;
   bottom: 3px;
   border-radius: 6px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
   transition:
     left 0.4s ease-out,
     width 0.4s ease-out;
@@ -4334,6 +4347,202 @@ fieldset.doc-card {
   overflow-x: auto;
   border: 1px solid #e1e8f0;
   border-radius: 12px;
+}
+.quote-module-row,
+.quote-program-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.quote-module-row {
+  background: #fff;
+  font-weight: 600;
+}
+.quote-module-row td:first-child {
+  white-space: nowrap;
+}
+.quote-module-row:hover {
+  background: #f4f8fc;
+}
+.quote-program-row {
+  background: #fafbff;
+  animation: quote-row-in 0.22s ease-out;
+}
+.quote-program-row:hover {
+  background: #eef2ff;
+}
+.quote-program-row td:first-child {
+  padding-left: 44px;
+  border-left: 3px solid #c7d2fe;
+  font-weight: 400;
+}
+.quote-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  padding: 0;
+  border: 1px solid #d3dce8;
+  border-radius: 8px;
+  background: #fff;
+  color: #3a4a5e;
+  cursor: pointer;
+  vertical-align: middle;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.quote-toggle:hover {
+  border-color: #5867d8;
+  background: #eef2ff;
+}
+.quote-chevron {
+  transition: transform 0.2s ease;
+}
+.quote-chevron.open {
+  transform: rotate(90deg);
+}
+.quote-detail td {
+  padding: 0;
+}
+.quote-detail-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  animation: quote-row-in 0.22s ease-out;
+}
+.quote-detail.module td {
+  background: #f1f4ff;
+  border-left: 3px solid #5867d8;
+}
+.quote-detail.module .quote-detail-body {
+  padding-left: 14px;
+}
+.quote-detail.program td {
+  background: #effaf8;
+  border-left: 3px solid #2f9e8f;
+}
+.quote-detail.program .quote-detail-body {
+  padding-left: 44px;
+}
+.quote-detail-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+.quote-detail-label b {
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+}
+.quote-detail.module .quote-detail-label b {
+  background: #5867d8;
+}
+.quote-detail.program .quote-detail-label b {
+  background: #2f9e8f;
+}
+.quote-detail-label small {
+  color: #55657a;
+}
+.quote-phase-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+.quote-phase-card {
+  padding: 10px 12px 12px;
+  border: 1px solid #d3dce8;
+  border-top: 4px solid var(--phase);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 400;
+}
+.quote-phase-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  font-size: 13px;
+}
+.quote-phase-card header span {
+  color: var(--phase);
+  font-weight: 700;
+}
+.quote-phase-card p {
+  margin: 2px 0 8px;
+  color: #55657a;
+}
+.quote-phase-card ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.quote-phase-card li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px 92px 38px;
+  gap: 8px;
+  align-items: baseline;
+  padding-top: 4px;
+  border-top: 1px solid #eef2f7;
+}
+.quote-phase-card li small,
+.quote-phase-card li em {
+  color: #55657a;
+  font-style: normal;
+  text-align: right;
+}
+.quote-phase-card li b {
+  text-align: right;
+}
+.quote-formula-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.quote-units h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+@keyframes quote-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quote-program-row,
+  .quote-detail-body,
+  .quote-chevron {
+    animation: none;
+    transition: none;
+  }
+}
+.quote-program-scroll {
+  max-height: 480px;
+  overflow-y: auto;
+}
+.quote-program-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.quote-table > input[type='search'] {
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 12px;
 }
 .quote-table table {
   width: 100%;
@@ -4880,6 +5089,96 @@ fieldset.doc-card {
   --status: var(--warn-fg);
   --status-bg: var(--warn-bg);
 }
+/* The delete button sits inside the card border in its own column, split
+   from the content by a divider; the card reserves that column as padding so
+   the content (avatar, name, status chip, bar) never reaches it. */
+.recent-item {
+  --delete-zone: 56px;
+  position: relative;
+}
+.recent-item > .recent-card {
+  padding-right: calc(var(--delete-zone) + 16px);
+}
+.recent-delete {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: var(--delete-zone);
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 13px 13px 0;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast),
+    color var(--dur-fast);
+}
+.recent-delete-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto;
+}
+/* The card lifts on hover of the whole item, button included. */
+.recent-item:hover > .recent-card {
+  transform: translateY(-2px);
+  border-color: var(--line-hover);
+}
+.recent-item:hover > .recent-delete {
+  transform: translateY(-2px);
+}
+.recent-delete:hover,
+.recent-delete:focus-visible {
+  background: var(--high-bg);
+  color: var(--high);
+}
+.recent-delete:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 34, 54, 0.45);
+}
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.modal h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.modal p {
+  margin: 0 0 16px;
+  color: var(--fg-body);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.button.danger {
+  background: var(--high);
+  border-color: var(--high);
+  color: var(--on-brand);
+}
+.button.danger:hover:not(:disabled) {
+  background: #a8332e;
+  border-color: #a8332e;
+}
 .recent-row {
   display: flex;
   align-items: center;
@@ -5128,4 +5427,370 @@ fieldset.doc-card {
 }
 .recent-name {
   min-width: 0;
+}
+
+.quote-input.compact {
+  width: 72px;
+  padding: 4px 8px;
+  text-align: right;
+}
+.quote-weight {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.quote-adjust header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+.quote-adjust header h2 {
+  margin: 0;
+}
+.quote-adjust header small {
+  color: #55657a;
+}
+.quote-adjust-grid {
+  margin-top: -4px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 16px 40px;
+  align-items: stretch;
+}
+.quote-adjust-grid > .quote-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.quote-unit-grid {
+  flex: 1;
+  grid-template-rows: repeat(3, 1fr);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+}
+.quote-unit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .quote-adjust-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.quote-reset {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.quote-adjust .quote-scope {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.quote-adjust .quote-scope legend {
+  float: none;
+  grid-column: 1 / -1;
+  padding: 6px 0 2px;
+  font-weight: 600;
+}
+.quote-adjust .quote-scope label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.quote-adjust .quote-weight {
+  position: relative;
+  display: inline-flex;
+}
+.quote-adjust .quote-weight .quote-input {
+  padding-right: 22px;
+}
+.quote-adjust .quote-weight small {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.quote-reset {
+  align-self: center;
+  margin: 0;
+}
+
+.quote-adjust-grid > .quote-group:first-child {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  align-content: start;
+}
+.quote-adjust-grid > .quote-group:first-child > span {
+  grid-column: 1 / -1;
+}
+@media (max-width: 600px) {
+  .quote-adjust-grid > .quote-group:first-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Quote document drawn into the PDF (quote-pdf.ts); never shown on screen. */
+.quote-doc-root {
+  display: none;
+}
+.quote-doc-root.qd-export {
+  display: block;
+  box-sizing: border-box;
+  width: 794px;
+  padding: 0 42px;
+  background: #fff;
+  color: #0f2236;
+  font-family:
+    'Yu Gothic', 'Meiryo', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  line-height: 1.5;
+}
+/* The copy is drawn outside the page, so it may not rely on the page's own
+   base styles: lay it out the same wherever it is measured. */
+:where(.quote-doc-root.qd-export) *,
+:where(.quote-doc-root.qd-export) *::before,
+:where(.quote-doc-root.qd-export) *::after {
+  box-sizing: border-box;
+}
+:where(.quote-doc-root.qd-export) :is(h1, h2, h3, p, ul, ol) {
+  margin: 0;
+  padding: 0;
+}
+:where(.quote-doc-root.qd-export) table {
+  border-spacing: 0;
+}
+.qd-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #0077be;
+}
+.qd-head img {
+  height: 36px;
+  width: auto;
+}
+.qd-head h1 {
+  margin: 0;
+  font-size: 18px;
+}
+.qd-head p {
+  margin: 2px 0 0;
+  color: #55657a;
+}
+.qd-block {
+  margin-top: 12px;
+  break-inside: avoid;
+}
+.qd-block.qd-flow {
+  break-inside: auto;
+}
+.qd-block h2 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+}
+.qd-block h3 {
+  margin: 0 0 4px;
+  color: #55657a;
+  font-size: 10px;
+  font-weight: 600;
+}
+.qd-kpis {
+  display: grid;
+  grid-template-columns: 1.5fr 1.3fr 1fr 1fr;
+  gap: 8px;
+}
+.qd-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 1px solid #d5dde6;
+  border-radius: 8px;
+}
+.qd-kpi span,
+.qd-kpi small {
+  color: #55657a;
+  font-size: 9px;
+}
+.qd-kpi b {
+  font-size: 15px;
+}
+.qd-kpi.main {
+  border-color: #0077be;
+  background: #e8f3fb;
+}
+.qd-kpi.main b {
+  color: #005b92;
+  font-size: 18px;
+}
+.qd-gantt {
+  display: grid;
+  gap: 4px;
+}
+.qd-gantt-row {
+  display: grid;
+  grid-template-columns: 34mm minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.qd-gantt-track,
+.qd-gantt-axis {
+  position: relative;
+  height: 16px;
+}
+.qd-gantt-track {
+  background: #f5f8fb;
+  border-radius: 3px;
+}
+.qd-gantt-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e1e8ef;
+}
+.qd-gantt-track b {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  overflow: hidden;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+.qd-gantt-axis {
+  height: 12px;
+}
+.qd-gantt-axis em {
+  position: absolute;
+  transform: translateX(-50%);
+  color: #55657a;
+  font-size: 8.5px;
+  font-style: normal;
+}
+.qd-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.qd-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e6ecf2;
+}
+.qd-bar i {
+  display: block;
+  height: 100%;
+}
+.qd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 5px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.qd-legend i,
+.qd-group i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+.qd-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.qd-table th,
+.qd-table td {
+  padding: 4px 7px;
+  border: 1px solid #d5dde6;
+  text-align: left;
+  vertical-align: middle;
+}
+.qd-compact th,
+.qd-compact td {
+  padding: 3px 6px;
+  font-size: 9.5px;
+}
+.qd-table thead th {
+  border-color: #0077be;
+  background: #0077be;
+  color: #fff;
+  font-weight: 600;
+}
+.qd-table thead {
+  display: table-header-group;
+}
+.qd-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qd-table .qd-group {
+  width: 22%;
+  background: #f5f8fb;
+  font-weight: 600;
+}
+.qd-table .qd-sub td {
+  background: #f2f2f2;
+  font-weight: 600;
+}
+.qd-table tfoot td {
+  background: #ddebf7;
+  font-weight: 700;
+}
+.qd-table tr {
+  break-inside: avoid;
+}
+.qd-note {
+  margin: 4px 0 0;
+  color: #55657a;
+  font-size: 9px;
+}
+.qd-notes {
+  margin: 0;
+  padding-left: 16px;
+}
+.qd-notes li {
+  margin-bottom: 3px;
+}
+
+/* Step 1 scan card: two animations hidden for now (user request,
+   03/11/2026): (1) the pulsing rings and the floating of the icon, and (3)
+   the sweeping scan line. The rules stay above; delete this block to bring
+   them back. The progress bar and the spinner of the step list still run; the
+   spinner in the icon is switched off in scan-stage.tsx (SHOW_SCAN_SPINNER). */
+.scan-ring {
+  display: none;
+}
+.scan-box {
+  animation: none;
+}
+.scan-line {
+  display: none;
 }

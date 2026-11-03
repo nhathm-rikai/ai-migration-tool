@@ -5523,6 +5523,242 @@ fieldset.doc-card {
   }
 }
 
+/* Quote document drawn into the PDF (quote-pdf.ts); never shown on screen. */
+.quote-doc-root {
+  display: none;
+}
+.quote-doc-root.qd-export {
+  display: block;
+  box-sizing: border-box;
+  width: 794px;
+  padding: 0 42px;
+  background: #fff;
+  color: #0f2236;
+  font-family:
+    'Yu Gothic', 'Meiryo', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 11px;
+  line-height: 1.5;
+}
+/* The copy is drawn outside the page, so it may not rely on the page's own
+   base styles: lay it out the same wherever it is measured. */
+:where(.quote-doc-root.qd-export) *,
+:where(.quote-doc-root.qd-export) *::before,
+:where(.quote-doc-root.qd-export) *::after {
+  box-sizing: border-box;
+}
+:where(.quote-doc-root.qd-export) :is(h1, h2, h3, p, ul, ol) {
+  margin: 0;
+  padding: 0;
+}
+:where(.quote-doc-root.qd-export) table {
+  border-spacing: 0;
+}
+.qd-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #0077be;
+}
+.qd-head img {
+  height: 36px;
+  width: auto;
+}
+.qd-head h1 {
+  margin: 0;
+  font-size: 18px;
+}
+.qd-head p {
+  margin: 2px 0 0;
+  color: #55657a;
+}
+.qd-block {
+  margin-top: 12px;
+  break-inside: avoid;
+}
+.qd-block.qd-flow {
+  break-inside: auto;
+}
+.qd-block h2 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+}
+.qd-block h3 {
+  margin: 0 0 4px;
+  color: #55657a;
+  font-size: 10px;
+  font-weight: 600;
+}
+.qd-kpis {
+  display: grid;
+  grid-template-columns: 1.5fr 1.3fr 1fr 1fr;
+  gap: 8px;
+}
+.qd-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 1px solid #d5dde6;
+  border-radius: 8px;
+}
+.qd-kpi span,
+.qd-kpi small {
+  color: #55657a;
+  font-size: 9px;
+}
+.qd-kpi b {
+  font-size: 15px;
+}
+.qd-kpi.main {
+  border-color: #0077be;
+  background: #e8f3fb;
+}
+.qd-kpi.main b {
+  color: #005b92;
+  font-size: 18px;
+}
+.qd-gantt {
+  display: grid;
+  gap: 4px;
+}
+.qd-gantt-row {
+  display: grid;
+  grid-template-columns: 34mm minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.qd-gantt-track,
+.qd-gantt-axis {
+  position: relative;
+  height: 16px;
+}
+.qd-gantt-track {
+  background: #f5f8fb;
+  border-radius: 3px;
+}
+.qd-gantt-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e1e8ef;
+}
+.qd-gantt-track b {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  overflow: hidden;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+.qd-gantt-axis {
+  height: 12px;
+}
+.qd-gantt-axis em {
+  position: absolute;
+  transform: translateX(-50%);
+  color: #55657a;
+  font-size: 8.5px;
+  font-style: normal;
+}
+.qd-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.qd-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #e6ecf2;
+}
+.qd-bar i {
+  display: block;
+  height: 100%;
+}
+.qd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 5px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.qd-legend i,
+.qd-group i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+.qd-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.qd-table th,
+.qd-table td {
+  padding: 4px 7px;
+  border: 1px solid #d5dde6;
+  text-align: left;
+  vertical-align: middle;
+}
+.qd-compact th,
+.qd-compact td {
+  padding: 3px 6px;
+  font-size: 9.5px;
+}
+.qd-table thead th {
+  border-color: #0077be;
+  background: #0077be;
+  color: #fff;
+  font-weight: 600;
+}
+.qd-table thead {
+  display: table-header-group;
+}
+.qd-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qd-table .qd-group {
+  width: 22%;
+  background: #f5f8fb;
+  font-weight: 600;
+}
+.qd-table .qd-sub td {
+  background: #f2f2f2;
+  font-weight: 600;
+}
+.qd-table tfoot td {
+  background: #ddebf7;
+  font-weight: 700;
+}
+.qd-table tr {
+  break-inside: avoid;
+}
+.qd-note {
+  margin: 4px 0 0;
+  color: #55657a;
+  font-size: 9px;
+}
+.qd-notes {
+  margin: 0;
+  padding-left: 16px;
+}
+.qd-notes li {
+  margin-bottom: 3px;
+}
+
 /* Step 1 scan card: two animations hidden for now (user request,
    03/11/2026): (1) the pulsing rings and the floating of the icon, and (3)
    the sweeping scan line. The rules stay above; delete this block to bring

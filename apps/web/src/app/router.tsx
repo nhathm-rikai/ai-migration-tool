@@ -18,7 +18,8 @@ export const STEP_IDS = [
 export type StepId = (typeof STEP_IDS)[number];
 
 export type Route =
-  | { name: 'projects' }
+  // Step 1 of a project that does not exist yet (created by its first scan).
+  | { name: 'new' }
   | {
       name: 'step';
       projectId: string;
@@ -41,6 +42,8 @@ function decodeSegment(segment: string): string | null {
   }
 }
 
+export const NEW_PROJECT_PATH = '/projects/new';
+
 // `redirect` is the canonical path when it differs from the one given.
 export function parseRoute(pathname: string): {
   route: Route;
@@ -48,13 +51,16 @@ export function parseRoute(pathname: string): {
 } {
   const segments = pathname.split('/').filter((segment) => segment !== '');
   if (segments.length === 0)
-    return { route: { name: 'projects' }, redirect: '/projects' };
+    return { route: { name: 'new' }, redirect: NEW_PROJECT_PATH };
   if (segments[0] !== 'projects')
     return { route: { name: 'not-found' }, redirect: null };
+  // The old project list is a dialog now; its address opens a new project.
   if (segments.length === 1)
+    return { route: { name: 'new' }, redirect: NEW_PROJECT_PATH };
+  if (segments.length === 2 && segments[1] === 'new')
     return {
-      route: { name: 'projects' },
-      redirect: pathname === '/projects' ? null : '/projects',
+      route: { name: 'new' },
+      redirect: pathname === NEW_PROJECT_PATH ? null : NEW_PROJECT_PATH,
     };
   const projectId = decodeSegment(segments[1] ?? '');
   if (projectId === null)
@@ -86,7 +92,7 @@ export function parseRoute(pathname: string): {
 }
 
 export function routePath(route: Route): string {
-  if (route.name === 'projects') return '/projects';
+  if (route.name === 'new') return NEW_PROJECT_PATH;
   if (route.name === 'not-found') return '/not-found';
   const base = `/projects/${encodeURIComponent(route.projectId)}/${route.step}`;
   return route.runId === null

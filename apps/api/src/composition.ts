@@ -1,9 +1,11 @@
 import { userInfo } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { FOLDER_PICKER_TIMEOUT_MS } from '@portal/contracts';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { openDatabase } from './db/database.js';
 import { createFixtureRunExecutor } from './adapters/fake/fixture-run.executor.js';
+import { demoInventory } from './adapters/fake/demo-inventory.js';
 import { createLocalSourceRootPolicy } from './adapters/local/local-source-root.js';
 import { createLocalWorkspaceProvider } from './adapters/local/local-workspace.provider.js';
 import {
@@ -12,6 +14,12 @@ import {
 } from './adapters/local/source-run.executor.js';
 import { createFilesystemArtifactStore } from './adapters/local/filesystem-artifact.store.js';
 import { createWorkerInventoryBuilder } from './adapters/local/worker-inventory.builder.js';
+import {
+  createNativeFolderPicker,
+  dialogCommands,
+} from './adapters/local/native-folder-picker.js';
+import { createFolderPickerService } from './modules/local-picker/folder-picker.service.js';
+import type { FolderPicker } from './ports/folder-picker.js';
 import { APPLICATION_ROOT } from './platform/data-directory.js';
 import type { RunLimits } from './modules/jobs/analyze-run-config.js';
 import {
@@ -20,6 +28,7 @@ import {
 } from './modules/jobs/job-dispatcher.js';
 import { createJobService } from './modules/jobs/job.service.js';
 import { createRunRepository } from './modules/jobs/run.repository.js';
+import { createRunEventHub, withRunEvents } from './modules/jobs/run-events.js';
 import { createProjectRepository } from './modules/projects/project.repository.js';
 import { createProjectService } from './modules/projects/project.service.js';
 import { createSourceRegistrationRepository } from './modules/projects/source-registration.repository.js';
@@ -162,6 +171,8 @@ export function createDependencies(
     jobs?: JobOptions;
     documents?: DocumentOptions;
     recovery?: StartupRecovery;
+    // Tests replace the OS folder dialog (UI05).
+    folderPicker?: FolderPicker;
   },
 ) {
   const db = openDatabase(dataDir);
@@ -195,7 +206,13 @@ export function createDependencies(
       nextId: randomUUID,
       now,
     });
-    const runs = createRunRepository(db);
+    // Events and per-file progress of runs (B09/PF08), in memory.
+    const storedRuns = createRunRepository(db);
+    const runEvents = createRunEventHub({
+      read: (runId) => storedRuns.findAny(runId),
+      now,
+    });
+    const runs = withRunEvents(storedRuns, runEvents);
     const artifactStore =
       options.jobs?.artifactStore ??
       createFilesystemArtifactStore({
@@ -228,6 +245,10 @@ export function createDependencies(
             createFixtureRunExecutor({
               stageDelayMs: FIXTURE_STAGE_DELAY_MS,
               nextId: randomUUID,
+              files: demoInventory.files.map((file) => ({
+                relativePath: file.manifest.relativePath,
+                byteLength: file.manifest.byteLength,
+              })),
             }),
           snapshots,
           artifacts,
@@ -240,6 +261,7 @@ export function createDependencies(
       now,
       log: options.log,
       recoveryRequired: options.recovery?.recoveryRequired ?? false,
+      progress: runEvents,
     });
     // Before any request: runs a previous process left executing end
     // interrupted and are never resumed.
@@ -250,10 +272,19 @@ export function createDependencies(
       sources,
       control: dispatcher,
       limits: { ...DEFAULT_RUN_LIMITS, ...options.jobs?.limits },
+      progressOf: runEvents.progressOf,
       nextId: randomUUID,
       now,
     });
     late.jobs = jobs;
+    const folderPicker = createFolderPickerService({
+      picker:
+        options.folderPicker ??
+        createNativeFolderPicker({
+          commands: dialogCommands(process.platform),
+          timeoutMs: FOLDER_PICKER_TIMEOUT_MS,
+        }),
+    });
     const documentOptions = options.documents ?? { runner: 'fake' };
     const documentRuns = createDocumentRunRepository(db);
     const documentStore = createFilesystemArtifactStore({
@@ -357,6 +388,8 @@ export function createDependencies(
       jobs,
       snapshots,
       artifacts,
+      folderPicker,
+      runEvents,
       documents,
       // Staging copies a previous process left are app-owned and never
       // public; remove them, then start queued runs from a previous process.
@@ -371,7 +404,11 @@ export function createDependencies(
       },
       async close() {
         try {
+          // An open folder dialog is closed (its process killed) first.
+          await folderPicker.close();
           await Promise.all([dispatcher.close(), documentDispatcher.close()]);
+          // Open event streams end; nothing is sent after the DB closes.
+          runEvents.close();
         } finally {
           db.close();
         }

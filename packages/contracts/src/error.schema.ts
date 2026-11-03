@@ -12,6 +12,8 @@ export const ApiErrorCodeSchema = Type.Union([
   Type.Literal('HOST_NOT_ALLOWED'),
   Type.Literal('ORIGIN_NOT_ALLOWED'),
   Type.Literal('CREDENTIAL_INVALID'),
+  // Native folder dialog (UI05): another dialog is already open.
+  Type.Literal('FOLDER_PICKER_BUSY'),
 ]);
 export type ApiErrorCode = Static<typeof ApiErrorCodeSchema>;
 
@@ -31,6 +33,8 @@ export const AnalyzeApiErrorCodeSchema = Type.Union([
   Type.Literal('SNAPSHOT_UNAVAILABLE'),
   Type.Literal('ARTIFACT_NOT_FOUND'),
   Type.Literal('RUNTIME_RECOVERY_REQUIRED'),
+  // Too many open event streams (B09); the client falls back to GET.
+  Type.Literal('RUN_EVENTS_LIMIT'),
   // Document runs (step 3).
   Type.Literal('ANALYSIS_REQUIRED'),
   Type.Literal('DOCUMENT_NOT_FOUND'),
@@ -52,6 +56,7 @@ export const ANALYZE_API_ERROR_HTTP_STATUS = {
   SNAPSHOT_UNAVAILABLE: 409,
   ARTIFACT_NOT_FOUND: 404,
   RUNTIME_RECOVERY_REQUIRED: 503,
+  RUN_EVENTS_LIMIT: 429,
   ANALYSIS_REQUIRED: 409,
   DOCUMENT_NOT_FOUND: 404,
   REVIEW_STALE: 409,

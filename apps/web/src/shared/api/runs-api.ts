@@ -5,6 +5,7 @@ import {
   type StartRunInput,
 } from '@portal/contracts';
 import { createApiClient } from './api-client';
+import { createRunEventStream } from './run-events';
 import {
   createLocalSession,
   localSession,
@@ -20,6 +21,7 @@ export function createRunsApi(
     : localSession,
 ) {
   const request = createApiClient(credentials, fetcher);
+  const stream = createRunEventStream(credentials, fetcher);
   const runs = (projectId: string) =>
     '/projects/' + encodeURIComponent(projectId) + '/runs';
   return {
@@ -61,6 +63,8 @@ export function createRunsApi(
         signal,
         { method: 'POST', body: { expectedStateVersion } },
       ),
+    // SSE of one run (F05); see run-events.ts.
+    events: stream,
   };
 }
 export type RunsApi = ReturnType<typeof createRunsApi>;

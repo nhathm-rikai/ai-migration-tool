@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ACTIVE_RUN_STATUSES,
+  RunSchema,
   type Run,
+  type RunEvent,
+  type RunProgress,
   type RunStatus,
   type StartRunInput,
 } from '@portal/contracts';
+import { Check } from 'typebox/value';
 import { ApiError } from '../../shared/api/api-error';
 import type { RunsApi } from '../../shared/api/runs-api';
 import { hasErrorCode } from './run-messages';
@@ -15,6 +19,27 @@ import { hasErrorCode } from './run-messages';
 
 export const RUN_POLL_INTERVAL_MS = 1000;
 export const RUN_POLL_MAX_INTERVAL_MS = 8000;
+// Reconnects of a broken event stream before polling alone remains.
+export const RUN_EVENT_MAX_RECONNECTS = 5;
+const PROGRESS_PHASES: readonly RunProgress['phase'][] = [
+  'listing',
+  'snapshot',
+  'inventory',
+  'publish',
+];
+
+function progressRegresses(previous: RunProgress, next: RunProgress): boolean {
+  const from = PROGRESS_PHASES.indexOf(previous.phase);
+  const to = PROGRESS_PHASES.indexOf(next.phase);
+  return (
+    to < from ||
+    (to === from &&
+      (next.filesSnapshotted < previous.filesSnapshotted ||
+        next.filesAnalyzed < previous.filesAnalyzed ||
+        next.bytesDone < previous.bytesDone ||
+        (previous.filesTotal !== null && next.filesTotal === null)))
+  );
+}
 
 export function isActiveRun(status: RunStatus): boolean {
   return (ACTIVE_RUN_STATUSES as readonly RunStatus[]).includes(status);
@@ -31,9 +56,26 @@ export function newerRun(existing: Run | null, incoming: Run): Run {
       : existing;
   if (existing.stateVersion !== incoming.stateVersion)
     return incoming.stateVersion > existing.stateVersion ? incoming : existing;
+  // Progress changes do not increment stateVersion/updatedAt. Retain the
+  // whole report together so phase, counts, paths and percentage agree.
+  if (
+    existing.progress &&
+    (!incoming.progress ||
+      progressRegresses(existing.progress, incoming.progress))
+  )
+    return existing;
   return Date.parse(incoming.updatedAt) >= Date.parse(existing.updatedAt)
     ? incoming
     : existing;
+}
+
+// The run with the stage and progress of an event of the same version, or
+// null when the result would not be a valid run.
+export function withEvent(run: Run, event: RunEvent): Run | null {
+  const next: Record<string, unknown> = { ...run, stage: event.stage };
+  if (event.progress) next.progress = event.progress;
+  else delete next.progress;
+  return Check(RunSchema, next) ? next : null;
 }
 
 type RunsState =
@@ -82,23 +124,54 @@ export function useAnalyzeRuns(
   // A Start whose outcome is unknown: retried with the same key.
   const [uncertainStart, setUncertainStart] = useState(false);
   const intent = useRef<StartIntent | null>(null);
+  // The event stream of the active run is open (polling slows down).
+  const streaming = useRef(false);
+  const eventGeneration = useRef(0);
+  // The current run as last shown, for comparing incoming events.
+  const latest = useRef<Run | null>(null);
+  useEffect(() => {
+    latest.current = state.status === 'ready' ? state.current : null;
+  });
   const busy = useRef(false);
   const loaded = useRef(false);
   const mutation = useRef<AbortController | null>(null);
   useEffect(() => () => mutation.current?.abort(), []);
 
   const refresh = useCallback(() => setReload((value) => value + 1), []);
-  const apply = useCallback((run: Run) => {
-    setState((previous) =>
-      previous.status === 'ready'
-        ? { ...previous, current: newerRun(previous.current, run) }
-        : previous,
-    );
-  }, []);
+  const merge = useCallback(
+    (known: Run | null, run: Run, readGeneration?: number) => {
+      // A GET captured before an accepted event cannot replace that report,
+      // even when all timestamps/counters tie. New state versions still win
+      // (in particular a terminal GET after a stream interruption).
+      if (
+        known?.id === run.id &&
+        known.stateVersion === run.stateVersion &&
+        readGeneration !== undefined &&
+        readGeneration !== eventGeneration.current
+      )
+        return known;
+      return newerRun(known, run);
+    },
+    [],
+  );
+  const apply = useCallback(
+    (run: Run, readGeneration?: number) => {
+      setState((previous) =>
+        previous.status === 'ready'
+          ? {
+              ...previous,
+              current: merge(previous.current, run, readGeneration),
+            }
+          : previous,
+      );
+    },
+    [merge],
+  );
 
   // Current run + first history page; again after every explicit reload.
   useEffect(() => {
     const controller = new AbortController();
+    const readGeneration = eventGeneration.current;
     setState((previous) =>
       previous.status === 'ready' ? previous : { status: 'loading' },
     );
@@ -114,7 +187,9 @@ export function useAnalyzeRuns(
           const known = previous.status === 'ready' ? previous.current : null;
           return {
             status: 'ready',
-            current: current.run ? newerRun(known, current.run) : known,
+            current: current.run
+              ? merge(known, current.run, readGeneration)
+              : known,
             history: page.items,
             nextCursor: page.nextCursor,
           };
@@ -128,7 +203,7 @@ export function useAnalyzeRuns(
       },
     );
     return () => controller.abort();
-  }, [api, projectId, reload]);
+  }, [api, projectId, reload, merge]);
 
   // Bounded polling of the active run: GET only, backoff on failure, stops at
   // a terminal state and on unmount/project switch.
@@ -144,13 +219,16 @@ export function useAnalyzeRuns(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let delay = RUN_POLL_INTERVAL_MS;
     const schedule = () => {
+      // While the event stream is open, polling is only a slow safety net.
+      const wait = streaming.current ? RUN_POLL_MAX_INTERVAL_MS : delay;
       timer = setTimeout(() => {
+        const readGeneration = eventGeneration.current;
         api.get(projectId, tracked, controller.signal).then(
           (run) => {
             if (controller.signal.aborted) return;
             setConnectionLost(false);
             delay = RUN_POLL_INTERVAL_MS;
-            apply(run);
+            apply(run, readGeneration);
             if (isActiveRun(run.status)) schedule();
             // Terminal: refresh the history once.
             else refresh();
@@ -162,12 +240,97 @@ export function useAnalyzeRuns(
             schedule();
           },
         );
-      }, delay);
+      }, wait);
     };
     schedule();
     return () => {
       controller.abort();
       clearTimeout(timer);
+    };
+  }, [api, projectId, tracked, apply, refresh]);
+
+  // Event stream of the active run (F05). An event of the shown version
+  // updates stage and progress in place; a newer version is read back with
+  // GET (the authoritative state); an older or foreign one is dropped. A
+  // broken stream reconnects with backoff, a bounded number of times, and
+  // the polling above covers the gap. Locale changes do not reconnect.
+  useEffect(() => {
+    if (!tracked) return;
+    const controller = new AbortController();
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+    const resync = () => {
+      const readGeneration = eventGeneration.current;
+      return api.get(projectId, tracked, controller.signal).then(
+        (run) => {
+          if (controller.signal.aborted) return;
+          apply(run, readGeneration);
+          if (!isActiveRun(run.status)) refresh();
+        },
+        () => undefined,
+      );
+    };
+    let connection = 0;
+    const onEvent = (event: RunEvent) => {
+      if (controller.signal.aborted || event.runId !== tracked) return;
+      streaming.current = true;
+      attempts = 0;
+      setConnectionLost(false);
+      const shown = latest.current;
+      if (!shown || shown.id !== event.runId) return;
+      if (event.stateVersion < shown.stateVersion) return;
+      eventGeneration.current++;
+      if (event.stateVersion > shown.stateVersion) {
+        void resync();
+        return;
+      }
+      const patched = withEvent(shown, event);
+      if (patched) apply(patched);
+    };
+    const connect = () => {
+      const activeConnection = ++connection;
+      // The backend resets sequence when its last subscriber disconnects.
+      let sequence = 0;
+      const receive = (event: RunEvent) => {
+        if (
+          activeConnection !== connection ||
+          event.runId !== tracked ||
+          event.sequence <= sequence
+        )
+          return;
+        sequence = event.sequence;
+        onEvent(event);
+      };
+      api.events(projectId, tracked, controller.signal, receive).then(
+        () => {
+          if (activeConnection !== connection) return;
+          connection++;
+          // Ended by the server: the run ended or the backend stops.
+          streaming.current = false;
+          if (!controller.signal.aborted) void resync();
+        },
+        () => {
+          if (activeConnection !== connection) return;
+          connection++;
+          streaming.current = false;
+          if (controller.signal.aborted) return;
+          attempts++;
+          if (attempts > RUN_EVENT_MAX_RECONNECTS) return;
+          retry = setTimeout(
+            connect,
+            Math.min(
+              RUN_POLL_INTERVAL_MS * 2 ** attempts,
+              RUN_POLL_MAX_INTERVAL_MS,
+            ),
+          );
+        },
+      );
+    };
+    connect();
+    return () => {
+      controller.abort();
+      clearTimeout(retry);
+      streaming.current = false;
     };
   }, [api, projectId, tracked, apply, refresh]);
 
@@ -223,21 +386,23 @@ export function useAnalyzeRuns(
     uncertainStart,
     refresh,
     // New run, or the same intent again while its outcome is unknown.
-    async start() {
+    // `revision` names a source just saved by the caller, before this hook
+    // has re-rendered with it.
+    async start(revision: number | null = sourceRevision) {
       // An intent whose outcome is unknown is resent exactly as it was.
       if (intent.current) return sendStart(intent.current);
-      if (sourceRevision === null) return;
+      if (revision === null) return;
       return sendStart({
         key: newKey(),
-        input: startInput(sourceRevision, null),
+        input: startInput(revision, null),
       });
     },
     // Business retry: always a new run with a new key.
-    async retry(runId: string) {
-      if (sourceRevision === null) return;
+    async retry(runId: string, revision: number | null = sourceRevision) {
+      if (revision === null) return;
       return sendStart({
         key: newKey(),
-        input: startInput(sourceRevision, runId),
+        input: startInput(revision, runId),
       });
     },
     async cancel(run: Run) {
@@ -295,3 +460,5 @@ export function visibleHistory(current: Run | null, history: Run[]): Run[] {
     ? merged
     : [current, ...merged];
 }
+
+export type AnalyzeRunsControl = ReturnType<typeof useAnalyzeRuns>;

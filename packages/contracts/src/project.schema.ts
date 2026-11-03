@@ -2,6 +2,7 @@ import { Type, type Static } from 'typebox';
 import {
   PROJECT_NAME_MIN_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  PROJECT_CUSTOMER_NAME_MAX_LENGTH,
   PROJECT_PAGE_SIZE_DEFAULT,
   PROJECT_FIXTURE_ID,
   PROJECT_DEMO_MODE,
@@ -13,17 +14,31 @@ const ProjectNameSchema = Type.String({
   maxLength: PROJECT_NAME_MAX_LENGTH,
   pattern: '\\S',
 });
+// Absent when the project has none; projects stored before UI04 never have one.
+const CustomerNameSchema = Type.String({
+  minLength: 1,
+  maxLength: PROJECT_CUSTOMER_NAME_MAX_LENGTH,
+  pattern: '\\S',
+});
 export const ProjectIdSchema = Type.String({ format: 'uuid' });
 // Init only: an explicit demo marker, not a filesystem path or an analysis result.
 export const FixtureIdSchema = Type.Literal(PROJECT_FIXTURE_ID);
 // A demo project names the bundled fixture; a local project has no fixture
 // and gets its source from registration (B03). The demo payload is unchanged.
 export const CreateDemoProjectSchema = Type.Object(
-  { name: ProjectNameSchema, fixtureId: FixtureIdSchema },
+  {
+    name: ProjectNameSchema,
+    customerName: Type.Optional(CustomerNameSchema),
+    fixtureId: FixtureIdSchema,
+  },
   { additionalProperties: false },
 );
 export const CreateLocalProjectSchema = Type.Object(
-  { name: ProjectNameSchema, mode: Type.Literal(PROJECT_LOCAL_MODE) },
+  {
+    name: ProjectNameSchema,
+    customerName: Type.Optional(CustomerNameSchema),
+    mode: Type.Literal(PROJECT_LOCAL_MODE),
+  },
   { additionalProperties: false },
 );
 export const CreateProjectSchema = Type.Union([
@@ -34,6 +49,7 @@ export const DemoProjectSchema = Type.Object(
   {
     id: ProjectIdSchema,
     name: ProjectNameSchema,
+    customerName: Type.Optional(CustomerNameSchema),
     fixtureId: FixtureIdSchema,
     mode: Type.Literal(PROJECT_DEMO_MODE),
     createdAt: Type.String({ format: 'date-time' }),
@@ -44,6 +60,7 @@ export const LocalProjectSchema = Type.Object(
   {
     id: ProjectIdSchema,
     name: ProjectNameSchema,
+    customerName: Type.Optional(CustomerNameSchema),
     mode: Type.Literal(PROJECT_LOCAL_MODE),
     createdAt: Type.String({ format: 'date-time' }),
   },
@@ -53,6 +70,15 @@ export const ProjectSchema = Type.Union([
   DemoProjectSchema,
   LocalProjectSchema,
 ]);
+// PATCH: the fields given change, the others stay; null removes the customer.
+// Last write wins: the form sends both fields it shows.
+export const UpdateProjectSchema = Type.Object(
+  {
+    name: Type.Optional(ProjectNameSchema),
+    customerName: Type.Optional(Type.Union([CustomerNameSchema, Type.Null()])),
+  },
+  { additionalProperties: false, minProperties: 1 },
+);
 export const ProjectParamsSchema = Type.Object(
   { projectId: ProjectIdSchema },
   { additionalProperties: false },
@@ -78,6 +104,7 @@ export const ProjectListSchema = Type.Object(
   { additionalProperties: false },
 );
 export type CreateProjectInput = Static<typeof CreateProjectSchema>;
+export type UpdateProjectInput = Static<typeof UpdateProjectSchema>;
 export type Project = Static<typeof ProjectSchema>;
 export type DemoProject = Static<typeof DemoProjectSchema>;
 export type LocalProject = Static<typeof LocalProjectSchema>;

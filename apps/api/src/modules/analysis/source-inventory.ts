@@ -169,6 +169,10 @@ export function buildSourceInventory(input: {
   files: readonly { relativePath: string; bytes: Uint8Array }[];
   encodingOverrides?: ReadonlyMap<string, ProfileEncoding>;
   tableNames?: TableNameMapping;
+  // Called once per file when its own work is done (PF08): after decoding
+  // for a file that is not analyzed code, after the cross-file reference
+  // scan (the expensive part) for analyzed code.
+  onFile?: (relativePath: string) => void;
 }): SourceInventory {
   const tableNames = input.tableNames ?? UNCONFIGURED_TABLE_NAMES;
   const { analyzer } = input.profile;
@@ -200,9 +204,11 @@ export function buildSourceInventory(input: {
       result.lines && role === 'code'
         ? analyzer.analyzeCodeFile(relativePath, result.lines.lines)
         : null;
+    const first = !files.has(relativePath);
     files.set(relativePath, { manifest: result.entry, analysis });
     if (analysis?.status === 'analyzed' && result.lines)
       codeLines.set(relativePath, result.lines.lines);
+    else if (first) input.onFile?.(relativePath);
     return result.lines;
   }
 
@@ -292,8 +298,10 @@ export function buildSourceInventory(input: {
   );
   const names = callableNames(analyzedFiles);
   const references = new Map<string, CodeReference[]>();
-  for (const [path, lines] of codeLines)
+  for (const [path, lines] of codeLines) {
     references.set(path, analyzer.findReferences(path, lines, names));
+    input.onFile?.(path);
+  }
 
   const programs = parsedProjects.map(
     ({ path, parsed, members: resolved }): InventoryProgram => {

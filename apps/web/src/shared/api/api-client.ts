@@ -23,6 +23,9 @@ export async function sendRequest<T extends TSchema>(
     method: ApiMethod;
     body?: unknown;
     headers?: Record<string, string>;
+    // Longer than the default only for a request that waits on a person
+    // (the native folder dialog).
+    timeoutMs?: number;
   },
 ): Promise<Static<T>> {
   signal.throwIfAborted();
@@ -34,7 +37,7 @@ export async function sendRequest<T extends TSchema>(
   const timeout = setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, API_REQUEST_TIMEOUT_MS);
+  }, options.timeoutMs ?? API_REQUEST_TIMEOUT_MS);
   try {
     const headers = {
       ...options.headers,
@@ -120,6 +123,7 @@ export function createApiClient(
       method?: ApiMethod;
       body?: unknown;
       headers?: Record<string, string>;
+      timeoutMs?: number;
     } = {},
   ): Promise<Static<T>> {
     const method = options.method ?? 'GET';
@@ -127,6 +131,9 @@ export function createApiClient(
       sendRequest(fetcher, API_BASE_PATH + path, schema, signal, {
         method,
         body: options.body,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : { timeoutMs: options.timeoutMs }),
         headers: {
           ...options.headers,
           Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}`,

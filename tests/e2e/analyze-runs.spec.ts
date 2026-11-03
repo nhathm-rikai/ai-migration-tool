@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 // PF03 flow on the fixture runtime: an explicit Start is accepted (202) and
-// reaches a terminal state; reloading reads the run back without starting
-// another one; a second run can be cancelled.
+// reaches a terminal state and opens the analysis step (UI04); reloading
+// reads the run back without starting another one; a second run can be
+// cancelled and stays on the source step.
 test(
   'start, finish, reload and cancel an analyze run',
   { tag: '@smoke' },
-  async ({ page }) => {
+  async ({ page }, testInfo) => {
     const seedName = process.env.E2E_SEED_PROJECT_NAME ?? '';
     const runMutations: { url: string; status: number; key: string | null }[] =
       [];
@@ -21,37 +22,62 @@ test(
     });
 
     await page.goto('/');
-    const projects = page.getByRole('navigation', { name: 'Danh sách dự án' });
-    await projects.getByRole('link', { name: seedName }).click();
+    // UI04: existing projects are reopened from "Dự án gần đây" (search by
+    // name).
+    const recent = page.getByRole('complementary', { name: 'Dự án gần đây' });
+    await recent.getByLabel('Tìm dự án theo tên').fill(seedName);
+    await recent
+      .getByRole('link', { name: new RegExp(seedName) })
+      .first()
+      .click();
     await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
-    const panel = page.getByRole('region', { name: /Phân tích \(demo\)/ });
-    await expect(panel.getByText('Chưa có lượt chạy nào')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Đã chọn thư mục' }),
+    ).toBeVisible();
     expect(runMutations).toEqual([]);
 
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    // The stage is shown instead of a percentage while it runs.
-    await expect(panel.getByText('Bước hiện tại')).toBeVisible();
+    const start = page.getByRole('button', { name: 'Quét source' });
+    await start.click();
+    // UI04: the scan card follows the run, then the analysis step opens.
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+      page.getByRole('heading', { name: 'Tiến trình' }),
     ).toBeVisible();
+    // PF08: the demo run reports simulated per-file progress (labelled DEMO)
+    // over the event stream: a share and the latest files read.
+    await expect(page.locator('.scan-percent')).toHaveText(/^\s*\d+%$/);
+    await expect(
+      page.getByRole('heading', { name: /File đang đọc/ }),
+    ).toContainText('DEMO');
+    await page.screenshot({
+      path: testInfo.outputPath('pf08-scanning-vi.png'),
+      fullPage: true,
+    });
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
     expect(runMutations).toHaveLength(1);
     expect(runMutations[0]?.status).toBe(202);
     expect(runMutations[0]?.key).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
 
-    // Reload stays on the project's source step and reads the run back.
+    // Back on the source step and after a reload the run is read back; a run
+    // that already finished never opens the analysis step by itself.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     await page.reload();
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Hoàn tất (demo)' }),
+      page.getByRole('button', { name: 'Xem kết quả lần quét gần nhất' }),
     ).toBeVisible();
-    await expect(panel.locator('.run-history > li')).toHaveCount(1);
+    await page.waitForTimeout(2_000);
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     expect(runMutations).toHaveLength(1);
 
-    await panel.getByRole('button', { name: 'Bắt đầu phân tích' }).click();
-    await panel.getByRole('button', { name: 'Hủy lượt chạy' }).click();
+    await start.click();
+    await page.getByRole('button', { name: 'Hủy lượt chạy' }).click();
     await expect(
-      panel.getByRole('status').filter({ hasText: 'Đã hủy' }),
+      page.getByRole('heading', { name: 'Đã hủy lượt quét' }),
     ).toBeVisible();
-    await expect(panel.locator('.run-history > li')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Chạy lại' })).toBeVisible();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/source$/);
     const [first, second, ...cancels] = runMutations;
     expect([first?.status, second?.status]).toEqual([202, 202]);
     // A cancel sent with the version shown right after Start may meet a run

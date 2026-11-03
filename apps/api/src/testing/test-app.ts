@@ -7,6 +7,7 @@ import { LOCAL_SESSION_PATH, type LocalSession } from '@portal/contracts';
 import { buildApp } from '../app.js';
 import type { JobOptions } from '../composition.js';
 import { loadConfig, type AppConfig } from '../config.js';
+import type { FolderPicker } from '../ports/folder-picker.js';
 
 type App = ReturnType<typeof buildApp>;
 
@@ -49,7 +50,7 @@ export function createTrustedInject(app: App, config: AppConfig) {
 
 export function createTestApp(
   env: NodeJS.ProcessEnv = {},
-  options: { jobs?: JobOptions } = {},
+  options: { jobs?: JobOptions; folderPicker?: FolderPicker } = {},
 ) {
   const dataDir = mkdtempSync(join(tmpdir(), 'portal-api-test-'));
   const config = loadConfig({

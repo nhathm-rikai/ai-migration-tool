@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Project } from '@portal/contracts';
 import { branding } from './branding';
-import { ProjectsPage } from '../features/projects/projects-page';
-import { ProjectDetail } from '../features/projects/project-detail';
+import { SourceStep } from '../features/source/source-step';
+import { NewProjectStep } from '../features/source/new-project-step';
+import { RecentProjects } from '../features/projects/recent-projects';
 import { AssessmentOverview } from '../features/assessment/assessment-overview';
 import {
   useProjectList,
@@ -50,6 +51,7 @@ import {
   navigate,
   parseRoute,
   STEP_IDS,
+  NEW_PROJECT_PATH,
   stepPath,
   usePathname,
   useQueryParam,
@@ -130,19 +132,6 @@ function AppShell({
     documentsApi,
   });
 
-  // "Created" notice: shown on the new project's page until the next
-  // navigation away from it.
-  const [created, setCreated] = useState<{
-    path: string;
-    seen: boolean;
-  } | null>(null);
-  useEffect(() => {
-    if (!created) return;
-    if (pathname === created.path) {
-      if (!created.seen) setCreated({ ...created, seen: true });
-    } else if (created.seen) setCreated(null);
-  }, [pathname, created]);
-
   const apis = { api, runsApi, sourcesApi, artifactsApi, documentsApi };
   return (
     <>
@@ -164,15 +153,12 @@ function AppShell({
           key={route.name === 'step' ? route.projectId : route.name}
         >
           <SessionStatus session={session} />
-          {route.name === 'projects' ? (
-            <ProjectsPage
-              api={api}
-              list={list}
+          {route.name === 'new' ? (
+            <NewProjectPage
+              apis={apis}
               onCreated={(next) => {
-                const path = stepPath(next.id, 'source');
-                setCreated({ path, seen: false });
                 list.refresh();
-                navigate(path);
+                navigate(stepPath(next.id, 'source'));
               }}
             />
           ) : route.name === 'not-found' ? (
@@ -208,8 +194,11 @@ function AppShell({
               progress={progress.state}
               onProgress={progress.refresh}
               onRetryProgress={progress.refresh}
-              created={created?.path === pathname}
               apis={apis}
+              onProjectChange={(next) => {
+                project.replace(next);
+                list.retry();
+              }}
             />
           ) : (
             <p role="status" className="page">
@@ -255,7 +244,9 @@ function Sidebar({
   const { locale, setLocale, messages } = useLocale();
   const copy = messages.shell;
   const projectId = route.name === 'step' ? route.projectId : null;
-  const currentStep = route.name === 'step' ? route.step : null;
+  // A new project is on its step 1 before it exists.
+  const currentStep =
+    route.name === 'step' ? route.step : route.name === 'new' ? 'source' : null;
   const listed = list.state.status === 'ready' ? list.state.page.items : [];
   // The open project stays selectable even when it is not on the list page.
   const options =
@@ -304,11 +295,11 @@ function Sidebar({
         </label>
         <div className="picker-card">
           <span className="picker-avatar" aria-hidden="true">
-            {initials(project?.name ?? copy.allProjects)}
+            {initials(project?.name ?? copy.newProject)}
           </span>
           <span className="picker-text" aria-hidden="true">
             <span className="picker-name">
-              {project?.name ?? copy.allProjects}
+              {project?.name ?? copy.newProject}
             </span>
             <span className="picker-detail">
               {!project
@@ -338,11 +329,13 @@ function Sidebar({
             onChange={(event) => {
               const id = event.currentTarget.value;
               navigate(
-                id === '' ? '/projects' : stepPath(id, currentStep ?? 'source'),
+                id === ''
+                  ? NEW_PROJECT_PATH
+                  : stepPath(id, currentStep ?? 'source'),
               );
             }}
           >
-            <option value="">{copy.allProjects}</option>
+            <option value="">+ {copy.newProject}</option>
             {options.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
@@ -410,8 +403,8 @@ function StepPage({
   progress,
   onProgress,
   onRetryProgress,
-  created,
   apis,
+  onProjectChange,
 }: {
   project: Project;
   step: StepId;
@@ -419,8 +412,8 @@ function StepPage({
   progress: ProjectProgress;
   onProgress: () => void;
   onRetryProgress: () => void;
-  created: boolean;
   apis: Apis;
+  onProjectChange: (project: Project) => void;
 }) {
   const { messages } = useLocale();
   const copy = messages.shell;
@@ -450,26 +443,30 @@ function StepPage({
           </h1>
           <div ref={setHeaderSlot} />
         </div>
+        {step === 'source' && (
+          <p className="page-lead">{messages.sourceStep.lead}</p>
+        )}
         {step === 'documents' && (
           <p className="page-lead">{messages.documents.lead}</p>
         )}
       </header>
-      {created && (
-        <p role="status" className="success">
-          {messages.projects.created}
-        </p>
-      )}
       {step === 'source' ? (
-        <ProjectDetail
-          id={project.id}
+        <SourceStep
           project={project}
           api={apis.api}
           runsApi={apis.runsApi}
           sourcesApi={apis.sourcesApi}
-          artifactsApi={apis.artifactsApi}
-          onOpenResults={(id) => navigate(stepPath(project.id, 'analysis', id))}
+          onProjectChange={onProjectChange}
           onProgress={onProgress}
-          onClose={() => navigate('/projects')}
+          onOpenResults={(id) => navigate(stepPath(project.id, 'analysis', id))}
+          aside={
+            <RecentProjects
+              api={apis.api}
+              runsApi={apis.runsApi}
+              openProjectId={project.id}
+              version={progressVersion(progress)}
+            />
+          }
         />
       ) : step === 'analysis' ? (
         <AnalysisStep
@@ -521,6 +518,50 @@ function StepPage({
       )}
     </div>
   );
+}
+
+// Step 1 before the project exists (UI04): created by its first scan.
+function NewProjectPage({
+  apis,
+  onCreated,
+}: {
+  apis: Apis;
+  onCreated: (project: Project) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.shell;
+  return (
+    <div className="page">
+      <header className="page-header">
+        <span className="eyebrow">
+          {copy.stepEyebrow(1)} · {copy.newProject}
+        </span>
+        <h1 id="page-title">{copy.pageTitles.source}</h1>
+        <p className="page-lead">{messages.sourceStep.lead}</p>
+      </header>
+      <NewProjectStep
+        api={apis.api}
+        sourcesApi={apis.sourcesApi}
+        runsApi={apis.runsApi}
+        onCreated={onCreated}
+        aside={
+          <RecentProjects
+            api={apis.api}
+            runsApi={apis.runsApi}
+            openProjectId={null}
+            version=""
+          />
+        }
+      />
+    </div>
+  );
+}
+
+// Re-read recent projects when a run of the open project starts or ends.
+function progressVersion(progress: ProjectProgress): string {
+  return progress.status === 'ready'
+    ? `${progress.activeRunId ?? ''}/${progress.analysisRunId ?? ''}`
+    : progress.status;
 }
 
 function AnalysisStep({
@@ -595,7 +636,7 @@ function NotFoundPage({ title, help }: { title: string; help: ReactNode }) {
         <h1 id="page-title">{title}</h1>
         <p className="muted">{help}</p>
         <div className="form-actions">
-          <Link className="button primary" to="/projects">
+          <Link className="button primary" to={NEW_PROJECT_PATH}>
             {messages.shell.notFound.back}
           </Link>
         </div>

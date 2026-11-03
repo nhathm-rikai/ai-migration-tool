@@ -10,6 +10,7 @@ import {
   type RunList,
   type RuntimeStatus,
   type StartRunInput,
+  type RunProgress,
 } from '@portal/contracts';
 import { Check } from 'typebox/value';
 import { AppError } from '../../shared/app-error.js';
@@ -81,10 +82,16 @@ export function createJobService(deps: {
   sources: { runSource(project: Project): ProjectRunSource };
   control: JobControl;
   limits: RunLimits;
+  // In-memory per-file progress of an active run (PF08), added to reads.
+  progressOf?: (run: Run) => RunProgress | undefined;
   nextId(): string;
   now(): Date;
 }) {
   const { repository } = deps;
+  function withProgress(run: Run): Run {
+    const progress = deps.progressOf?.(run);
+    return progress ? { ...run, progress } : run;
+  }
   function findRun(projectId: string, runId: string): Run {
     deps.projects.get(projectId);
     const run = repository.findById(projectId, runId);
@@ -182,17 +189,17 @@ export function createJobService(deps: {
       const project = deps.projects.get(projectId);
       const result = admit(project, idempotencyKey, input);
       if (result.created) deps.control.wake();
-      return result;
+      return { ...result, run: withProgress(result.run) };
     },
-    get: findRun,
+    get: (projectId: string, runId: string) =>
+      withProgress(findRun(projectId, runId)),
     current(projectId: string): CurrentRunResponse {
       deps.projects.get(projectId);
-      return {
-        run:
-          repository.findActive(projectId) ??
-          repository.findLatest(projectId) ??
-          null,
-      };
+      const run =
+        repository.findActive(projectId) ??
+        repository.findLatest(projectId) ??
+        null;
+      return { run: run && withProgress(run) };
     },
     list(projectId: string, query: ListRunsQuery): RunList {
       if (!Check(ListRunsQuerySchema, query))
@@ -205,7 +212,7 @@ export function createJobService(deps: {
       const items = rows.slice(0, limit);
       const last = items.at(-1);
       return {
-        items,
+        items: items.map(withProgress),
         nextCursor: rows.length > limit && last ? encodeCursor(last) : null,
       };
     },
@@ -219,7 +226,7 @@ export function createJobService(deps: {
       // keeps waiting for its stop to be confirmed.
       if (run.status === 'cancelling') {
         deps.control.requestStop(run.id);
-        return repository.findById(projectId, runId) ?? run;
+        return withProgress(repository.findById(projectId, runId) ?? run);
       }
       if (
         isTerminalStatus(run.status) ||
@@ -239,7 +246,7 @@ export function createJobService(deps: {
       // Moved between the read and the compare-and-set (claim or completion).
       if (!updated) throw new AppError('RUN_STATE_CONFLICT');
       if (updated.status === 'cancelling') deps.control.requestStop(updated.id);
-      return updated;
+      return withProgress(updated);
     },
     runtimeStatus: (): RuntimeStatus => deps.control.runtimeStatus(),
   };

@@ -226,11 +226,7 @@ function ArtifactView({
       <Kpis artifact={artifact} summary={summary} />
       <div className="dashboard-charts">
         <LocSplit summary={summary} artifact={artifact} />
-        <Histogram
-          summary={summary}
-          artifact={artifact}
-          onShowPrograms={showPrograms}
-        />
+        <Histogram summary={summary} onShowPrograms={showPrograms} />
       </div>
       <Warnings
         summary={summary}
@@ -498,11 +494,9 @@ function LocSplit({
 
 function Histogram({
   summary,
-  artifact,
   onShowPrograms,
 }: {
   summary: AssessmentSummary;
-  artifact: ArtifactEnvelope;
   onShowPrograms: (filter: Partial<ProgramFilter>) => void;
 }) {
   const { messages } = useLocale();
@@ -544,10 +538,11 @@ function Histogram({
           </li>
         ))}
       </ol>
-      <p className="muted histogram-note">
-        {copy.histogramNote(artifact.payload.complexityVersion)}
-        {notAnalyzed > 0 && <> · {copy.notAnalyzed(number(notAnalyzed))}</>}
-      </p>
+      {notAnalyzed > 0 && (
+        <p className="muted histogram-note">
+          {copy.notAnalyzed(number(notAnalyzed))}
+        </p>
+      )}
     </section>
   );
 }

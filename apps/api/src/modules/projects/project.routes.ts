@@ -8,6 +8,7 @@ import {
   ProjectListSchema,
   ErrorResponseSchema,
   EmptyQuerySchema,
+  UpdateProjectSchema,
 } from '@portal/contracts';
 import type { ProjectService } from './project.service.js';
 
@@ -53,5 +54,17 @@ export function registerProjectRoutes(
       },
     },
     (request) => service.get(request.params.projectId),
+  );
+  app.patch(
+    '/api/v1/projects/:projectId',
+    {
+      schema: {
+        params: ProjectParamsSchema,
+        querystring: EmptyQuerySchema,
+        body: UpdateProjectSchema,
+        response: { 200: ProjectSchema, default: ErrorResponseSchema },
+      },
+    },
+    (request) => service.update(request.params.projectId, request.body),
   );
 }

@@ -7,6 +7,7 @@ import type { SnapshotManifest } from '../../ports/workspace-provider.js';
 import type { ArtifactService } from '../../modules/artifacts/artifact.service.js';
 import type { SnapshotService } from '../../modules/snapshots/snapshot.service.js';
 import { DEMO_SNAPSHOT_HASH, demoInventory } from '../fake/demo-inventory.js';
+import { createRunFileProgress } from './run-file-progress.js';
 
 // Executor of analyze runs by source kind. Demo projects run the fixture
 // executor, then publish the bundled demo inventory as the run's artifact
@@ -38,12 +39,14 @@ export function createSourceRunExecutor(deps: {
   return {
     async execute(request) {
       const { run, signal, report } = request;
+      const files = createRunFileProgress(request.reportFiles);
       if (run.source.kind === 'fixture') {
         const result = await deps.fixture.execute(request);
         if (result.status !== 'succeeded') return result;
         // Cancel/timeout won while the stages ran: publish nothing.
         if (signal.aborted) return { status: 'stopped' };
         report({ stage: 'publish', sourceSnapshotId: result.sourceSnapshotId });
+        files.update({ phase: 'publish' });
         const outcome = await deps.artifacts.publishInventory({
           run,
           sourceSnapshotId: result.sourceSnapshotId,
@@ -61,24 +64,39 @@ export function createSourceRunExecutor(deps: {
 
       if (signal.aborted) return { status: 'stopped' };
       report({ stage: 'inventory', sourceSnapshotId: snapshotId });
+      // The snapshot part is complete: counted on the files it holds.
+      files.update({
+        phase: 'inventory',
+        filesTotal: manifest.fileCount,
+        filesSnapshotted: manifest.fileCount,
+        bytesDone: manifest.totalBytes,
+        bytesTotal: manifest.totalBytes,
+      });
       await deps.hooks?.beforeReadFiles?.();
-      const files = await stoppable(async () => {
+      const read = await stoppable(async () => {
         const read = await deps.snapshots.readFiles(manifest, signal);
         // The stored bytes no longer match the snapshot just checked.
         return read
           ? { status: 'read' as const, files: read }
           : { status: 'failed' as const, errorCode: 'INTERNAL_ERROR' as const };
       });
-      if (files.status !== 'read') return files;
+      if (read.status !== 'read') return read;
       const built = await deps.inventory.build(
-        { run, manifest, files: files.files },
+        { run, manifest, files: read.files },
         signal,
+        ({ analyzed, recentPaths }) => {
+          files.recent(recentPaths);
+          files.update({
+            filesAnalyzed: Math.min(analyzed, manifest.fileCount),
+          });
+        },
       );
       if (built.status !== 'prepared') return built;
 
       await deps.hooks?.beforePublish?.();
       if (signal.aborted) return { status: 'stopped' };
       report({ stage: 'publish', sourceSnapshotId: snapshotId });
+      files.update({ phase: 'publish', filesAnalyzed: manifest.fileCount });
       const outcome = await deps.artifacts.publishPrepared({
         run,
         sourceSnapshotId: snapshotId,
@@ -101,7 +119,27 @@ export function createSourceRunExecutor(deps: {
             ? { status: 'ready', snapshotId: run.sourceSnapshotId, manifest }
             : { status: 'failed', errorCode: 'INTERNAL_ERROR' };
         }
-        const outcome = await deps.snapshots.createForRun(run, signal);
+        const outcome = await deps.snapshots.createForRun(
+          run,
+          signal,
+          undefined,
+          (progress) => {
+            if (progress.phase === 'listing') {
+              files.update({ phase: 'listing' });
+              return;
+            }
+            files.update(
+              {
+                phase: 'snapshot',
+                filesSnapshotted: progress.filesDone,
+                filesTotal: progress.filesTotal,
+                bytesDone: progress.bytesDone,
+                bytesTotal: progress.bytesTotal,
+              },
+              progress.path ?? undefined,
+            );
+          },
+        );
         if (outcome.status !== 'published') return outcome;
         report({ stage: 'snapshot', sourceSnapshotId: outcome.snapshotId });
         return {

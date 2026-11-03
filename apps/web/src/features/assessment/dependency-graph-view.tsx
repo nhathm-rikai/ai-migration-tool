@@ -174,6 +174,10 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   // reader sees what changed without searching for it.
   const [recent, setRecent] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const clearFocus = useCallback(() => {
+    setFocus(null);
+    setRecent(null);
+  }, []);
 
   // Each request remembers what it draws; the canvas shows the one whose
   // layout finished last, so nodes and positions always match.
@@ -245,9 +249,9 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
         else next.add(box);
         return next;
       });
-      // A focused box that opens is no longer one node: nothing stays
-      // focused, so the graph is not left dimmed.
-      setFocus((current) => (current === box ? null : current));
+      // Opening/closing a box is the new point of attention. Drop the old
+      // selection, including a different folder's highlighted edges.
+      setFocus(null);
       setRecent(box);
       setPendingReveal(box);
     },
@@ -255,7 +259,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   );
   const setAllBoxes = (value: boolean) => {
     setOpen(new Set(value ? allBoxes(graph) : []));
-    setRecent(null);
+    clearFocus();
   };
   const boxes = useMemo(() => presentBoxes(graph), [graph]);
   const openBoxes = boxes.filter((box) => open.has(box));
@@ -315,12 +319,12 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     if (!expanded) return;
     const onEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
-      if (focus) setFocus(null);
-      else setExpanded(false);
+      clearFocus();
+      if (!focus) setExpanded(false);
     };
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
-  }, [expanded, focus]);
+  }, [expanded, focus, clearFocus]);
   const firstSize = useRef(true);
   useEffect(() => {
     if (firstSize.current) {
@@ -333,15 +337,16 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
     return () => cancelAnimationFrame(frame);
   }, [expanded, flow]);
 
-  const toggleFocus = useCallback(
-    (id: string) => setFocus((current) => (current === id ? null : id)),
-    [],
-  );
+  const toggleFocus = useCallback((id: string) => {
+    setRecent(null);
+    setFocus((current) => (current === id ? null : id));
+  }, []);
   // From the search, the panel or the table: focuses the node, shows it
   // (opening its folder, showing common modules) and brings it into view.
   const reveal = useCallback(
     (id: string) => {
       const node = byId.get(id);
+      setRecent(null);
       setFocus(id);
       if (node?.common) setShowCommon(true);
       const box = node ? boxOf(node) : null;
@@ -358,7 +363,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
   // window while full screen).
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || expanded) return;
-    setFocus(null);
+    clearFocus();
   };
 
   // Before useFloatingHost: the focused element is noted before the host
@@ -442,6 +447,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
                       title={copy.showBox(boxName(box, copy))}
                       aria-label={copy.showBox(boxName(box, copy))}
                       onClick={() => {
+                        setFocus(null);
                         setRecent(box);
                         setPendingReveal(box);
                       }}
@@ -475,7 +481,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
                 pending={layoutState.pending}
                 failed={layoutState.failed}
                 onFocus={toggleFocus}
-                onClear={() => setFocus(null)}
+                onClear={clearFocus}
               />
             </BoxToggle.Provider>
           </div>
@@ -496,11 +502,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
         </div>
         <aside className="dep-graph-side" aria-label={copy.commonTitle}>
           {focusedNode && (
-            <FocusCard
-              node={focusedNode}
-              copy={copy}
-              onClear={() => setFocus(null)}
-            />
+            <FocusCard node={focusedNode} copy={copy} onClear={clearFocus} />
           )}
           {focus !== null && !focusedNode && boxes.includes(focus) && (
             <BoxCard
@@ -509,7 +511,7 @@ function GraphTab({ graph }: { graph: DependencyGraph }) {
               copy={copy}
               open={open.has(focus)}
               onOpen={() => toggleBox(focus)}
-              onClear={() => setFocus(null)}
+              onClear={clearFocus}
             />
           )}
           <CommonPanel
@@ -858,6 +860,7 @@ function GraphCanvas({
           onNodeClick={(_event, node) => {
             if (node.type !== 'box' || node.data.box?.collapsed)
               onFocus(node.id);
+            else onClear();
           }}
           onPaneClick={onClear}
           proOptions={{ hideAttribution: true }}

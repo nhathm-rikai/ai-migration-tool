@@ -548,7 +548,8 @@ export const viMessages = {
       columnHints: {
         codeLines:
           'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
-        complexity: 'Độ phức tạp tham khảo, không dùng để tính công sức',
+        complexity:
+          'Độ phức tạp tham khảo; báo giá nháp dùng mức này làm hệ số',
       },
       state: {
         complete: 'Đầy đủ',
@@ -923,6 +924,88 @@ export const viMessages = {
       REVIEW_STALE:
         'Tài liệu này đã có phiên bản mới hơn. Tải lại trang để review đúng phiên bản.',
     },
+  },
+  quote: {
+    title: (project: string) => `Báo giá chuyển đổi ${project}`,
+    loading: 'Đang tải dữ liệu báo giá…',
+    loadFailed: 'Không đọc được kết quả phân tích để lập báo giá.',
+    emptyTitle: 'Chưa có tài liệu đã duyệt',
+    emptyHelp:
+      'Báo giá chỉ tính các program có tài liệu đã duyệt ở bước Review.',
+    emptyAction: 'Sang Review & duyệt',
+    lead: (programs: number, loc: number, documents: number) =>
+      `Dựa trên ${programs} program, ${loc.toLocaleString('en-US')} LoC, ${documents} tài liệu đã duyệt`,
+    draft:
+      'Bản nháp để tham khảo: hệ số complexity và năng suất chưa được kiểm chứng trên dự án thực tế. Người phụ trách cần rà soát trước khi gửi khách hàng.',
+    exportPdf: 'Xuất PDF',
+    exportExcel: 'Xuất Excel',
+    send: 'Gửi khách hàng',
+    sendLater: 'Chưa có trong bản này',
+    totalCost: 'Tổng chi phí',
+    costNote: 'Chưa gồm VAT · đã áp dụng AI assistance',
+    totalEffort: 'Tổng effort',
+    effortNote: (dev: string, mgmt: string) =>
+      `Dev ${dev} MM + PM/BrSE/Comtor ${mgmt} MM`,
+    duration: 'Thời gian dự kiến',
+    months: (months: number) => `${months} tháng`,
+    durationNote: (devs: number, saved: string) =>
+      `Team ${devs} dev · AI giảm ${saved} MM`,
+    paramsTitle: 'Tham số',
+    validity: (days: number) => `Hiệu lực ${days} ngày`,
+    quoteNumber: 'Số báo giá',
+    validityDays: 'Hiệu lực (ngày)',
+    scopeTitle: 'Hạng mục',
+    scopeHelp: '% effort so với Coding (100%)',
+    aiTitle: 'AI assistance',
+    aiHelp: 'giảm effort theo phase',
+    aiCode: 'DD & Coding',
+    aiTest: 'Kiểm thử (QA / QC)',
+    saved: (saved: string) => `Tiết kiệm ${saved} MM · BD không áp dụng giảm`,
+    devs: 'Số dev',
+    devsHelp: 'Dùng để tính timeline',
+    devsLess: 'Giảm số dev',
+    devsMore: 'Tăng số dev',
+    rolesTitle: 'Vai trò & đơn giá',
+    role: 'Vai trò',
+    rate: 'Đơn giá',
+    roles: { pm: 'PM', brse: 'BrSE', comtor: 'Comtor', dev: 'Dev / QA / QC' },
+    rolesHelp:
+      '% effort của PM / BrSE / Comtor tính trên effort dev (tài liệu + coding + kiểm thử). Dev, QA, QC dùng chung một đơn giá.',
+    formulaTitle: 'Công thức',
+    formula: [
+      'Effort gốc = Σ (LoC × hệ số complexity) / năng suất',
+      'Dev = BD + (DD + Coding) × (1 - AI) + Kiểm thử × (1 - AI test)',
+      'PM / BrSE / Comtor = % × Dev',
+      'Chi phí = Σ effort vai trò × đơn giá vai trò',
+    ],
+    phaseTitle: 'Effort theo giai đoạn',
+    phases: {
+      doc: 'Tài liệu',
+      code: 'Coding (migrate)',
+      test: 'Kiểm thử',
+      mgmt: 'PM / BrSE / Comtor',
+    },
+    scheduleTitle: 'Lịch triển khai dự kiến',
+    scheduleNote: (devs: number, months: number) =>
+      `Team ${devs} dev · ${months} tháng`,
+    moduleTitle: 'Chi tiết theo module',
+    factorNote:
+      'Hệ số theo mức complexity: Thấp (<45) ×0.8 · Trung bình (45–59) ×1.0 · Cao (60–69) ×1.3 · Rất cao (≥70) ×1.4',
+    module: 'Module',
+    programCount: 'Program',
+    complexity: 'Complexity TB',
+    factor: 'Hệ số',
+    effort: 'Effort (MM)',
+    cost: 'Chi phí',
+    shareColumn: 'Tỷ trọng',
+    total: 'Tổng',
+    assumptionsTitle: 'Giả định & phạm vi',
+    assumptions: (productivity: number) => [
+      `Năng suất chuẩn ${productivity.toLocaleString('en-US')} LoC / MM (trước khi áp dụng AI assistance), tính trên code riêng của program; module dùng chung chưa được tính.`,
+      'Chỉ gồm các program có tài liệu đã duyệt, không phải toàn bộ hệ thống.',
+      'AI assistance giảm effort DD, Coding và Kiểm thử; BD giữ nguyên effort.',
+      'Không bao gồm thay đổi nghiệp vụ, chỉ chuyển đổi tương đương chức năng.',
+    ],
   },
   errors: {
     unexpected: 'Có lỗi khi xử lý yêu cầu. Vui lòng thử lại.',

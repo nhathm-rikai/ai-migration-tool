@@ -57,12 +57,14 @@ export function ReviewStep({
   projectId,
   program: chosenProgram,
   headerSlot = null,
+  onReviewChanged,
   api,
 }: {
   projectId: string;
   program: string | null;
   // Place in the page header for the action next to the title.
   headerSlot?: HTMLElement | null;
+  onReviewChanged?: () => void;
   api: DocumentsApi;
 }) {
   const { messages } = useLocale();
@@ -155,6 +157,7 @@ export function ReviewStep({
           sha256: current.document.sha256,
         } as AddReviewEvent);
         setBoard(next);
+        onReviewChanged?.();
         return true;
       } catch (error) {
         setActionError(error);
@@ -163,7 +166,7 @@ export function ReviewStep({
         setBusy(false);
       }
     },
-    [api, projectId, current],
+    [api, projectId, current, onReviewChanged],
   );
 
   if (loadError !== null)
@@ -248,7 +251,7 @@ export function ReviewStep({
         createPortal(
           <Link
             className={allApproved ? 'button primary pop-in' : 'button'}
-            to={stepPath(projectId, 'quote')}
+            to={`${stepPath(projectId, 'quote')}?program=${encodeURIComponent(programs[0]?.program ?? '')}`}
           >
             {allApproved ? copy.createQuote : copy.previewQuote}
           </Link>,

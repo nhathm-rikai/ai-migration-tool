@@ -15,6 +15,7 @@ import {
 //   source registration.
 // - analysis: the newest succeeded run that published an inventory.
 // - documents: the project's latest document run succeeded.
+// - review: every document of the selected program is approved.
 // Lives in the app shell, so an active run is followed to its end whichever
 // step is open. Reads only (GET); never starts or changes anything.
 
@@ -27,9 +28,24 @@ export type ProjectProgress =
       // Run whose inventory the analysis step shows; null = none yet.
       analysisRunId: string | null;
       documentsWritten: boolean;
+      // Newest first, as on the review board.
+      reviewPrograms: ReviewProgramMark[];
       // Queued/running run being followed; null = none.
       activeRunId: string | null;
     };
+
+export type ReviewProgramMark = { program: string; approved: boolean };
+
+// The selected program, else the latest one: the same pick as the review step.
+export function isReviewDone(
+  programs: readonly ReviewProgramMark[],
+  selected: string | null,
+): boolean {
+  const mark = selected
+    ? programs.find((entry) => entry.program === selected)
+    : programs[0];
+  return mark?.approved ?? false;
+}
 
 // Walks the whole history, newest first, until a succeeded run with an
 // inventory or the last page.
@@ -114,8 +130,26 @@ export function useProjectProgress(
           () => false,
         )
       : Promise.resolve(false);
-    void Promise.all([source, analysis, active, documents]).then(
-      ([sourceSaved, analysisRunId, activeRunId, documentsWritten]) => {
+    const approved = documentsApi
+      ? documentsApi.reviewBoard(projectId, controller.signal).then(
+          (board): ReviewProgramMark[] =>
+            board.programs.map((item) => ({
+              program: item.program,
+              approved:
+                item.documents.length > 0 &&
+                item.documents.every((doc) => doc.status === 'approved'),
+            })),
+          (): ReviewProgramMark[] => [],
+        )
+      : Promise.resolve<ReviewProgramMark[]>([]);
+    void Promise.all([source, analysis, active, documents, approved]).then(
+      ([
+        sourceSaved,
+        analysisRunId,
+        activeRunId,
+        documentsWritten,
+        reviewPrograms,
+      ]) => {
         if (!controller.signal.aborted)
           setTagged({
             projectId,
@@ -124,6 +158,7 @@ export function useProjectProgress(
               sourceSaved,
               analysisRunId,
               documentsWritten,
+              reviewPrograms,
               activeRunId,
             },
           });

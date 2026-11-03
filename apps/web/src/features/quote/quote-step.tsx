@@ -28,7 +28,11 @@ import {
   type QuoteUnitDays,
   type QuoteProgram,
 } from './quote-model';
-import { buildXlsx, type Cell } from './xlsx';
+import { branding } from '../../app/branding';
+import { QuoteDocument } from './quote-document';
+import { renderQuotePdf } from './quote-pdf';
+import { buildQuoteSheets } from './quote-workbook';
+import { buildWorkbook } from './xlsx';
 
 // Step 5 (prototype tpl-Quote). A draft estimate of every program of the
 // latest analysis; every number comes from stored analysis data and the
@@ -85,12 +89,15 @@ function issueQuoteNumber(projectId: string): string {
   }
 }
 
-function saveFile(name: string, bytes: Uint8Array<ArrayBuffer>) {
-  const url = URL.createObjectURL(
-    new Blob([bytes], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    }),
-  );
+const XLSX_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function saveFile(
+  name: string,
+  bytes: Uint8Array<ArrayBuffer>,
+  type = XLSX_TYPE,
+) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
   const link = document.createElement('a');
   link.href = url;
   link.download = name;
@@ -243,6 +250,7 @@ export function QuoteStep({
   const hasQuote = (scope?.programs.length ?? 0) > 0;
   const [quoteNumber, setQuoteNumber] = useState('');
   const [programFilter, setProgramFilter] = useState('');
+  const [pdfBusy, setPdfBusy] = useState(false);
   // Keys of the open rows: `m:<module>` shows its programs, `p:<path>` the
   // effort of that program by work item.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
@@ -408,80 +416,52 @@ export function QuoteStep({
     label: copy.roles[key],
   }));
 
+  // 見積書_<project>_<number without the QT- prefix>, without characters a file name cannot hold.
+  const fileName = (title: string) =>
+    [title, projectName, quoteNumber.replace(/^QT-/, '')]
+      .filter(Boolean)
+      .join('_')
+      .replace(/[\\/:*?"<>|\s]+/g, '_');
+
+  async function exportPdf() {
+    const source = document.querySelector<HTMLElement>('.quote-doc-root');
+    if (!source || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const bytes = await renderQuotePdf(
+        source,
+        `${branding.logoAlt} · ${quoteNumber}`,
+      );
+      saveFile(`${fileName('見積書')}.pdf`, bytes, 'application/pdf');
+    } catch {
+      // The button comes back; the screen itself is unaffected.
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   function exportExcel() {
     if (!result || !scope) return;
-    const rows: Cell[][] = [
-      [copy.title(projectName)],
-      [copy.quoteNumber, quoteNumber],
-      [copy.validityDays, QUOTE_VALIDITY_DAYS],
-      [],
-      [copy.totalCost, Math.round(result.totalCost)],
-      [copy.totalEffort, Number(mm(result.totalMM))],
-      [copy.duration, result.months],
-      [],
-      [copy.phaseTitle, 'MM', copy.cost],
-      ...result.phases.map((phase): Cell[] => [
-        phaseName(phase.id),
-        Number(mm(phase.mm)),
-        Math.round(phase.cost),
-      ]),
-      [],
-      [
-        copy.module,
-        copy.programCount,
-        'LoC',
-        copy.complexity,
-        copy.effort,
-        copy.cost,
-      ],
-      ...result.modules.map((row): Cell[] => [
-        moduleName(row.name),
-        row.programs,
-        row.codeLines,
-        row.programs > 0 ? row.score : null,
-        Number(mm(row.mm)),
-        Math.round(row.cost),
-      ]),
-      [
-        copy.total,
-        result.programs,
-        result.codeLines,
-        result.averageScore,
-        Number(mm(result.totalMM)),
-        Math.round(result.totalCost),
-      ],
-      [],
-      [
-        copy.programTitle,
-        copy.module,
-        'LoC',
-        copy.complexity,
-        copy.effort,
-        copy.cost,
-      ],
-      ...result.rows.map((row): Cell[] => [
-        row.name,
-        moduleOf(row.projectPath),
-        row.codeLines,
-        row.score,
-        Number(row.mm.toFixed(2)),
-        Math.round(row.cost),
-      ]),
-      [],
-      [copy.formulaTitle],
-      ...formulaLines.map((line): Cell[] => [line]),
-      [],
-      [copy.unitsTitle, copy.unitColumns.unit, copy.unitColumns.days],
-      ...unitRows.map((row): Cell[] => [row.part, row.unit, row.days]),
-      [],
-      [copy.assumptionsTitle],
-      ...copy.assumptions().map((line): Cell[] => [line]),
-    ];
-    saveFile(`${quoteNumber || 'quote'}.xlsx`, buildXlsx('Quote', rows));
+    const sheets = buildQuoteSheets({
+      projectName,
+      quoteNumber,
+      params,
+      result,
+    });
+    saveFile(`${fileName('見積書')}.xlsx`, buildWorkbook(sheets));
   }
 
   return (
     <div className="quote">
+      {createPortal(
+        <QuoteDocument
+          projectName={projectName}
+          quoteNumber={quoteNumber}
+          params={params}
+          result={result}
+        />,
+        document.body,
+      )}
       {eyebrowSlot &&
         quoteNumber &&
         createPortal(
@@ -494,7 +474,8 @@ export function QuoteStep({
             <button
               type="button"
               className="button"
-              onClick={() => window.print()}
+              onClick={() => void exportPdf()}
+              disabled={pdfBusy}
             >
               {copy.exportPdf}
             </button>
@@ -797,7 +778,7 @@ export function QuoteStep({
           </div>
         </div>
       </section>
-      <section className="doc-card quote-table">
+      <section className="doc-card quote-table print-hide">
         <header>
           <h2>{copy.moduleTitle}</h2>
           <small>{copy.shareNote}</small>

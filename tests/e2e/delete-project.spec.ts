@@ -72,6 +72,24 @@ for (const locale of ['vi', 'ja'] as const) {
           card!.x + card!.width,
         );
         expect(button!.x).toBeGreaterThanOrEqual(chip!.x + chip!.width);
+        // The confirm overlay covers the whole viewport, not just the page box.
+        await item.locator('.recent-delete').click();
+        const backdrop = page.locator('.modal-backdrop');
+        await expect(backdrop).toBeVisible();
+        expect(await backdrop.boundingBox()).toEqual({
+          x: 0,
+          y: 0,
+          width,
+          height: 800,
+        });
+        const dialogBox = await page.getByRole('alertdialog').boundingBox();
+        expect(dialogBox!.x + dialogBox!.width / 2).toBeCloseTo(width / 2, 0);
+        expect(dialogBox!.y + dialogBox!.height / 2).toBeCloseTo(400, 0);
+        await page.screenshot({
+          path: `${process.env.E2E_OUTPUT_DIR}/recent-delete-dialog-${locale}-${width}.png`,
+        });
+        await page.keyboard.press('Escape');
+        await expect(backdrop).toBeHidden();
       }
       await page
         .locator('.recent-item')

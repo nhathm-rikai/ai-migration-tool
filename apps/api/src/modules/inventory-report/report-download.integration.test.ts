@@ -15,9 +15,12 @@ import { createTestApp, trustedHeaders } from '../../testing/test-app.js';
 import { unzip } from '../../testing/zip-reader.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
 import { inventoryReportSheets } from './inventory-report-workbook.js';
+import { buildCustomerReport } from './customer-report.js';
+import { SHEET_NAMES } from './customer-report-constants.js';
 import {
   contentDisposition,
   createReportDownloadService,
+  customerReportFileName,
   reportFileName,
 } from './report-download.service.js';
 
@@ -147,6 +150,47 @@ describe('Assessment report download (AR01)', { timeout: 20_000 }, () => {
     expect(json.headers['cache-control']).toBe('no-store');
   });
 
+  // AR02-AC06/AC07 (API): the customer workbook of the same version.
+  it('returns the six-sheet customer workbook and its json (AR02)', async () => {
+    const { ctx, project, ref } = await setup('Demo');
+    const url = (format: string) =>
+      `/api/v1/projects/${project.id}/artifacts/${ref.id}/versions/1/customer-report?format=${format}`;
+    const xlsx = await ctx.inject(url('xlsx'));
+    expect(xlsx.statusCode).toBe(200);
+    const disposition = String(xlsx.headers['content-disposition']);
+    const [, encoded = ''] = disposition.split("filename*=UTF-8''");
+    expect(decodeURIComponent(encoded)).toMatch(
+      new RegExp('^アセスメント報告書_Demo_[0-9]{8}[.]xlsx$'),
+    );
+    expect(disposition).toMatch(
+      new RegExp('^attachment; filename="[A-Za-z0-9._-]+"'),
+    );
+    const workbook = unzip(xlsx.rawPayload).get('xl/workbook.xml') ?? '';
+    expect(
+      [...workbook.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]),
+    ).toEqual([...SHEET_NAMES]);
+    expect(xlsx.headers['cache-control']).toBe('no-store');
+
+    const json = await ctx.inject(url('json'));
+    expect(json.statusCode).toBe(200);
+    const expected = buildCustomerReport(demoInventory, {
+      mode: 'demo',
+      projectId: project.id,
+      projectName: 'Demo',
+      runId: ref.runId,
+      artifactId: ref.id,
+      artifactVersion: 1,
+      createdAt: ref.createdAt,
+    });
+    expect(json.json()).toEqual(JSON.parse(JSON.stringify(expected)));
+    // Same guards as the technical report: no latest, no foreign project.
+    expect(
+      (await ctx.inject(url('json').replace('/versions/1/', '/versions/2/')))
+        .statusCode,
+    ).toBe(404);
+    expect((await ctx.inject(url('csv'))).statusCode).toBe(400);
+  });
+
   // AR01-AC02
   it('rejects a foreign project, unknown artifact and unknown version', async () => {
     const { ctx, project, ref } = await setup();
@@ -254,6 +298,20 @@ describe('createReportDownloadService', () => {
     expect(String(v2.body)).toContain('MARKTWO');
     expect(String(v2.body)).not.toContain('MARKONE');
     await expect(service.build('p', 'a', '3', 'json')).rejects.toThrow();
+  });
+});
+
+describe('customer report file name', () => {
+  it('is アセスメント報告書_<project>_<date> with an ASCII fallback', () => {
+    const name = customerReportFileName(
+      '受注/管理',
+      new Date('2026-11-06T10:00:00Z'),
+      'xlsx',
+    );
+    expect(name).toBe('アセスメント報告書_受注_管理_20261106.xlsx');
+    expect(contentDisposition(name)).toMatch(
+      new RegExp('^attachment; filename="[ -~]+"; filename[*]=UTF-8'),
+    );
   });
 });
 

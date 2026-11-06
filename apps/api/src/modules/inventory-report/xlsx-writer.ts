@@ -23,6 +23,11 @@ export type Sheet = {
   tabColor?: string;
   // A title line above the table (then one blank row, then the header).
   title?: string;
+  // Reading notes under the title, one row each (then one blank row).
+  notes?: readonly string[];
+  // Data rows (0-based) written in the header style: a further table under
+  // the first one, with its own column labels.
+  subHeaderRows?: readonly number[];
   // Data rows (0-based) shown as section headings; no autofilter then.
   headingRows?: readonly number[];
   // Data rows (0-based) whose first cell links to the sheet it names.
@@ -56,6 +61,7 @@ const STYLE = {
   key: 8,
   wrapped: 9,
   link: 10,
+  note: 11,
 } as const;
 
 // Excel limits per worksheet.
@@ -79,12 +85,12 @@ export class SheetLimitError extends Error {
 }
 
 // Row index of the header: below the optional title and one blank row.
-const headerRowOf = (sheet: Pick<Sheet, 'title'>) =>
-  sheet.title === undefined ? 1 : TITLE_ROWS + 1;
+const headerRowOf = (sheet: Pick<Sheet, 'title' | 'notes'>) =>
+  sheet.title === undefined ? 1 : TITLE_ROWS + 1 + (sheet.notes?.length ?? 0);
 
 // Checked before any XML is built, so an oversized table fails fast.
 export function assertSheetFits(
-  sheet: Pick<Sheet, 'name' | 'title'> & {
+  sheet: Pick<Sheet, 'name' | 'title' | 'notes'> & {
     rows: { length: number };
     columns: { length: number };
   },
@@ -146,12 +152,19 @@ function sheetXml(sheet: Sheet): string {
   const width = sheet.columns.length;
   const headerRow = headerRowOf(sheet);
   const headings = new Set(sheet.headingRows ?? []);
+  const subHeaders = new Set(sheet.subHeaderRows ?? []);
   const rowsXml: string[] = [];
   if (sheet.title !== undefined) {
     rowsXml.push(
       `<row r="1" ht="24" customHeight="1">${cellXml('A1', sheet.title, { text: STYLE.title, empty: STYLE.title })}</row>`,
     );
   }
+  (sheet.notes ?? []).forEach((note, index) => {
+    const r = 2 + index;
+    rowsXml.push(
+      `<row r="${r}">${cellXml(`A${r}`, note, { text: STYLE.note, empty: STYLE.note })}</row>`,
+    );
+  });
   const header = sheet.columns
     .map((column, c) =>
       cellXml(`${columnName(c)}${headerRow}`, column.header, {
@@ -168,18 +181,21 @@ function sheetXml(sheet: Sheet): string {
         `Sheet ${sheet.name} row ${index + 2} has ${row.length} cells, expected ${width}`,
       );
     const heading = headings.has(index);
+    const subHeader = subHeaders.has(index);
     const cells = row
       .map((value, c) => {
         const column = sheet.columns[c];
-        const kind: CellKind = heading
-          ? { text: STYLE.heading, empty: STYLE.heading }
-          : sheet.linkRows?.has(index) && c === 0
-            ? { text: STYLE.link, empty: STYLE.text }
-            : c === 0 && sheet.boldFirstColumn
-              ? { text: STYLE.key, empty: STYLE.key }
-              : column?.wrap
-                ? { text: STYLE.wrapped, empty: STYLE.text }
-                : { text: STYLE.text, empty: STYLE.text };
+        const kind: CellKind = subHeader
+          ? { text: STYLE.header, empty: STYLE.header }
+          : heading
+            ? { text: STYLE.heading, empty: STYLE.heading }
+            : sheet.linkRows?.has(index) && c === 0
+              ? { text: STYLE.link, empty: STYLE.text }
+              : c === 0 && sheet.boldFirstColumn
+                ? { text: STYLE.key, empty: STYLE.key }
+                : column?.wrap
+                  ? { text: STYLE.wrapped, empty: STYLE.text }
+                  : { text: STYLE.text, empty: STYLE.text };
         return cellXml(`${columnName(c)}${r}`, value, kind);
       })
       .join('');
@@ -225,12 +241,13 @@ const BORDER = 'borderId="1"';
 const STYLES_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-  '<fonts count="5">' +
+  '<fonts count="6">' +
   '<font><sz val="11"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="16"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' +
   '<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font>' +
+  '<font><i/><sz val="10"/><color rgb="FF595959"/><name val="Calibri"/></font>' +
   '</fonts>' +
   '<fills count="4"><fill><patternFill patternType="none"/></fill>' +
   '<fill><patternFill patternType="gray125"/></fill>' +
@@ -240,7 +257,7 @@ const STYLES_XML =
   '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right>' +
   '<top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="11">' +
+  '<cellXfs count="12">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   `<xf numFmtId="0" fontId="1" fillId="2" ${BORDER} xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>` +
   `<xf numFmtId="49" fontId="0" fillId="0" ${BORDER} xfId="0" quotePrefix="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
@@ -252,6 +269,7 @@ const STYLES_XML =
   `<xf numFmtId="0" fontId="2" fillId="0" ${BORDER} xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
   `<xf numFmtId="0" fontId="0" fillId="0" ${BORDER} xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>` +
   `<xf numFmtId="0" fontId="4" fillId="0" ${BORDER} xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
+  '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
   '</cellXfs>' +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   '</styleSheet>';

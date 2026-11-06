@@ -581,6 +581,7 @@ describe('C01 operation table', () => {
       listRunArtifacts: fixtures.artifactListFixture,
       getArtifactVersion: fixtures.mappedInventoryArtifactFixture,
       exportInventoryReport: new Uint8Array([0x50, 0x4b]),
+      exportCustomerReport: new Uint8Array([0x50, 0x4b]),
     } satisfies Record<keyof typeof ANALYZE_API_OPERATIONS, unknown>;
     for (const [id, sample] of Object.entries(samples)) {
       const operation =

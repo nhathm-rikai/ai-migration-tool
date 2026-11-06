@@ -207,6 +207,22 @@ export const ANALYZE_API_OPERATIONS = {
       'REPORT_TOO_LARGE',
     ],
   },
+  // Customer assessment report (AR02): the six-sheet Japanese workbook, or
+  // its JSON, of the same exact inventory version.
+  exportCustomerReport: {
+    method: 'GET',
+    path: `${ProjectsPath}/artifacts/:artifactId/versions/:version/customer-report`,
+    successStatuses: [200],
+    params: ArtifactVersionParamsSchema,
+    querystring: InventoryReportQuerySchema,
+    response: Type.Unknown(),
+    contentType: 'attachment',
+    errorCodes: [
+      ...PROJECT_READ_ERRORS,
+      'ARTIFACT_NOT_FOUND',
+      'REPORT_TOO_LARGE',
+    ],
+  },
 } as const satisfies Record<string, Operation>;
 
 export type AnalyzeOperationId = keyof typeof ANALYZE_API_OPERATIONS;

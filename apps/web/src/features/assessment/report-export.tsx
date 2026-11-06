@@ -80,7 +80,11 @@ export function ReportExportButton({
           failed.kind === 'http' &&
           failed.code === 'ARTIFACT_NOT_FOUND'
             ? messages.assessment.errors.ARTIFACT_NOT_FOUND
-            : copy.failed}
+            : failed instanceof ApiError &&
+                failed.kind === 'http' &&
+                failed.code === 'REPORT_TOO_LARGE'
+              ? copy.tooLarge
+              : copy.failed}
         </p>
       )}
     </>

@@ -201,7 +201,11 @@ export const ANALYZE_API_OPERATIONS = {
     // The bytes are not validated against a schema (they are a file).
     response: Type.Unknown(),
     contentType: 'attachment',
-    errorCodes: [...PROJECT_READ_ERRORS, 'ARTIFACT_NOT_FOUND'],
+    errorCodes: [
+      ...PROJECT_READ_ERRORS,
+      'ARTIFACT_NOT_FOUND',
+      'REPORT_TOO_LARGE',
+    ],
   },
 } as const satisfies Record<string, Operation>;
 

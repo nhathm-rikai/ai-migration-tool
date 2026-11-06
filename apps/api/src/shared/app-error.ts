@@ -95,6 +95,11 @@ const RUN_ERROR_DEFINITIONS = {
     status: S.REVIEW_STALE,
     message: 'This document version is no longer the one under review.',
   },
+  REPORT_TOO_LARGE: {
+    status: S.REPORT_TOO_LARGE,
+    message:
+      'The report does not fit an Excel worksheet. Download the JSON report instead.',
+  },
   PROJECT_BUSY: {
     status: S.PROJECT_BUSY,
     message: 'The project has a run in progress; stop it before deleting.',

@@ -8,12 +8,29 @@ import { crc32, deflateRawSync } from 'node:zlib';
 
 export type CellValue = string | number | null;
 
-export type SheetColumn = { header: string; width?: number };
+export type SheetColumn = {
+  header: string;
+  width?: number;
+  // Long text goes over several lines instead of running on.
+  wrap?: boolean;
+};
 
 export type Sheet = {
   name: string;
   columns: readonly SheetColumn[];
   rows: readonly (readonly CellValue[])[];
+  // ARGB colour of the sheet tab (`FF1F3864`), for grouping.
+  tabColor?: string;
+  // A title line above the table (then one blank row, then the header).
+  title?: string;
+  // Data rows (0-based) shown as section headings; no autofilter then.
+  headingRows?: readonly number[];
+  // Data rows (0-based) whose first cell links to the sheet it names.
+  linkRows?: ReadonlyMap<number, string>;
+  // First column in bold (key/value layout).
+  boldFirstColumn?: boolean;
+  // Autofilter on the header; default on.
+  filter?: boolean;
 };
 
 // Excel's limit per cell; longer text is cut and marked (JSON keeps it all).
@@ -27,9 +44,55 @@ const SHEET_NAME = /^[^[\]:*?/\\]{1,31}$/;
 // Characters added to a header's length for bold text and the filter button.
 const HEADER_MARGIN = 4;
 
-// Style indexes in styles.xml.
-const STYLE_HEADER = 1;
-const STYLE_QUOTED = 2;
+// Style indexes in styles.xml (cellXfs order).
+const STYLE = {
+  header: 1,
+  quoted: 2,
+  text: 3,
+  integer: 4,
+  decimal: 5,
+  heading: 6,
+  title: 7,
+  key: 8,
+  wrapped: 9,
+  link: 10,
+} as const;
+
+// Excel limits per worksheet.
+export const MAX_SHEET_ROWS = 1_048_576;
+export const MAX_SHEET_COLUMNS = 16_384;
+// Widest column the layout asks for; longer text runs on (wrap is opt-in).
+export const MAX_COLUMN_WIDTH = 60;
+const TITLE_ROWS = 2;
+
+export class SheetLimitError extends Error {
+  constructor(
+    readonly sheet: string,
+    readonly rows: number,
+    readonly columns: number,
+  ) {
+    super(
+      `Sheet ${sheet} needs ${rows} rows and ${columns} columns; a worksheet holds at most ${MAX_SHEET_ROWS} rows and ${MAX_SHEET_COLUMNS} columns`,
+    );
+    this.name = 'SheetLimitError';
+  }
+}
+
+// Row index of the header: below the optional title and one blank row.
+const headerRowOf = (sheet: Pick<Sheet, 'title'>) =>
+  sheet.title === undefined ? 1 : TITLE_ROWS + 1;
+
+// Checked before any XML is built, so an oversized table fails fast.
+export function assertSheetFits(
+  sheet: Pick<Sheet, 'name' | 'title'> & {
+    rows: { length: number };
+    columns: { length: number };
+  },
+): void {
+  const rows = headerRowOf(sheet) + sheet.rows.length;
+  if (rows > MAX_SHEET_ROWS || sheet.columns.length > MAX_SHEET_COLUMNS)
+    throw new SheetLimitError(sheet.name, rows, sheet.columns.length);
+}
 
 function escapeXml(text: string): string {
   return text
@@ -47,78 +110,148 @@ export function columnName(index: number): string {
   return name;
 }
 
-// Wide enough for the whole (bold) header on one line; a narrower requested
-// width would cut the header off.
+// Wide enough for the whole (bold) header on one line, never past the
+// maximum: a narrower requested width would cut the header off.
 export function columnWidth(column: SheetColumn): number {
-  return Math.max(column.width ?? 14, column.header.length + HEADER_MARGIN);
+  return Math.min(
+    MAX_COLUMN_WIDTH,
+    Math.max(column.width ?? 14, column.header.length + HEADER_MARGIN),
+  );
 }
 
-function cellXml(ref: string, value: CellValue, header: boolean): string {
-  // An empty string is written as an empty cell.
-  if (value === null || value === '') return '';
+type CellKind = {
+  // Style of a text cell and of an empty one (empty cells keep borders).
+  text: number;
+  empty: number;
+};
+
+function cellXml(ref: string, value: CellValue, kind: CellKind): string {
+  // An empty string is written as an empty (but styled) cell.
+  if (value === null || value === '')
+    return `<c r="${ref}" s="${kind.empty}"/>`;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`Cell ${ref} is not finite`);
-    return `<c r="${ref}"><v>${value}</v></c>`;
+    const style = Number.isInteger(value) ? STYLE.integer : STYLE.decimal;
+    return `<c r="${ref}" s="${style}"><v>${value}</v></c>`;
   }
   const text =
     value.length > MAX_CELL_TEXT
       ? value.slice(0, MAX_CELL_TEXT - TRUNCATED.length) + TRUNCATED
       : value;
-  const style = header
-    ? ` s="${STYLE_HEADER}"`
-    : FORMULA_START.test(text)
-      ? ` s="${STYLE_QUOTED}"`
-      : '';
-  return `<c r="${ref}" t="inlineStr"${style}><is><t xml:space="preserve">${escapeXml(text)}</t></is></c>`;
+  const style = FORMULA_START.test(text) ? STYLE.quoted : kind.text;
+  return `<c r="${ref}" t="inlineStr" s="${style}"><is><t xml:space="preserve">${escapeXml(text)}</t></is></c>`;
 }
 
 function sheetXml(sheet: Sheet): string {
   const width = sheet.columns.length;
-  const rows = [sheet.columns.map((column) => column.header), ...sheet.rows];
-  const rowsXml = rows.map((row, r) => {
+  const headerRow = headerRowOf(sheet);
+  const headings = new Set(sheet.headingRows ?? []);
+  const rowsXml: string[] = [];
+  if (sheet.title !== undefined) {
+    rowsXml.push(
+      `<row r="1" ht="24" customHeight="1">${cellXml('A1', sheet.title, { text: STYLE.title, empty: STYLE.title })}</row>`,
+    );
+  }
+  const header = sheet.columns
+    .map((column, c) =>
+      cellXml(`${columnName(c)}${headerRow}`, column.header, {
+        text: STYLE.header,
+        empty: STYLE.header,
+      }),
+    )
+    .join('');
+  rowsXml.push(`<row r="${headerRow}">${header}</row>`);
+  sheet.rows.forEach((row, index) => {
+    const r = headerRow + 1 + index;
     if (row.length !== width)
       throw new Error(
-        `Sheet ${sheet.name} row ${r + 1} has ${row.length} cells, expected ${width}`,
+        `Sheet ${sheet.name} row ${index + 2} has ${row.length} cells, expected ${width}`,
       );
+    const heading = headings.has(index);
     const cells = row
-      .map((value, c) => cellXml(`${columnName(c)}${r + 1}`, value, r === 0))
+      .map((value, c) => {
+        const column = sheet.columns[c];
+        const kind: CellKind = heading
+          ? { text: STYLE.heading, empty: STYLE.heading }
+          : sheet.linkRows?.has(index) && c === 0
+            ? { text: STYLE.link, empty: STYLE.text }
+            : c === 0 && sheet.boldFirstColumn
+              ? { text: STYLE.key, empty: STYLE.key }
+              : column?.wrap
+                ? { text: STYLE.wrapped, empty: STYLE.text }
+                : { text: STYLE.text, empty: STYLE.text };
+        return cellXml(`${columnName(c)}${r}`, value, kind);
+      })
       .join('');
-    return `<row r="${r + 1}">${cells}</row>`;
+    rowsXml.push(`<row r="${r}">${cells}</row>`);
   });
-  const lastCell = `${columnName(width - 1)}${rows.length}`;
+  const lastRow = headerRow + sheet.rows.length;
   const cols = sheet.columns
     .map(
       (column, c) =>
         `<col min="${c + 1}" max="${c + 1}" width="${columnWidth(column)}" customWidth="1"/>`,
     )
     .join('');
+  const links = [...(sheet.linkRows ?? [])]
+    .map(
+      ([index, target]) =>
+        `<hyperlink ref="A${headerRow + 1 + index}" location="${escapeXml(`'${target.replaceAll("'", "''")}'!A1`)}" display="${escapeXml(target)}"/>`,
+    )
+    .join('');
   return (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    '<sheetViews><sheetView workbookViewId="0">' +
-    '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
+    (sheet.tabColor
+      ? `<sheetPr><tabColor rgb="${sheet.tabColor}"/></sheetPr>`
+      : '') +
+    '<sheetViews><sheetView workbookViewId="0" showGridLines="0">' +
+    `<pane ySplit="${headerRow}" topLeftCell="A${headerRow + 1}" activePane="bottomLeft" state="frozen"/>` +
     '</sheetView></sheetViews>' +
     `<cols>${cols}</cols>` +
     `<sheetData>${rowsXml.join('')}</sheetData>` +
-    `<autoFilter ref="A1:${lastCell}"/>` +
+    (sheetFilters(sheet)
+      ? `<autoFilter ref="A${headerRow}:${columnName(width - 1)}${lastRow}"/>`
+      : '') +
+    (links ? `<hyperlinks>${links}</hyperlinks>` : '') +
     '</worksheet>'
   );
 }
 
+// Section headings and the index sheet are read, not filtered.
+const sheetFilters = (sheet: Sheet) =>
+  sheet.filter !== false && (sheet.headingRows ?? []).length === 0;
+
+const BORDER = 'borderId="1"';
 const STYLES_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-  '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
-  '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
-  '<fills count="3"><fill><patternFill patternType="none"/></fill>' +
+  '<fonts count="5">' +
+  '<font><sz val="11"/><name val="Calibri"/></font>' +
+  '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
+  '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
+  '<font><b/><sz val="16"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' +
+  '<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font>' +
+  '</fonts>' +
+  '<fills count="4"><fill><patternFill patternType="none"/></fill>' +
   '<fill><patternFill patternType="gray125"/></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/></patternFill></fill>' +
   '<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/></patternFill></fill></fills>' +
-  '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+  '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right>' +
+  '<top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="3">' +
+  '<cellXfs count="11">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
-  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
-  '<xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" quotePrefix="1" applyNumberFormat="1"/>' +
+  `<xf numFmtId="0" fontId="1" fillId="2" ${BORDER} xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>` +
+  `<xf numFmtId="49" fontId="0" fillId="0" ${BORDER} xfId="0" quotePrefix="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
+  `<xf numFmtId="0" fontId="0" fillId="0" ${BORDER} xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
+  `<xf numFmtId="3" fontId="0" fillId="0" ${BORDER} xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf>` +
+  `<xf numFmtId="4" fontId="0" fillId="0" ${BORDER} xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf>` +
+  `<xf numFmtId="0" fontId="2" fillId="3" ${BORDER} xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>` +
+  '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  `<xf numFmtId="0" fontId="2" fillId="0" ${BORDER} xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
+  `<xf numFmtId="0" fontId="0" fillId="0" ${BORDER} xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>` +
+  `<xf numFmtId="0" fontId="4" fillId="0" ${BORDER} xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
   '</cellXfs>' +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   '</styleSheet>';
@@ -132,6 +265,7 @@ function workbookParts(sheets: readonly Sheet[]): [string, string][] {
       throw new Error(`Duplicate sheet name: ${sheet.name}`);
     if (sheet.columns.length === 0)
       throw new Error(`Sheet ${sheet.name} has no columns`);
+    assertSheetFits(sheet);
     names.add(sheet.name.toLowerCase());
   }
   const sheetEntries = sheets.map((sheet, i) => ({
@@ -158,6 +292,20 @@ function workbookParts(sheets: readonly Sheet[]): [string, string][] {
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
     '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
     '</Relationships>';
+  const filtered = sheetEntries.flatMap((entry, i) =>
+    sheetFilters(entry.sheet) ? [{ entry, i }] : [],
+  );
+  const definedNames =
+    filtered.length === 0
+      ? ''
+      : '<definedNames>' +
+        filtered
+          .map(
+            ({ entry, i }) =>
+              `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${escapeXml(entry.sheet.name.replaceAll("'", "''"))}'!$A$${headerRowOf(entry.sheet)}:$${columnName(entry.sheet.columns.length - 1)}$${headerRowOf(entry.sheet) + entry.sheet.rows.length}</definedName>`,
+          )
+          .join('') +
+        '</definedNames>';
   const workbook =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
@@ -168,14 +316,9 @@ function workbookParts(sheets: readonly Sheet[]): [string, string][] {
           `<sheet name="${escapeXml(entry.sheet.name)}" sheetId="${i + 1}" r:id="${entry.rel}"/>`,
       )
       .join('') +
-    '</sheets><definedNames>' +
-    sheetEntries
-      .map(
-        (entry, i) =>
-          `<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${escapeXml(entry.sheet.name.replaceAll("'", "''"))}'!$A$1:$${columnName(entry.sheet.columns.length - 1)}$${entry.sheet.rows.length + 1}</definedName>`,
-      )
-      .join('') +
-    '</definedNames></workbook>';
+    '</sheets>' +
+    definedNames +
+    '</workbook>';
   const workbookRels =
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +

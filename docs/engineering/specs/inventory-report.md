@@ -24,7 +24,15 @@
 | `totals` | `perProgramSum` và `unique` (mục 3). | — |
 | `warnings` | Mục 4. | program/file/dòng nếu có |
 
-XLSX: một sheet mỗi bảng theo thứ tự trên, header in đậm, freeze dòng đầu, có autofilter; danh sách nối bằng `; ` trong một ô. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
+XLSX (AR01): 14 sheet theo nhóm cố định, tab tô màu theo nhóm. `README` đứng đầu: tên báo cáo, dự án, nguồn gốc dữ liệu, rồi bảng mô tả từng sheet (nội dung, cột khóa, số dòng, link tới sheet). Overview (`Summary`, `Totals`) → Program level (`Programs`, `Members`, `ExternalRefs`, `ExternalAPIs`) → Detail (`Files`, `Procedures`, `Calls`, `CRUD`, `DynamicSQL`, `ConcatenatedSQL`) → `Warnings`. `Summary` là bảng khóa/giá trị chia mục (Provenance, Source and versions, Scope and size, Warnings). Kiểu bảng: header chữ trắng đậm nền xanh đậm, viền mảnh, freeze dòng header, autofilter (trừ `README`/`Summary`), số nguyên `#,##0`, số thập phân `#,##0.00`, chữ căn trái, độ rộng cột từ độ dài header + 4 đến tối đa 60, chỉ cột mô tả dài (README, Summary) xuống dòng; ô trống vẫn có viền, không ghi chuỗi rỗng. Danh sách nối bằng `; ` trong một ô.
+
+Nguồn gốc (DATA-08): khi xuất qua API, `source.origin` trong JSON và mục Provenance của `Summary`/`README` ghi `mode` (`demo` hiện rõ "DEMO: bundled sample data, not a customer system"), `projectId`, tên dự án, `runId`, `artifactId`, `artifactVersion`, `createdAt` của artifact, cùng `snapshotHash` và `reportVersion`; CLI để `origin: null`.
+
+Giới hạn Excel: một sheet tối đa 1.048.576 dòng (tính cả header và dòng tiêu đề) và 16.384 cột. Kiểm trước khi dựng XML; vượt giới hạn thì API trả `REPORT_TOO_LARGE` (422) và người dùng tải JSON, không có file XLSX lỗi.
+
+Che đường dẫn tuyệt đối: dấu ngoặc kép/đơn và khoảng trắng bao quanh được bỏ trước khi kiểm (`"C:\root\X.bas"` → `<absolute path>/X.bas`), áp cho `declaredPath`, `externalReferences`, `externalApis` và mọi cảnh báo.
+
+ID program ở chế độ tất cả: tên file; trùng (không phân biệt hoa thường) → đường dẫn project bỏ phần mở rộng; vẫn trùng (`A/X.vbp` và `A/X.VBP`) → đường dẫn project đầy đủ. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
 
 ## 3. Totals
 

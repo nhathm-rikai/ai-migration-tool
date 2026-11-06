@@ -110,9 +110,19 @@ describe('Assessment report download (AR01)', { timeout: 20_000 }, () => {
   // AR01-AC01
   it('returns the xlsx with every report sheet and the json equal to the core report', async () => {
     const { ctx, project, ref } = await setup('Demo');
-    const expected = buildInventoryReport(demoInventory, ALL_PROGRAMS);
+    const expected = buildInventoryReport(demoInventory, ALL_PROGRAMS, {
+      mode: 'demo',
+      projectId: project.id,
+      projectName: 'Demo',
+      runId: ref.runId,
+      artifactId: ref.id,
+      artifactVersion: 1,
+      createdAt: ref.createdAt,
+    });
     const names = inventoryReportSheets(expected).map((s) => s.name);
-    expect(names).toHaveLength(13);
+    // README (index) + the 13 report tables.
+    expect(names).toHaveLength(14);
+    expect(names[0]).toBe('README');
 
     const xlsx = await ctx.inject(reportUrl(project.id, ref.id, 1, 'xlsx'));
     expect(xlsx.statusCode).toBe(200);

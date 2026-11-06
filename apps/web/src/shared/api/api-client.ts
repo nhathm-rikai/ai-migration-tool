@@ -95,6 +95,18 @@ export async function sendRequest<T extends TSchema>(
 
 export type Download = { blob: Blob; fileName: string | null };
 
+// What a file answer must be before it is handed on: its media type, and
+// optionally a check of the bytes. A 200 that is something else (an HTML
+// page from a proxy, a truncated body) is an invalid response, not a file.
+export type DownloadExpectation = {
+  mediaType: string;
+  isValid?: (blob: Blob) => Promise<boolean>;
+  timeoutMs?: number;
+};
+
+const mediaTypeOf = (header: string | null) =>
+  (header ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+
 // File name of a Content-Disposition header: `filename*` (RFC 5987, UTF-8)
 // wins over the ASCII `filename`.
 export function fileNameFromDisposition(header: string | null): string | null {
@@ -118,7 +130,7 @@ export async function sendDownload(
   fetcher: typeof fetch,
   url: string,
   signal: AbortSignal,
-  options: { headers: Record<string, string>; timeoutMs?: number },
+  options: { headers: Record<string, string> } & DownloadExpectation,
 ): Promise<Download> {
   signal.throwIfAborted();
   const method = 'GET';
@@ -155,9 +167,17 @@ export async function sendDownload(
         );
       throw new ApiError('http', method, response.status);
     }
+    if (
+      mediaTypeOf(response.headers.get('content-type')) !==
+      options.mediaType.toLowerCase()
+    )
+      throw new ApiError('invalid-response', method, response.status);
     const blob = await response.blob();
     signal.throwIfAborted();
     if (timedOut) throw new ApiError('timeout', method);
+    if (options.isValid && !(await options.isValid(blob)))
+      throw new ApiError('invalid-response', method, response.status);
+    signal.throwIfAborted();
     return {
       blob,
       fileName: fileNameFromDisposition(
@@ -250,11 +270,15 @@ export function createApiClient(
     );
   }
   // GET of a file: same credential handling as `request`.
-  function download(path: string, signal: AbortSignal, timeoutMs?: number) {
+  function download(
+    path: string,
+    signal: AbortSignal,
+    expected: DownloadExpectation,
+  ) {
     return withCredential('GET', signal, (token) =>
       sendDownload(fetcher, API_BASE_PATH + path, signal, {
         headers: { Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}` },
-        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...expected,
       }),
     );
   }

@@ -58,10 +58,19 @@ function setup(report: (pending: Pending) => Promise<Response> | Response) {
   return { calls, pendings, save, view, fetcher };
 }
 
-const fileResponse = (name = 'assessment-Demo-20261106.xlsx') =>
-  new Response(new Blob(['PK']), {
+const XLSX_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const ZIP_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0]);
+
+const fileResponse = (
+  name = 'assessment-Demo-20261106.xlsx',
+  body: BodyInit = ZIP_BYTES,
+  type = XLSX_TYPE,
+) =>
+  new Response(body, {
     status: 200,
     headers: {
+      'content-type': type,
       'content-disposition': `attachment; filename="a.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`,
     },
   });
@@ -123,6 +132,38 @@ describe('Assessment report export button (AR01)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Không xuất được báo cáo',
+    );
+    expect(ctx.save).not.toHaveBeenCalled();
+  });
+
+  // Review finding 3: a 200 that is not the requested file is not saved.
+  it.each([
+    ['an HTML page', '<html>login</html>', 'text/html'],
+    ['a body that is not a ZIP', 'plain text', XLSX_TYPE],
+    ['a ZIP under another media type', ZIP_BYTES, 'application/octet-stream'],
+    ['an empty body', '', XLSX_TYPE],
+  ])('does not save %s answered with 200', async (_name, body, type) => {
+    const ctx = setup(() => fileResponse('x.xlsx', body, type));
+    render(ctx.view());
+    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'Không xuất được báo cáo',
+    );
+    expect(ctx.save).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Xuất Excel' })
+        .disabled,
+    ).toBe(false);
+  });
+
+  it('explains a report too large for Excel', async () => {
+    const ctx = setup(() =>
+      json(errorResponseFixture('REPORT_TOO_LARGE'), 422),
+    );
+    render(ctx.view());
+    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'quá lớn để xếp vào một sheet Excel',
     );
     expect(ctx.save).not.toHaveBeenCalled();
   });

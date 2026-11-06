@@ -4,9 +4,14 @@ import {
   type Project,
   type SourceInventoryArtifact,
 } from '@portal/contracts';
-import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
+import { AppError } from '../../shared/app-error.js';
+import {
+  ALL_PROGRAMS,
+  buildInventoryReport,
+  type InventoryReport,
+} from './inventory-report.js';
 import { inventoryReportSheets } from './inventory-report-workbook.js';
-import { writeXlsx } from './xlsx-writer.js';
+import { SheetLimitError, writeXlsx } from './xlsx-writer.js';
 
 // Builds the downloadable assessment report (AR01) of one exact inventory
 // version, in memory only: nothing is written to the data directory. The
@@ -71,6 +76,18 @@ export function contentDisposition(fileName: string): string {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987(fileName)}`;
 }
 
+// A table past the Excel worksheet limits is a request the portal can refuse
+// (the JSON report has no such limit), not a server fault.
+function buildWorkbook(report: InventoryReport): Uint8Array {
+  try {
+    return writeXlsx(inventoryReportSheets(report));
+  } catch (error) {
+    if (error instanceof SheetLimitError)
+      throw new AppError('REPORT_TOO_LARGE');
+    throw error;
+  }
+}
+
 export function createReportDownloadService(deps: ReportDownloadDeps) {
   return {
     async build(
@@ -85,12 +102,20 @@ export function createReportDownloadService(deps: ReportDownloadDeps) {
         artifactId,
         version,
       );
-      const report = buildInventoryReport(artifact.payload, ALL_PROGRAMS);
+      const report = buildInventoryReport(artifact.payload, ALL_PROGRAMS, {
+        mode: artifact.mode,
+        projectId: artifact.projectId,
+        projectName: project.name,
+        runId: artifact.runId,
+        artifactId: artifact.id,
+        artifactVersion: artifact.version,
+        createdAt: artifact.createdAt,
+      });
       const fileName = reportFileName(project.name, deps.now(), format);
       return {
         body:
           format === 'xlsx'
-            ? writeXlsx(inventoryReportSheets(report))
+            ? buildWorkbook(report)
             : `${JSON.stringify(report, null, 2)}\n`,
         contentType: INVENTORY_REPORT_CONTENT_TYPES[format],
         contentDisposition: contentDisposition(fileName),

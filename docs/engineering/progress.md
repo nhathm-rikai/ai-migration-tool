@@ -1,5 +1,17 @@
 # Tiến độ kỹ thuật Portal
 
+## 06/11/2026 — AR01 sau review độc lập (CHANGES_REQUIRED trên d5d6e97..e04d310) và chỉnh giao diện workbook
+
+- Mỗi finding được tái hiện bằng test trước khi sửa (test mới `review-findings.test.ts` fail trên code cũ: 8 test của finding 1, 2, 4 đỏ ở HEAD, xanh sau sửa):
+  - 1 (P2, đường dẫn tuyệt đối trong ngoặc kép lọt vào báo cáo): đúng. `redactAbsolutePath` bỏ dấu ngoặc và khoảng trắng bao quanh; test JSON và mọi sheet với `Module=`, `Reference=`, `Object=`.
+  - 2 (P2, mất nhãn demo/truy vết): đúng. `source.origin` (mode, projectId, tên dự án, runId, artifactId, artifactVersion, createdAt) vào JSON, `Summary` và `README`.
+  - 3 (P2, lưu HTML thành .xlsx): đúng (đã tái hiện: 200 + HTML được lưu). Client kiểm media type, chữ ký ZIP (4 byte đầu 50 4B 03 04) cho xlsx, JSON parse được cho json; sai thì báo lỗi, không lưu. Test web: HTML, body không phải ZIP, ZIP sai media type, body rỗng.
+  - 4 (P3, hai program trùng ID `A/X`): đúng. Còn trùng sau bước tạo ID thì dùng `projectPath` đầy đủ.
+  - 5 (P3, vượt giới hạn Excel): đúng qua đọc code (không có kiểm tra). `assertSheetFits` kiểm trước khi dựng XML; API trả `REPORT_TOO_LARGE` (422, mã mới trong `AnalyzeApiErrorCodeSchema`), UI có thông báo vi/ja. Test dùng sheet giả có `rows.length` lớn, không cấp phát một triệu dòng.
+- Giao diện workbook: thêm sheet `README` (mô tả từng sheet, cột khóa, số dòng, link), 14 sheet theo nhóm Overview, Program level, Detail, Warnings, tab tô màu theo nhóm; `Summary` chia mục; kiểu bảng thống nhất (header xanh đậm chữ trắng, viền mảnh, `#,##0`, độ rộng tối đa 60, ô trống vẫn có viền). Nội dung các bảng và tên cột không đổi; thứ tự sheet đổi so với bản trước. Writer vẫn không thêm dependency, ô chữ vẫn là inline string, quy tắc quote prefix cho `= + - @` giữ nguyên.
+- Giới hạn: chưa mở bằng Excel thật (máy không có Excel/LibreOffice); đã kiểm bằng `openpyxl` và ảnh xem trước dựng lại từ style của file (không phải ảnh Excel). Workbook mẫu: `test-results/ar01-review/AR01-demo-styled.xlsx`.
+- Kiểm chứng sau sửa (Windows 11 x64, Node 24.16.0): `npm run typecheck` sạch; `npm run lint` sạch; contracts 50 test pass; api 613 test pass (1 skipped) và web 296 test pass khi chạy `vitest --maxWorkers=2`; `npm run e2e` 17/17 pass ở lần chạy riêng. Khi chạy cả bộ song song trên máy đang tải có test không thuộc thay đổi này timeout (api: xóa dự án, snapshot, instance lock, document-run; web: documents-step, review) và một ca E2E `analyze-local` fail một lần; chạy lại riêng đều pass.
+
 ## 06/11/2026 — AR01: xuất Excel/JSON báo cáo Assessment từ bước 2
 
 - Nhánh `feat/ar01-assessment-report-export`, base `master` @ `d5d6e97d685a6705113399cd8c9a6a52ffb112bd` (đã gồm PR #18 xóa dự án), làm trong git worktree riêng `portal-ar01`. Chưa push, chưa merge, chưa review độc lập theo SHA.

@@ -41,6 +41,8 @@ export const AnalyzeApiErrorCodeSchema = Type.Union([
   Type.Literal('REVIEW_STALE'),
   // Deleting a project while a run of it is queued or executing.
   Type.Literal('PROJECT_BUSY'),
+  // The report does not fit an Excel worksheet; JSON has no such limit.
+  Type.Literal('REPORT_TOO_LARGE'),
 ]);
 export type AnalyzeApiErrorCode = Static<typeof AnalyzeApiErrorCodeSchema>;
 // HTTP status of each code; the BE error catalog reuses it.
@@ -63,6 +65,7 @@ export const ANALYZE_API_ERROR_HTTP_STATUS = {
   DOCUMENT_NOT_FOUND: 404,
   REVIEW_STALE: 409,
   PROJECT_BUSY: 409,
+  REPORT_TOO_LARGE: 422,
 } as const satisfies Record<AnalyzeApiErrorCode, number>;
 
 export const ErrorResponseSchema = Type.Object(

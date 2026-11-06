@@ -710,6 +710,8 @@ export const jaMessages = {
     report: {
       export: 'Excel 出力',
       exporting: '出力中…',
+      tooLarge:
+        'レポートが大きすぎて Excel のシートに収まりません。JSON 形式で取得してください。',
       failed:
         'レポートを出力できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
     },

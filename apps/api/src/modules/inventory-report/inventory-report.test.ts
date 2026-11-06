@@ -308,39 +308,40 @@ describe('inventory report workbook', () => {
       ),
     ].map((match) => match[1]);
     expect(names).toEqual([
+      'README',
       'Summary',
+      'Totals',
       'Programs',
       'Members',
+      'ExternalRefs',
+      'ExternalAPIs',
       'Files',
       'Procedures',
       'Calls',
       'CRUD',
       'DynamicSQL',
       'ConcatenatedSQL',
-      'ExternalRefs',
-      'ExternalAPIs',
-      'Totals',
       'Warnings',
     ]);
   });
 
   it('writes one row per record under the header', () => {
     const rowCount = (xml: string) => [...xml.matchAll(/<row /g)].length;
-    expect(rowCount(sheetXml(2))).toBe(1 + report.programs.length);
-    expect(rowCount(sheetXml(5))).toBe(1 + report.procedures.length);
-    expect(rowCount(sheetXml(13))).toBe(1 + report.warnings.length);
+    expect(rowCount(sheetXml(4))).toBe(1 + report.programs.length);
+    expect(rowCount(sheetXml(9))).toBe(1 + report.procedures.length);
+    expect(rowCount(sheetXml(14))).toBe(1 + report.warnings.length);
   });
 
   it('keeps a formula-like program name as quoted text', () => {
-    expect(sheetXml(2)).toContain(
+    expect(sheetXml(4)).toContain(
       '<c r="C2" t="inlineStr" s="2"><is><t xml:space="preserve">=cmd|calc</t>',
     );
-    expect(sheetXml(2)).not.toContain('<f>');
+    expect(sheetXml(4)).not.toContain('<f>');
   });
 
   it('leaves an empty list as an empty cell', () => {
     // PA and PB have no complexity review flag.
-    for (let index = 1; index <= 12; index += 1)
+    for (let index = 1; index <= 13; index += 1)
       expect(sheetXml(index)).not.toContain('<t xml:space="preserve"></t>');
   });
 });

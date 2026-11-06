@@ -62,9 +62,23 @@ export type ReportWarning = {
   detail: string;
 };
 
+// Where the inventory came from, so a file taken out of the portal can be
+// traced to its run and recognised as demo data (DATA-08). Null for the CLI.
+export type ReportOrigin = {
+  mode: 'demo' | 'local';
+  projectId: string;
+  projectName: string;
+  runId: string;
+  artifactId: string;
+  artifactVersion: number;
+  // When the inventory artifact was published.
+  createdAt: string;
+};
+
 export type InventoryReport = {
   reportVersion: typeof INVENTORY_REPORT_VERSION;
   source: {
+    origin: ReportOrigin | null;
     schemaVersion: string;
     profileId: string;
     languageId: string;
@@ -231,8 +245,12 @@ function addCounters(sum: LineCounters, add: LineCounters): void {
 const ABSOLUTE_PATH = /^(?:[A-Za-z]:|[\\/])/;
 export const REDACTED_PREFIX = '<absolute path>/';
 
+// A path may be written in quotes (`Module=X; "C:\dir\X.bas"`); the quotes
+// are not part of it.
+const SURROUNDING_QUOTES = /^["']+|["']+$/g;
+
 export function redactAbsolutePath(path: string): string {
-  const trimmed = path.trim();
+  const trimmed = path.trim().replace(SURROUNDING_QUOTES, '').trim();
   if (!ABSOLUTE_PATH.test(trimmed)) return path;
   return REDACTED_PREFIX + (trimmed.split(/[\\/]/).at(-1) ?? '');
 }
@@ -259,7 +277,7 @@ function selectAllPrograms(inventory: Inventory) {
     const key = programId(program.projectPath).toUpperCase();
     count.set(key, (count.get(key) ?? 0) + 1);
   }
-  return inventory.programs.map((program) => {
+  const named = inventory.programs.map((program) => {
     const id = programId(program.projectPath);
     const repeated = (count.get(id.toUpperCase()) ?? 0) > 1;
     return {
@@ -269,6 +287,13 @@ function selectAllPrograms(inventory: Inventory) {
       program,
     };
   });
+  // `A/X.vbp` and `A/X.VBP` still share an ID; the full path tells them apart.
+  const exact = new Map<string, number>();
+  for (const { id } of named) exact.set(id, (exact.get(id) ?? 0) + 1);
+  return named.map(({ id, program }) => ({
+    id: (exact.get(id) ?? 0) > 1 ? program.projectPath : id,
+    program,
+  }));
 }
 
 function extensionOf(projectPath: string): string {
@@ -329,6 +354,7 @@ const fileOf = (procedureId: string) =>
 export function buildInventoryReport(
   inventory: Inventory,
   requested: ProgramSelection,
+  origin: ReportOrigin | null = null,
 ): InventoryReport {
   const selected =
     requested === ALL_PROGRAMS
@@ -649,6 +675,7 @@ export function buildInventoryReport(
   return {
     reportVersion: INVENTORY_REPORT_VERSION,
     source: {
+      origin,
       schemaVersion: inventory.schemaVersion,
       profileId: inventory.profileId,
       languageId: inventory.languageId,

@@ -41,7 +41,27 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
   const warningCounts = new Map<string, number>();
   for (const warning of report.warnings)
     warningCounts.set(warning.code, (warningCounts.get(warning.code) ?? 0) + 1);
+  const origin = source.origin;
+  const heading = (title: string): [string, CellValue] => [title, null];
   const summary: [string, CellValue][] = [
+    ...(origin
+      ? ([
+          heading('Provenance'),
+          [
+            'dataMode',
+            origin.mode === 'demo'
+              ? 'DEMO: bundled sample data, not a customer system'
+              : 'local',
+          ],
+          ['project', origin.projectName],
+          ['projectId', origin.projectId],
+          ['runId', origin.runId],
+          ['artifactId', origin.artifactId],
+          ['artifactVersion', origin.artifactVersion],
+          ['inventoryCreatedAt', origin.createdAt],
+        ] satisfies [string, CellValue][])
+      : []),
+    heading('Source and versions'),
     ['reportVersion', report.reportVersion],
     ['schemaVersion', source.schemaVersion],
     ['profileId', source.profileId],
@@ -56,6 +76,7 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ? `${source.tableNames.defaultSchema ?? '(none)'} (${source.tableNames.status})`
         : null,
     ],
+    heading('Scope and size'),
     ['programs', totals.programs],
     ['programIds', list(report.selection.programs.map((p) => p.id))],
     ['uniqueFiles', totals.unique.files],
@@ -70,12 +91,22 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
       'complexityUse',
       'Reference classification only: do not derive effort or quotes from the score. Review file processing, DB writes and transactions separately.',
     ],
+    heading('Warnings'),
     ['warnings', report.warnings.length],
     ...[...warningCounts].map(([code, count]): [string, CellValue] => [
-      `warnings.${code}`,
+      code,
       count,
     ]),
   ];
+  const SECTIONS = new Set([
+    'Provenance',
+    'Source and versions',
+    'Scope and size',
+    'Warnings',
+  ]);
+  const summaryHeadings = summary.flatMap(([label, value], index) =>
+    value === null && SECTIONS.has(label) ? [index] : [],
+  );
 
   type Program = InventoryReport['programs'][number];
   const totalRows = [
@@ -83,11 +114,11 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
     { scope: 'unique', ...totals.unique },
   ];
 
-  return [
+  const tables: Sheet[] = [
     table(
       'Summary',
       [
-        ['Item', 40, (row) => row[0]],
+        ['Item', 30, (row) => row[0]],
         ['Value', 90, (row) => row[1]],
       ],
       summary,
@@ -306,4 +337,204 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
       report.warnings,
     ),
   ];
+  return arrangeSheets(report, tables, summaryHeadings);
+}
+
+type SheetInfo = { name: string; about: string; key: string };
+// Fixed order and grouping of the workbook. A name here that the tables
+// above do not produce (or the other way round) fails the arrangement.
+const GROUPS: { title: string; color: string; sheets: SheetInfo[] }[] = [
+  {
+    title: 'Overview',
+    color: 'FF1F3864',
+    sheets: [
+      {
+        name: 'Summary',
+        about:
+          'Where the data comes from (project, run, artifact, snapshot), the analyzer versions and the size of the selection.',
+        key: 'Item',
+      },
+      {
+        name: 'Totals',
+        about:
+          'Line counters of the whole selection: the sum over programs (shared files counted per program) next to the unique total.',
+        key: 'scope',
+      },
+    ],
+  },
+  {
+    title: 'Program level',
+    color: 'FF2E75B6',
+    sheets: [
+      {
+        name: 'Programs',
+        about:
+          'One row per program: status, line counters, metrics and the reference complexity.',
+        key: 'programId',
+      },
+      {
+        name: 'Members',
+        about:
+          'Files each project file declares and where they were found; shared files are marked.',
+        key: 'programId + declaredPath',
+      },
+      {
+        name: 'ExternalRefs',
+        about: 'COM / OCX references declared by each project file.',
+        key: 'programId + identifier',
+      },
+      {
+        name: 'ExternalAPIs',
+        about: 'Native (DLL) API functions declared by each program.',
+        key: 'programId + name',
+      },
+    ],
+  },
+  {
+    title: 'Detail',
+    color: 'FF548235',
+    sheets: [
+      {
+        name: 'Files',
+        about:
+          'Each distinct source file of the selection with its hash, encoding and line counters.',
+        key: 'relativePath',
+      },
+      {
+        name: 'Procedures',
+        about:
+          'Line counters, decision points and line range of every procedure.',
+        key: 'procedureId',
+      },
+      {
+        name: 'Calls',
+        about: 'Procedure calls with how each one was resolved.',
+        key: 'from + name',
+      },
+      {
+        name: 'CRUD',
+        about:
+          'Tables read or written per program: as written in source (raw) and after table-name mapping (normalized).',
+        key: 'programId + table',
+      },
+      {
+        name: 'DynamicSQL',
+        about: 'SQL whose table name is only known at runtime.',
+        key: 'relativePath + line',
+      },
+      {
+        name: 'ConcatenatedSQL',
+        about: 'SQL that joins runtime values into the statement text.',
+        key: 'relativePath + line',
+      },
+    ],
+  },
+  {
+    title: 'Warnings',
+    color: 'FFC55A11',
+    sheets: [
+      {
+        name: 'Warnings',
+        about:
+          'Everything the analysis could not decide or a reader should double-check, with file and line when known.',
+        key: 'code',
+      },
+    ],
+  },
+];
+
+function arrangeSheets(
+  report: InventoryReport,
+  tables: readonly Sheet[],
+  summaryHeadings: readonly number[],
+): Sheet[] {
+  const byName = new Map(tables.map((sheet) => [sheet.name, sheet]));
+  const ordered: Sheet[] = [];
+  const indexRows: CellValue[][] = [];
+  const headingRows: number[] = [];
+  const linkRows = new Map<number, string>();
+  const heading = (title: string) => {
+    headingRows.push(indexRows.length);
+    indexRows.push([title, null, null, null]);
+  };
+  const { origin } = report.source;
+  heading('About this report');
+  indexRows.push(['Report', report.reportVersion, null, null]);
+  if (origin)
+    indexRows.push(
+      [
+        'Data',
+        origin.mode === 'demo'
+          ? 'DEMO: bundled sample data, not a customer system'
+          : 'local source',
+        null,
+        null,
+      ],
+      ['Project', origin.projectName, null, null],
+      ['Run', origin.runId, null, null],
+      [
+        'Inventory',
+        `${origin.artifactId} v${origin.artifactVersion}`,
+        null,
+        null,
+      ],
+    );
+  indexRows.push(
+    ['Snapshot', report.source.snapshotHash, null, null],
+    ['Programs', report.totals.programs, null, null],
+  );
+  for (const group of GROUPS) {
+    heading(`Sheets: ${group.title}`);
+    for (const info of group.sheets) {
+      const sheet = byName.get(info.name);
+      if (!sheet) throw new Error(`Workbook has no sheet ${info.name}`);
+      byName.delete(info.name);
+      linkRows.set(indexRows.length, info.name);
+      indexRows.push([
+        info.name,
+        info.about,
+        info.key,
+        sheet.rows.length -
+          (sheet.name === 'Summary' ? summaryHeadings.length : 0),
+      ]);
+      ordered.push({
+        ...sheet,
+        tabColor: group.color,
+        ...(sheet.name === 'Summary'
+          ? {
+              columns: [
+                { header: 'Item', width: 30 },
+                { header: 'Value', width: 80, wrap: true },
+              ],
+              headingRows: summaryHeadings,
+              boldFirstColumn: true,
+              filter: false,
+            }
+          : {}),
+      });
+    }
+  }
+  if (byName.size > 0)
+    throw new Error(
+      `Sheets not in the workbook layout: ${[...byName.keys()].join(', ')}`,
+    );
+  const index: Sheet = {
+    name: 'README',
+    title: origin
+      ? `Assessment report: ${origin.projectName}`
+      : 'Assessment report',
+    tabColor: 'FF1F3864',
+    columns: [
+      { header: 'Sheet / item', width: 22 },
+      { header: 'What it contains', width: 60, wrap: true },
+      { header: 'Key column', width: 26 },
+      { header: 'Rows', width: 8 },
+    ],
+    rows: indexRows,
+    headingRows,
+    linkRows,
+    boldFirstColumn: true,
+    filter: false,
+  };
+  return [index, ...ordered];
 }

@@ -833,6 +833,9 @@ export const jaMessages = {
     report: {
       export: '技術データ（Excel・社内用）',
       exportCustomer: 'お客様向け報告書（Excel）',
+      exportCustomerPdf: 'お客様向け報告書（PDF）',
+      pdfFailed:
+        'PDF を作成できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
       exporting: '出力中…',
       tooLarge:
         'レポートが大きすぎて Excel のシートに収まりません。右のボタンから JSON 形式でダウンロードしてください。',

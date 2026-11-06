@@ -1,5 +1,8 @@
+import { Check } from 'typebox/value';
 import {
   ArtifactEnvelopeSchema,
+  CustomerReportSchema,
+  type CustomerReportDocument,
   ArtifactListSchema,
   INVENTORY_REPORT_CONTENT_TYPES,
   type InventoryReportFormat,
@@ -147,7 +150,32 @@ export function createArtifactsApi(
         signal,
         reportExpectation(kind, format, artifactId, version),
       ),
+    // The customer report (AR02) as data, for the PDF (AR03): the JSON of
+    // the exact version, checked against the contract before it is drawn.
+    getCustomerReport: async (
+      projectId: string,
+      artifactId: string,
+      version: number,
+      signal: AbortSignal,
+    ): Promise<CustomerReportDocument> => {
+      const file = await request.download(
+        project(projectId) +
+          '/artifacts/' +
+          encodeURIComponent(artifactId) +
+          '/versions/' +
+          String(version) +
+          REPORT_PATH.customer +
+          '?format=json',
+        signal,
+        reportExpectation('customer', 'json', artifactId, version),
+      );
+      const parsed: unknown = JSON.parse(await readBlob(file.blob, 'text'));
+      if (!Check(CustomerReportSchema, parsed))
+        throw new Error('The customer report does not match its contract.');
+      return parsed;
+    },
   };
 }
 export type ArtifactsApi = ReturnType<typeof createArtifactsApi>;
+export type { CustomerReportDocument };
 export const artifactsApi = createArtifactsApi();

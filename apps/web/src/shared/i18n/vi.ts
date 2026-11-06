@@ -852,6 +852,8 @@ export const viMessages = {
     report: {
       export: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
       exportCustomer: 'Báo cáo cho khách (Excel)',
+      exportCustomerPdf: 'Báo cáo cho khách (PDF)',
+      pdfFailed: 'Không tạo được PDF. Thử lại sau; không có file nào được lưu.',
       exporting: 'Đang xuất…',
       tooLarge:
         'Báo cáo quá lớn để xếp vào một sheet Excel. Hãy tải bản JSON bằng nút bên cạnh.',

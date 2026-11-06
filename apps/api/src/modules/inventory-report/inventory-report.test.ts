@@ -5,6 +5,7 @@ import { buildSourceInventory } from '../analysis/source-inventory.js';
 import { findSourceProfile } from '../analysis/source-profiles.js';
 import { createTableNameMapping } from '../analysis/table-names.js';
 import {
+  ALL_PROGRAMS,
   buildInventoryReport,
   programId,
   ReportSelectionError,
@@ -341,5 +342,70 @@ describe('inventory report workbook', () => {
     // PA and PB have no complexity review flag.
     for (let index = 1; index <= 12; index += 1)
       expect(sheetXml(index)).not.toContain('<t xml:space="preserve"></t>');
+  });
+});
+
+// AR01: the portal exports every program, chosen by project path.
+describe('buildInventoryReport with all programs', () => {
+  const SAME_NAME = [
+    text('A/X.vbp', ['Type=Exe', 'Module=M; M.BAS', 'Name="=cmd|calc"']),
+    text('B/X.vbp', [
+      'Type=Exe',
+      'Module=M; M.BAS',
+      'Module=Abs; C:\\Users\\secret-root\\ABS.BAS',
+    ]),
+    text('A/M.BAS', ['Sub Main()', 'End Sub']),
+    text('B/M.BAS', ['Sub Main()', '    x = 1', 'End Sub']),
+  ];
+  function sameNameInventory(): SourceInventoryDocument {
+    const profile = findSourceProfile('vb6-cp932-v1');
+    const tableNames = createTableNameMapping('HAN01');
+    if (!profile || !tableNames) throw new Error('setup');
+    const built: unknown = JSON.parse(
+      JSON.stringify(
+        buildSourceInventory({ profile, files: SAME_NAME, tableNames }),
+      ),
+    );
+    return built as SourceInventoryDocument;
+  }
+
+  // AR01-AC04
+  it('keeps two project files with the same name in different folders', () => {
+    const doc = sameNameInventory();
+    const report = buildInventoryReport(doc, ALL_PROGRAMS);
+    expect(report.totals.programs).toBe(2);
+    expect(report.selection.programs).toEqual([
+      { id: 'A/X', projectPath: 'A/X.vbp' },
+      { id: 'B/X', projectPath: 'B/X.vbp' },
+    ]);
+    expect(report.programs.map((p) => p.id)).toEqual(['A/X', 'B/X']);
+    // Each file lists only the program that owns it.
+    expect(
+      report.files.filter((f) => f.relativePath.endsWith('.vbp')),
+    ).toMatchObject([{ usedBy: ['A/X'] }, { usedBy: ['B/X'] }]);
+    // The ID mode of the CLI still refuses the ambiguous name.
+    expect(() => buildInventoryReport(doc, ['X'])).toThrow('matches 2');
+  });
+
+  it('uses the file name as ID when it is unique', () => {
+    const report = buildInventoryReport(inventory(), ALL_PROGRAMS);
+    expect(report.programs.map((p) => p.id)).toEqual(['PA', 'PB', 'PZ']);
+    expect(report.selection.requested).toEqual(['PA', 'PB', 'PZ']);
+  });
+
+  // AR01-AC05
+  it('writes no absolute path and keeps formula-like text as text', () => {
+    const report = buildInventoryReport(sameNameInventory(), ALL_PROGRAMS);
+    const parts = unzip(writeXlsx(inventoryReportSheets(report)));
+    const all = [...parts.values()].join('\n');
+    expect(all).not.toContain('secret-root');
+    expect(all).not.toMatch(/[A-Za-z]:\\/);
+    expect(JSON.stringify(report)).not.toContain('secret-root');
+    // The raw formula text is only ever an inline string, never `<f>`.
+    expect(all).toContain('=cmd|calc');
+    expect(all).not.toContain('<f>');
+    expect(all).toMatch(
+      /<c r="[A-Z]+\d+" t="inlineStr" s="2"><is><t xml:space="preserve">=cmd\|calc/,
+    );
   });
 });

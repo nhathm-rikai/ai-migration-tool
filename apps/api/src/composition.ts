@@ -39,6 +39,7 @@ import { createSnapshotRepository } from './modules/snapshots/snapshot.repositor
 import { createSnapshotService } from './modules/snapshots/snapshot.service.js';
 import { createArtifactRepository } from './modules/artifacts/artifact.repository.js';
 import { createArtifactService } from './modules/artifacts/artifact.service.js';
+import { createReportDownloadService } from './modules/inventory-report/report-download.service.js';
 import type { ArtifactStore } from './ports/artifact-store.js';
 import type { RunExecutor } from './ports/run-executor.js';
 import type { AgentRunner } from './ports/agent-runner.js';
@@ -401,6 +402,11 @@ export function createDependencies(
       jobs,
       snapshots,
       artifacts,
+      reportDownloads: createReportDownloadService({
+        projects,
+        artifacts,
+        now,
+      }),
       folderPicker,
       runEvents,
       documents,

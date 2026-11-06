@@ -580,12 +580,34 @@ describe('C01 operation table', () => {
       streamRunEvents: fixtures.runEventFixture,
       listRunArtifacts: fixtures.artifactListFixture,
       getArtifactVersion: fixtures.mappedInventoryArtifactFixture,
+      exportInventoryReport: new Uint8Array([0x50, 0x4b]),
     } satisfies Record<keyof typeof ANALYZE_API_OPERATIONS, unknown>;
     for (const [id, sample] of Object.entries(samples)) {
       const operation =
         ANALYZE_API_OPERATIONS[id as keyof typeof ANALYZE_API_OPERATIONS];
       expectValid(operation.response, sample);
     }
+  });
+});
+
+describe('AR01 report export operation', () => {
+  const { querystring, errorCodes } =
+    ANALYZE_API_OPERATIONS.exportInventoryReport;
+  it('requires format and accepts only xlsx or json', () => {
+    expectValid(querystring, { format: 'xlsx' });
+    expectValid(querystring, { format: 'json' });
+    for (const bad of [
+      {},
+      { format: 'pdf' },
+      { format: 'XLSX' },
+      { format: 1 },
+    ])
+      expectInvalid(querystring, bad);
+    expectInvalid(querystring, { format: 'xlsx', extra: 1 });
+  });
+  it('lists only existing error codes', () => {
+    expect(errorCodes).toContain('ARTIFACT_NOT_FOUND');
+    expect(errorCodes).toContain('PROJECT_NOT_FOUND');
   });
 });
 

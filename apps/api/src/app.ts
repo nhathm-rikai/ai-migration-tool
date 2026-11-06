@@ -18,6 +18,7 @@ import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerProjectRoutes } from './modules/projects/project.routes.js';
 import { registerJobRoutes } from './modules/jobs/job.routes.js';
 import { registerRunEventRoutes } from './modules/jobs/run-events.routes.js';
+import { registerReportDownloadRoutes } from './modules/inventory-report/report-download.routes.js';
 import { registerArtifactRoutes } from './modules/artifacts/artifact.routes.js';
 import { registerSourceRegistrationRoutes } from './modules/projects/source-registration.routes.js';
 import { createLoggerOptions } from './plugins/logger.js';
@@ -98,6 +99,7 @@ export function buildApp(
   registerJobRoutes(app, dependencies.jobs);
   registerRunEventRoutes(app, dependencies.jobs, dependencies.runEvents);
   registerArtifactRoutes(app, dependencies.artifacts);
+  registerReportDownloadRoutes(app, dependencies.reportDownloads);
   registerFolderPickerRoutes(app, dependencies.folderPicker);
   registerDocumentRoutes(app, dependencies.documents, dependencies.reviews);
   return app;

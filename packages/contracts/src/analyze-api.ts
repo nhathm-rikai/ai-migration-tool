@@ -1,8 +1,9 @@
-import type { TSchema } from 'typebox';
+import { Type, type TSchema } from 'typebox';
 import {
   ArtifactEnvelopeSchema,
   ArtifactListSchema,
   ArtifactVersionParamsSchema,
+  InventoryReportQuerySchema,
 } from './artifact.schema.js';
 import type { AnalyzeApiErrorCode, ApiErrorCode } from './error.schema.js';
 import { EmptyQuerySchema } from './health.schema.js';
@@ -43,7 +44,8 @@ type Operation = {
   body?: TSchema;
   // JSON response; for SSE the schema of each event's `data`.
   response: TSchema;
-  contentType: 'application/json' | 'text/event-stream';
+  // `attachment`: a file download whose bytes are not an API envelope.
+  contentType: 'application/json' | 'text/event-stream' | 'attachment';
   errorCodes: readonly AnalyzeOperationErrorCode[];
 };
 
@@ -186,6 +188,19 @@ export const ANALYZE_API_OPERATIONS = {
     querystring: EmptyQuerySchema,
     response: ArtifactEnvelopeSchema,
     contentType: 'application/json',
+    errorCodes: [...PROJECT_READ_ERRORS, 'ARTIFACT_NOT_FOUND'],
+  },
+  // Assessment report (AR01) built from this exact inventory version:
+  // xlsx or the inventory-report JSON, sent as an attachment.
+  exportInventoryReport: {
+    method: 'GET',
+    path: `${ProjectsPath}/artifacts/:artifactId/versions/:version/report`,
+    successStatuses: [200],
+    params: ArtifactVersionParamsSchema,
+    querystring: InventoryReportQuerySchema,
+    // The bytes are not validated against a schema (they are a file).
+    response: Type.Unknown(),
+    contentType: 'attachment',
     errorCodes: [...PROJECT_READ_ERRORS, 'ARTIFACT_NOT_FOUND'],
   },
 } as const satisfies Record<string, Operation>;

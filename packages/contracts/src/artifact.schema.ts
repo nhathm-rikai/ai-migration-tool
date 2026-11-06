@@ -64,6 +64,22 @@ export const ArtifactVersionParamsSchema = Type.Object(
   Strict,
 );
 
+// Assessment report download (AR01): the format of the file to build from
+// one exact inventory version. Required, no default.
+export const InventoryReportFormatSchema = Type.Union([
+  Type.Literal('xlsx'),
+  Type.Literal('json'),
+]);
+export type InventoryReportFormat = Static<typeof InventoryReportFormatSchema>;
+export const InventoryReportQuerySchema = Type.Object(
+  { format: InventoryReportFormatSchema },
+  Strict,
+);
+export const INVENTORY_REPORT_CONTENT_TYPES = {
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  json: 'application/json; charset=utf-8',
+} as const satisfies Record<InventoryReportFormat, string>;
+
 export type ArtifactRef = Static<typeof ArtifactRefSchema>;
 export type ArtifactList = Static<typeof ArtifactListSchema>;
 export type SourceInventoryArtifact = Static<

@@ -245,6 +245,38 @@ export function programId(projectPath: string): string {
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
+// Request value that selects every program of the inventory (portal export).
+export const ALL_PROGRAMS = 'all' as const;
+export type ProgramSelection = readonly string[] | typeof ALL_PROGRAMS;
+
+// All programs, chosen by project path instead of file-name ID, so two
+// project files with the same name in different folders are both kept. The
+// ID stays the file name unless it repeats (compared without case); a
+// repeated name uses the project path without extension (`A/X`).
+function selectAllPrograms(inventory: Inventory) {
+  const count = new Map<string, number>();
+  for (const program of inventory.programs) {
+    const key = programId(program.projectPath).toUpperCase();
+    count.set(key, (count.get(key) ?? 0) + 1);
+  }
+  return inventory.programs.map((program) => {
+    const id = programId(program.projectPath);
+    const repeated = (count.get(id.toUpperCase()) ?? 0) > 1;
+    return {
+      id: repeated
+        ? program.projectPath.slice(0, -extensionOf(program.projectPath).length)
+        : id,
+      program,
+    };
+  });
+}
+
+function extensionOf(projectPath: string): string {
+  const name = projectPath.split('/').at(-1) ?? projectPath;
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot) : '';
+}
+
 function selectPrograms(inventory: Inventory, requested: readonly string[]) {
   const seen = new Set<string>();
   const selected: { id: string; program: InventoryProgram }[] = [];
@@ -296,9 +328,12 @@ const fileOf = (procedureId: string) =>
 
 export function buildInventoryReport(
   inventory: Inventory,
-  requested: readonly string[],
+  requested: ProgramSelection,
 ): InventoryReport {
-  const selected = selectPrograms(inventory, requested);
+  const selected =
+    requested === ALL_PROGRAMS
+      ? selectAllPrograms(inventory)
+      : selectPrograms(inventory, requested);
   const filesByPath = new Map(
     inventory.files.map((file) => [file.manifest.relativePath, file]),
   );
@@ -633,7 +668,10 @@ export function buildInventoryReport(
         : null,
     },
     selection: {
-      requested: [...requested],
+      requested:
+        requested === ALL_PROGRAMS
+          ? selected.map(({ id }) => id)
+          : [...requested],
       programs: selected.map(({ id, program }) => ({
         id,
         projectPath: program.projectPath,

@@ -4,6 +4,7 @@ import {
   INVENTORY_REPORT_CONTENT_TYPES,
   type InventoryReportFormat,
 } from '@portal/contracts';
+import { isWellFormedXlsx } from '../files/xlsx-structure';
 import { createApiClient, type DownloadExpectation } from './api-client';
 import {
   createLocalSession,
@@ -12,7 +13,7 @@ import {
 } from './local-session';
 
 // A report answer is accepted only as the media type it was asked for, and
-// an xlsx only if it is a ZIP; JSON only if it parses.
+// an xlsx only if its ZIP structure holds a workbook; JSON only if it parses.
 // FileReader exists in every browser; Blob.arrayBuffer() is not in all test
 // environments.
 function readBlob(blob: Blob, as: 'bytes'): Promise<ArrayBuffer>;
@@ -30,14 +31,11 @@ function readBlob(
   });
 }
 
-const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
 const REPORT_EXPECTATIONS = {
   xlsx: {
     mediaType: INVENTORY_REPORT_CONTENT_TYPES.xlsx,
-    isValid: async (blob: Blob) => {
-      const head = new Uint8Array(await readBlob(blob.slice(0, 4), 'bytes'));
-      return ZIP_SIGNATURE.every((byte, index) => head[index] === byte);
-    },
+    isValid: async (blob: Blob) =>
+      isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
   },
   json: {
     mediaType: 'application/json',

@@ -11,6 +11,7 @@ import { createArtifactsApi } from '../../shared/api/artifacts-api';
 import { fileNameFromDisposition } from '../../shared/api/api-client';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { json, requestUrl, testCredentials } from '../../testing/fixtures';
+import { REAL_WRITER_XLSX_BASE64 } from '../../testing/real-writer-xlsx';
 
 // AR01-AC06: the export button of the analysis step.
 
@@ -60,7 +61,11 @@ function setup(report: (pending: Pending) => Promise<Response> | Response) {
 
 const XLSX_TYPE =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const ZIP_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0]);
+// A real workbook (output of the API writer), and the bare ZIP signature.
+const ZIP_BYTES = Uint8Array.from(atob(REAL_WRITER_XLSX_BASE64), (c) =>
+  c.charCodeAt(0),
+);
+const SIGNATURE_ONLY = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
 
 const fileResponse = (
   name = 'assessment-Demo-20261106.xlsx',
@@ -140,6 +145,8 @@ describe('Assessment report export button (AR01)', () => {
   it.each([
     ['an HTML page', '<html>login</html>', 'text/html'],
     ['a body that is not a ZIP', 'plain text', XLSX_TYPE],
+    ['only the ZIP signature', SIGNATURE_ONLY, XLSX_TYPE],
+    ['a truncated workbook', ZIP_BYTES.slice(0, 200), XLSX_TYPE],
     ['a ZIP under another media type', ZIP_BYTES, 'application/octet-stream'],
     ['an empty body', '', XLSX_TYPE],
   ])('does not save %s answered with 200', async (_name, body, type) => {

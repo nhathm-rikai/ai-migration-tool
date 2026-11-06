@@ -1,4 +1,8 @@
 import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  buildScreenReportTotals,
+  type ScreenReportTotals,
+} from '../analysis/screen-report.js';
 
 // Builds a report for selected programs from a source inventory that was
 // already produced and validated (specs/inventory-report.md). It only reads
@@ -92,6 +96,9 @@ export type InventoryReport = {
       callGraphVersion: string;
       complexityVersion: string;
       tableNameVersion: string | null;
+      // AR04; null for inventories written before screen/report counting.
+      screenReportVersion: string | null;
+      reportComplexityVersion: string | null;
     };
     tableNames: { defaultSchema: string | null; status: string } | null;
   };
@@ -116,6 +123,39 @@ export type InventoryReport = {
     metrics: NonNullable<InventoryProgram['analysis']>['metrics'] | null;
     complexity: ReportComplexity | null;
     normalizedComplexity: ReportComplexity | null;
+    // AR04; null when the inventory has no screen/report data (not zero).
+    programType: string | null;
+    screens: number | null;
+    // detected + referenced; suspected rows are counted apart.
+    reports: number | null;
+    suspectedReports: number | null;
+  }[];
+  // AR04: one row per screen of each selected program (shared forms appear
+  // in every program that lists them). Empty when the inventory has none.
+  screens: {
+    programId: string;
+    name: string | null;
+    file: string;
+    shared: boolean;
+    warnings: string[];
+  }[];
+  // AR04: one row per report evidence, with its reference complexity.
+  reports: {
+    programId: string;
+    kind: string;
+    name: string;
+    file: string;
+    line: number | null;
+    confidence: string;
+    shared: boolean;
+    procedureId: string | null;
+    complexityLevel: string;
+    complexityScore: number | null;
+    complexityVersion: string;
+    // "factor=value:points; ..." as in the inventory.
+    complexityFactors: string[];
+    complexityReason: string | null;
+    warnings: string[];
   }[];
   members: {
     programId: string;
@@ -194,6 +234,8 @@ export type InventoryReport = {
   externalApis: { programId: string; name: string; library: string }[];
   totals: {
     programs: number;
+    // Distinct screens/reports of the selection; null without AR04 data.
+    screenReport: ScreenReportTotals | null;
     // Sum of the per-program counters: shared files counted once per
     // program. Not a corpus size.
     perProgramSum: LineCounters & ProcedureLineTotals;
@@ -462,8 +504,66 @@ export function buildInventoryReport(
       normalizedComplexity: reportComplexity(
         program.analysis?.normalizedComplexity,
       ),
+      programType: program.programType ?? null,
+      screens: program.screens?.length ?? null,
+      reports: program.reports
+        ? program.reports.filter((row) => row.confidence !== 'suspected').length
+        : null,
+      suspectedReports: program.reports
+        ? program.reports.filter((row) => row.confidence === 'suspected').length
+        : null,
     };
   });
+
+  const screens = selected.flatMap(({ id, program }) =>
+    (program.screens ?? []).map((screen) => ({
+      programId: id,
+      name: screen.name,
+      file: redactAbsolutePath(screen.file),
+      shared: screen.shared,
+      warnings: screen.warnings,
+    })),
+  );
+  const reports = selected.flatMap(({ id, program }) =>
+    (program.reports ?? []).map((row) => ({
+      programId: id,
+      kind: row.kind,
+      name: row.name,
+      file: row.file,
+      line: row.line,
+      confidence: row.confidence,
+      shared: row.shared,
+      procedureId: row.procedureId,
+      complexityLevel: row.complexity.level,
+      complexityScore: row.complexity.score,
+      complexityVersion: row.complexity.version,
+      complexityFactors: row.complexity.factors.map(
+        (item) => `${item.factor}=${item.value}:${item.points}`,
+      ),
+      complexityReason: row.complexity.reason ?? null,
+      warnings: row.warnings,
+    })),
+  );
+  const hasScreenReport = selected.every(
+    ({ program }) =>
+      program.status !== 'parsed' ||
+      (program.screens !== undefined && program.reports !== undefined),
+  );
+  const screenReport: ScreenReportTotals | null = hasScreenReport
+    ? buildScreenReportTotals(
+        selected.flatMap(({ program }) =>
+          program.programType === undefined
+            ? []
+            : [
+                {
+                  programType: program.programType,
+                  screens: program.screens ?? [],
+                  reports: program.reports ?? [],
+                },
+              ],
+        ),
+      )
+    : null;
 
   const members = selected.flatMap(({ id, program }) =>
     program.members.map((member) => ({
@@ -688,6 +788,39 @@ export function buildInventoryReport(
           `${call.name} → ${call.targets.join(', ')}`,
         );
   }
+  if (!hasScreenReport)
+    warn(
+      'SCREEN_REPORT_MISSING',
+      null,
+      null,
+      null,
+      'Inventory has no screen/report data (画面・帳票・バッチ): run the analysis again; the figures are unknown, not zero',
+    );
+  for (const { id, program } of selected) {
+    for (const screen of program.screens ?? [])
+      for (const code of screen.warnings)
+        warn(
+          code,
+          id,
+          redactAbsolutePath(screen.file),
+          null,
+          `screen ${screen.name ?? redactAbsolutePath(screen.file)}`,
+        );
+    const suspected = (program.reports ?? []).filter(
+      (row) => row.confidence === 'suspected',
+    ).length;
+    if (suspected > 0)
+      warn(
+        'REPORT_SUSPECTED',
+        id,
+        program.projectPath,
+        null,
+        `${suspected} suspected report outputs (print/Excel/file); not counted as reports`,
+      );
+    for (const row of program.reports ?? [])
+      for (const code of row.warnings)
+        warn(code, id, row.file, row.line, `${row.kind} ${row.name}`);
+  }
   for (const file of files) {
     if (file.issue)
       warn(
@@ -732,6 +865,8 @@ export function buildInventoryReport(
         callGraphVersion: inventory.callGraphVersion,
         complexityVersion: inventory.complexityVersion,
         tableNameVersion: tableNames?.version ?? null,
+        screenReportVersion: inventory.screenReportVersion ?? null,
+        reportComplexityVersion: inventory.reportComplexityVersion ?? null,
       },
       tableNames: tableNames
         ? { defaultSchema: tableNames.defaultSchema, status: tableNames.status }
@@ -748,6 +883,8 @@ export function buildInventoryReport(
       })),
     },
     programs,
+    screens,
+    reports,
     members,
     files,
     procedures,
@@ -759,6 +896,7 @@ export function buildInventoryReport(
     externalApis,
     totals: {
       programs: programs.length,
+      screenReport,
       perProgramSum: { ...perProgramSum, ...perProgramBreakdown },
       unique: {
         ...uniqueCounters,

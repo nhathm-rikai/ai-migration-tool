@@ -83,6 +83,24 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
     ['sharedFilesInSelection', totals.unique.sharedFiles],
     ['uniqueCodeLines', totals.unique.codeLines],
     ['perProgramCodeLinesSum', totals.perProgramSum.codeLines],
+    ...(totals.screenReport
+      ? ([
+          ['screens', totals.screenReport.screens],
+          ['sharedScreens', totals.screenReport.sharedScreens],
+          ['batchPrograms', totals.screenReport.batches],
+          ['reportsFound', totals.screenReport.reports.counted],
+          ['reportsSuspected', totals.screenReport.reports.suspected],
+          [
+            'programsWithSuspectedReports',
+            totals.screenReport.suspectedPrograms,
+          ],
+        ] satisfies [string, CellValue][])
+      : ([
+          [
+            'screensAndReports',
+            'not analyzed (no screen/report data in this inventory): run the analysis again',
+          ],
+        ] satisfies [string, CellValue][])),
     [
       'note',
       'Per-program totals count a shared file in every program that lists it; unique totals count each file once. Do not add them together.',
@@ -157,6 +175,10 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ['parameterizedSql', 15, (p) => p.metrics?.parameterizedSql ?? null],
         ['components', 11, (p) => p.metrics?.components ?? null],
         ['externalApis', 11, (p) => p.metrics?.externalApis ?? null],
+        ['programType', 11, (p) => p.programType],
+        ['screens', 9, (p) => p.screens],
+        ['reports', 9, (p) => p.reports],
+        ['suspectedReports', 14, (p) => p.suspectedReports],
         ['complexityScore', 12, (p) => p.complexity?.score ?? null],
         ['complexityLevel', 12, (p) => p.complexity?.level ?? null],
         [
@@ -171,6 +193,37 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ],
       ],
       report.programs,
+    ),
+    table(
+      'Screens',
+      [
+        ['programId', 12, (s) => s.programId],
+        ['name', 22, (s) => s.name],
+        ['file', 34, (s) => s.file],
+        ['sharedInCorpus', 10, (s) => flag(s.shared)],
+        ['warnings', 26, (s) => list(s.warnings)],
+      ],
+      report.screens,
+    ),
+    table(
+      'Reports',
+      [
+        ['programId', 12, (r) => r.programId],
+        ['kind', 12, (r) => r.kind],
+        ['name', 24, (r) => r.name],
+        ['file', 34, (r) => r.file],
+        ['line', 8, (r) => r.line],
+        ['confidence', 11, (r) => r.confidence],
+        ['sharedInCorpus', 10, (r) => flag(r.shared)],
+        ['procedureId', 34, (r) => r.procedureId],
+        ['complexityLevel', 13, (r) => r.complexityLevel],
+        ['complexityScore', 13, (r) => r.complexityScore],
+        ['complexityVersion', 26, (r) => r.complexityVersion],
+        ['complexityFactors', 50, (r) => list(r.complexityFactors)],
+        ['complexityReason', 26, (r) => r.complexityReason],
+        ['warnings', 22, (r) => list(r.warnings)],
+      ],
+      report.reports,
     ),
     table(
       'Members',
@@ -371,6 +424,18 @@ const GROUPS: { title: string; color: string; sheets: SheetInfo[] }[] = [
         about:
           'One row per program: status, line counters, metrics and the reference complexity.',
         key: 'programId',
+      },
+      {
+        name: 'Screens',
+        about:
+          'Screens (forms) of each program, with the file and a warning when the form is missing or not analyzed. Empty when the inventory has no screen data.',
+        key: 'programId + file',
+      },
+      {
+        name: 'Reports',
+        about:
+          'Report evidence (Crystal, DataReport, Excel, print, file output) with file, line, confidence and the reference complexity of each report. Suspected rows are not counted as reports; empty when the inventory has no report data.',
+        key: 'programId + file + line',
       },
       {
         name: 'Members',

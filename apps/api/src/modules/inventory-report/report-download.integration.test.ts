@@ -120,8 +120,8 @@ describe('Assessment report download (AR01)', { timeout: 20_000 }, () => {
       createdAt: ref.createdAt,
     });
     const names = inventoryReportSheets(expected).map((s) => s.name);
-    // README (index) + the 13 report tables.
-    expect(names).toHaveLength(14);
+    // README (index) + the 15 report tables.
+    expect(names).toHaveLength(16);
     expect(names[0]).toBe('README');
 
     const xlsx = await ctx.inject(reportUrl(project.id, ref.id, 1, 'xlsx'));

@@ -163,6 +163,8 @@ describe('second review finding 3: sheet count in the spec', () => {
     'Summary',
     'Totals',
     'Programs',
+    'Screens',
+    'Reports',
     'Members',
     'ExternalRefs',
     'ExternalAPIs',
@@ -175,7 +177,7 @@ describe('second review finding 3: sheet count in the spec', () => {
     'Warnings',
   ];
 
-  it('builds exactly 14 sheets in the order the spec names', () => {
+  it('builds exactly 16 sheets in the order the spec names', () => {
     const report = buildInventoryReport(
       inventoryOf([text('P.vbp', ['Type=Exe'])]),
       ALL_PROGRAMS,
@@ -194,7 +196,7 @@ describe('second review finding 3: sheet count in the spec', () => {
       expect(spec).toContain(`\`${name}\``);
     const counts = [...spec.matchAll(/(\d+) sheet/g)].map((m) => m[1]);
     expect(counts.length).toBeGreaterThan(0);
-    expect(new Set(counts)).toEqual(new Set(['14']));
+    expect(new Set(counts)).toEqual(new Set(['16']));
   });
 });
 

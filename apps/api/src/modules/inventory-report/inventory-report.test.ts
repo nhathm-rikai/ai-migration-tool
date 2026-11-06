@@ -312,6 +312,8 @@ describe('inventory report workbook', () => {
       'Summary',
       'Totals',
       'Programs',
+      'Screens',
+      'Reports',
       'Members',
       'ExternalRefs',
       'ExternalAPIs',
@@ -328,8 +330,8 @@ describe('inventory report workbook', () => {
   it('writes one row per record under the header', () => {
     const rowCount = (xml: string) => [...xml.matchAll(/<row /g)].length;
     expect(rowCount(sheetXml(4))).toBe(1 + report.programs.length);
-    expect(rowCount(sheetXml(9))).toBe(1 + report.procedures.length);
-    expect(rowCount(sheetXml(14))).toBe(1 + report.warnings.length);
+    expect(rowCount(sheetXml(11))).toBe(1 + report.procedures.length);
+    expect(rowCount(sheetXml(16))).toBe(1 + report.warnings.length);
   });
 
   it('keeps a formula-like program name as quoted text', () => {

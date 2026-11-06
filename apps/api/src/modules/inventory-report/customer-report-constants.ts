@@ -2,7 +2,7 @@
 // may want to reword lives here, so the builder and the workbook have no
 // customer-facing sentences of their own. Japanese only (R2).
 
-export const CUSTOMER_REPORT_VERSION = 'customer-assessment-report-v1';
+export { CUSTOMER_REPORT_VERSION } from '@portal/contracts';
 
 // R8: the customer's own figures are not collected yet.
 export const CUSTOMER_PROVIDED_COUNT = 'お客様提示数：未入力';

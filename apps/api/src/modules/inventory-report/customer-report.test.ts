@@ -1,8 +1,13 @@
-import { inventoryKpis, type SourceInventoryDocument } from '@portal/contracts';
+import {
+  CustomerReportSchema,
+  inventoryKpis,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 import {
   UNOWNED_SQL_EXPECTED,
   unownedSqlInventoryFixture,
 } from '@portal/contracts/fixtures';
+import { Check } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
 import { demoInventory } from '../../adapters/fake/demo-inventory.js';
 import {
@@ -56,6 +61,17 @@ const sheetOf = (name: string, from: CustomerReport = report) => {
   if (!found) throw new Error(name);
   return found;
 };
+
+describe('customer report JSON contract (AR03 reads it)', () => {
+  it('matches CustomerReportSchema, with and without AR04 data', () => {
+    const json = JSON.parse(JSON.stringify(report)) as unknown;
+    expect(Check(CustomerReportSchema, json)).toBe(true);
+    const old = JSON.parse(
+      JSON.stringify(buildCustomerReport(legacy(), origin)),
+    ) as unknown;
+    expect(Check(CustomerReportSchema, old)).toBe(true);
+  });
+});
 
 describe('AR02-AC01 figures equal the assessment step and AR04', () => {
   it('uses the inventory totals the step 2 cards use', () => {

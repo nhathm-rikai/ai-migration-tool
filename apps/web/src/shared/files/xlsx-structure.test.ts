@@ -124,3 +124,42 @@ describe('isWellFormedXlsx', () => {
     expect(isWellFormedXlsx(zip(names))).toBe(false);
   });
 });
+
+// Third review, finding 1: the entries the check relies on must be inside
+// the file, with a local header and their data before the central directory.
+describe('isWellFormedXlsx entry ranges', () => {
+  // Patch a field of the central directory entry called `name`.
+  function patched(name: string, at: number, value: number, wide: boolean) {
+    const bytes = zip(REQUIRED);
+    const view = new DataView(bytes.buffer);
+    let entry = view.getUint32(bytes.length - 22 + 16, true);
+    for (;;) {
+      const length = view.getUint16(entry + 28, true);
+      const found = new TextDecoder().decode(
+        bytes.subarray(entry + 46, entry + 46 + length),
+      );
+      if (found === name) break;
+      entry += 46 + length;
+    }
+    if (wide) view.setUint32(entry + at, value, true);
+    else view.setUint16(entry + at, value, true);
+    return bytes;
+  }
+
+  it('accepts the unpatched package', () => {
+    expect(isWellFormedXlsx(zip(REQUIRED))).toBe(true);
+  });
+
+  it.each(REQUIRED)('rejects %s with a local offset outside the file', (n) => {
+    expect(isWellFormedXlsx(patched(n, 42, 0x7fffffff, true))).toBe(false);
+  });
+
+  it.each(REQUIRED)('rejects %s with no local signature at its offset', (n) => {
+    // Offset 5 is inside the first local header, not at a signature.
+    expect(isWellFormedXlsx(patched(n, 42, 5, true))).toBe(false);
+  });
+
+  it.each(REQUIRED)('rejects %s whose data overruns the file', (n) => {
+    expect(isWellFormedXlsx(patched(n, 20, 100000, true))).toBe(false);
+  });
+});

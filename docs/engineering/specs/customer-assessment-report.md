@@ -43,3 +43,11 @@ Một file hằng số: `customer-risk-catalog.ts` ánh xạ mã → {区分, �
 ## 5. Giới hạn
 
 Không có chữ ký, logo, kiểu mẫu của khách; chưa xuất theo bộ lọc (R5); chưa ô nhập số khách nêu và đối chiếu (R8); chưa tự chia wave (R9); PDF là AR03. Đã sinh file mở được bằng writer đã test, chưa mở bằng Excel Desktop.
+
+## 6. PDF cho khách (AR03)
+
+- Nguồn: đúng JSON của `customer-report?format=json` (schema `CustomerReportSchema` trong `packages/contracts`, bị kiểm trước khi vẽ), nên PDF và Excel cùng một số liệu. Web đọc qua `artifactsApi.getCustomerReport`.
+- `AssessmentDocument` (`features/assessment/assessment-document.tsx`, chữ cố định ở `assessment-document-text.ts`, tiếng Nhật): bìa (dự án, ngày phân tích, ngày xuất, phạm vi, nguồn gốc, nhãn DEMO, mục lục), rồi 1 規模概要 (thẻ KPI 画面/帳票/バッチ và quy mô, 帳票 theo kind và theo mức, bảng module có dòng 共通), 2 複雑度 (hai biểu đồ cột SVG: program và report, top program), 3 依存関係, 4 データベース, 5 リスク・確認事項, 6 画面・帳票一覧 (tối đa 40 dòng: 帳票, バッチ, 画面; câu "全件は Excel 参照"), 今後の進め方 (hằng số R9), 付録 (định nghĩa chỉ số, luật đếm 画面/帳票/バッチ, độ phức tạp report, version mô hình). Inventory không có dữ liệu AR04: ô và mục 6 ghi 未解析（再解析が必要）, không ghi 0.
+- Renderer A4 dùng chung `shared/pdf/a4-pdf.ts` (tách từ báo giá, báo giá gọi qua `QUOTE_PDF_OPTIONS`). Mỗi trang là ảnh JPEG, chữ không chọn được; cắt trang ở đáy các khối `.qd-block`; thêm `pageBreakBeforeSelector` (bìa tách khỏi 1, 付録 sang trang mới). Bảng dài được chia thành nhiều khối, mỗi khối lặp hàng header, nên không cắt ngang dòng/thẻ. Số trang ở chân.
+- Nút "Báo cáo cho khách (PDF)" cạnh nút Excel cho khách; cùng quy tắc disabled/hủy khi đổi artifact/version/không lưu khi lỗi. Tên file `アセスメント報告書_<dự án>_<YYYYMMDD>.pdf`.
+- Giới hạn: PDF là ảnh (không tìm kiếm được chữ); khách hàng/tên công ty không có trong dữ liệu nên bìa chỉ ghi tên dự án; chưa xem bằng trình xem PDF khác ngoài ảnh trang trích từ chính file.

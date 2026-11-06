@@ -831,7 +831,8 @@ export const jaMessages = {
       },
     },
     report: {
-      export: 'Excel 出力',
+      export: '技術データ（Excel・社内用）',
+      exportCustomer: 'お客様向け報告書（Excel）',
       exporting: '出力中…',
       tooLarge:
         'レポートが大きすぎて Excel のシートに収まりません。右のボタンから JSON 形式でダウンロードしてください。',

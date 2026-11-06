@@ -84,7 +84,11 @@ describe('Assessment report export button (AR01)', () => {
   it('asks for the displayed artifact id and version, then saves under the server name', async () => {
     const ctx = setup(() => fileResponse('assessment-受注-20261106.xlsx'));
     render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     await waitFor(() => expect(ctx.save).toHaveBeenCalledTimes(1));
     expect(ctx.calls.filter((url) => url.includes('/report'))).toEqual([
       reportUrl,
@@ -105,7 +109,9 @@ describe('Assessment report export button (AR01)', () => {
         }),
     );
     render(ctx.view());
-    const button = await screen.findByRole('button', { name: 'Xuất Excel' });
+    const button = await screen.findByRole('button', {
+      name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+    });
     fireEvent.click(button);
     const busy = await screen.findByRole('button', { name: 'Đang xuất…' });
     expect((busy as HTMLButtonElement).disabled).toBe(true);
@@ -114,8 +120,9 @@ describe('Assessment report export button (AR01)', () => {
     finish(fileResponse());
     await waitFor(() => expect(ctx.save).toHaveBeenCalledTimes(1));
     expect(
-      screen.getByRole<HTMLButtonElement>('button', { name: 'Xuất Excel' })
-        .disabled,
+      screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }).disabled,
     ).toBe(false);
   });
 
@@ -124,7 +131,11 @@ describe('Assessment report export button (AR01)', () => {
       json(errorResponseFixture('ARTIFACT_NOT_FOUND'), 404),
     );
     render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Không tìm thấy phiên bản kết quả',
     );
@@ -134,7 +145,11 @@ describe('Assessment report export button (AR01)', () => {
   it('shows a generic error when the request fails', async () => {
     const ctx = setup(() => json({ nope: true }, 500));
     render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Không xuất được báo cáo',
     );
@@ -152,14 +167,19 @@ describe('Assessment report export button (AR01)', () => {
   ])('does not save %s answered with 200', async (_name, body, type) => {
     const ctx = setup(() => fileResponse('x.xlsx', body, type));
     render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Không xuất được báo cáo',
     );
     expect(ctx.save).not.toHaveBeenCalled();
     expect(
-      screen.getByRole<HTMLButtonElement>('button', { name: 'Xuất Excel' })
-        .disabled,
+      screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }).disabled,
     ).toBe(false);
   });
 
@@ -168,7 +188,11 @@ describe('Assessment report export button (AR01)', () => {
       json(errorResponseFixture('REPORT_TOO_LARGE'), 422),
     );
     render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     expect((await screen.findByRole('alert')).textContent).toContain(
       'quá lớn để xếp vào một sheet Excel',
     );
@@ -202,7 +226,9 @@ describe('Assessment report export button (AR01)', () => {
       render(ctx.view());
       expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Xuất Excel' }),
+        await screen.findByRole('button', {
+          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        }),
       );
       await screen.findByRole('button', { name: 'Tải bản JSON' });
       expect((await screen.findByRole('alert')).textContent).not.toContain(
@@ -214,7 +240,9 @@ describe('Assessment report export button (AR01)', () => {
       const ctx = setup(() => json({ nope: true }, 500));
       render(ctx.view());
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Xuất Excel' }),
+        await screen.findByRole('button', {
+          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        }),
       );
       await screen.findByRole('alert');
       expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
@@ -226,7 +254,9 @@ describe('Assessment report export button (AR01)', () => {
       );
       render(ctx.view());
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Xuất Excel' }),
+        await screen.findByRole('button', {
+          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        }),
       );
       fireEvent.click(
         await screen.findByRole('button', { name: 'Tải bản JSON' }),
@@ -259,7 +289,9 @@ describe('Assessment report export button (AR01)', () => {
         );
         const view = render(ctx.view());
         fireEvent.click(
-          await screen.findByRole('button', { name: 'Xuất Excel' }),
+          await screen.findByRole('button', {
+            name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+          }),
         );
         fireEvent.click(
           await screen.findByRole('button', { name: 'Tải bản JSON' }),
@@ -283,7 +315,9 @@ describe('Assessment report export button (AR01)', () => {
       );
       const { rerender } = render(ctx.view());
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Xuất Excel' }),
+        await screen.findByRole('button', {
+          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        }),
       );
       fireEvent.click(
         await screen.findByRole('button', { name: 'Tải bản JSON' }),
@@ -307,7 +341,11 @@ describe('Assessment report export button (AR01)', () => {
         }),
     );
     const { rerender } = render(ctx.view());
-    fireEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      }),
+    );
     await screen.findByRole('button', { name: 'Đang xuất…' });
     const signal = ctx.pendings[0]?.signal;
     rerender(ctx.view(FIXTURE_IDS.runs.failed));
@@ -330,5 +368,86 @@ describe('fileNameFromDisposition', () => {
     );
     expect(fileNameFromDisposition(null)).toBeNull();
     expect(fileNameFromDisposition('attachment')).toBeNull();
+  });
+});
+
+// AR02-AC07 (web): two separate buttons, each downloads its own file.
+describe('Customer report export button (AR02)', () => {
+  const customerUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=xlsx`;
+  const customer = () =>
+    screen.findByRole('button', { name: 'Báo cáo cho khách (Excel)' });
+  const technical = () =>
+    screen.findByRole('button', { name: 'Dữ liệu kỹ thuật (Excel, nội bộ)' });
+
+  it('downloads the customer file from its own route and saves it by the server name', async () => {
+    const { view, save, calls } = setup(() =>
+      fileResponse('アセスメント報告書_Demo_20261106.xlsx'),
+    );
+    render(view());
+    fireEvent.click(await customer());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0]?.[0]).toBe(
+      'アセスメント報告書_Demo_20261106.xlsx',
+    );
+    expect(calls).toContain(customerUrl);
+    expect(calls).not.toContain(reportUrl);
+  });
+
+  it('keeps the technical data button apart and labelled internal', async () => {
+    const { view, save, calls } = setup(() => fileResponse());
+    render(view());
+    expect((await customer()).className).toContain('primary');
+    fireEvent.click(await technical());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(calls).toContain(reportUrl);
+    expect(calls).not.toContain(customerUrl);
+  });
+
+  it('shows a failure and saves nothing when the file is not a workbook', async () => {
+    const { view, save } = setup(() => fileResponse('x.xlsx', SIGNATURE_ONLY));
+    render(view());
+    fireEvent.click(await customer());
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('offers the customer JSON when the workbook is too large', async () => {
+    const { view, calls } = setup(() => {
+      const url = calls.at(-1) ?? '';
+      if (url.includes('format=json'))
+        return new Response(
+          JSON.stringify({
+            reportVersion: 'customer-assessment-report-v1',
+            scale: {},
+            source: {
+              origin: { artifactId, artifactVersion: 1 },
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              'content-type': 'application/json',
+              'content-disposition': 'attachment; filename="a.json"',
+            },
+          },
+        );
+      return new Response(
+        JSON.stringify(errorResponseFixture('REPORT_TOO_LARGE')),
+        {
+          status: 422,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    });
+    render(view());
+    fireEvent.click(await customer());
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Tải bản JSON' }),
+    );
+    await waitFor(() =>
+      expect(
+        calls.some((url) => url.includes('/customer-report?format=json')),
+      ).toBe(true),
+    );
   });
 });

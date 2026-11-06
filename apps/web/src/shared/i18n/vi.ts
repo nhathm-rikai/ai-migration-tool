@@ -850,7 +850,8 @@ export const viMessages = {
       },
     },
     report: {
-      export: 'Xuất Excel',
+      export: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      exportCustomer: 'Báo cáo cho khách (Excel)',
       exporting: 'Đang xuất…',
       tooLarge:
         'Báo cáo quá lớn để xếp vào một sheet Excel. Hãy tải bản JSON bằng nút bên cạnh.',
@@ -1076,7 +1077,7 @@ export const viMessages = {
         ? ` · ${skipped} program không phân tích được, chưa tính`
         : ''),
     exportPdf: 'Xuất PDF',
-    exportExcel: 'Xuất Excel',
+    exportExcel: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
     send: 'Gửi khách hàng',
     sendLater: 'Chưa có trong bản này',
     totalCost: 'Tổng chi phí',

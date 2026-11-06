@@ -31,15 +31,31 @@ function readBlob(
   });
 }
 
-const REPORT_VERSION = 'inventory-report-v1';
+export type ReportKind = 'technical' | 'customer';
+const REPORT_VERSION: Record<ReportKind, string> = {
+  technical: 'inventory-report-v1',
+  customer: 'customer-assessment-report-v1',
+};
+const REPORT_PATH: Record<ReportKind, string> = {
+  technical: '/report',
+  customer: '/customer-report',
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // The JSON answer must be the report of the exact artifact and version asked.
-function isReportOf(value: unknown, artifactId: string, version: number) {
-  if (!isRecord(value) || value.reportVersion !== REPORT_VERSION) return false;
-  if (!Array.isArray(value.programs)) return false;
+function isReportOf(
+  value: unknown,
+  kind: ReportKind,
+  artifactId: string,
+  version: number,
+) {
+  if (!isRecord(value) || value.reportVersion !== REPORT_VERSION[kind])
+    return false;
+  // The technical report lists programs; the customer one has its scale.
+  if (kind === 'technical' && !Array.isArray(value.programs)) return false;
+  if (kind === 'customer' && !isRecord(value.scale)) return false;
   const origin = isRecord(value.source) ? value.source.origin : null;
   return (
     isRecord(origin) &&
@@ -49,6 +65,7 @@ function isReportOf(value: unknown, artifactId: string, version: number) {
 }
 
 function reportExpectation(
+  kind: ReportKind,
   format: InventoryReportFormat,
   artifactId: string,
   version: number,
@@ -64,7 +81,7 @@ function reportExpectation(
     isValid: async (blob) => {
       try {
         const parsed: unknown = JSON.parse(await readBlob(blob, 'text'));
-        return isReportOf(parsed, artifactId, version);
+        return isReportOf(parsed, kind, artifactId, version);
       } catch {
         return false;
       }
@@ -116,6 +133,7 @@ export function createArtifactsApi(
       version: number,
       format: InventoryReportFormat,
       signal: AbortSignal,
+      kind: ReportKind = 'technical',
     ) =>
       request.download(
         project(projectId) +
@@ -123,10 +141,11 @@ export function createArtifactsApi(
           encodeURIComponent(artifactId) +
           '/versions/' +
           String(version) +
-          '/report?format=' +
+          REPORT_PATH[kind] +
+          '?format=' +
           format,
         signal,
-        reportExpectation(format, artifactId, version),
+        reportExpectation(kind, format, artifactId, version),
       ),
   };
 }

@@ -111,6 +111,14 @@ export function AssessmentOverview({
             api={api}
             artifact={state.artifact}
             slot={headerSlot}
+            kind="customer"
+            {...(saveFile ? { save: saveFile } : {})}
+          />
+          <ReportExportButton
+            api={api}
+            artifact={state.artifact}
+            slot={headerSlot}
+            kind="technical"
             {...(saveFile ? { save: saveFile } : {})}
           />
           <ArtifactView artifact={state.artifact} projectId={projectId} />

@@ -179,7 +179,14 @@ describe('Assessment report export button (AR01)', () => {
   describe('JSON download after REPORT_TOO_LARGE', () => {
     const jsonUrl = reportUrl.replace('format=xlsx', 'format=json');
     const tooLarge = () => json(errorResponseFixture('REPORT_TOO_LARGE'), 422);
-    const jsonResponse = (body: BodyInit = '{"ok":true}') =>
+    const report = (patch: Record<string, unknown> = {}) =>
+      JSON.stringify({
+        reportVersion: 'inventory-report-v1',
+        source: { origin: { artifactId, artifactVersion: 1 } },
+        programs: [],
+        ...patch,
+      });
+    const jsonResponse = (body: BodyInit = report()) =>
       new Response(body, {
         status: 200,
         headers: {
@@ -233,8 +240,20 @@ describe('Assessment report export button (AR01)', () => {
       expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
     });
 
-    it('saves nothing when the JSON answer is not JSON or is empty', async () => {
-      for (const body of ['<html>login</html>', '']) {
+    it('saves nothing when the JSON answer is not the report of this version', async () => {
+      for (const body of [
+        '<html>login</html>',
+        '',
+        'null',
+        '[]',
+        '{"ok":true}',
+        report({ reportVersion: 'other' }),
+        report({ programs: null }),
+        report({ source: { origin: null } }),
+        report({ source: {} }),
+        report({ source: { origin: { artifactId: 'x', artifactVersion: 1 } } }),
+        report({ source: { origin: { artifactId, artifactVersion: 2 } } }),
+      ]) {
         const ctx = setup(() =>
           asked(ctx).length === 1 ? tooLarge() : jsonResponse(body),
         );

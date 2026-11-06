@@ -31,24 +31,46 @@ function readBlob(
   });
 }
 
-const REPORT_EXPECTATIONS = {
-  xlsx: {
-    mediaType: INVENTORY_REPORT_CONTENT_TYPES.xlsx,
-    isValid: async (blob: Blob) =>
-      isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
-  },
-  json: {
+const REPORT_VERSION = 'inventory-report-v1';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// The JSON answer must be the report of the exact artifact and version asked.
+function isReportOf(value: unknown, artifactId: string, version: number) {
+  if (!isRecord(value) || value.reportVersion !== REPORT_VERSION) return false;
+  if (!Array.isArray(value.programs)) return false;
+  const origin = isRecord(value.source) ? value.source.origin : null;
+  return (
+    isRecord(origin) &&
+    origin.artifactId === artifactId &&
+    origin.artifactVersion === version
+  );
+}
+
+function reportExpectation(
+  format: InventoryReportFormat,
+  artifactId: string,
+  version: number,
+): DownloadExpectation {
+  if (format === 'xlsx')
+    return {
+      mediaType: INVENTORY_REPORT_CONTENT_TYPES.xlsx,
+      isValid: async (blob) =>
+        isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
+    };
+  return {
     mediaType: 'application/json',
-    isValid: async (blob: Blob) => {
+    isValid: async (blob) => {
       try {
-        JSON.parse(await readBlob(blob, 'text'));
-        return true;
+        const parsed: unknown = JSON.parse(await readBlob(blob, 'text'));
+        return isReportOf(parsed, artifactId, version);
       } catch {
         return false;
       }
     },
-  },
-} as const satisfies Record<InventoryReportFormat, DownloadExpectation>;
+  };
+}
 
 // Artifact read endpoints (C01 API 7). A version is always named exactly;
 // there is no "latest" read.
@@ -104,7 +126,7 @@ export function createArtifactsApi(
           '/report?format=' +
           format,
         signal,
-        REPORT_EXPECTATIONS[format],
+        reportExpectation(format, artifactId, version),
       ),
   };
 }

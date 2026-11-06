@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 06/11/2026 — AR01: sửa phát hiện của review lần bốn (trên e069169)
+
+- [P2] `isWellFormedXlsx` áp dụng cùng kiểm tra cho **mọi** mục của central directory: offset local header nằm trong file và trước central directory, chữ ký `PK\x03\x04` tại đó, header + tên + extra + dữ liệu nén kết thúc trước central directory, tên trong local header bằng tên trong central directory; số mục khớp EOCD và thư mục không có byte thừa. Vẫn không giải nén, không kiểm CRC, không parse XML.
+- Ranh giới ghi trong spec và comment mã: đây là kiểm tra cấu trúc sơ bộ cho phản hồi từ backend cục bộ của chính Portal; hỏng ở mức thấp hơn (dữ liệu nén, CRC, XML) nằm ngoài phạm vi vì server dựng file bằng writer đã test.
+- Kiểm chứng: `typecheck`, `lint` pass; `test` với 2 workers: contracts 50, api 620 pass/1 skipped, web 325 pass; `e2e` 17 pass (Windows x64, Node 24.16.0). Chưa mở bằng Excel Desktop, chưa kiểm macOS/Linux.
+
 ## 06/11/2026 — AR01: sửa 3 phát hiện của review lần ba (trên 52d5700)
 
 - [P2] `isWellFormedXlsx` kiểm thêm, cho hai mục bắt buộc: offset local header nằm trong file, có chữ ký `PK\x03\x04` tại đó, và header + tên + extra + dữ liệu nén kết thúc trước central directory. Không giải nén.

@@ -129,8 +129,14 @@ describe('isWellFormedXlsx', () => {
 // the file, with a local header and their data before the central directory.
 describe('isWellFormedXlsx entry ranges', () => {
   // Patch a field of the central directory entry called `name`.
-  function patched(name: string, at: number, value: number, wide: boolean) {
-    const bytes = zip(REQUIRED);
+  function patched(
+    name: string,
+    at: number,
+    value: number,
+    wide: boolean,
+    names: string[] = REQUIRED,
+  ) {
+    const bytes = zip(names);
     const view = new DataView(bytes.buffer);
     let entry = view.getUint32(bytes.length - 22 + 16, true);
     for (;;) {
@@ -161,5 +167,50 @@ describe('isWellFormedXlsx entry ranges', () => {
 
   it.each(REQUIRED)('rejects %s whose data overruns the file', (n) => {
     expect(isWellFormedXlsx(patched(n, 20, 100000, true))).toBe(false);
+  });
+
+  // Fourth review: every entry is held to the same ranges.
+  const SHEET = 'xl/worksheets/sheet1.xml';
+  const WITH_SHEET = [...REQUIRED, SHEET];
+
+  it('accepts a package with a sheet entry', () => {
+    expect(isWellFormedXlsx(zip(WITH_SHEET))).toBe(true);
+  });
+
+  it('rejects a sheet entry with a local offset outside the file', () => {
+    expect(
+      isWellFormedXlsx(patched(SHEET, 42, 0x7fffffff, true, WITH_SHEET)),
+    ).toBe(false);
+  });
+
+  it('rejects a sheet entry with no local signature at its offset', () => {
+    expect(isWellFormedXlsx(patched(SHEET, 42, 5, true, WITH_SHEET))).toBe(
+      false,
+    );
+  });
+
+  it('rejects a sheet entry whose data overruns the file', () => {
+    expect(isWellFormedXlsx(patched(SHEET, 20, 100000, true, WITH_SHEET))).toBe(
+      false,
+    );
+  });
+
+  it('rejects a local header name that differs from the central one', () => {
+    const bytes = zip(WITH_SHEET);
+    // Last local header: change the last letter of its name.
+    const view = new DataView(bytes.buffer);
+    const central = view.getUint32(bytes.length - 22 + 16, true);
+    // Local header of the sheet is the third; its name ends right before
+    // the central directory.
+    bytes[central - 1] = 0x5a;
+    expect(isWellFormedXlsx(bytes)).toBe(false);
+  });
+
+  it('rejects an entry count that differs from the directory', () => {
+    const bytes = zip(WITH_SHEET);
+    const view = new DataView(bytes.buffer);
+    view.setUint16(bytes.length - 22 + 10, 2, true);
+    view.setUint16(bytes.length - 22 + 8, 2, true);
+    expect(isWellFormedXlsx(bytes)).toBe(false);
   });
 });

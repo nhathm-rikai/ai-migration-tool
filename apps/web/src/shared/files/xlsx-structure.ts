@@ -1,13 +1,20 @@
-// Structural check of an .xlsx (a ZIP) before it is saved: the End Of Central
-// Directory record is found, the central directory lies inside the file and
-// lists the two parts every workbook has. It does not inflate anything.
+// Structural sanity check of an .xlsx (a ZIP) before it is saved. The answer
+// comes from our own local backend, which builds the file with a tested
+// writer; this only catches a response that is not a workbook package at all
+// (an error page, a cut-off body, a wrong offset table). It finds the End Of
+// Central Directory record, walks EVERY central directory entry, checks that
+// each has a local header at an offset inside the file whose name equals the
+// central one and whose data ends before the central directory, and that the
+// two parts every workbook has are listed. It does not decompress, verify
+// CRCs or parse XML: corruption below that level is out of scope.
 
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
+const LOCAL_SIGNATURE = 0x04034b50;
 const EOCD_MIN = 22;
 // 22 bytes plus a comment of at most 65535 bytes.
 const EOCD_MAX = EOCD_MIN + 0xffff;
-const LOCAL_SIGNATURE = 0x04034b50;
+const CENTRAL_HEADER = 46;
 const LOCAL_HEADER = 30;
 const REQUIRED_ENTRIES = ['[Content_Types].xml', 'xl/workbook.xml'];
 
@@ -29,38 +36,42 @@ export function isWellFormedXlsx(bytes: Uint8Array): boolean {
   const entries = view.getUint16(eocd + 10, true);
   const size = view.getUint32(eocd + 12, true);
   const offset = view.getUint32(eocd + 16, true);
-  if (offset + size > eocd) return false;
+  const end = offset + size;
+  if (end > eocd) return false;
 
-  const found = new Map<string, { local: number; compressed: number }>();
+  const found = new Set<string>();
   const decoder = new TextDecoder();
   let at = offset;
   for (let index = 0; index < entries; index++) {
-    if (at + 46 > offset + size) return false;
+    if (at + CENTRAL_HEADER > end) return false;
     if (view.getUint32(at, true) !== CENTRAL_SIGNATURE) return false;
+    const compressed = view.getUint32(at + 20, true);
     const nameLength = view.getUint16(at + 28, true);
     const extraLength = view.getUint16(at + 30, true);
     const commentLength = view.getUint16(at + 32, true);
-    const next = at + 46 + nameLength + extraLength + commentLength;
-    if (next > offset + size) return false;
-    found.set(decoder.decode(bytes.subarray(at + 46, at + 46 + nameLength)), {
-      local: view.getUint32(at + 42, true),
-      compressed: view.getUint32(at + 20, true),
-    });
-    at = next;
-  }
-  // Each required entry: a local header at its offset, and header, name,
-  // extra field and data all end before the central directory.
-  return REQUIRED_ENTRIES.every((name) => {
-    const entry = found.get(name);
-    if (!entry) return false;
-    const { local, compressed } = entry;
+    const local = view.getUint32(at + 42, true);
+    const next = at + CENTRAL_HEADER + nameLength + extraLength + commentLength;
+    if (next > end) return false;
+
+    // Local header: signature, same name, and header + data before the
+    // central directory.
     if (local + LOCAL_HEADER > offset) return false;
     if (view.getUint32(local, true) !== LOCAL_SIGNATURE) return false;
-    const dataStart =
-      local +
-      LOCAL_HEADER +
-      view.getUint16(local + 26, true) +
-      view.getUint16(local + 28, true);
-    return dataStart + compressed <= offset;
-  });
+    if (view.getUint16(local + 26, true) !== nameLength) return false;
+    const nameStart = local + LOCAL_HEADER;
+    const dataStart = nameStart + nameLength + view.getUint16(local + 28, true);
+    if (dataStart + compressed > offset) return false;
+    const name = decoder.decode(
+      bytes.subarray(at + CENTRAL_HEADER, at + CENTRAL_HEADER + nameLength),
+    );
+    if (
+      name !== decoder.decode(bytes.subarray(nameStart, nameStart + nameLength))
+    )
+      return false;
+    found.add(name);
+    at = next;
+  }
+  // The directory holds exactly the counted entries.
+  if (at !== end) return false;
+  return REQUIRED_ENTRIES.every((name) => found.has(name));
 }

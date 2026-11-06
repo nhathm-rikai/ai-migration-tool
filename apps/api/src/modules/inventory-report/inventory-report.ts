@@ -268,30 +268,55 @@ export const ALL_PROGRAMS = 'all' as const;
 export type ProgramSelection = readonly string[] | typeof ALL_PROGRAMS;
 
 // All programs, chosen by project path instead of file-name ID, so two
-// project files with the same name in different folders are both kept. The
-// ID stays the file name unless it repeats (compared without case); a
-// repeated name uses the project path without extension (`A/X`).
+// project files with the same name in different folders are both kept. IDs
+// are unique without regard to case. Each program starts with its file name
+// (tier 0); every program in a colliding group moves one tier up: the project
+// path without extension (`A/X`), then the full project path. Collisions that
+// remain between full paths differing only by case get `#<n>` in order.
 function selectAllPrograms(inventory: Inventory) {
-  const count = new Map<string, number>();
-  for (const program of inventory.programs) {
-    const key = programId(program.projectPath).toUpperCase();
-    count.set(key, (count.get(key) ?? 0) + 1);
+  const programs = inventory.programs;
+  const withoutExtension = (path: string) =>
+    path.slice(0, path.length - extensionOf(path).length);
+  const tiers = programs.map(() => 0);
+  const idOf = (index: number) => {
+    const path = programs[index]?.projectPath ?? '';
+    const tier = tiers[index] ?? 0;
+    return tier === 0
+      ? programId(path)
+      : tier === 1
+        ? withoutExtension(path)
+        : path;
+  };
+  const groups = () => {
+    const byKey = new Map<string, number[]>();
+    programs.forEach((_, index) => {
+      const key = idOf(index).toUpperCase();
+      byKey.set(key, [...(byKey.get(key) ?? []), index]);
+    });
+    return [...byKey.values()].filter((members) => members.length > 1);
+  };
+  for (;;) {
+    const raisable = groups()
+      .flat()
+      .filter((index) => (tiers[index] ?? 0) < 2);
+    if (raisable.length === 0) break;
+    // A group is raised as a whole, also members already on a higher tier.
+    for (const members of groups()) {
+      if (members.every((index) => (tiers[index] ?? 0) >= 2)) continue;
+      for (const index of members)
+        tiers[index] = Math.min(2, (tiers[index] ?? 0) + 1);
+    }
   }
-  const named = inventory.programs.map((program) => {
-    const id = programId(program.projectPath);
-    const repeated = (count.get(id.toUpperCase()) ?? 0) > 1;
-    return {
-      id: repeated
-        ? program.projectPath.slice(0, -extensionOf(program.projectPath).length)
-        : id,
-      program,
-    };
-  });
-  // `A/X.vbp` and `A/X.VBP` still share an ID; the full path tells them apart.
-  const exact = new Map<string, number>();
-  for (const { id } of named) exact.set(id, (exact.get(id) ?? 0) + 1);
-  return named.map(({ id, program }) => ({
-    id: (exact.get(id) ?? 0) > 1 ? program.projectPath : id,
+  const ids = programs.map((_, index) => idOf(index));
+  for (const members of groups()) {
+    members.forEach((index, order) => {
+      ids[index] = `${idOf(index)}#${String(order + 1)}`;
+    });
+  }
+  if (new Set(ids.map((id) => id.toUpperCase())).size !== ids.length)
+    throw new Error('Internal error: program IDs are not unique.');
+  return programs.map((program, index) => ({
+    id: ids[index] ?? program.projectPath,
     program,
   }));
 }

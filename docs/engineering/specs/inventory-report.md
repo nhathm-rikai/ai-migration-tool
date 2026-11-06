@@ -32,7 +32,7 @@ Giới hạn Excel: một sheet tối đa 1.048.576 dòng (tính cả header và
 
 Che đường dẫn tuyệt đối: dấu ngoặc kép/đơn và khoảng trắng bao quanh được bỏ trước khi kiểm (`"C:\root\X.bas"` → `<absolute path>/X.bas`), áp cho `declaredPath`, `externalReferences`, `externalApis` và mọi cảnh báo.
 
-ID program ở chế độ tất cả: tên file; trùng (không phân biệt hoa thường) → đường dẫn project bỏ phần mở rộng; vẫn trùng (`A/X.vbp` và `A/X.VBP`) → đường dẫn project đầy đủ. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
+ID program ở chế độ tất cả luôn duy nhất, không phân biệt hoa thường: tên file; trùng → đường dẫn project bỏ phần mở rộng; vẫn trùng với ID khác (kể cả ID ngắn của file khác, ví dụ `X.vbp.vbp` có ID `X.vbp`) → cả nhóm trùng dùng đường dẫn project đầy đủ; đường dẫn đầy đủ chỉ khác hoa thường (`X.vbp` và `X.VBP`) → thêm `#1`, `#2` theo thứ tự. Nếu vẫn còn ID trùng thì báo lỗi nội bộ, không xuất báo cáo. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
 
 ## 3. Totals
 
@@ -63,7 +63,7 @@ Inventory và hai output phải là ba file khác nhau; output ghi qua file tạ
 ### Tải qua API và UI (AR01)
 
 - `GET /api/v1/projects/:projectId/artifacts/:artifactId/versions/:version/report?format=xlsx|json` (operation `exportInventoryReport`, route protected như route artifact). Đọc đúng `projectId + artifactId + version` qua artifact service, không bao giờ lấy version khác hoặc latest; project khác, artifact/version không có → `ARTIFACT_NOT_FOUND` (404), `format` thiếu hoặc sai → 400. Mã trong `ErrorResponseSchema`, không thêm mã mới.
-- Chế độ chọn **tất cả program** (`buildInventoryReport(inventory, ALL_PROGRAMS)`): chọn theo `projectPath`, nên hai project file cùng tên ở hai thư mục không bị từ chối. ID là tên file; nếu tên lặp (không phân biệt hoa thường) thì ID là đường dẫn project bỏ phần mở rộng (`A/X`). Chế độ ID của CLI giữ nguyên, vẫn từ chối ID khớp nhiều file.
-- `xlsx` = `writeXlsx(inventoryReportSheets(report))` (13 sheet), `json` = report. `Content-Disposition: attachment` với `assessment-<tên dự án>-<YYYYMMDD UTC>.<đuôi>`: `filename` ASCII an toàn + `filename*=UTF-8''…` (RFC 5987); ký tự không an toàn trong tên file bị thay `_`, tên cắt 80 ký tự. Dựng trong bộ nhớ, không ghi file vào data directory hay thư mục tạm; `Cache-Control: no-store`.
+- Chế độ chọn **tất cả program** (`buildInventoryReport(inventory, ALL_PROGRAMS)`): chọn theo `projectPath`, nên hai project file cùng tên ở hai thư mục không bị từ chối. ID là tên file; nếu tên lặp (không phân biệt hoa thường) thì ID là đường dẫn project bỏ phần mở rộng (`A/X`), và leo tiếp lên đường dẫn đầy đủ khi vẫn trùng (mục 2). Chế độ ID của CLI giữ nguyên, vẫn từ chối ID khớp nhiều file.
+- `xlsx` = `writeXlsx(inventoryReportSheets(report))` (14 sheet: `README` + 13 bảng theo thứ tự nhóm ở mục 2), `json` = report. `Content-Disposition: attachment` với `assessment-<tên dự án>-<YYYYMMDD UTC>.<đuôi>`: `filename` ASCII an toàn + `filename*=UTF-8''…` (RFC 5987); ký tự không an toàn trong tên file bị thay `_`, tên cắt 80 ký tự. Dựng trong bộ nhớ, không ghi file vào data directory hay thư mục tạm; `Cache-Control: no-store`.
 - UI: nút "Xuất Excel" ở tiêu đề bước 2 (chỉ khi inventory `ready`), truyền đúng `artifact.id` và `version` đang hiển thị.
 - Chưa có: job nền, HTML, xuất theo bộ lọc/program đang chọn, phần cho khách (AR02), PDF (AR03).

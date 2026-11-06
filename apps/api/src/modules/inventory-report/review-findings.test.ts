@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import { describe, expect, it } from 'vitest';
 import { unzip } from '../../testing/zip-reader.js';
@@ -113,6 +114,86 @@ describe('review finding 4: program ID collisions', () => {
     expect(report.programs).toHaveLength(2);
     const ids = report.programs.map((p) => p.id);
     expect(new Set(ids).size).toBe(2);
-    expect(ids).toEqual(['A/X.vbp', 'A/X.VBP']);
+    expect(ids).toEqual(['A/X.vbp#1', 'A/X.VBP#2']);
+  });
+});
+
+// Second review, finding 2: IDs are unique without regard to case.
+describe('second review finding 2: unique program IDs', () => {
+  const idsOf = (paths: string[]) =>
+    buildInventoryReport(
+      inventoryOf(paths.map((path) => text(path, ['Type=Exe']))),
+      ALL_PROGRAMS,
+    ).programs.map((p) => p.id);
+  const unique = (ids: string[]) =>
+    new Set(ids.map((id) => id.toUpperCase())).size === ids.length;
+
+  it('keeps X.vbp, X.VBP and X.vbp.vbp apart', () => {
+    const ids = idsOf(['X.vbp', 'X.VBP', 'X.vbp.vbp']);
+    expect(unique(ids)).toBe(true);
+    // The short ID of the third file equals the full path of the first.
+    expect(ids).toEqual(['X.vbp#1', 'X.VBP#2', 'X.vbp.vbp']);
+  });
+
+  it('keeps the file name when it is unique and the path otherwise', () => {
+    expect(idsOf(['A/X.vbp', 'B/X.vbp', 'C/Y.vbp'])).toEqual([
+      'A/X',
+      'B/X',
+      'Y',
+    ]);
+  });
+
+  it('uses full paths when a short ID equals another path-based ID', () => {
+    const ids = idsOf(['A/X.vbp', 'B/X.vbp', 'A/X.vbp.vbp', 'B/A/X.vbp']);
+    expect(unique(ids)).toBe(true);
+    expect(ids[2]).toBe('X.vbp');
+  });
+
+  it('never repeats an ID that differs only by case', () => {
+    expect(unique(idsOf(['a/p.vbp', 'b/P.vbp', 'A/p.VBP', 'P.vbp']))).toBe(
+      true,
+    );
+  });
+});
+
+// Second review, finding 3: spec, acceptance and code say the same.
+describe('second review finding 3: sheet count in the spec', () => {
+  const SHEETS_IN_SPEC_ORDER = [
+    'README',
+    'Summary',
+    'Totals',
+    'Programs',
+    'Members',
+    'ExternalRefs',
+    'ExternalAPIs',
+    'Files',
+    'Procedures',
+    'Calls',
+    'CRUD',
+    'DynamicSQL',
+    'ConcatenatedSQL',
+    'Warnings',
+  ];
+
+  it('builds exactly 14 sheets in the order the spec names', () => {
+    const report = buildInventoryReport(
+      inventoryOf([text('P.vbp', ['Type=Exe'])]),
+      ALL_PROGRAMS,
+    );
+    expect(inventoryReportSheets(report).map((s) => s.name)).toEqual(
+      SHEETS_IN_SPEC_ORDER,
+    );
+    const spec = readFileSync(
+      new URL(
+        '../../../../../docs/engineering/specs/inventory-report.md',
+        import.meta.url,
+      ),
+      'utf8',
+    );
+    for (const name of SHEETS_IN_SPEC_ORDER.slice(1))
+      expect(spec).toContain(`\`${name}\``);
+    const counts = [...spec.matchAll(/(\d+) sheet/g)].map((m) => m[1]);
+    expect(counts.length).toBeGreaterThan(0);
+    expect(new Set(counts)).toEqual(new Set(['14']));
   });
 });

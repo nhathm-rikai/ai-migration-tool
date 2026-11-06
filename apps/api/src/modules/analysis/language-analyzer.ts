@@ -87,6 +87,19 @@ export type CodeFileAnalysis =
     }
   | { status: 'unsupported'; reason: string; line: number | null };
 
+// A lexical hint that code can produce a report (screen-report-v1).
+// `crystal` names the .rpt file; the others are suspected outputs.
+export type ReportSignalKind = 'crystal' | 'excel' | 'print' | 'file-output';
+export type ReportSignal = {
+  kind: ReportSignalKind;
+  name: string;
+  line: number;
+};
+
+// What a project reference says about reports, by runtime component.
+// Names the report kind it should produce.
+export type ReportRuntime = 'crystal' | 'data-report';
+
 export type ProjectMember = {
   kind: string;
   name: string | null;
@@ -107,6 +120,8 @@ export type ProjectFileAnalysis =
       name: string | null;
       members: ProjectMember[];
       externalReferences: ProjectExternalReference[];
+      // Startup object as written (e.g. "Sub Main"); absent when not set.
+      startup?: string;
     }
   | { status: 'unsupported'; reason: string; line: number | null };
 
@@ -124,6 +139,18 @@ export interface LanguageAnalyzer {
     names: ReadonlySet<string>,
   ): CodeReference[];
   parseProjectFile(lines: string[]): ProjectFileAnalysis;
+  // Member kinds that are one screen each (forms, user documents).
+  isScreenMemberKind(kind: string): boolean;
+  // True when the startup object is a Sub Main style entry (no UI).
+  isBatchStartup(startup: string | undefined): boolean;
+  // Output hints in one analyzed code file (outside designer sections).
+  findReportSignals(relativePath: string, lines: string[]): ReportSignal[];
+  // Header of a designer member file that is a report; null otherwise.
+  detectReportDesigner(lines: string[]): { line: number; name: string } | null;
+  // Report runtime a reference/OCX belongs to, or null.
+  reportRuntimeOf(reference: ProjectExternalReference): ReportRuntime | null;
+  // Extension of the design file of a `crystal` report, e.g. ".rpt".
+  readonly crystalFileExtension: string;
   // Role a file gets when a project declares it as a member of this kind,
   // or null to keep the role from its extension.
   roleForProjectMember(kind: string): SourceFileRole | null;

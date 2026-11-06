@@ -144,6 +144,9 @@ export const AnalyzeRunConfigSchema = Type.Object(
         callGraphVersion: VersionLabelSchema,
         complexityVersion: VersionLabelSchema,
         tableNameVersion: VersionLabelSchema,
+        // AR04; absent in runs admitted before screen/report counting.
+        screenReportVersion: Type.Optional(VersionLabelSchema),
+        reportComplexityVersion: Type.Optional(VersionLabelSchema),
       },
       Strict,
     ),

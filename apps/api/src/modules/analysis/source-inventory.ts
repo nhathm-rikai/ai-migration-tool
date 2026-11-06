@@ -13,10 +13,27 @@ import {
   type ManifestEntry,
 } from './source-manifest.js';
 import {
+  decodeSourceBytes,
   SOURCE_DECODER_VERSION,
   type ProfileEncoding,
 } from './source-decoder.js';
-import { SOURCE_NORMALIZATION_VERSION } from './source-text.js';
+import {
+  SOURCE_NORMALIZATION_VERSION,
+  splitSourceLines,
+} from './source-text.js';
+import {
+  buildCodeFileReportRows,
+  buildProgramScreenReport,
+  buildScreenReportTotals,
+  designerReportRow,
+  REPORT_COMPLEXITY_VERSION,
+  SCREEN_REPORT_VERSION,
+  type ProgramReport,
+  type ProgramScreen,
+  type ProgramType,
+  type ReportRow,
+  type ScreenReportTotals,
+} from './screen-report.js';
 import type { SourceProfile } from './source-profiles.js';
 import {
   analyzeProgram,
@@ -78,6 +95,10 @@ export type InventoryProgram = {
   complete: boolean;
   // Call graph, CRUD, metrics and draft complexity; null when not parsed.
   analysis: ProgramAnalysis | null;
+  // screen-report-v1; absent when the project is unsupported.
+  programType?: ProgramType;
+  screens?: ProgramScreen[];
+  reports?: ProgramReport[];
 };
 
 export type SourceInventory = {
@@ -91,6 +112,8 @@ export type SourceInventory = {
   sqlAccessVersion: string;
   callGraphVersion: string;
   complexityVersion: string;
+  screenReportVersion: string;
+  reportComplexityVersion: string;
   // How table names were merged for `normalizedCrud`, so the view can be
   // reproduced; an assumption unless `status` is confirmed.
   tableNames: TableNameMapping;
@@ -105,6 +128,7 @@ export type SourceInventory = {
     errorFiles: number;
     // Each analyzed code file counted once across the corpus.
     uniqueCounters: LineCounters;
+    screenReport: ScreenReportTotals;
   };
 };
 
@@ -169,6 +193,10 @@ export function buildSourceInventory(input: {
   files: readonly { relativePath: string; bytes: Uint8Array }[];
   encodingOverrides?: ReadonlyMap<string, ProfileEncoding>;
   tableNames?: TableNameMapping;
+  // Paths of files seen in the source but not loaded (e.g. excluded types
+  // such as Crystal .rpt): only their names are used, to tell whether the
+  // design file of a report exists.
+  knownPaths?: readonly string[];
   // Called once per file when its own work is done (PF08): after decoding
   // for a file that is not analyzed code, after the cross-file reference
   // scan (the expensive part) for analyzed code.
@@ -303,6 +331,45 @@ export function buildSourceInventory(input: {
     input.onFile?.(path);
   }
 
+  // Report rows per file: code signals, and designer members (.dsr).
+  const designFiles = new Set(
+    [...sources.keys(), ...(input.knownPaths ?? [])].map((path) =>
+      (path.split('/').at(-1) ?? path).toLowerCase(),
+    ),
+  );
+  const rowsByFile = new Map<string, ReportRow[]>();
+  for (const [path, lines] of codeLines) {
+    const analysis = files.get(path)?.analysis;
+    if (analysis?.status !== 'analyzed') continue;
+    rowsByFile.set(
+      path,
+      buildCodeFileReportRows({
+        analyzer,
+        relativePath: path,
+        lines,
+        analysis,
+        references: references.get(path) ?? [],
+        hasFile: (name) => designFiles.has(name.toLowerCase()),
+      }),
+    );
+  }
+  for (const { members } of parsedProjects)
+    for (const member of members) {
+      const path = member.relativePath;
+      if (member.kind !== 'designer' || path === null || rowsByFile.has(path))
+        continue;
+      const bytes = sources.get(path);
+      const decoded = bytes
+        ? decodeSourceBytes(bytes, {
+            profileEncoding: input.profile.defaultEncoding,
+          })
+        : null;
+      const header = decoded?.ok
+        ? analyzer.detectReportDesigner(splitSourceLines(decoded.text).lines)
+        : null;
+      rowsByFile.set(path, header ? [designerReportRow(path, header)] : []);
+    }
+
   const programs = parsedProjects.map(
     ({ path, parsed, members: resolved }): InventoryProgram => {
       if (parsed?.status !== 'parsed')
@@ -345,6 +412,23 @@ export function buildSourceInventory(input: {
           references: references.get(member.relativePath) ?? [],
         });
       }
+      const baseDir = path.split('/').slice(0, -1).join('/');
+      const screenReport = buildProgramScreenReport({
+        analyzer,
+        projectPath: path,
+        startup: parsed.startup,
+        externalReferences: parsed.externalReferences,
+        rowsByFile,
+        members: members.map((member) => {
+          const relative = analyzer.toRelativeMemberPath(member.declaredPath);
+          const joined =
+            relative === null ? null : joinRelative(baseDir, relative);
+          return {
+            ...member,
+            displayPath: member.relativePath ?? joined ?? member.declaredPath,
+          };
+        }),
+      });
       return {
         projectPath: path,
         status: 'parsed',
@@ -361,6 +445,7 @@ export function buildSourceInventory(input: {
           parsed.externalReferences,
           tableNames,
         ),
+        ...screenReport,
       };
     },
   );
@@ -383,6 +468,8 @@ export function buildSourceInventory(input: {
     sqlAccessVersion: SQL_ACCESS_VERSION,
     callGraphVersion: CALL_GRAPH_VERSION,
     complexityVersion: COMPLEXITY_VERSION,
+    screenReportVersion: SCREEN_REPORT_VERSION,
+    reportComplexityVersion: REPORT_COMPLEXITY_VERSION,
     tableNames,
     snapshotHash: computeSnapshotHash(entries, input.profile.id),
     files: inventoryFiles,
@@ -402,6 +489,19 @@ export function buildSourceInventory(input: {
         programs.filter((program) => program.status === 'unsupported').length,
       errorFiles: entries.filter((entry) => entry.kind === 'error').length,
       uniqueCounters,
+      screenReport: buildScreenReportTotals(
+        programs.flatMap((program) =>
+          program.programType === undefined
+            ? []
+            : [
+                {
+                  programType: program.programType,
+                  screens: program.screens ?? [],
+                  reports: program.reports ?? [],
+                },
+              ],
+        ),
+      ),
     },
   };
 }

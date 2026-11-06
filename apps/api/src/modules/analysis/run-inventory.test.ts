@@ -170,3 +170,45 @@ describe('buildRunInventory (B08)', () => {
     ).toEqual({ status: 'failed', errorCode: 'SOURCE_PROFILE_UNSUPPORTED' });
   });
 });
+
+describe('buildRunInventory report design files (AR04)', () => {
+  const withReport = [
+    files[0] ?? { relativePath: '', bytes: new Uint8Array() },
+    {
+      relativePath: 'app/MAIN.BAS',
+      bytes: encoder.encode(
+        'Attribute VB_Name = "Main"\r\nPublic Sub Run()\r\n  r.ReportFileName = "form1.rpt"\r\nEnd Sub\r\n',
+      ),
+    },
+  ];
+  const rowOf = (skipped: SnapshotManifest['skipped']) => {
+    const outcome = buildRunInventory({
+      run: run(),
+      manifest: manifest(skipped),
+      files: withReport,
+    });
+    if (outcome.status !== 'built') throw new Error(outcome.errorCode);
+    return outcome.inventory.programs[0]?.reports?.[0];
+  };
+
+  it('treats an excluded .rpt of the snapshot as the existing design file', () => {
+    expect(
+      rowOf([
+        {
+          relativePath: 'app/reports/FORM1.RPT',
+          kind: 'file',
+          reason: 'excluded',
+          byteLength: 10,
+        },
+      ]),
+    ).toMatchObject({ kind: 'crystal', confidence: 'detected', warnings: [] });
+  });
+
+  it('keeps the report referenced, with a warning, when no .rpt exists', () => {
+    expect(rowOf([])).toMatchObject({
+      kind: 'crystal',
+      confidence: 'referenced',
+      warnings: ['REPORT_FILE_MISSING'],
+    });
+  });
+});

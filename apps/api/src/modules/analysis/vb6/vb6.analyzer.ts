@@ -5,6 +5,10 @@ import {
   type Vb6ModuleKind,
 } from './vb6-code-file.js';
 import { parseVb6ProjectFile } from './vb6-project-file.js';
+import {
+  detectVb6ReportDesigner,
+  findVb6ReportSignals,
+} from './vb6-report-signals.js';
 
 // v1 text allowlist is .bas/.frm/.cls/.vbp; other VB6 source types are
 // reported unsupported until fixtures/parser tests exist.
@@ -50,6 +54,20 @@ export const vb6Analyzer: LanguageAnalyzer = {
       names,
     }),
   parseProjectFile: parseVb6ProjectFile,
+  isScreenMemberKind: (kind) => kind === 'form' || kind === 'user-document',
+  isBatchStartup: (startup) =>
+    startup !== undefined && /^sub\s+main$/i.test(startup.trim()),
+  findReportSignals: (relativePath, lines) =>
+    findVb6ReportSignals(lines, { module: moduleKind(relativePath) }),
+  detectReportDesigner: detectVb6ReportDesigner,
+  reportRuntimeOf(reference) {
+    const text = `${reference.fileName ?? ''} ${reference.description ?? ''}`;
+    if (/crystl32|craxdrt|crviewer|crystal\s+reports?/i.test(text))
+      return 'crystal';
+    if (/msdbrptr|msdatrep|data\s*report/i.test(text)) return 'data-report';
+    return null;
+  },
+  crystalFileExtension: '.rpt',
   // Forms and standard modules are VB code whatever their extension
   // (e.g. `Module=ORACONST; ..\cmn\ORACONST.TXT`). A class keeps the role of
   // its extension: its header is only parsed for .cls.

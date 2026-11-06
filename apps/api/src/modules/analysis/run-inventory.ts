@@ -93,6 +93,11 @@ export function buildRunInventory(
     profile,
     files: input.files,
     tableNames,
+    // Excluded files (e.g. Crystal .rpt) are not loaded, but their names tell
+    // whether a report design file exists.
+    knownPaths: input.manifest.skipped
+      .filter((entry) => entry.reason === 'excluded')
+      .map((entry) => entry.relativePath),
     ...(onFile ? { onFile } : {}),
   });
   return {

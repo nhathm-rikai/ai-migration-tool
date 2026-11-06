@@ -67,6 +67,7 @@ const KEY_VALUE = /^[^=\s][^=]*=/;
 
 export function parseVb6ProjectFile(lines: string[]): ProjectFileAnalysis {
   let name: string | null = null;
+  let startup: string | undefined;
   let hasType = false;
   const members: ProjectMember[] = [];
   const externalReferences: ProjectExternalReference[] = [];
@@ -91,6 +92,7 @@ export function parseVb6ProjectFile(lines: string[]): ProjectFileAnalysis {
       externalReferences.push(parseReference(value));
     else if (key === 'object') externalReferences.push(parseComponent(value));
     else if (key === 'name') name = unquote(value) || null;
+    else if (key === 'startup') startup = unquote(value) || undefined;
   }
   if (!hasType)
     return {
@@ -98,5 +100,11 @@ export function parseVb6ProjectFile(lines: string[]): ProjectFileAnalysis {
       reason: 'PROJECT_TYPE_MISSING',
       line: null,
     };
-  return { status: 'parsed', name, members, externalReferences };
+  return {
+    status: 'parsed',
+    name,
+    members,
+    externalReferences,
+    ...(startup === undefined ? {} : { startup }),
+  };
 }

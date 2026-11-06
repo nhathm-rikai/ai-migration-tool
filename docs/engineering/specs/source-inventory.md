@@ -12,6 +12,8 @@
 | `sqlAccessVersion` | `sql-access-v5` | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
 | `complexityVersion` | `complexity-v1` | Công thức điểm complexity (mục 5), chỉ là phân loại tham khảo. Inventory cũ ghi `complexity-v0` hoặc `complexity-v0-draft` (cùng công thức v0: SQL động chỉ đếm tên bảng runtime, ngưỡng 40/55, không có `very-high`). |
+| `screenReportVersion` | `screen-report-v1` | Luật đếm 画面・帳票・バッチ (mục 6). Optional: inventory cũ không có, và khi đó mọi nơi hiển thị "chưa có dữ liệu, cần phân tích lại", không hiện 0. |
+| `reportComplexityVersion` | `report-complexity-v1-draft` | Phân loại tham khảo độ phức tạp từng report (mục 6.3), không phải effort. Optional như trên. |
 | `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
 
 Số liệu khác version không được trộn trong cùng report.
@@ -90,7 +92,41 @@ Ngưỡng 45/60 chọn trên VB6 pilot (28/10/2026, `sql-access-v5`): thêm SQL 
 
 v1 không gắn cờ review (`reviewFlags`, mức cao hoặc gần ngưỡng) như v0; trường đó chỉ còn trong inventory v0 và không được report/UI dùng (quyết định của người dùng 28/10/2026).
 
-## 6. Chạy
+## 6. Màn hình, report và batch (`screen-report-v1`)
+
+Tất cả là fact từ code/project file, không gọi AI. Trường mới đều optional nên `schemaVersion` giữ `source-inventory-v1`.
+
+### 6.1. Màn hình (画面) và batch
+
+- Màn hình = member kind `form` hoặc `user-document`, đếm theo file thật (`relativePath`), không theo tên. `programs[].screens[]`: `name`, `file`, `shared` (file do ≥ 2 program khai báo), `warnings`. Form không tìm thấy hoặc không phân tích được vẫn đếm, kèm `SCREEN_FILE_MISSING` / `SCREEN_FILE_NOT_ANALYZED` (file là đường dẫn đã khai báo khi chưa resolve được).
+- Toàn dự án: số form duy nhất (không phân biệt hoa thường), form dùng chung chỉ tính một lần: `totals.screenReport.screens`, `sharedScreens`.
+- `programs[].programType`: `screen` nếu có ít nhất một màn hình; `batch` nếu không có màn hình và `Startup` của `.vbp` là `Sub Main`; còn lại `unknown`. Program có form nhưng startup `Sub Main` vẫn là `screen`. Project không parse được không có các trường này.
+
+### 6.2. Report (帳票)
+
+`programs[].reports[]`: `kind`, `name`, `file`, `line` (null với bằng chứng cấp project), `confidence`, `shared`, `procedureId`, `warnings`, `complexity`. Một dòng cho mỗi (kind, tên, procedure); code ở file dùng chung gắn vào mọi program khai báo file, tổng dự án tính một lần.
+
+| `kind` | Nhận diện | `confidence` |
+|---|---|---|
+| `data-report` | member `designer` có header `Begin {guid} DataReport/ActiveReport… <tên>` trong file (đọc header, chưa parse thiết kế) | `detected` |
+| `crystal` | chuỗi `"….rpt"` trong code (không tính comment, đoạn trong chuỗi khác) | `detected` nếu có file cùng tên (không phân biệt thư mục/hoa thường) trong source, ngược lại `referenced` + `REPORT_FILE_MISSING` |
+| `excel` | `CreateObject("Excel.Application")`, `GetObject(, "Excel.Application")`, `New Excel.Application` | `suspected` |
+| `print` | `Printer.Print` / `Printer.EndDoc` / `PrintForm` | `suspected` |
+| `file-output` | `Open … For Output/Append` | `suspected` |
+| `unknown` | program có reference/OCX báo cáo (Crystal `crystl32`, `craxdrt`, `crviewer`; DataReport `msdbrptr`/`msdatrep`) mà không có dòng cùng loại | `suspected` |
+
+`totals.screenReport.reports`: `rows` (số dòng duy nhất, bằng tổng `byKind` và tổng `byLevel`), `counted` (detected + referenced, "báo cáo phát hiện được"), `suspected` (hiển thị riêng, không cộng vào `counted`); `suspectedPrograms` = số program có ít nhất một dòng suspected; `batches` = số program `batch`.
+
+Giới hạn: lexical. `file-output` gồm cả ghi log/work file; xuất Excel bằng `Shell` hoặc file CSV không phải `excel`; một `.rpt` được dựng động từ biến không thấy; số mẫu report thật không biết với `suspected`.
+
+### 6.3. Độ phức tạp từng report (`report-complexity-v1-draft`)
+
+Phân loại tham khảo (không phải effort). Chấm trên procedure chứa dòng report: số decision point, dòng Executable, số bảng truy cập, SQL động/ghép chuỗi (`dynamicSql` + `concatenatedSql`), số procedure khác được tham chiếu. Mỗi yếu tố cộng điểm theo bậc trong `DEFAULT_REPORT_COMPLEXITY_CONFIG` (`screen-report.ts`); `complexity = { version, level, score, factors[], reason? }`, tổng `points` của `factors` bằng `score`. `level`: `low` < 3 ≤ `medium` < 6 ≤ `high` < 9 ≤ `very-high` (theo hằng số, đổi hằng số là đổi mức và phải đổi version).
+
+- `suspected` hoặc không xác định được procedure → `level: unrated`, `score: null`, `reason` `SUSPECTED` / `NO_PROCEDURE`. Không bao giờ ghi `low` thay cho thiếu dữ liệu.
+- Thiết kế report chưa phân tích (`.rpt`, `.dsr`): thêm factor `design-not-analyzed` (0 điểm) và mức tối thiểu `medium` (`reason: DESIGN_NOT_ANALYZED_FLOOR` khi bị nâng). `.dsr` không có procedure gọi nên là `unrated` + factor đó.
+
+## 7. Chạy
 
 ```text
 npm run build -w @portal/contracts && npm run build -w @portal/api

@@ -8,6 +8,10 @@ import {
   CALL_GRAPH_VERSION,
   COMPLEXITY_VERSION,
 } from '../analysis/program-analysis.js';
+import {
+  REPORT_COMPLEXITY_VERSION,
+  SCREEN_REPORT_VERSION,
+} from '../analysis/screen-report.js';
 import { SOURCE_DECODER_VERSION } from '../analysis/source-decoder.js';
 import { findSourceProfile } from '../analysis/source-profiles.js';
 import { SOURCE_NORMALIZATION_VERSION } from '../analysis/source-text.js';
@@ -46,6 +50,8 @@ export function analyzeRunConfig(
       callGraphVersion: CALL_GRAPH_VERSION,
       complexityVersion: COMPLEXITY_VERSION,
       tableNameVersion: TABLE_NAME_VERSION,
+      screenReportVersion: SCREEN_REPORT_VERSION,
+      reportComplexityVersion: REPORT_COMPLEXITY_VERSION,
     },
     limits,
   };

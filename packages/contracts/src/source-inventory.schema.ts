@@ -322,6 +322,92 @@ const ProgramAnalysisSchema = Type.Object(
   Strict,
 );
 
+// screen-report-v1 (AR04). All fields below are optional on the program and
+// inventory: an inventory without them means "not analyzed for this yet",
+// never zero.
+export const REPORT_KINDS = [
+  'data-report',
+  'crystal',
+  'excel',
+  'print',
+  'file-output',
+  'unknown',
+] as const;
+export const REPORT_LEVELS = [
+  'low',
+  'medium',
+  'high',
+  'very-high',
+  'unrated',
+] as const;
+
+const ReportKindSchema = Type.Union([
+  Type.Literal('data-report'),
+  Type.Literal('crystal'),
+  Type.Literal('excel'),
+  Type.Literal('print'),
+  Type.Literal('file-output'),
+  Type.Literal('unknown'),
+]);
+const ReportLevelSchema = Type.Union([
+  Type.Literal('low'),
+  Type.Literal('medium'),
+  Type.Literal('high'),
+  Type.Literal('very-high'),
+  Type.Literal('unrated'),
+]);
+
+const ReportComplexitySchema = Type.Object(
+  {
+    // report-complexity-v1-draft: reference classification, not effort.
+    version: Type.String(),
+    level: ReportLevelSchema,
+    // null when unrated.
+    score: Nullable(Count),
+    // Each scored factor; points sum to `score`.
+    factors: Type.Array(
+      Type.Object(
+        { factor: Type.String(), value: Type.Number(), points: Count },
+        Strict,
+      ),
+    ),
+    // Why a report is unrated or floored (code, e.g. SUSPECTED).
+    reason: Type.Optional(Type.String()),
+  },
+  Strict,
+);
+
+const ProgramScreenSchema = Type.Object(
+  {
+    name: Nullable(Type.String()),
+    // Real file when resolved, else the path as declared in the project.
+    file: Type.String(),
+    shared: Type.Boolean(),
+    warnings: Type.Array(Type.String()),
+  },
+  Strict,
+);
+
+const ProgramReportSchema = Type.Object(
+  {
+    kind: ReportKindSchema,
+    name: Type.String(),
+    file: Type.String(),
+    // null for project-level evidence (a reference without code line).
+    line: Nullable(Line),
+    confidence: Type.Union([
+      Type.Literal('detected'),
+      Type.Literal('referenced'),
+      Type.Literal('suspected'),
+    ]),
+    shared: Type.Boolean(),
+    procedureId: Nullable(Type.String()),
+    warnings: Type.Array(Type.String()),
+    complexity: ReportComplexitySchema,
+  },
+  Strict,
+);
+
 const ProgramSchema = Type.Object(
   {
     projectPath: Type.String(),
@@ -348,6 +434,62 @@ const ProgramSchema = Type.Object(
     counters: LineCountersSchema,
     complete: Type.Boolean(),
     analysis: Nullable(ProgramAnalysisSchema),
+    programType: Type.Optional(
+      Type.Union([
+        Type.Literal('screen'),
+        Type.Literal('batch'),
+        Type.Literal('unknown'),
+      ]),
+    ),
+    screens: Type.Optional(Type.Array(ProgramScreenSchema)),
+    reports: Type.Optional(Type.Array(ProgramReportSchema)),
+  },
+  Strict,
+);
+
+const CountsByKind = Type.Object(
+  {
+    'data-report': Count,
+    crystal: Count,
+    excel: Count,
+    print: Count,
+    'file-output': Count,
+    unknown: Count,
+  },
+  Strict,
+);
+const CountsByLevel = Type.Object(
+  {
+    low: Count,
+    medium: Count,
+    high: Count,
+    'very-high': Count,
+    unrated: Count,
+  },
+  Strict,
+);
+
+const ScreenReportTotalsSchema = Type.Object(
+  {
+    // Distinct forms across the project; shared ones counted once.
+    screens: Count,
+    sharedScreens: Count,
+    batches: Count,
+    reports: Type.Object(
+      {
+        // Distinct report rows = sum of byKind = sum of byLevel.
+        rows: Count,
+        // detected + referenced: the "reports found" figure.
+        counted: Count,
+        // Suspected rows, shown apart and not part of `counted`.
+        suspected: Count,
+        byKind: CountsByKind,
+        byLevel: CountsByLevel,
+      },
+      Strict,
+    ),
+    // Programs with at least one suspected report row.
+    suspectedPrograms: Count,
   },
   Strict,
 );
@@ -367,6 +509,10 @@ export const SourceInventorySchema = Type.Object(
     sqlAccessVersion: Type.String(),
     callGraphVersion: Type.String(),
     complexityVersion: Type.String(),
+    // screen-report-v1 and report-complexity-v1-draft (AR04); absent in
+    // inventories written before.
+    screenReportVersion: Type.Optional(Type.String()),
+    reportComplexityVersion: Type.Optional(Type.String()),
     // Optional for inventories written before table name mapping existed.
     tableNames: Type.Optional(
       Type.Object(
@@ -401,6 +547,7 @@ export const SourceInventorySchema = Type.Object(
         unsupportedFiles: Count,
         errorFiles: Count,
         uniqueCounters: LineCountersSchema,
+        screenReport: Type.Optional(ScreenReportTotalsSchema),
       },
       Strict,
     ),

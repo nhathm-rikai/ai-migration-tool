@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  buildScreenReportTotals,
+  REPORT_COMPLEXITY_VERSION,
+  SCREEN_REPORT_VERSION,
+} from '../../modules/analysis/screen-report.js';
 
 // Hand-written inventory the demo executor publishes (B07 before B08). It
 // describes an invented order-management sample, not customer source, and
@@ -14,6 +19,10 @@ type Program = SourceInventoryDocument['programs'][number];
 type Analysis = NonNullable<Program['analysis']>;
 type Counters = Program['counters'];
 type Complexity = Analysis['complexity'];
+type ScreenReport = Required<
+  Pick<Program, 'programType' | 'screens' | 'reports'>
+>;
+type Report = ScreenReport['reports'][number];
 
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
@@ -212,6 +221,7 @@ function program(input: {
   normalizedCrud: NonNullable<Analysis['normalizedCrud']>;
   complexity: Complexity;
   normalizedComplexity: Complexity;
+  screenReport: ScreenReport;
 }): Program {
   const programCounters = zero();
   let ownFiles = 0;
@@ -269,8 +279,115 @@ function program(input: {
       complexity: input.complexity,
       normalizedComplexity: input.normalizedComplexity,
     },
+    ...input.screenReport,
   };
 }
+
+// Screens and reports are written by hand like the rest of the demo: one
+// shared form (LOGIN, listed by two programs), one batch (CUSTOMER), and one
+// report per confidence level. The missing PREVIEW.FRM keeps its warning.
+const LOGIN = 'cmn/LOGIN.FRM';
+const screen = (
+  name: string | null,
+  file: string,
+  shared = false,
+  warnings: string[] = [],
+) => ({ name, file, shared, warnings });
+const VERSION = REPORT_COMPLEXITY_VERSION;
+const reportRow = (
+  row: Omit<Report, 'procedureId' | 'warnings' | 'shared'> &
+    Partial<Pick<Report, 'procedureId' | 'warnings'>>,
+): Report => ({
+  procedureId: null,
+  warnings: [],
+  shared: false,
+  ...row,
+});
+const unrated = (reason: string, design = false) => ({
+  version: VERSION,
+  level: 'unrated' as const,
+  score: null,
+  factors: design
+    ? [{ factor: 'design-not-analyzed', value: 1, points: 0 }]
+    : [],
+  reason,
+});
+const orderReports: Report[] = [
+  reportRow({
+    kind: 'crystal',
+    name: 'order.rpt',
+    file: 'programs/ORDER/ORDER.BAS',
+    line: 130,
+    confidence: 'detected',
+    procedureId: 'programs/ORDER/ORDER.BAS#Sub:SaveOrder',
+    complexity: {
+      version: VERSION,
+      level: 'high',
+      score: 6,
+      factors: [
+        { factor: 'decisionPoints', value: 28, points: 2 },
+        { factor: 'executableLines', value: 150, points: 3 },
+        { factor: 'tables', value: 3, points: 1 },
+        { factor: 'dynamicSql', value: 0, points: 0 },
+        { factor: 'calls', value: 1, points: 0 },
+        { factor: 'design-not-analyzed', value: 1, points: 0 },
+      ],
+    },
+  }),
+];
+const customerReports: Report[] = [
+  reportRow({
+    kind: 'print',
+    name: 'Printer',
+    file: 'programs/CUSTOMER/CUSTOMER.BAS',
+    line: 70,
+    confidence: 'suspected',
+    procedureId: 'programs/CUSTOMER/CUSTOMER.BAS#Sub:SearchCustomer',
+    complexity: unrated('SUSPECTED'),
+  }),
+];
+const reportReports: Report[] = [
+  reportRow({
+    kind: 'crystal',
+    name: 'summary.rpt',
+    file: 'programs/REPORT/REPORT.BAS',
+    line: 40,
+    confidence: 'referenced',
+    procedureId: 'programs/REPORT/REPORT.BAS#Sub:PrintMonthly',
+    warnings: ['REPORT_FILE_MISSING'],
+    complexity: {
+      version: VERSION,
+      level: 'medium',
+      score: 2,
+      factors: [
+        { factor: 'decisionPoints', value: 7, points: 1 },
+        { factor: 'executableLines', value: 80, points: 1 },
+        { factor: 'tables', value: 1, points: 0 },
+        { factor: 'dynamicSql', value: 0, points: 0 },
+        { factor: 'calls', value: 0, points: 0 },
+        { factor: 'design-not-analyzed', value: 1, points: 0 },
+      ],
+      reason: 'DESIGN_NOT_ANALYZED_FLOOR',
+    },
+  }),
+  reportRow({
+    kind: 'data-report',
+    name: 'rptMonthly',
+    file: 'programs/REPORT/MONTHLY.DSR',
+    line: 2,
+    confidence: 'detected',
+    complexity: unrated('NO_PROCEDURE', true),
+  }),
+  reportRow({
+    kind: 'excel',
+    name: 'Excel.Application',
+    file: 'programs/REPORT/REPORT.BAS',
+    line: 60,
+    confidence: 'suspected',
+    procedureId: 'programs/REPORT/REPORT.BAS#Sub:PrintMonthly',
+    complexity: unrated('SUSPECTED'),
+  }),
+];
 
 const parts = (size: number, decisions: number, tables: number) => ({
   size,
@@ -345,6 +462,14 @@ const programs: Program[] = [
     ],
     complexity: complexity(42, parts(18.6, 12.1, 11.3)),
     normalizedComplexity: complexity(40, parts(18.6, 12.1, 9.6)),
+    screenReport: {
+      programType: 'screen',
+      screens: [
+        screen('ORDERFORM', 'programs/ORDER/ORDERFORM.FRM'),
+        screen('LOGIN', LOGIN, true),
+      ],
+      reports: orderReports.map((row) => ({ ...row })),
+    },
   }),
   program({
     name: 'CUSTOMER',
@@ -390,6 +515,11 @@ const programs: Program[] = [
     ],
     complexity: complexity(27, parts(15.2, 7.4, 4.8)),
     normalizedComplexity: complexity(27, parts(15.2, 7.4, 4.8)),
+    screenReport: {
+      programType: 'batch',
+      screens: [],
+      reports: customerReports,
+    },
   }),
   program({
     name: 'REPORT',
@@ -418,6 +548,16 @@ const programs: Program[] = [
     ],
     complexity: complexity(19, parts(13.1, 5.2, 0.7)),
     normalizedComplexity: complexity(19, parts(13.1, 5.2, 0.7)),
+    screenReport: {
+      programType: 'screen',
+      screens: [
+        screen('LOGIN', LOGIN, true),
+        screen(null, 'programs/REPORT/PREVIEW.FRM', false, [
+          'SCREEN_FILE_MISSING',
+        ]),
+      ],
+      reports: reportReports,
+    },
   }),
 ];
 
@@ -436,6 +576,8 @@ export const demoInventory: SourceInventoryDocument = {
   sqlAccessVersion: 'sql-access-v4',
   callGraphVersion: 'call-graph-v2',
   complexityVersion: 'complexity-v0',
+  screenReportVersion: SCREEN_REPORT_VERSION,
+  reportComplexityVersion: REPORT_COMPLEXITY_VERSION,
   tableNames: {
     version: 'table-name-v1',
     defaultSchema: 'APP',
@@ -455,6 +597,13 @@ export const demoInventory: SourceInventoryDocument = {
     ).length,
     errorFiles: 0,
     uniqueCounters,
+    screenReport: buildScreenReportTotals(
+      programs.map((entry) => ({
+        programType: entry.programType ?? 'unknown',
+        screens: entry.screens ?? [],
+        reports: entry.reports ?? [],
+      })),
+    ),
   },
   skipped: [],
 };

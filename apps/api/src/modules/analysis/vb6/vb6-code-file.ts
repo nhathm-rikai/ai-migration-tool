@@ -386,3 +386,13 @@ function scanVb6CodeFile(
     references,
   };
 }
+
+// Index of the first line after a form designer / class header; the whole
+// file when the boundary cannot be found (such a file is unsupported, so no
+// code facts are read from it).
+export function vb6CodeStart(lines: string[], module: Vb6ModuleKind): number {
+  if (module === 'standard') return 0;
+  const end =
+    module === 'form' ? findDesignerEnd(lines) : findClassHeaderEnd(lines);
+  return end ?? lines.length;
+}

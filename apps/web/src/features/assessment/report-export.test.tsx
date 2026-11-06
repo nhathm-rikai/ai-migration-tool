@@ -175,6 +175,110 @@ describe('Assessment report export button (AR01)', () => {
     expect(ctx.save).not.toHaveBeenCalled();
   });
 
+  // Second review, finding 4: the way out of REPORT_TOO_LARGE is in the UI.
+  describe('JSON download after REPORT_TOO_LARGE', () => {
+    const jsonUrl = reportUrl.replace('format=xlsx', 'format=json');
+    const tooLarge = () => json(errorResponseFixture('REPORT_TOO_LARGE'), 422);
+    const jsonResponse = (body: BodyInit = '{"ok":true}') =>
+      new Response(body, {
+        status: 200,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'content-disposition': `attachment; filename="a.json"; filename*=UTF-8''assessment-Demo-20261106.json`,
+        },
+      });
+    const asked = (ctx: ReturnType<typeof setup>) =>
+      ctx.calls.filter((url) => url.includes('/report'));
+
+    it('offers the JSON button only in that error state', async () => {
+      const ctx = setup(tooLarge);
+      render(ctx.view());
+      expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Xuất Excel' }),
+      );
+      await screen.findByRole('button', { name: 'Tải bản JSON' });
+      expect((await screen.findByRole('alert')).textContent).not.toContain(
+        'API',
+      );
+    });
+
+    it('does not offer it for other failures', async () => {
+      const ctx = setup(() => json({ nope: true }, 500));
+      render(ctx.view());
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Xuất Excel' }),
+      );
+      await screen.findByRole('alert');
+      expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
+    });
+
+    it('asks for format=json and saves the .json file', async () => {
+      const ctx = setup((pending) =>
+        asked(ctx).length === 1 && pending ? tooLarge() : jsonResponse(),
+      );
+      render(ctx.view());
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Xuất Excel' }),
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Tải bản JSON' }),
+      );
+      await waitFor(() => expect(ctx.save).toHaveBeenCalledTimes(1));
+      expect(asked(ctx)).toEqual([reportUrl, jsonUrl]);
+      expect(ctx.save.mock.calls[0]?.[0]).toBe('assessment-Demo-20261106.json');
+      expect(ctx.save.mock.calls[0]?.[1].size).toBeGreaterThan(0);
+      expect(JSON.stringify(ctx.pendings[1]?.headers)).toContain('Bearer');
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
+    });
+
+    it('saves nothing when the JSON answer is not JSON or is empty', async () => {
+      for (const body of ['<html>login</html>', '']) {
+        const ctx = setup(() =>
+          asked(ctx).length === 1 ? tooLarge() : jsonResponse(body),
+        );
+        const view = render(ctx.view());
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Xuất Excel' }),
+        );
+        fireEvent.click(
+          await screen.findByRole('button', { name: 'Tải bản JSON' }),
+        );
+        expect((await screen.findByRole('alert')).textContent).toContain(
+          'Không xuất được báo cáo',
+        );
+        expect(ctx.save).not.toHaveBeenCalled();
+        view.unmount();
+      }
+    });
+
+    it('aborts the JSON request when the run changes', async () => {
+      let finish: (response: Response) => void = () => undefined;
+      const ctx = setup(() =>
+        asked(ctx).length === 1
+          ? tooLarge()
+          : new Promise<Response>((resolve) => {
+              finish = resolve;
+            }),
+      );
+      const { rerender } = render(ctx.view());
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Xuất Excel' }),
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Tải bản JSON' }),
+      );
+      await waitFor(() => expect(ctx.pendings).toHaveLength(2));
+      const signal = ctx.pendings[1]?.signal;
+      rerender(ctx.view(FIXTURE_IDS.runs.failed));
+      await waitFor(() => expect(signal?.aborted).toBe(true));
+      finish(jsonResponse());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(ctx.save).not.toHaveBeenCalled();
+    });
+  });
+
   it('drops the answer when the run changes while downloading', async () => {
     let finish: (response: Response) => void = () => undefined;
     const ctx = setup(

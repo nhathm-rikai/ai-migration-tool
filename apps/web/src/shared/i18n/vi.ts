@@ -732,7 +732,8 @@ export const viMessages = {
       export: 'Xuất Excel',
       exporting: 'Đang xuất…',
       tooLarge:
-        'Báo cáo quá lớn để xếp vào một sheet Excel. Hãy tải bản JSON bằng API hoặc xuất theo từng nhóm program.',
+        'Báo cáo quá lớn để xếp vào một sheet Excel. Hãy tải bản JSON bằng nút bên cạnh.',
+      downloadJson: 'Tải bản JSON',
       failed:
         'Không xuất được báo cáo. Thử lại sau; không có file nào được lưu.',
     },

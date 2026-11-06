@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 06/11/2026 — AR01: sửa 4 phát hiện của review lần hai (trên 526adea)
+
+- [P2] Web kiểm cấu trúc ZIP của xlsx trước khi lưu (`shared/files/xlsx-structure.ts`): tìm End Of Central Directory, offset/size central directory nằm trong file, có `[Content_Types].xml` và `xl/workbook.xml`. Body chỉ có `PK\x03\x04` không còn được lưu.
+- [P3] ID program ở chế độ tất cả luôn duy nhất không phân biệt hoa thường (tên file → đường dẫn bỏ đuôi → đường dẫn đầy đủ cho cả nhóm trùng); đường dẫn đầy đủ chỉ khác hoa thường được thêm `#1`, `#2`; có assertion cuối. **Thay đổi hành vi:** `A/X.vbp` + `A/X.VBP` trước là `A/X.vbp`/`A/X.VBP`, nay là `A/X.vbp#1`/`A/X.VBP#2` (bắt buộc để không trùng khi bỏ phân biệt hoa thường). Chế độ ID của CLI giữ nguyên.
+- [P3] Spec nói thống nhất 14 sheet (README + 13 bảng theo thứ tự nhóm); test khẳng định đúng 14 tên theo thứ tự và quét spec không còn số sheet khác.
+- [P3] Lỗi REPORT_TOO_LARGE có nút "Tải bản JSON" (vi/ja) gọi `format=json`; thông báo trỏ tới nút này.
+- Kiểm chứng: `typecheck`, `lint` pass; `test`: lần chạy song song đầy đủ timeout ở test không liên quan (api `server.test.ts` protected roots; web `documents-step`, `review-step`), chạy lại với 2 workers: api 618 pass/1 skipped, web 312 pass; `e2e` 17 pass (Windows x64, Node 24.16.0). Chưa kiểm macOS/Linux.
+
 ## 06/11/2026 — AR01 sau review độc lập (CHANGES_REQUIRED trên d5d6e97..e04d310) và chỉnh giao diện workbook
 
 - Mỗi finding được tái hiện bằng test trước khi sửa (test mới `review-findings.test.ts` fail trên code cũ: 8 test của finding 1, 2, 4 đỏ ở HEAD, xanh sau sửa):

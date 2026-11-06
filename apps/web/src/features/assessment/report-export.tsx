@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { ArtifactEnvelope } from '@portal/contracts';
+import type {
+  ArtifactEnvelope,
+  InventoryReportFormat,
+} from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
 import { saveBlob } from '../../shared/files/save-blob';
@@ -38,7 +41,7 @@ export function ReportExportButton({
     return () => controller.current?.abort();
   }, [projectId, id, version]);
 
-  async function download() {
+  async function download(format: InventoryReportFormat) {
     if (busy) return;
     const own = new AbortController();
     controller.current = own;
@@ -49,11 +52,12 @@ export function ReportExportButton({
         projectId,
         id,
         version,
-        'xlsx',
+        format,
         own.signal,
       );
       if (own.signal.aborted) return;
-      save(file.fileName ?? 'assessment.xlsx', file.blob);
+      save(file.fileName ?? 'assessment.' + format, file.blob);
+      setFailed(null);
     } catch (error) {
       if (!own.signal.aborted) setFailed(error);
     } finally {
@@ -65,27 +69,42 @@ export function ReportExportButton({
     <button
       type="button"
       className="button"
-      onClick={() => void download()}
+      onClick={() => void download('xlsx')}
       disabled={busy}
     >
       {busy ? copy.exporting : copy.export}
     </button>
   );
+  const tooLarge =
+    failed instanceof ApiError &&
+    failed.kind === 'http' &&
+    failed.code === 'REPORT_TOO_LARGE';
   return (
     <>
       {slot ? createPortal(button, slot) : button}
       {failed !== null && (
-        <p role="alert" className="error">
+        <div role="alert" className="error">
           {failed instanceof ApiError &&
           failed.kind === 'http' &&
           failed.code === 'ARTIFACT_NOT_FOUND'
             ? messages.assessment.errors.ARTIFACT_NOT_FOUND
-            : failed instanceof ApiError &&
-                failed.kind === 'http' &&
-                failed.code === 'REPORT_TOO_LARGE'
+            : tooLarge
               ? copy.tooLarge
               : copy.failed}
-        </p>
+          {tooLarge && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="button"
+                onClick={() => void download('json')}
+                disabled={busy}
+              >
+                {copy.downloadJson}
+              </button>
+            </>
+          )}
+        </div>
       )}
     </>
   );

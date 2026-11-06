@@ -1,4 +1,8 @@
-import { ArtifactEnvelopeSchema, ArtifactListSchema } from '@portal/contracts';
+import {
+  ArtifactEnvelopeSchema,
+  ArtifactListSchema,
+  type InventoryReportFormat,
+} from '@portal/contracts';
 import { createApiClient } from './api-client';
 import {
   createLocalSession,
@@ -40,6 +44,25 @@ export function createArtifactsApi(
           '/versions/' +
           String(version),
         ArtifactEnvelopeSchema,
+        signal,
+      ),
+    // Assessment report (AR01) of one exact inventory version: the file
+    // bytes and the name the server chose. Saving is the caller's job.
+    exportReport: (
+      projectId: string,
+      artifactId: string,
+      version: number,
+      format: InventoryReportFormat,
+      signal: AbortSignal,
+    ) =>
+      request.download(
+        project(projectId) +
+          '/artifacts/' +
+          encodeURIComponent(artifactId) +
+          '/versions/' +
+          String(version) +
+          '/report?format=' +
+          format,
         signal,
       ),
   };

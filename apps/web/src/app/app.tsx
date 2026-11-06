@@ -475,6 +475,7 @@ function StepPage({
           progress={progress}
           onRetry={onRetryProgress}
           artifactsApi={apis.artifactsApi}
+          headerSlot={headerSlot}
         />
       ) : step === 'documents' ? (
         <DocumentsStep
@@ -569,12 +570,14 @@ function AnalysisStep({
   progress,
   onRetry,
   artifactsApi,
+  headerSlot,
 }: {
   project: Project;
   runId: string | null;
   progress: ProjectProgress;
   onRetry: () => void;
   artifactsApi: ArtifactsApi;
+  headerSlot: HTMLElement | null;
 }) {
   const { messages } = useLocale();
   const copy = messages.shell.analysis;
@@ -622,6 +625,7 @@ function AnalysisStep({
         api={artifactsApi}
         projectId={project.id}
         runId={shown}
+        headerSlot={headerSlot}
       />
     </section>
   );

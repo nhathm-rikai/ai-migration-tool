@@ -1,5 +1,15 @@
 # Tiến độ kỹ thuật Portal
 
+## 06/11/2026 — AR01: xuất Excel/JSON báo cáo Assessment từ bước 2
+
+- Nhánh `feat/ar01-assessment-report-export`, base `master` @ `d5d6e97d685a6705113399cd8c9a6a52ffb112bd` (đã gồm PR #18 xóa dự án), làm trong git worktree riêng `portal-ar01`. Chưa push, chưa merge, chưa review độc lập theo SHA.
+- Contract: operation `exportInventoryReport` (`GET …/artifacts/:artifactId/versions/:version/report?format=xlsx|json`), `InventoryReportQuerySchema` (`format` bắt buộc, chỉ `xlsx`/`json`), `contentType: 'attachment'`. Không mã lỗi mới.
+- BE: `report-download.service.ts` (đọc đúng version qua artifact service, dựng trong bộ nhớ, tên file RFC 5987) và `report-download.routes.ts`; lõi `buildInventoryReport` nhận thêm `ALL_PROGRAMS` (chọn theo `projectPath`). Chế độ ID của CLI không đổi.
+- FE: `ArtifactsApi.exportReport` dùng chung xử lý credential (`createApiClient` tách `withCredential`, thêm `download`/`sendDownload`, timeout 60 giây, abort), nút `ReportExportButton` ở tiêu đề bước 2 (disabled và nhãn "Đang xuất…" khi tải, lỗi hiện trong trang và không lưu file, đổi dự án/run thì hủy request và bỏ response). i18n vi/ja; sửa chuỗi `runs.localNotice` vi/ja (không còn nói báo cáo chưa có).
+- Test: AC01–AC03 `report-download.integration.test.ts`; AC04–AC05 `inventory-report.test.ts`; contract `analyze-contract.test.ts`; AC06 `report-export.test.tsx`; AC07 `tests/e2e/assessment-report-export.spec.ts`.
+- Kiểm chứng (Windows 11, x64, Node 24.16.0): `npm run typecheck` sạch; `npm run lint` sạch; `npm run e2e` đủ 17 test pass (gồm spec mới và `assessment-overview.spec.ts`); `npm run test`: contracts 50, api 594 (1 skipped), web 291 đều pass; lần chạy đầu có 4 test api và 1 test web không thuộc thay đổi này (xóa dự án, server startup, document-run, documents-step) timeout khi cả bộ chạy song song, chạy riêng và chạy lại đều pass.
+- Giới hạn: chưa mở file XLSX của dự án demo bằng Excel (E2E chỉ kiểm chữ ký ZIP và `xl/workbook.xml`); loại artifact hiện chỉ có `source-inventory` nên AC02 "không phải inventory" được bảo đảm bởi schema, không có test riêng; 'hai version' của AC02 được kiểm ở mức service (hai payload khác nhau), vì API hiện chỉ tạo version 1; chưa thử inventory rất lớn (dựng XLSX đồng bộ trong process API).
+
 ## 03/11/2026 — Xóa dự án cũ
 
 - `DELETE /api/v1/projects/:projectId` (200 `{ id }`): một transaction xóa mọi dòng của dự án (review, tiến trình agent, log và lượt chạy tài liệu, artifact, lượt chạy phân tích, bản chụp, đăng ký nguồn và các revision), rồi xóa dự án; sau commit mới xóa file app sở hữu (bản chụp, payload inventory, file gói tài liệu, workspace spec). Lỗi xóa file chỉ ghi log vì dòng công bố đã mất nên file mồ côi không bao giờ được đọc. Thư mục mã nguồn gốc của người dùng không bị đụng tới.

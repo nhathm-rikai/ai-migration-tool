@@ -8,6 +8,8 @@ import { ApiError, type ApiMethod } from './api-error';
 import type { CredentialSource } from './local-session';
 
 export const API_REQUEST_TIMEOUT_MS = 15_000;
+// Building a large report takes longer than a JSON read.
+export const DOWNLOAD_TIMEOUT_MS = 60_000;
 const API_BASE_PATH = '/api/v1';
 
 export const defaultFetcher: typeof fetch = (input, init) => fetch(input, init);
@@ -91,6 +93,88 @@ export async function sendRequest<T extends TSchema>(
   }
 }
 
+export type Download = { blob: Blob; fileName: string | null };
+
+// File name of a Content-Disposition header: `filename*` (RFC 5987, UTF-8)
+// wins over the ASCII `filename`.
+export function fileNameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const extended = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
+  if (extended?.[1]) {
+    try {
+      return decodeURIComponent(extended[1].trim());
+    } catch {
+      // Fall through to the plain filename.
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]*)"/i.exec(header);
+  return plain?.[1] ?? null;
+}
+
+// One file download: like sendRequest (timeout including the body read,
+// caller cancellation, error envelope validation) but the success body is
+// kept as a Blob. Nothing is saved here.
+export async function sendDownload(
+  fetcher: typeof fetch,
+  url: string,
+  signal: AbortSignal,
+  options: { headers: Record<string, string>; timeoutMs?: number },
+): Promise<Download> {
+  signal.throwIfAborted();
+  const method = 'GET';
+  const controller = new AbortController();
+  let timedOut = false;
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? DOWNLOAD_TIMEOUT_MS);
+  try {
+    const response = await fetcher(url, {
+      method,
+      signal: controller.signal,
+      headers: options.headers,
+    });
+    signal.throwIfAborted();
+    if (!response.ok) {
+      let value: unknown;
+      try {
+        value = await response.json();
+      } catch {
+        // A non-JSON error page still has HTTP semantics.
+      }
+      signal.throwIfAborted();
+      if (Check(ErrorResponseSchema, value))
+        throw new ApiError(
+          'http',
+          method,
+          response.status,
+          value.error.code,
+          value.error.requestId,
+        );
+      throw new ApiError('http', method, response.status);
+    }
+    const blob = await response.blob();
+    signal.throwIfAborted();
+    if (timedOut) throw new ApiError('timeout', method);
+    return {
+      blob,
+      fileName: fileNameFromDisposition(
+        response.headers.get('content-disposition'),
+      ),
+    };
+  } catch (error) {
+    signal.throwIfAborted();
+    if (timedOut) throw new ApiError('timeout', method);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError('network', method);
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener('abort', abort);
+  }
+}
+
 function isCredentialRejected(error: unknown): boolean {
   return (
     error instanceof ApiError &&
@@ -115,30 +199,13 @@ export function createApiClient(
       throw new ApiError('credential', method);
     }
   }
-  return async function request<T extends TSchema>(
-    path: string,
-    schema: T,
+  // Sends with the current credential; a rejected one is invalidated and a
+  // GET is retried once with a fresh one, a mutation never is.
+  async function withCredential<R>(
+    method: ApiMethod,
     signal: AbortSignal,
-    options: {
-      method?: ApiMethod;
-      body?: unknown;
-      headers?: Record<string, string>;
-      timeoutMs?: number;
-    } = {},
-  ): Promise<Static<T>> {
-    const method = options.method ?? 'GET';
-    const send = (token: string) =>
-      sendRequest(fetcher, API_BASE_PATH + path, schema, signal, {
-        method,
-        body: options.body,
-        ...(options.timeoutMs === undefined
-          ? {}
-          : { timeoutMs: options.timeoutMs }),
-        headers: {
-          ...options.headers,
-          Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}`,
-        },
-      });
+    send: (token: string) => Promise<R>,
+  ): Promise<R> {
     const token = credentials.current() ?? (await authorize(signal, method));
     try {
       return await send(token);
@@ -155,5 +222,41 @@ export function createApiClient(
       if (isCredentialRejected(error)) credentials.invalidate(retryToken);
       throw error;
     }
-  };
+  }
+  async function request<T extends TSchema>(
+    path: string,
+    schema: T,
+    signal: AbortSignal,
+    options: {
+      method?: ApiMethod;
+      body?: unknown;
+      headers?: Record<string, string>;
+      timeoutMs?: number;
+    } = {},
+  ): Promise<Static<T>> {
+    const method = options.method ?? 'GET';
+    return withCredential(method, signal, (token) =>
+      sendRequest(fetcher, API_BASE_PATH + path, schema, signal, {
+        method,
+        body: options.body,
+        ...(options.timeoutMs === undefined
+          ? {}
+          : { timeoutMs: options.timeoutMs }),
+        headers: {
+          ...options.headers,
+          Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}`,
+        },
+      }),
+    );
+  }
+  // GET of a file: same credential handling as `request`.
+  function download(path: string, signal: AbortSignal, timeoutMs?: number) {
+    return withCredential('GET', signal, (token) =>
+      sendDownload(fetcher, API_BASE_PATH + path, signal, {
+        headers: { Authorization: `${LOCAL_CREDENTIAL_SCHEME} ${token}` },
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      }),
+    );
+  }
+  return Object.assign(request, { download });
 }

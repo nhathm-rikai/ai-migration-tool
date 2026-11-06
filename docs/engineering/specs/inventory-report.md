@@ -50,4 +50,12 @@ npm run build -w @portal/contracts && npm run build -w @portal/api
 node apps/api/dist/cli/export-inventory-report.js --inventory <inventory.json> --source-root <thư mục source> --programs <ID,ID,...> --out-json <report.json> --out-xlsx <report.xlsx>
 ```
 
-Inventory và hai output phải là ba file khác nhau; output ghi qua file tạm rồi rename. Chưa có: route/job/UI, HTML, chọn version qua API (B14).
+Inventory và hai output phải là ba file khác nhau; output ghi qua file tạm rồi rename.
+
+### Tải qua API và UI (AR01)
+
+- `GET /api/v1/projects/:projectId/artifacts/:artifactId/versions/:version/report?format=xlsx|json` (operation `exportInventoryReport`, route protected như route artifact). Đọc đúng `projectId + artifactId + version` qua artifact service, không bao giờ lấy version khác hoặc latest; project khác, artifact/version không có → `ARTIFACT_NOT_FOUND` (404), `format` thiếu hoặc sai → 400. Mã trong `ErrorResponseSchema`, không thêm mã mới.
+- Chế độ chọn **tất cả program** (`buildInventoryReport(inventory, ALL_PROGRAMS)`): chọn theo `projectPath`, nên hai project file cùng tên ở hai thư mục không bị từ chối. ID là tên file; nếu tên lặp (không phân biệt hoa thường) thì ID là đường dẫn project bỏ phần mở rộng (`A/X`). Chế độ ID của CLI giữ nguyên, vẫn từ chối ID khớp nhiều file.
+- `xlsx` = `writeXlsx(inventoryReportSheets(report))` (13 sheet), `json` = report. `Content-Disposition: attachment` với `assessment-<tên dự án>-<YYYYMMDD UTC>.<đuôi>`: `filename` ASCII an toàn + `filename*=UTF-8''…` (RFC 5987); ký tự không an toàn trong tên file bị thay `_`, tên cắt 80 ký tự. Dựng trong bộ nhớ, không ghi file vào data directory hay thư mục tạm; `Cache-Control: no-store`.
+- UI: nút "Xuất Excel" ở tiêu đề bước 2 (chỉ khi inventory `ready`), truyền đúng `artifact.id` và `version` đang hiển thị.
+- Chưa có: job nền, HTML, xuất theo bộ lọc/program đang chọn, phần cho khách (AR02), PDF (AR03).

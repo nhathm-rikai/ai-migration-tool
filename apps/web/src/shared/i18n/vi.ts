@@ -239,7 +239,7 @@ export const viMessages = {
     demoNotice:
       'Lượt chạy demo dùng bộ thực thi mô phỏng trên dữ liệu mẫu: không đọc mã nguồn, chỉ công bố kết quả kiểm kê mẫu đi kèm ứng dụng.',
     localNotice:
-      'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc) rồi kiểm kê tĩnh trên bản chụp đó. Hiểu nghiệp vụ và báo cáo chưa có trong bản này.',
+      'Lượt chạy tạo bản chụp bất biến của thư mục đã đăng ký (chỉ đọc) rồi kiểm kê tĩnh trên bản chụp đó. Hiểu nghiệp vụ chưa có trong bản này; báo cáo kỹ thuật xuất Excel ở bước Phân tích.',
     localSucceeded: 'Hoàn tất',
     loading: 'Đang tải lượt chạy…',
     reload: 'Tải lại lượt chạy',
@@ -727,6 +727,12 @@ export const viMessages = {
           minimap: 'Bản đồ thu nhỏ',
         },
       },
+    },
+    report: {
+      export: 'Xuất Excel',
+      exporting: 'Đang xuất…',
+      failed:
+        'Không xuất được báo cáo. Thử lại sau; không có file nào được lưu.',
     },
     errors: {
       ARTIFACT_NOT_FOUND:

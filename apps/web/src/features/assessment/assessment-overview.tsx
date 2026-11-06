@@ -47,6 +47,7 @@ import {
   TableNameView,
 } from './tags';
 import { effectiveMapping, type EffectiveMapping } from './table-mapping';
+import { ReportExportButton, type SaveFile } from './report-export';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -72,10 +73,15 @@ export function AssessmentOverview({
   api,
   projectId,
   runId,
+  headerSlot = null,
+  saveFile,
 }: {
   api: ArtifactsApi;
   projectId: string;
   runId: string;
+  // Header of the step page, where the export button goes.
+  headerSlot?: HTMLElement | null;
+  saveFile?: SaveFile;
 }) {
   const { messages } = useLocale();
   const copy = messages.assessment;
@@ -98,7 +104,15 @@ export function AssessmentOverview({
       )}
       {state.status === 'empty' && <p className="empty-state">{copy.empty}</p>}
       {state.status === 'ready' && (
-        <ArtifactView artifact={state.artifact} projectId={projectId} />
+        <>
+          <ReportExportButton
+            api={api}
+            artifact={state.artifact}
+            slot={headerSlot}
+            {...(saveFile ? { save: saveFile } : {})}
+          />
+          <ArtifactView artifact={state.artifact} projectId={projectId} />
+        </>
       )}
     </section>
   );

@@ -5794,3 +5794,60 @@ fieldset.doc-card {
 .scan-line {
   display: none;
 }
+
+/* AR04: screens, reports and batches. Colour only repeats the text. */
+.kpi-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.tag-unrated {
+  color: var(--muted, #5b6b7f);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.tag-conf-detected {
+  color: var(--low);
+  background: var(--low-bg);
+  border-color: #b9dfc7;
+}
+.tag-conf-referenced {
+  color: #8a5a0b;
+  background: #fdf3cf;
+  border-color: #f0d98a;
+}
+.tag-conf-suspected {
+  color: var(--muted, #5b6b7f);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.report-distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 8px 0 16px;
+}
+.report-distribution-grid table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.report-distribution-grid caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: 4px;
+}
+.report-distribution-grid th,
+.report-distribution-grid td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.report-distribution-grid td.num {
+  text-align: right;
+}
+.report-distribution-grid .total-row th,
+.report-distribution-grid .total-row td {
+  font-weight: 600;
+}
+.error-text {
+  color: var(--high);
+  font-size: 12px;
+}

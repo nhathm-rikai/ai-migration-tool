@@ -10,6 +10,8 @@ import type { SourceInventoryDocument } from '@portal/contracts';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { pageOf, programLabel } from './assessment-summary';
 import { ComplexityTag, TableNameView } from './tags';
+import { ProgramScreensReports } from './screen-report-panels';
+import { programScreenReport } from './screen-report-model';
 import {
   crudRows,
   programDetail,
@@ -60,12 +62,21 @@ export function ProgramDetail({
   const label = programLabel(detail.projectPath);
   const analysis = detail.analysis;
   const tabs: DetailTab[] = analysis
-    ? ['summary', 'files', 'procedures', 'crud', 'calls', 'graph']
+    ? ['summary', 'files', 'procedures', 'crud', 'calls', 'graph', 'reports']
     : ['summary', 'files'];
   const panel = (value: DetailTab) => `${titleId}-${value}`;
   const count = (value: DetailTab): number | null => {
     if (value === 'files') return detail.members.length;
     if (!analysis) return null;
+    if (value === 'reports') {
+      const program = inventory.programs.find(
+        (item) => item.projectPath === detail.projectPath,
+      );
+      const found = program ? programScreenReport(program) : null;
+      return found?.available
+        ? found.screens.length + found.reports.length
+        : null;
+    }
     if (value === 'procedures') return analysis.procedures.length;
     // The mapped view opens first, so its count is the one shown.
     if (value === 'crud')
@@ -130,6 +141,12 @@ export function ProgramDetail({
           <TabPanel id={panel('calls')} active={tab === 'calls'}>
             <Calls rows={analysis.calls} />
           </TabPanel>
+          <TabPanel id={panel('reports')} active={tab === 'reports'}>
+            <ProgramScreensReports
+              inventory={inventory}
+              projectPath={detail.projectPath}
+            />
+          </TabPanel>
           <TabPanel id={panel('graph')} active={tab === 'graph'}>
             {graphOpened && (
               <Suspense fallback={<p role="status">{copy.graph.loading}</p>}>
@@ -147,7 +164,7 @@ export function ProgramDetail({
 }
 
 type DetailTab =
-  'summary' | 'files' | 'procedures' | 'crud' | 'calls' | 'graph';
+  'summary' | 'files' | 'procedures' | 'crud' | 'calls' | 'graph' | 'reports';
 
 function TabPanel({
   id,

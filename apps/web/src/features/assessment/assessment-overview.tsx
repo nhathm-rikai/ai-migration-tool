@@ -48,6 +48,8 @@ import {
 } from './tags';
 import { effectiveMapping, type EffectiveMapping } from './table-mapping';
 import { ReportExportButton, type SaveFile } from './report-export';
+import { ReportsTab, ScreenReportKpis } from './screen-report-panels';
+import { reportListRows } from './screen-report-model';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -118,8 +120,8 @@ export function AssessmentOverview({
   );
 }
 
-type Tab = 'programs' | 'graph' | 'tables';
-const TABS: Tab[] = ['programs', 'graph', 'tables'];
+type Tab = 'programs' | 'reports' | 'graph' | 'tables';
+const TABS: Tab[] = ['programs', 'reports', 'graph', 'tables'];
 
 // The call graph and its libraries (React Flow, ELK) load only when the
 // tab is first opened.
@@ -221,6 +223,7 @@ function ArtifactView({
   );
   const counts: Record<Tab, number | null> = {
     programs: summary.programs.length,
+    reports: reportListRows(artifact.payload)?.length ?? null,
     graph: null,
     tables: tableCount,
   };
@@ -238,6 +241,7 @@ function ArtifactView({
         </p>
       )}
       <Kpis artifact={artifact} summary={summary} />
+      <ScreenReportKpis inventory={artifact.payload} />
       <div className="dashboard-charts">
         <LocSplit summary={summary} artifact={artifact} />
         <Histogram summary={summary} onShowPrograms={showPrograms} />
@@ -297,6 +301,14 @@ function ArtifactView({
               setOpenKey((current) => (current === key ? null : key))
             }
           />
+        </div>
+        <div
+          role="tabpanel"
+          id={panelId('reports')}
+          aria-labelledby={`${panelId('reports')}-tab`}
+          hidden={tab !== 'reports'}
+        >
+          {tab === 'reports' && <ReportsTab inventory={artifact.payload} />}
         </div>
         <div
           role="tabpanel"
@@ -741,7 +753,7 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 9;
+const COLUMNS = 11;
 
 // List row: the table count shown first is the mapped one when there is a
 // mapped view (configured or inferred); the count as written stays beside it.
@@ -916,6 +928,8 @@ function ProgramList({
                   )}
                   {header('procedures', copy.columns.procedures)}
                   {header('tables', copy.columns.tables)}
+                  {header('screens', copy.columns.screens)}
+                  {header('reports', copy.columns.reports)}
                   {header(
                     'complexity',
                     copy.columns.complexity,
@@ -981,6 +995,19 @@ function ProgramList({
                               <span className="muted raw-count">
                                 {' '}
                                 {copy.rawTables(number(row.rawTables))}
+                              </span>
+                            )}
+                        </td>
+                        <td className="num" data-col="screens">
+                          {metric(row.screens)}
+                        </td>
+                        <td className="num" data-col="reports">
+                          {metric(row.reports)}
+                          {row.suspectedReports !== null &&
+                            row.suspectedReports > 0 && (
+                              <span className="muted raw-count">
+                                {' '}
+                                +{number(row.suspectedReports)}?
                               </span>
                             )}
                         </td>

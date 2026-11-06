@@ -314,6 +314,126 @@ export const jaMessages = {
       programs: 'プログラム一覧',
       graph: 'コールグラフ',
       tables: 'DBテーブル',
+      reports: '帳票',
+    },
+    screenReport: {
+      kpis: {
+        screens: '画面',
+        screensSub: (shared: string) => `共通 ${shared} 件（1回のみ集計）`,
+        reports: '帳票（検出分）',
+        reportsSub: (programs: string, suspected: string) =>
+          `帳票出力の疑いがあるプログラム ${programs} 件（疑い ${suspected} 件は合計に含めません）`,
+        batches: 'バッチ',
+        batchesSub: 'フォームがなく Sub Main で起動するプログラム',
+        noData: 'データなし',
+        noDataHelp:
+          'この解析結果は画面・帳票・バッチの集計機能より前に作成されています。再解析が必要です。データがない項目を 0 とは表示しません。',
+      },
+      reference: (version: string | null) =>
+        version === null ? '参考値' : `参考値 · モデル ${version}`,
+      distribution: {
+        title: '帳票の分布',
+        help: '帳票ごとの複雑度は参考分類です。帳票を呼び出すプロシージャで評価しており、工数ではありません。',
+        byLevel: '複雑度別',
+        byKind: '種類別',
+        total: '合計',
+        level: {
+          low: '低',
+          medium: '中',
+          high: '高',
+          'very-high': '非常に高',
+          unrated: '未評価',
+        },
+        kind: {
+          'data-report': 'DataReport / ActiveReports',
+          crystal: 'Crystal Reports',
+          excel: 'Excel出力（疑い）',
+          print: '印刷（疑い）',
+          'file-output': 'ファイル出力（疑い）',
+          unknown: '不明（疑い）',
+        },
+      },
+      list: {
+        title: '帳票一覧',
+        count: (shown: string, total: string) =>
+          `${total} 件中 ${shown} 件の帳票を表示`,
+        search: '帳票を検索',
+        levelFilter: '複雑度',
+        kindFilter: '種類',
+        confidenceFilter: '信頼度',
+        all: 'すべて',
+        confidenceCounted: '検出＋参照',
+        none: '帳票はありません。',
+        noMatch: '条件に合う帳票はありません。',
+        columns: {
+          program: 'プログラム',
+          module: 'モジュール',
+          kind: '種類',
+          name: '名前',
+          location: 'ファイル:行',
+          confidence: '信頼度',
+          complexity: '複雑度（参考）',
+        },
+        sortBy: (label: string) => `${label} で並べ替え`,
+        morePrograms: (count: string) => `ほか ${count} プログラム`,
+        sharedFile: '共通ファイル',
+        factorsTitle: '評価要因',
+        noFactors: '評価された要因はありません。',
+        page: (current: string, pages: string) =>
+          `${current} / ${pages} ページ`,
+        previous: '前のページ',
+        next: '次のページ',
+      },
+      confidence: {
+        detected: '検出',
+        referenced: '参照',
+        suspected: '疑い',
+      },
+      reasons: {
+        SUSPECTED: '兆候のみで、帳票様式の数は不明です',
+        NO_PROCEDURE:
+          '帳票を呼び出すプロシージャを特定できないため評価していません',
+        DESIGN_NOT_ANALYZED_FLOOR:
+          '帳票デザインは未解析です。呼び出しコードのみ評価し、低レベルにはしません',
+      },
+      factors: {
+        decisionPoints: '分岐数',
+        executableLines: '実行行数',
+        tables: 'アクセステーブル数',
+        dynamicSql: '動的SQL・文字列連結SQL',
+        calls: '他プロシージャの呼び出し',
+        'design-not-analyzed': 'デザイン未解析',
+      },
+      warnings: {
+        REPORT_FILE_MISSING:
+          'ソースに .rpt がありません。お客様に提供を依頼してください',
+        SCREEN_FILE_MISSING: 'ソースにフォームファイルがありません',
+        SCREEN_FILE_NOT_ANALYZED: 'フォームファイルを解析できませんでした',
+      },
+      programTypes: {
+        screen: '画面あり',
+        batch: 'バッチ',
+        unknown: '不明',
+      },
+      detail: {
+        screensTitle: '画面',
+        reportsTitle: '帳票',
+        noScreens: 'このプログラムは画面を宣言していません。',
+        noReports: '帳票は見つかりませんでした。',
+        sharedScreen: '共通',
+        columns: {
+          screen: '画面',
+          file: 'ファイル',
+          kind: '種類',
+          name: '名前',
+          location: 'ファイル:行',
+          confidence: '信頼度',
+          complexity: '複雑度（参考）',
+          notes: '備考',
+        },
+        suspectedNote:
+          '「疑い」の行は帳票を出力している可能性を示すだけで、帳票の合計には含めません。',
+      },
     },
     dashboard: {
       kpis: {
@@ -537,6 +657,8 @@ export const jaMessages = {
         codeLines: 'LoC（共通込み）',
         procedures: '固有プロシージャ',
         tables: 'テーブル数',
+        screens: '画面',
+        reports: '帳票',
         complexity: '複雑度',
       },
       columnHints: {
@@ -579,6 +701,7 @@ export const jaMessages = {
         crud: 'CRUD',
         calls: '呼び出し',
         graph: '呼び出し図',
+        reports: '画面と帳票',
       },
       rowRange: (from: string, to: string, total: string) =>
         `${total} 行中 ${from}–${to} 行`,

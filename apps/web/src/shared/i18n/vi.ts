@@ -328,6 +328,124 @@ export const viMessages = {
       programs: 'Danh sách program',
       graph: 'Call graph',
       tables: 'Bảng DB',
+      reports: 'Report (帳票)',
+    },
+    screenReport: {
+      kpis: {
+        screens: 'Màn hình (画面)',
+        screensSub: (shared: string) => `${shared} dùng chung, tính một lần`,
+        reports: 'Report (帳票) phát hiện',
+        reportsSub: (programs: string, suspected: string) =>
+          `${programs} program nghi có xuất report (${suspected} dòng nghi, không cộng vào tổng)`,
+        batches: 'Batch (バッチ)',
+        batchesSub: 'Program không có form, khởi động bằng Sub Main',
+        noData: 'Chưa có dữ liệu',
+        noDataHelp:
+          'Kết quả phân tích này được tạo trước khi có đếm màn hình, report và batch. Cần phân tích lại để có số liệu; Portal không hiện 0 thay cho dữ liệu chưa có.',
+      },
+      reference: (version: string | null) =>
+        version === null ? 'Tham khảo' : `Tham khảo · mô hình ${version}`,
+      distribution: {
+        title: 'Phân bố report',
+        help: 'Mức phức tạp của từng report chỉ là phân loại tham khảo, chấm trên procedure chứa dòng gọi report; không phải effort.',
+        byLevel: 'Theo mức phức tạp',
+        byKind: 'Theo loại',
+        total: 'Tổng',
+        level: {
+          low: 'Thấp',
+          medium: 'Trung bình',
+          high: 'Cao',
+          'very-high': 'Rất cao',
+          unrated: 'Chưa đánh giá',
+        },
+        kind: {
+          'data-report': 'DataReport / ActiveReports',
+          crystal: 'Crystal Reports',
+          excel: 'Xuất Excel (nghi)',
+          print: 'In (nghi)',
+          'file-output': 'Ghi file (nghi)',
+          unknown: 'Chưa xác định (nghi)',
+        },
+      },
+      list: {
+        title: 'Danh sách report',
+        count: (shown: string, total: string) =>
+          `Đang hiển thị ${shown} / ${total} report`,
+        search: 'Tìm report',
+        levelFilter: 'Mức phức tạp',
+        kindFilter: 'Loại',
+        confidenceFilter: 'Độ tin cậy',
+        all: 'Tất cả',
+        confidenceCounted: 'Phát hiện + tham chiếu',
+        none: 'Không có report nào.',
+        noMatch: 'Không có report khớp bộ lọc.',
+        columns: {
+          program: 'Program',
+          module: 'Module',
+          kind: 'Loại',
+          name: 'Tên',
+          location: 'File:dòng',
+          confidence: 'Tin cậy',
+          complexity: 'Phức tạp (tham khảo)',
+        },
+        sortBy: (label: string) => `Sắp xếp theo ${label}`,
+        morePrograms: (count: string) => `và ${count} program khác`,
+        sharedFile: 'File dùng chung',
+        factorsTitle: 'Yếu tố chấm điểm',
+        noFactors: 'Không có yếu tố nào được chấm.',
+        page: (current: string, pages: string) => `Trang ${current} / ${pages}`,
+        previous: 'Trang trước',
+        next: 'Trang sau',
+      },
+      confidence: {
+        detected: 'Phát hiện',
+        referenced: 'Tham chiếu',
+        suspected: 'Nghi có',
+      },
+      reasons: {
+        SUSPECTED: 'Chỉ là dấu hiệu, chưa biết có bao nhiêu mẫu report',
+        NO_PROCEDURE:
+          'Không xác định được procedure chứa dòng report nên không chấm',
+        DESIGN_NOT_ANALYZED_FLOOR:
+          'Thiết kế report chưa được phân tích; chỉ chấm phần code gọi và không xếp mức thấp',
+      } as Record<string, string>,
+      factors: {
+        decisionPoints: 'Điểm rẽ nhánh',
+        executableLines: 'Dòng thực thi',
+        tables: 'Bảng truy cập',
+        dynamicSql: 'SQL động / ghép chuỗi',
+        calls: 'Lời gọi procedure khác',
+        'design-not-analyzed': 'Thiết kế chưa phân tích',
+      } as Record<string, string>,
+      warnings: {
+        REPORT_FILE_MISSING: 'Thiếu file .rpt trong source: cần khách cung cấp',
+        SCREEN_FILE_MISSING: 'Thiếu file form trong source',
+        SCREEN_FILE_NOT_ANALYZED: 'File form chưa phân tích được',
+      } as Record<string, string>,
+      programTypes: {
+        screen: 'Có màn hình',
+        batch: 'Batch',
+        unknown: 'Chưa xác định',
+      },
+      detail: {
+        screensTitle: 'Màn hình',
+        reportsTitle: 'Report',
+        noScreens: 'Program không khai báo màn hình.',
+        noReports: 'Không tìm thấy report.',
+        sharedScreen: 'Dùng chung',
+        columns: {
+          screen: 'Màn hình',
+          file: 'File',
+          kind: 'Loại',
+          name: 'Tên',
+          location: 'File:dòng',
+          confidence: 'Tin cậy',
+          complexity: 'Phức tạp (tham khảo)',
+          notes: 'Ghi chú',
+        },
+        suspectedNote:
+          'Dòng "Nghi có" chỉ là dấu hiệu program có thể xuất report; không cộng vào tổng report.',
+      },
     },
     dashboard: {
       kpis: {
@@ -551,6 +669,8 @@ export const viMessages = {
         codeLines: 'LoC + dùng chung',
         procedures: 'Procedure riêng',
         tables: 'Số bảng',
+        screens: 'Màn hình',
+        reports: 'Report',
         complexity: 'Độ phức tạp',
       },
       columnHints: {
@@ -599,6 +719,7 @@ export const viMessages = {
         crud: 'CRUD',
         calls: 'Lời gọi',
         graph: 'Sơ đồ gọi',
+        reports: 'Màn hình và report',
       },
       rowRange: (from: string, to: string, total: string) =>
         `Dòng ${from}–${to} / ${total}`,

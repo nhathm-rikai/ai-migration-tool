@@ -263,3 +263,184 @@ export function procedureCorpus(): Inventory {
   ];
   return inventory;
 }
+
+type ScreenReportProgram = Inventory['programs'][number];
+type Report = NonNullable<ScreenReportProgram['reports']>[number];
+
+const REPORT_VERSION = 'report-complexity-v1-draft';
+const reportRow = (row: Partial<Report> & Pick<Report, 'kind' | 'name'>) =>
+  ({
+    file: 'x.bas',
+    line: 1,
+    confidence: 'detected',
+    shared: false,
+    procedureId: null,
+    warnings: [],
+    complexity: {
+      version: REPORT_VERSION,
+      level: 'unrated',
+      score: null,
+      factors: [],
+      reason: 'SUSPECTED',
+    },
+    ...row,
+  }) satisfies Report;
+
+// Hand-written AR04 inventory (numbers are set here, not computed): three
+// programs, a form shared by two of them, one batch, and one report per
+// confidence level plus a Crystal report in a shared module.
+//   screens: frmOrder, frmLogin (shared), frmInvoice = 3, shared 1
+//   reports: order.rpt (detected, high), common.rpt (detected, shared,
+//   very-high), bill.rpt (referenced, medium), Excel + Printer (suspected)
+//   = 5 rows, 3 counted, 2 suspected in 2 programs; batches 1.
+export function screenReportCorpus(): Inventory {
+  const inventory = structuredClone(mappedInventoryFixture) as Inventory;
+  const [base] = inventory.programs;
+  if (!base) throw new Error('fixture has a program');
+  const program = (
+    projectPath: string,
+    name: string,
+    extra: Pick<ScreenReportProgram, 'programType' | 'screens' | 'reports'>,
+  ): ScreenReportProgram => ({
+    ...structuredClone(base),
+    projectPath,
+    name,
+    ...extra,
+  });
+  const common = reportRow({
+    kind: 'crystal',
+    name: 'common.rpt',
+    file: 'cmn/Common.bas',
+    line: 5,
+    shared: true,
+    procedureId: 'cmn/Common.bas#Sub:Print',
+    complexity: {
+      version: REPORT_VERSION,
+      level: 'very-high',
+      score: 10,
+      factors: [
+        { factor: 'decisionPoints', value: 40, points: 3 },
+        { factor: 'dynamicSql', value: 2, points: 3 },
+        { factor: 'design-not-analyzed', value: 1, points: 0 },
+      ],
+    },
+  });
+  const login = {
+    name: 'frmLogin',
+    file: 'cmn/frmLogin.frm',
+    shared: true,
+    warnings: [],
+  };
+  inventory.programs = [
+    program('programs/Order/Order.vbp', 'Order', {
+      programType: 'screen',
+      screens: [
+        {
+          name: 'frmOrder',
+          file: 'programs/Order/frmOrder.frm',
+          shared: false,
+          warnings: [],
+        },
+        login,
+      ],
+      reports: [
+        reportRow({
+          kind: 'crystal',
+          name: 'order.rpt',
+          file: 'programs/Order/Order.bas',
+          line: 12,
+          procedureId: 'programs/Order/Order.bas#Sub:Show',
+          complexity: {
+            version: REPORT_VERSION,
+            level: 'high',
+            score: 7,
+            factors: [
+              { factor: 'decisionPoints', value: 30, points: 3 },
+              { factor: 'tables', value: 4, points: 2 },
+              { factor: 'executableLines', value: 80, points: 2 },
+              { factor: 'design-not-analyzed', value: 1, points: 0 },
+            ],
+          },
+        }),
+        common,
+      ],
+    }),
+    program('programs/Invoice/Invoice.vbp', 'Invoice', {
+      programType: 'screen',
+      screens: [
+        login,
+        {
+          name: 'frmInvoice',
+          file: 'programs/Invoice/frmInvoice.frm',
+          shared: false,
+          warnings: [],
+        },
+      ],
+      reports: [
+        reportRow({
+          kind: 'crystal',
+          name: 'bill.rpt',
+          file: 'programs/Invoice/Invoice.bas',
+          line: 20,
+          confidence: 'referenced',
+          warnings: ['REPORT_FILE_MISSING'],
+          procedureId: 'programs/Invoice/Invoice.bas#Sub:Bill',
+          complexity: {
+            version: REPORT_VERSION,
+            level: 'medium',
+            score: 1,
+            factors: [
+              { factor: 'tables', value: 2, points: 1 },
+              { factor: 'design-not-analyzed', value: 1, points: 0 },
+            ],
+            reason: 'DESIGN_NOT_ANALYZED_FLOOR',
+          },
+        }),
+        { ...common },
+        reportRow({
+          kind: 'excel',
+          name: 'Excel.Application',
+          file: 'programs/Invoice/Invoice.bas',
+          line: 30,
+          confidence: 'suspected',
+        }),
+      ],
+    }),
+    program('programs/Batch/Batch.vbp', 'Batch', {
+      programType: 'batch',
+      screens: [],
+      reports: [
+        reportRow({
+          kind: 'print',
+          name: 'Printer',
+          file: 'programs/Batch/Batch.bas',
+          line: 7,
+          confidence: 'suspected',
+        }),
+      ],
+    }),
+  ];
+  inventory.screenReportVersion = 'screen-report-v1';
+  inventory.reportComplexityVersion = REPORT_VERSION;
+  inventory.totals.screenReport = {
+    screens: 3,
+    sharedScreens: 1,
+    batches: 1,
+    reports: {
+      rows: 5,
+      counted: 3,
+      suspected: 2,
+      byKind: {
+        'data-report': 0,
+        crystal: 3,
+        excel: 1,
+        print: 1,
+        'file-output': 0,
+        unknown: 0,
+      },
+      byLevel: { low: 0, medium: 1, high: 1, 'very-high': 1, unrated: 2 },
+    },
+    suspectedPrograms: 2,
+  };
+  return inventory;
+}

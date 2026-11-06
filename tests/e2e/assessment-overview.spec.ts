@@ -85,7 +85,9 @@ test(
     await expect(
       assessment.getByText('Đang hiển thị 1 / 3 program'),
     ).toBeVisible();
-    await assessment.getByRole('button', { name: 'REPORT' }).click();
+    await assessment
+      .getByRole('button', { name: 'REPORT', exact: true })
+      .click();
     await assessment.getByRole('tab', { name: /^File/ }).click();
     await expect(assessment.getByText('File của REPORT')).toBeVisible();
     await expect(

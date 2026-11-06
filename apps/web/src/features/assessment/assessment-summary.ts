@@ -48,6 +48,12 @@ export type ProgramRow = {
   // Present only when the inventory has the mapped view.
   mappedTables: number | null;
   complexity: ComplexityView | null;
+  // AR04. null = the inventory has no screen/report data (not 0).
+  programType: Program['programType'] | null;
+  screens: number | null;
+  // detected + referenced; suspected outputs are counted apart.
+  reports: number | null;
+  suspectedReports: number | null;
   members: Program['members'];
   sharedMembers: number;
   unresolvedMembers: number;
@@ -118,6 +124,14 @@ function programRow(program: Program): ProgramRow {
     tables: analysis ? analysis.metrics.tables : null,
     mappedTables: analysis?.metrics.normalizedTables ?? null,
     complexity: analysis ? complexityView(analysis.complexity) : null,
+    programType: program.programType ?? null,
+    screens: program.screens ? program.screens.length : null,
+    reports: program.reports
+      ? program.reports.filter((row) => row.confidence !== 'suspected').length
+      : null,
+    suspectedReports: program.reports
+      ? program.reports.filter((row) => row.confidence === 'suspected').length
+      : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
     // A case-only difference still finds the file (Windows), so it is not
@@ -289,6 +303,8 @@ export type ProgramSortKey =
   | 'codeLines'
   | 'procedures'
   | 'tables'
+  | 'screens'
+  | 'reports'
   | 'complexity';
 export type ProgramSort = { key: ProgramSortKey; direction: 'asc' | 'desc' };
 

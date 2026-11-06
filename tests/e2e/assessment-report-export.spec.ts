@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { openNewDemoProject } from './demo-project.js';
 
@@ -78,6 +78,42 @@ test(
       technical.click(),
     ]);
     expect(technicalDownload.suggestedFilename()).toMatch(/^assessment-/);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  },
+);
+
+// AR03-AC05: the customer PDF of the demo project: a real PDF of 3 to 8 A4
+// pages. The file is also kept under test-results/ar03-demo for a human check.
+test(
+  'analysis step exports the customer report as a PDF',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await openNewDemoProject(page, `AR03 export ${Date.now()}`);
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
+    const pdf = page.getByRole('button', { name: 'Báo cáo cho khách (PDF)' });
+    await expect(pdf).toBeEnabled({ timeout: 20_000 });
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      pdf.click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(
+      /^アセスメント報告書_AR03_export_\d+_\d{8}\.pdf$/,
+    );
+    const path = await download.path();
+    const bytes = await readFile(path);
+    expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const text = bytes.toString('latin1');
+    const pages = Number(/\/Type \/Pages \/Count (\d+)/.exec(text)?.[1]);
+    expect(pages).toBeGreaterThanOrEqual(3);
+    expect(pages).toBeLessThanOrEqual(8);
+    // A4: 595.5 x 842.25 pt, the same page size as the quote.
+    expect(text).toContain('/MediaBox [0 0 595.50 842.25]');
+    await mkdir('test-results/ar03-demo', { recursive: true });
+    await download.saveAs('test-results/ar03-demo/customer-report-demo.pdf');
+    await expect(pdf).toBeEnabled();
     await expect(page.getByRole('alert')).toHaveCount(0);
   },
 );

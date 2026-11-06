@@ -48,6 +48,10 @@ import {
 } from './tags';
 import { effectiveMapping, type EffectiveMapping } from './table-mapping';
 import { ReportExportButton, type SaveFile } from './report-export';
+import {
+  CustomerPdfButton,
+  type RenderCustomerPdf,
+} from './customer-pdf-button';
 import { ReportsTab, ScreenReportKpis } from './screen-report-panels';
 import { reportListRows } from './screen-report-model';
 import { useRunAssessment } from './use-run-assessment';
@@ -77,6 +81,7 @@ export function AssessmentOverview({
   runId,
   headerSlot = null,
   saveFile,
+  renderCustomerPdf,
 }: {
   api: ArtifactsApi;
   projectId: string;
@@ -84,6 +89,8 @@ export function AssessmentOverview({
   // Header of the step page, where the export button goes.
   headerSlot?: HTMLElement | null;
   saveFile?: SaveFile;
+  // Draws the customer PDF; tests replace it (jsdom cannot paint).
+  renderCustomerPdf?: RenderCustomerPdf;
 }) {
   const { messages } = useLocale();
   const copy = messages.assessment;
@@ -113,6 +120,13 @@ export function AssessmentOverview({
             slot={headerSlot}
             kind="customer"
             {...(saveFile ? { save: saveFile } : {})}
+          />
+          <CustomerPdfButton
+            api={api}
+            artifact={state.artifact}
+            slot={headerSlot}
+            {...(saveFile ? { save: saveFile } : {})}
+            {...(renderCustomerPdf ? { render: renderCustomerPdf } : {})}
           />
           <ReportExportButton
             api={api}

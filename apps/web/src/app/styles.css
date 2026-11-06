@@ -5851,3 +5851,50 @@ fieldset.doc-card {
   color: var(--high);
   font-size: 12px;
 }
+
+/* AR03: customer assessment document (assessment-document.tsx). It reuses the
+   quote document's qd-* rules and the export layout of .quote-doc-root. */
+.assess-doc-root .ad-kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 8px;
+}
+.assess-doc-root .ad-kpis-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ad-heading {
+  margin-top: 16px;
+}
+.ad-toc {
+  list-style: none;
+  padding-left: 0;
+}
+.ad-heading h2 {
+  margin: 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #0077be;
+  font-size: 14px;
+}
+.ad-note {
+  margin-top: 6px;
+}
+.ad-demo {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border: 1px solid #e0a800;
+  border-radius: 6px;
+  background: #fdf3cf;
+  color: #8a5a0b;
+  font-weight: 600;
+}
+.ad-toc {
+  margin-top: 12px;
+}
+.ad-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.assess-doc-root .qd-table td {
+  overflow-wrap: anywhere;
+}

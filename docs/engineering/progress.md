@@ -1,5 +1,12 @@
 # Tiến độ kỹ thuật Portal
 
+## 06/11/2026 — AR01: sửa 3 phát hiện của review lần ba (trên 52d5700)
+
+- [P2] `isWellFormedXlsx` kiểm thêm, cho hai mục bắt buộc: offset local header nằm trong file, có chữ ký `PK\x03\x04` tại đó, và header + tên + extra + dữ liệu nén kết thúc trước central directory. Không giải nén.
+- [P3] Tải JSON chỉ lưu khi nội dung là báo cáo: object có `reportVersion` = `inventory-report-v1`, `programs` là mảng, `source.origin.artifactId`/`artifactVersion` bằng id và version đã yêu cầu. `null`, mảng, object khác, id/version lệch bị từ chối.
+- [P3] Hậu tố `#n` không thể đụng ID có sẵn: lấy trước mọi ID không trùng, rồi cấp `#n` cho nhóm trùng và bỏ qua giá trị đã dùng. Assertion cuối giữ nguyên. Thêm test bộ ba `X.vbp`, `X.VBP`, `X.vbp#1.vbp` và test ngẫu nhiên (hạt giống cố định, hơn 200 đường dẫn).
+- Kiểm chứng: `typecheck`, `lint` pass; `test` với 2 workers: contracts 50, api 620 pass/1 skipped, web 319 pass; `e2e` 17 pass (Windows x64, Node 24.16.0). Chưa mở bằng Excel Desktop, chưa kiểm macOS/Linux.
+
 ## 06/11/2026 — AR01: sửa 4 phát hiện của review lần hai (trên 526adea)
 
 - [P2] Web kiểm cấu trúc ZIP của xlsx trước khi lưu (`shared/files/xlsx-structure.ts`): tìm End Of Central Directory, offset/size central directory nằm trong file, có `[Content_Types].xml` và `xl/workbook.xml`. Body chỉ có `PK\x03\x04` không còn được lưu.

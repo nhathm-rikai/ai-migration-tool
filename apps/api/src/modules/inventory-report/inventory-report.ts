@@ -307,11 +307,29 @@ function selectAllPrograms(inventory: Inventory) {
         tiers[index] = Math.min(2, (tiers[index] ?? 0) + 1);
     }
   }
+  // Residual collisions (full paths that differ only by case): first the IDs
+  // that do not collide are taken, then each member of a colliding group gets
+  // `#<n>`, skipping any ID already taken.
   const ids = programs.map((_, index) => idOf(index));
-  for (const members of groups()) {
-    members.forEach((index, order) => {
-      ids[index] = `${idOf(index)}#${String(order + 1)}`;
-    });
+  const collisions = groups();
+  const taken = new Set(
+    ids
+      .filter((_, index) => !collisions.some((m) => m.includes(index)))
+      .map((id) => id.toUpperCase()),
+  );
+  for (const members of collisions) {
+    let next = 1;
+    for (const index of members) {
+      const base = idOf(index);
+      let candidate = `${base}#${String(next)}`;
+      while (taken.has(candidate.toUpperCase())) {
+        next += 1;
+        candidate = `${base}#${String(next)}`;
+      }
+      taken.add(candidate.toUpperCase());
+      ids[index] = candidate;
+      next += 1;
+    }
   }
   if (new Set(ids.map((id) => id.toUpperCase())).size !== ids.length)
     throw new Error('Internal error: program IDs are not unique.');

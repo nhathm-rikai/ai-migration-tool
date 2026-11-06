@@ -197,3 +197,44 @@ describe('second review finding 3: sheet count in the spec', () => {
     expect(new Set(counts)).toEqual(new Set(['14']));
   });
 });
+
+// Third review, finding 3: a generated suffix never meets an existing ID.
+describe('third review finding 3: suffix cannot collide', () => {
+  const idsOf = (paths: string[]) =>
+    buildInventoryReport(
+      inventoryOf(paths.map((path) => text(path, ['Type=Exe']))),
+      ALL_PROGRAMS,
+    ).programs.map((p) => p.id);
+  const lowered = (ids: string[]) => new Set(ids.map((id) => id.toLowerCase()));
+
+  it('keeps X.vbp, X.VBP and X.vbp#1.vbp apart', () => {
+    const ids = idsOf(['X.vbp', 'X.VBP', 'X.vbp#1.vbp']);
+    expect(lowered(ids).size).toBe(3);
+    // The ID of the third file is its file name; it keeps it.
+    expect(ids[2]).toBe('X.vbp#1');
+  });
+
+  it('never throws and never repeats an ID for random paths', () => {
+    let seed = 12345;
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed % limit;
+    };
+    const tokens = ['x', 'X', '.vbp', '.VBP', '#1', '/'];
+    const randomPath = () => {
+      let path = '';
+      for (let i = 0, n = 1 + next(4); i < n; i++)
+        path += tokens[next(tokens.length)];
+      path = path.replace(/\/+/g, '/').replace(/^\/|\/$/g, '');
+      return path === '' || path.endsWith('/') ? 'x.vbp' : `${path}.vbp`;
+    };
+    let total = 0;
+    for (let round = 0; round < 100; round++) {
+      const paths = [...new Set(Array.from({ length: 40 }, randomPath))];
+      total += paths.length;
+      const ids = idsOf(paths);
+      expect(lowered(ids).size).toBe(paths.length);
+    }
+    expect(total).toBeGreaterThan(200);
+  });
+});

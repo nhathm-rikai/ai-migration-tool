@@ -32,7 +32,7 @@ Giới hạn Excel: một sheet tối đa 1.048.576 dòng (tính cả header và
 
 Che đường dẫn tuyệt đối: dấu ngoặc kép/đơn và khoảng trắng bao quanh được bỏ trước khi kiểm (`"C:\root\X.bas"` → `<absolute path>/X.bas`), áp cho `declaredPath`, `externalReferences`, `externalApis` và mọi cảnh báo.
 
-ID program ở chế độ tất cả luôn duy nhất, không phân biệt hoa thường: tên file; trùng → đường dẫn project bỏ phần mở rộng; vẫn trùng với ID khác (kể cả ID ngắn của file khác, ví dụ `X.vbp.vbp` có ID `X.vbp`) → cả nhóm trùng dùng đường dẫn project đầy đủ; đường dẫn đầy đủ chỉ khác hoa thường (`X.vbp` và `X.VBP`) → thêm `#1`, `#2` theo thứ tự. Nếu vẫn còn ID trùng thì báo lỗi nội bộ, không xuất báo cáo. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
+ID program ở chế độ tất cả luôn duy nhất, không phân biệt hoa thường: tên file; trùng → đường dẫn project bỏ phần mở rộng; vẫn trùng với ID khác (kể cả ID ngắn của file khác, ví dụ `X.vbp.vbp` có ID `X.vbp`) → cả nhóm trùng dùng đường dẫn project đầy đủ; đường dẫn đầy đủ chỉ khác hoa thường (`X.vbp` và `X.VBP`) → thêm `#1`, `#2` theo thứ tự, bỏ qua mọi ID đã dùng. Nếu vẫn còn ID trùng thì báo lỗi nội bộ, không xuất báo cáo. JSON là nguồn chuẩn: ô quá 32.767 ký tự bị cắt và đánh dấu `…[truncated]`, ký tự XML không cho phép thay bằng `U+FFFD`. CSV `programs.csv` của analyze-source không thay báo cáo này.
 
 ## 3. Totals
 

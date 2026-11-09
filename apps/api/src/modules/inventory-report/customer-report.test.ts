@@ -404,13 +404,10 @@ describe('customer report never carries a declared absolute path (AR04 review ro
     for (const [, xml] of parts) expect(xml).not.toContain('PrivateCustomer');
   });
   it('reads an inventory stored before reportItems existed like a new one', () => {
-    const fresh = JSON.parse(
-      JSON.stringify(buildCustomerReport(demoInventory, origin)),
-    );
     const stored = clone();
     delete stored.totals.screenReport?.reportItems;
-    expect(
-      JSON.parse(JSON.stringify(buildCustomerReport(stored, origin))),
-    ).toEqual(fresh);
+    expect(JSON.stringify(buildCustomerReport(stored, origin))).toBe(
+      JSON.stringify(buildCustomerReport(demoInventory, origin)),
+    );
   });
 });

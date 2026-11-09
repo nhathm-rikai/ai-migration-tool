@@ -134,7 +134,7 @@ describe('review: the list reads the project-level entries the analyzer computed
   it('shows the level the totals count, not a program row (shared report)', () => {
     const inventory = screenReportCorpus();
     const totals = inventory.totals.screenReport;
-    const shared = totals?.reportItems.find((item) => item.shared);
+    const shared = totals?.reportItems?.find((item) => item.shared);
     if (!totals || !shared) throw new Error('fixture');
     // Program rows disagree (medium in one, high in the other); the entry
     // says high, which is what totals.byLevel counts.
@@ -155,5 +155,15 @@ describe('review: the list reads the project-level entries the analyzer computed
       inventory.totals.screenReport?.reports.byLevel ?? {};
     for (const [level, count] of Object.entries(byLevel))
       expect(rows.filter((row) => row.level === level)).toHaveLength(count);
+  });
+});
+
+describe('review round 3: an inventory stored before reportItems existed', () => {
+  it('reads the same list and counts as a freshly written one', () => {
+    const fresh = screenReportCorpus();
+    const stored = structuredClone(fresh);
+    delete stored.totals.screenReport?.reportItems;
+    expect(reportListRows(stored)).toEqual(reportListRows(fresh));
+    expect(screenReportView(stored)).toEqual(screenReportView(fresh));
   });
 });

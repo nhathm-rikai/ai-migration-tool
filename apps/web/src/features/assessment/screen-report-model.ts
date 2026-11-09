@@ -1,4 +1,7 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  normalizeScreenReportTotals,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 import { programLabel } from './assessment-summary';
 
 // View model of the screen (画面), report (帳票) and batch counts (AR04). It
@@ -49,7 +52,8 @@ export type ScreenReportView =
     };
 
 export function screenReportView(inventory: Inventory): ScreenReportView {
-  const totals = inventory.totals.screenReport;
+  // Stored before reportItems existed: derived by the shared contracts rule.
+  const totals = normalizeScreenReportTotals(inventory);
   if (!totals) return { available: false };
   return {
     available: true,
@@ -119,7 +123,7 @@ export function moduleOfProgram(projectPath: string): string {
 // gave it. Nothing is aggregated again here, so the list always agrees with
 // the totals by level.
 export function reportListRows(inventory: Inventory): ReportListRow[] | null {
-  const totals = inventory.totals.screenReport;
+  const totals = normalizeScreenReportTotals(inventory);
   if (!totals) return null;
   return totals.reportItems.map((item) => ({
     key: [item.kind, item.file, item.line ?? '', item.name.toLowerCase()].join(

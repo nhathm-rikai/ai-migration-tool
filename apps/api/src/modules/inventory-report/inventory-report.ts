@@ -1,5 +1,9 @@
 import type { SourceInventoryDocument } from '@portal/contracts';
 import {
+  REDACTED_PREFIX,
+  redactAbsolutePath,
+} from '../analysis/redact-path.js';
+import {
   buildScreenReportTotals,
   reportKey,
   type ScreenReportTotals,
@@ -290,18 +294,7 @@ function addCounters(sum: LineCounters, add: LineCounters): void {
 // A member path written as absolute (drive `C:\...`, UNC `\\server\...`,
 // rooted `/...` or `\...`) names a place on someone's machine; the report
 // keeps only the file name, and the resolution says it was absolute.
-const ABSOLUTE_PATH = /^(?:[A-Za-z]:|[\\/])/;
-export const REDACTED_PREFIX = '<absolute path>/';
-
-// A path may be written in quotes (`Module=X; "C:\dir\X.bas"`); the quotes
-// are not part of it.
-const SURROUNDING_QUOTES = /^["']+|["']+$/g;
-
-export function redactAbsolutePath(path: string): string {
-  const trimmed = path.trim().replace(SURROUNDING_QUOTES, '').trim();
-  if (!ABSOLUTE_PATH.test(trimmed)) return path;
-  return REDACTED_PREFIX + (trimmed.split(/[\\/]/).at(-1) ?? '');
-}
+export { REDACTED_PREFIX, redactAbsolutePath };
 
 // Program ID: project file name without extension (`KUN/KUNO0020.vbp` →
 // `KUNO0020`), compared without case.
@@ -862,7 +855,13 @@ export function buildInventoryReport(
       );
     for (const row of program.reports ?? [])
       for (const code of row.warnings)
-        warn(code, id, row.file, row.line, `${row.kind} ${row.name}`);
+        warn(
+          code,
+          id,
+          redactAbsolutePath(row.file),
+          row.line,
+          `${row.kind} ${redactAbsolutePath(row.name)}`,
+        );
   }
   for (const file of files) {
     if (file.issue)

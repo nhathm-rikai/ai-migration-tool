@@ -412,7 +412,7 @@ const ProgramReportSchema = Type.Object(
 // programs but is one report). Its complexity is the highest score of any
 // program that lists it (ties: the first program in inventory order); the
 // score each program gave it is kept in `programs`.
-const ProjectReportSchema = Type.Object(
+export const ProjectReportSchema = Type.Object(
   {
     ...ProgramReportSchema.properties,
     programs: Type.Array(
@@ -513,7 +513,9 @@ const ScreenReportTotalsSchema = Type.Object(
     suspectedPrograms: Count,
     // The project-level report list, computed once here; every view of the
     // project totals reads it instead of aggregating program rows again.
-    reportItems: Type.Array(ProjectReportSchema),
+    // Optional: an inventory stored before this field existed reads through
+    // normalizeScreenReportTotals, which derives the same list.
+    reportItems: Type.Optional(Type.Array(ProjectReportSchema)),
   },
   Strict,
 );
@@ -602,3 +604,4 @@ export const SourceInventorySchema = Type.Object(
 );
 
 export type SourceInventoryDocument = Static<typeof SourceInventorySchema>;
+export type ProjectReportItem = Static<typeof ProjectReportSchema>;

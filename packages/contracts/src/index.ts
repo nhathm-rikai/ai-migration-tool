@@ -5,6 +5,7 @@ export * from './health.schema.js';
 export * from './local-session.schema.js';
 export * from './folder-picker.schema.js';
 export * from './source-inventory.schema.js';
+export * from './screen-report-items.js';
 export * from './source-registration.schema.js';
 export * from './run.schema.js';
 export * from './artifact.schema.js';

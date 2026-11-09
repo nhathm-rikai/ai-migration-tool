@@ -1,3 +1,5 @@
+import { projectReportItems } from '@portal/contracts';
+import { redactAbsolutePath } from './redact-path.js';
 import type {
   CodeFileAnalysis,
   LanguageAnalyzer,
@@ -373,12 +375,14 @@ export function buildProgramScreenReport(input: {
     if (analyzer.isScreenMemberKind(member.kind)) {
       // Two resolved files that differ only in case are two files (a
       // case-sensitive file system); an unresolved path is matched loosely.
-      const key = member.relativePath ?? member.displayPath.toLowerCase();
+      const key =
+        member.relativePath ??
+        redactAbsolutePath(member.displayPath).toLowerCase();
       if (!seenScreens.has(key)) {
         seenScreens.add(key);
         screens.push({
           name: member.name,
-          file: member.displayPath,
+          file: redactAbsolutePath(member.displayPath),
           shared: member.shared,
           warnings: screenWarnings(member),
         });
@@ -437,19 +441,12 @@ type ProgramView = {
 const zeroRecord = <K extends string>(keys: readonly K[]) =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
 
-// Identity of a report across programs.
-export const reportKey = (row: {
-  kind: string;
-  file: string;
-  line: number | null;
-  name: string;
-}) => `${row.kind} ${row.file} ${row.line ?? ''} ${row.name.toLowerCase()}`;
+export { reportKey } from '@portal/contracts';
 
 export function buildScreenReportTotals(
   programs: readonly ProgramView[],
 ): ScreenReportTotals {
   const screens = new Map<string, ProgramScreen>();
-  const rows = new Map<string, ProjectReport>();
   let suspectedPrograms = 0;
   let batches = 0;
   for (const program of programs) {
@@ -464,32 +461,19 @@ export function buildScreenReportTotals(
       if (!existing) screens.set(key, screen);
       else if (screen.shared) existing.shared = true;
     }
-    for (const row of program.reports) {
-      const key = `${row.kind}\u0000${row.file}\u0000${row.line ?? ''}\u0000${row.name.toLowerCase()}`;
-      const own = {
-        program: program.program,
-        level: row.complexity.level,
-        score: row.complexity.score,
-      };
-      const existing = rows.get(key);
-      if (!existing) {
-        rows.set(key, { ...row, programs: [own] });
-        continue;
-      }
-      if (!existing.programs.some((entry) => entry.program === own.program))
-        existing.programs.push(own);
-      // Strictly higher only: a tie keeps the first program's entry, so the
-      // result does not depend on anything but the program order.
-      if ((row.complexity.score ?? -1) > (existing.complexity.score ?? -1)) {
-        const programs = existing.programs;
-        Object.assign(existing, row, { programs });
-      } else if (row.shared) existing.shared = true;
-    }
   }
+  // The project-level list: one rule, shared with the readers of stored
+  // inventories (contracts/screen-report-items.ts).
+  const items = projectReportItems(
+    programs.map((program) => ({
+      projectPath: program.program,
+      reports: program.reports,
+    })),
+  );
   const byKind = zeroRecord(REPORT_KIND_LIST);
   const byLevel = zeroRecord(REPORT_LEVEL_LIST);
   let counted = 0;
-  for (const row of rows.values()) {
+  for (const row of items) {
     byKind[row.kind] += 1;
     byLevel[row.complexity.level] += 1;
     if (row.confidence !== 'suspected') counted += 1;
@@ -500,13 +484,13 @@ export function buildScreenReportTotals(
       .length,
     batches,
     reports: {
-      rows: rows.size,
+      rows: items.length,
       counted,
-      suspected: rows.size - counted,
+      suspected: items.length - counted,
       byKind,
       byLevel,
     },
     suspectedPrograms,
-    reportItems: [...rows.values()],
+    reportItems: items,
   };
 }

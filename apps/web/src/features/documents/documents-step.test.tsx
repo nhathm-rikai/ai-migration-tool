@@ -135,6 +135,7 @@ function fakeApi(current: CurrentDocumentRunResponse) {
         content: '# Business rules\n<script>x</script>',
       }),
     ),
+    utSpecExcel: vi.fn(),
     reviewBoard: vi.fn(),
     addReview: vi.fn(),
   } satisfies Record<keyof DocumentsApi, unknown>;

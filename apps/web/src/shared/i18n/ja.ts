@@ -10,6 +10,12 @@ import type { Messages } from './vi';
 export const jaMessages = {
   app: {
     skipToContent: 'メインコンテンツへ移動',
+    utExcel: {
+      download: 'Excel をダウンロード（単体テスト仕様書）',
+      busy: '出力中…',
+      failed:
+        '単体テスト仕様書の Excel を出力できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
+    },
     language: '言語',
     session: {
       pending: 'ローカルバックエンドに接続しています…',
@@ -659,6 +665,7 @@ export const jaMessages = {
         tables: 'テーブル数',
         screens: '画面',
         reports: '帳票',
+        utPoints: 'UTテスト観点数',
         complexity: '複雑度',
       },
       columnHints: {
@@ -889,6 +896,11 @@ export const jaMessages = {
         name: 'セキュリティ監査',
         detail: 'プログラムのセキュリティリスク（静的レビュー・根拠付き）',
       },
+      'ut-test-spec': {
+        name: '単体テスト仕様書',
+        detail:
+          'ポータルのチェックリストに沿ってエージェントが分岐単位でケースを作成（Excel出力あり）',
+      },
     },
     companion: '自動追加',
     always:
@@ -1042,6 +1054,7 @@ export const jaMessages = {
       'detail-design': '詳細設計',
       'db-design': 'DB設計',
       'security-audit': 'セキュリティ監査',
+      'ut-test-spec': '単体テスト仕様書',
     },
     comments: 'コメント',
     noComments: 'コメントはありません。',

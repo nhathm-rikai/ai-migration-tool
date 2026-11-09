@@ -62,6 +62,26 @@ function setup(
 }
 
 describe('ReviewStep', () => {
+  it('offers the Excel only for the unit test specification (TC01)', async () => {
+    const api = setup(board({ name: 'ut-test-spec.md' }));
+    api.packageFile.mockResolvedValue({
+      runId: 'r',
+      program: 'src/P.vbp',
+      name: 'ut-test-spec.md',
+      sha256: 'a'.repeat(64),
+      byteLength: 3,
+      content: '# UT',
+    });
+    await screen.findByRole('heading', { level: 1, name: 'UT' });
+    expect(screen.getByTestId('ut-excel')).toBeTruthy();
+  });
+
+  it('has no Excel button for other documents', async () => {
+    setup(board());
+    await screen.findByRole('heading', { level: 1, name: 'Tài liệu' });
+    expect(screen.queryByTestId('ut-excel')).toBeNull();
+  });
+
   it('points to step 3 when no document exists', async () => {
     setup({ programs: [] });
     expect(await screen.findByText('Chưa có tài liệu để review')).toBeTruthy();

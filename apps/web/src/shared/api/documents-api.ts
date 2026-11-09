@@ -7,6 +7,9 @@ import {
   type AddReviewEvent,
   type StartDocumentRunInput,
 } from '@portal/contracts';
+import { INVENTORY_REPORT_CONTENT_TYPES } from '@portal/contracts';
+import { isWellFormedXlsx } from '../files/xlsx-structure';
+import { readBlob } from './artifacts-api';
 import { createApiClient } from './api-client';
 import {
   createLocalSession,
@@ -83,6 +86,22 @@ export function createDocumentsApi(
           encodeURIComponent(file),
         PackageFileContentSchema,
         signal,
+      ),
+    // TC01: the Japanese Excel of the unit test specification of one package.
+    utSpecExcel: (
+      projectId: string,
+      runId: string,
+      item: number,
+      signal: AbortSignal,
+    ) =>
+      request.download(
+        run(projectId, runId) + '/items/' + String(item) + '/ut-test-spec',
+        signal,
+        {
+          mediaType: INVENTORY_REPORT_CONTENT_TYPES.xlsx,
+          isValid: async (blob) =>
+            isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
+        },
       ),
     reviewBoard: (projectId: string, signal: AbortSignal) =>
       request(

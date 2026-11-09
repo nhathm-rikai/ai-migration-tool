@@ -29,6 +29,12 @@ import type { QuoteFormulaFacts } from '../../features/quote/quote-model';
 export const viMessages = {
   app: {
     skipToContent: 'Đến nội dung chính',
+    utExcel: {
+      download: 'Tải Excel (単体テスト仕様書)',
+      busy: 'Đang xuất…',
+      failed:
+        'Không xuất được Excel của test case UT. Thử lại sau; không có file nào được lưu.',
+    },
     language: 'Ngôn ngữ',
     session: {
       pending: 'Đang kết nối backend cục bộ…',
@@ -671,6 +677,7 @@ export const viMessages = {
         tables: 'Số bảng',
         screens: 'Màn hình',
         reports: 'Report',
+        utPoints: 'Điểm test UT',
         complexity: 'Độ phức tạp',
       },
       columnHints: {
@@ -907,6 +914,11 @@ export const viMessages = {
         name: 'Security audit',
         detail: 'Rủi ro bảo mật của program, review tĩnh có evidence',
       },
+      'ut-test-spec': {
+        name: 'Test case UT (単体テスト仕様書)',
+        detail:
+          'Agent liệt kê case mức nhánh theo checklist của Portal; có Excel',
+      },
     },
     companion: 'sinh kèm',
     always:
@@ -1055,6 +1067,7 @@ export const viMessages = {
       'detail-design': 'Thiết kế chi tiết',
       'db-design': 'Thiết kế CSDL',
       'security-audit': 'Security audit',
+      'ut-test-spec': 'Test case UT',
     },
     comments: 'Nhận xét',
     noComments: 'Chưa có nhận xét.',

@@ -19,9 +19,9 @@ import {
 // an xlsx only if its ZIP structure holds a workbook; JSON only if it parses.
 // FileReader exists in every browser; Blob.arrayBuffer() is not in all test
 // environments.
-function readBlob(blob: Blob, as: 'bytes'): Promise<ArrayBuffer>;
-function readBlob(blob: Blob, as: 'text'): Promise<string>;
-function readBlob(
+export function readBlob(blob: Blob, as: 'bytes'): Promise<ArrayBuffer>;
+export function readBlob(blob: Blob, as: 'text'): Promise<string>;
+export function readBlob(
   blob: Blob,
   as: 'bytes' | 'text',
 ): Promise<ArrayBuffer | string> {

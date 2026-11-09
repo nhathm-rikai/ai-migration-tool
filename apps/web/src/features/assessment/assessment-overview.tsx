@@ -775,7 +775,7 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 11;
+const COLUMNS = 12;
 
 // List row: the table count shown first is the mapped one when there is a
 // mapped view (configured or inferred); the count as written stays beside it.
@@ -952,6 +952,7 @@ function ProgramList({
                   {header('tables', copy.columns.tables)}
                   {header('screens', copy.columns.screens)}
                   {header('reports', copy.columns.reports)}
+                  {header('utPoints', copy.columns.utPoints)}
                   {header(
                     'complexity',
                     copy.columns.complexity,
@@ -1032,6 +1033,9 @@ function ProgramList({
                                 +{number(row.suspectedReports)}?
                               </span>
                             )}
+                        </td>
+                        <td className="num" data-col="utPoints">
+                          {metric(row.utPoints)}
                         </td>
                         <td>
                           <span className="cx-cell">

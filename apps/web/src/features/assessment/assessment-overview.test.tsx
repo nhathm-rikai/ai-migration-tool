@@ -206,7 +206,7 @@ describe('Assessment overview (F03)', () => {
       .closest('tr');
     if (!row) throw new Error('row');
     expect(within(row).getByText('Không phân tích được')).toBeTruthy();
-    expect(within(row).getAllByText('Chưa phân tích')).toHaveLength(7);
+    expect(within(row).getAllByText('Chưa phân tích')).toHaveLength(8);
     expect(within(row).queryByText('0')).toBeNull();
     // Members of the partial program show why it is incomplete.
     openPrograms();

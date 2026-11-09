@@ -258,7 +258,12 @@ Every document starts with the common header table of the pack README, including
 export type ParsedPackage =
   | { status: 'ok'; files: { name: string; content: string }[] }
   | { status: 'invalid'; reason: string }
-  | { status: 'incomplete' };
+  // `pending`: the documents not "hoàn tất" and the state read from each
+  // (undefined = no status row), for the run log.
+  | {
+      status: 'incomplete';
+      pending: { name: string; state: string | undefined }[];
+    };
 
 // Blocks of the answer. Every expected file exactly once, nothing else, and
 // every document `hoàn tất` in its header (SD-CT-08); otherwise the package
@@ -268,8 +273,10 @@ export function parsePackage(
   expected: readonly string[],
 ): ParsedPackage {
   const files: { name: string; content: string }[] = [];
+  // A block without its end marker was cut by an output limit and the answer
+  // restarted it: only complete blocks count.
   const pattern =
-    /^=== FILE: ([a-z-]+\.md) ===\r?\n([\s\S]*?)\r?\n=== END FILE ===$/gm;
+    /^=== FILE: ([a-z-]+\.md) ===\r?\n((?:(?!^=== FILE: )[\s\S])*?)\r?\n=== END FILE ===$/gm;
   for (const match of raw.matchAll(pattern)) {
     const name = match[1] ?? '';
     if (!expected.includes(name))
@@ -285,8 +292,19 @@ export function parsePackage(
   );
   if (missing.length)
     return { status: 'invalid', reason: `missing ${missing.join(', ')}` };
-  if (files.some((file) => generationState(file.content) !== 'hoàn tất'))
-    return { status: 'incomplete' };
+  const pending = files
+    .map((file) => ({
+      name: file.name,
+      // As written by the agent, with the last unit it reached.
+      state: statusCell(file.content)?.replace(/[`*]/g, '').trim(),
+      normalized: generationState(file.content),
+    }))
+    .filter((entry) => entry.normalized !== 'hoàn tất');
+  if (pending.length)
+    return {
+      status: 'incomplete',
+      pending: pending.map(({ name, state }) => ({ name, state })),
+    };
   return {
     status: 'ok',
     files: expected.map(
@@ -299,11 +317,15 @@ export function parsePackage(
 // Value of the status row of the document's header table, in any output
 // language, as "hoàn tất" or "đang sinh"; undefined when the row is missing. Anything
 // after the state (e.g. the last unit reached) is ignored.
-export function generationState(document: string): string | undefined {
-  const cell = new RegExp(
+function statusCell(document: string): string | undefined {
+  return new RegExp(
     `^\\|\\s*\\**(?:${ROW_LABELS})\\**\\s*\\|\\s*([^|\\n]*)\\|`,
     'im',
   ).exec(document)?.[1];
+}
+
+export function generationState(document: string): string | undefined {
+  const cell = statusCell(document);
   if (cell === undefined) return undefined;
   const value = cell.replace(/[`*]/g, '').trim();
   const rows = Object.values(GENERATION_ROWS);

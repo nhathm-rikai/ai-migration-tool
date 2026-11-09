@@ -81,6 +81,18 @@ describe('specification-design package', () => {
     expect(parsed.files[0]?.content).toContain('# BR');
   });
 
+  it('drops a block cut by an output limit and keeps the restarted one', () => {
+    const expected = packageFileNames(['business-rules', 'db-design']);
+    const parsed = parsePackage(
+      `${answer({ 'business-rules.md': doc('BR', 'hoàn tất') })}\n=== FILE: db-design.md ===\n${doc('DB cut', 'đang sinh').slice(0, 40)}\n${answer({ 'db-design.md': doc('DB', 'hoàn tất') })}`,
+      expected,
+    );
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') return;
+    expect(parsed.files[1]?.content).toContain('# DB\n');
+    expect(parsed.files[1]?.content).not.toContain('cut');
+  });
+
   it('rejects missing, unexpected or duplicated files', () => {
     const expected = packageFileNames(['db-design']);
     expect(parsePackage(answer({}), expected)).toMatchObject({
@@ -107,7 +119,7 @@ describe('specification-design package', () => {
         }),
         expected,
       ),
-    ).toEqual({ status: 'incomplete' });
+    ).toMatchObject({ status: 'incomplete' });
     expect(
       parsePackage(
         answer({
@@ -116,7 +128,7 @@ describe('specification-design package', () => {
         }),
         expected,
       ),
-    ).toEqual({ status: 'incomplete' });
+    ).toMatchObject({ status: 'incomplete' });
     expect(generationState('| **Trạng thái sinh** | `hoàn tất` |')).toBe(
       'hoàn tất',
     );

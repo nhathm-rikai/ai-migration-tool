@@ -361,7 +361,15 @@ export function createDocumentExecutor(deps: {
             continue;
           }
           if (parsed.status === 'incomplete') {
-            fail('PACKAGE_INCOMPLETE', 'A document is not "hoàn tất".');
+            fail(
+              'PACKAGE_INCOMPLETE',
+              `A document is not "hoàn tất": ${parsed.pending
+                .map(
+                  (entry) =>
+                    `${entry.name} (${entry.state === undefined ? 'no status row' : JSON.stringify(entry.state)})`,
+                )
+                .join(', ')}.`,
+            );
             continue;
           }
           const packageId = deps.nextId();

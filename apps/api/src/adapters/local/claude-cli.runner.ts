@@ -46,10 +46,29 @@ export function claudeCliArgs(
   ];
 }
 
+// The answer across all assistant messages. A continuation resumes mid-text,
+// so segments are joined as they are, except that a file marker always starts
+// on its own line. Falls back to the result text when no message carried text.
+function joinSegments(segments: readonly string[], fallback: string): string {
+  let text = '';
+  for (const segment of segments) {
+    const needsBreak =
+      text !== '' &&
+      !text.endsWith('\n') &&
+      !segment.startsWith('\n') &&
+      segment.startsWith('=== FILE: ');
+    text += (needsBreak ? '\n' : '') + segment;
+  }
+  return text.trim() ? text : fallback;
+}
+
 export const claudeDialect: CliDialect = {
   args: (model, effort) => claudeCliArgs(model ?? 'sonnet', effort),
   createParser(emit) {
     let result: CliOutcome | undefined;
+    // When an answer hits the output limit the CLI resumes it in a new
+    // assistant message, and the result event only repeats the last one.
+    const segments: string[] = [];
     return {
       line(line) {
         const event = parseJsonObject(line);
@@ -103,8 +122,10 @@ export const claudeDialect: CliDialect = {
                 name?: unknown;
                 input?: unknown;
               };
-              if (block.type === 'text' && typeof block.text === 'string')
+              if (block.type === 'text' && typeof block.text === 'string') {
+                segments.push(block.text);
                 emitText(emit, block.text);
+              }
               if (block.type === 'tool_use') {
                 const name = typeof block.name === 'string' ? block.name : '';
                 const input = (block.input ?? {}) as Record<string, unknown>;
@@ -127,7 +148,10 @@ export const claudeDialect: CliDialect = {
           const usage = (event.usage ?? {}) as Record<string, unknown>;
           result = {
             isError: event.is_error === true || event.subtype !== 'success',
-            text: typeof event.result === 'string' ? event.result : '',
+            text: joinSegments(
+              segments,
+              typeof event.result === 'string' ? event.result : '',
+            ),
             usage: {
               inputTokens:
                 count(usage.input_tokens) +

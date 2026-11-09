@@ -125,6 +125,28 @@ process.stdin.on('end', () => {
     setInterval(() => {}, 1000);
     return;
   }
+  // Output-limit continuation: the CLI resumes the answer in a new assistant
+  // message and `result` carries only that last message.
+  if (scenario === 'continued') {
+    const message = (text: string) =>
+      emit({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text }] },
+      });
+    message(
+      '=== FILE: a.md ===\n# A\n=== END FILE ===\n=== FILE: b.md ===\n# B, cut of',
+    );
+    const last = '=== FILE: b.md ===\n# B\n=== END FILE ===';
+    message(last);
+    emit({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: last,
+      usage: { input_tokens: 10, output_tokens: 7 },
+    });
+    return;
+  }
   // Partial messages: a text block, then the answer in a new block whose
   // first delta has no leading newline.
   const delta = (text: string) =>
@@ -143,7 +165,8 @@ process.stdin.on('end', () => {
   // Split one multi-byte character across two writes.
   const text = `# Tài liệu\n\nprompt bytes: ${Buffer.byteLength(prompt)}`;
   const line = Buffer.from(
-    `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text }] } })}\n`,
+    // `invalid`: an answer with no text at all.
+    `${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: scenario === 'invalid' ? ' ' : text }] } })}\n`,
   );
   const cut = line.indexOf(Buffer.from('à')) + 1;
   process.stdout.write(line.subarray(0, cut));

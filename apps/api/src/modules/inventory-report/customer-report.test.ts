@@ -332,3 +332,27 @@ describe('AR02-AC06 workbook', () => {
     );
   });
 });
+
+describe('customer report keeps files that differ only in case apart (AR04 review)', () => {
+  it('counts both screens and lists both rows', () => {
+    const inv = clone();
+    const program = inv.programs[0];
+    if (!program?.screens || !program.reports?.[0]) throw new Error('fixture');
+    const [report] = program.reports;
+    program.screens = [
+      { name: 'A', file: 'x/Main.frm', shared: false, warnings: [] },
+      { name: 'B', file: 'x/main.frm', shared: false, warnings: [] },
+    ];
+    program.reports = [
+      { ...report, file: 'x/Main.frm', shared: false },
+      { ...report, file: 'x/main.frm', shared: false },
+    ];
+    const built = buildCustomerReport(inv, origin);
+    expect(
+      built.items.filter((i) => i.type === '画面' && i.file.startsWith('x/')),
+    ).toHaveLength(2);
+    expect(
+      built.items.filter((i) => i.type === '帳票' && i.file.startsWith('x/')),
+    ).toHaveLength(2);
+  });
+});

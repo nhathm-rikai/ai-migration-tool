@@ -304,7 +304,9 @@ export function buildCustomerReport(
     row.codeLines += program.analysis?.metrics.ownCodeLines ?? 0;
     if (program.programType === 'batch') row.batches += 1;
     for (const screen of program.screens ?? []) {
-      const key = screen.file.toLowerCase();
+      const key = screen.warnings.includes('SCREEN_FILE_MISSING')
+        ? screen.file.toLowerCase()
+        : screen.file;
       if (seenScreens.has(key)) continue;
       seenScreens.add(key);
       (screen.shared ? sharedRow : row).screens += 1;
@@ -312,7 +314,7 @@ export function buildCustomerReport(
     for (const report of program.reports ?? []) {
       const key = [
         report.kind,
-        report.file.toLowerCase(),
+        report.file,
         report.line,
         report.name.toLowerCase(),
       ].join('\u0000');
@@ -557,7 +559,9 @@ function buildItems(inventory: Inventory): ItemRow[] {
       module: moduleOf(program.projectPath),
     };
     for (const screen of program.screens ?? []) {
-      const key = screen.file.toLowerCase();
+      const key = screen.warnings.includes('SCREEN_FILE_MISSING')
+        ? screen.file.toLowerCase()
+        : screen.file;
       const entry = screens.get(key) ?? { row: screen, owners: [] };
       entry.owners.push(owner);
       screens.set(key, entry);
@@ -565,7 +569,7 @@ function buildItems(inventory: Inventory): ItemRow[] {
     for (const report of program.reports ?? []) {
       const key = [
         report.kind,
-        report.file.toLowerCase(),
+        report.file,
         report.line,
         report.name.toLowerCase(),
       ].join('\u0000');

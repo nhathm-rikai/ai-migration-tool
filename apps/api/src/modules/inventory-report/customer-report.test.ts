@@ -289,6 +289,7 @@ describe('AR02-AC06 workbook', () => {
         byLevel: { low: 0, medium: 0, high: 0, 'very-high': 0, unrated: 0 },
       },
       suspectedPrograms: 0,
+      reportItems: [],
     };
     const empty = buildCustomerReport(none, origin);
     for (const name of [
@@ -347,6 +348,14 @@ describe('customer report keeps files that differ only in case apart (AR04 revie
       { ...report, file: 'x/Main.frm', shared: false },
       { ...report, file: 'x/main.frm', shared: false },
     ];
+    const sr = inv.totals.screenReport;
+    if (!sr) throw new Error('fixture');
+    sr.reportItems = program.reports.map((row) => ({
+      ...row,
+      programs: [
+        { program: program.projectPath, level: 'unrated', score: null },
+      ],
+    }));
     const built = buildCustomerReport(inv, origin);
     expect(
       built.items.filter((i) => i.type === '画面' && i.file.startsWith('x/')),
@@ -354,5 +363,20 @@ describe('customer report keeps files that differ only in case apart (AR04 revie
     expect(
       built.items.filter((i) => i.type === '帳票' && i.file.startsWith('x/')),
     ).toHaveLength(2);
+  });
+});
+
+describe('customer report reads the project-level entry of a shared report (AR04 review round 2)', () => {
+  it('shows the highest score, not a program row', () => {
+    const inv = clone();
+    const sr = inv.totals.screenReport;
+    const item = sr?.reportItems.find((entry) => entry.kind === 'crystal');
+    if (!sr || !item) throw new Error('fixture');
+    item.complexity = { ...item.complexity, level: 'very-high', score: 12 };
+    const built = buildCustomerReport(inv, origin);
+    const row = built.items.find(
+      (i) => i.type === '帳票' && i.name === item.name,
+    );
+    expect(row).toMatchObject({ level: 'very-high', score: 12 });
   });
 });

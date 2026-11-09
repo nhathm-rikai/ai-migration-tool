@@ -566,17 +566,6 @@ function buildItems(inventory: Inventory): ItemRow[] {
       entry.owners.push(owner);
       screens.set(key, entry);
     }
-    for (const report of program.reports ?? []) {
-      const key = [
-        report.kind,
-        report.file,
-        report.line,
-        report.name.toLowerCase(),
-      ].join('\u0000');
-      const entry = reports.get(key) ?? { row: report, owners: [] };
-      entry.owners.push(owner);
-      reports.set(key, entry);
-    }
     if (program.programType === 'batch')
       items.push({
         type: 'バッチ',
@@ -597,6 +586,19 @@ function buildItems(inventory: Inventory): ItemRow[] {
         note: '',
       });
   }
+  // Reports come from the project-level list the analyzer computed once (a
+  // shared report at its highest score), never from the program rows.
+  for (const item of inventory.totals.screenReport.reportItems)
+    reports.set(
+      [item.kind, item.file, item.line, item.name.toLowerCase()].join('\u0000'),
+      {
+        row: item,
+        owners: item.programs.map((entry) => ({
+          label: programLabel(entry.program),
+          module: moduleOf(entry.program),
+        })),
+      },
+    );
   const who = (owners: Owner[]) => {
     const labels = [...new Set(owners.map((o) => o.label))];
     return labels.length <= 3

@@ -295,10 +295,16 @@ export function parsePackage(
   const pending = files
     .map((file) => ({
       name: file.name,
-      state: generationState(file.content),
+      // As written by the agent, with the last unit it reached.
+      state: statusCell(file.content)?.replace(/[`*]/g, '').trim(),
+      normalized: generationState(file.content),
     }))
-    .filter((entry) => entry.state !== 'hoàn tất');
-  if (pending.length) return { status: 'incomplete', pending };
+    .filter((entry) => entry.normalized !== 'hoàn tất');
+  if (pending.length)
+    return {
+      status: 'incomplete',
+      pending: pending.map(({ name, state }) => ({ name, state })),
+    };
   return {
     status: 'ok',
     files: expected.map(
@@ -311,11 +317,15 @@ export function parsePackage(
 // Value of the status row of the document's header table, in any output
 // language, as "hoàn tất" or "đang sinh"; undefined when the row is missing. Anything
 // after the state (e.g. the last unit reached) is ignored.
-export function generationState(document: string): string | undefined {
-  const cell = new RegExp(
+function statusCell(document: string): string | undefined {
+  return new RegExp(
     `^\\|\\s*\\**(?:${ROW_LABELS})\\**\\s*\\|\\s*([^|\\n]*)\\|`,
     'im',
   ).exec(document)?.[1];
+}
+
+export function generationState(document: string): string | undefined {
+  const cell = statusCell(document);
   if (cell === undefined) return undefined;
   const value = cell.replace(/[`*]/g, '').trim();
   const rows = Object.values(GENERATION_ROWS);

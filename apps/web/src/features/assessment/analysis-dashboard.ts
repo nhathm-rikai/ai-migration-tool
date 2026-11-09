@@ -8,6 +8,7 @@ import { programLabel } from './assessment-summary';
 import type { CrudView, SqlOperation } from './program-detail-model';
 import {
   effectiveMapping,
+  hasMappedCrud,
   mappedCrud,
   type EffectiveMapping,
 } from './table-mapping';
@@ -78,19 +79,8 @@ function analyzedFiles(inventory: Inventory): Map<string, AnalyzedFile> {
   return files;
 }
 
-// A mapped view exists when the schema is inferred from the source or every
-// analyzed program carries the analyzer's mapped CRUD.
-export function hasMappedCrud(inventory: Inventory): boolean {
-  const mapping = effectiveMapping(inventory);
-  const analyzed = inventory.programs.filter((program) => program.analysis);
-  return (
-    analyzed.length > 0 &&
-    analyzed.every(
-      (program) =>
-        program.analysis && mappedCrud(program.analysis, mapping) !== null,
-    )
-  );
-}
+// The rule for a mapped view is shared with the customer report.
+export { hasMappedCrud };
 
 export function dashboardKpis(
   inventory: Inventory,

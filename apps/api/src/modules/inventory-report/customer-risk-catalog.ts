@@ -169,6 +169,14 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     confirmation:
       '利用中の外部コンポーネントのライセンス・入手方法・代替可否をご確認ください。',
   },
+  CONCATENATED_SQL: {
+    category: 'データベース',
+    severity: '中',
+    content:
+      '文字列連結で組み立てているSQLがあります。実行時の内容を機械的に特定できず、移行時の書き換え対象になります。',
+    confirmation:
+      '該当SQLの用途と、入力値の扱い（SQLインジェクション対策）をご確認ください。',
+  },
   EXTERNAL_API: {
     category: '外部コンポーネント',
     severity: '低',

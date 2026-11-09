@@ -308,7 +308,8 @@ function sheet3(report: CustomerReport): Sheet {
   b.subHeader(['識別子', 'ファイル名', '説明', '参照プログラム数']);
   b.table(
     dependencies.components.map((c) => [
-      c.identifier,
+      (c.kind === 'reference' ? '【参照設定】' : '【コンポーネント】') +
+        c.identifier,
       c.fileName,
       c.description,
       c.programs,
@@ -329,9 +330,10 @@ function sheet4(report: CustomerReport): Sheet {
   const { database } = report;
   const b = new SheetBuilder(3);
   b.heading(
-    report.scale.tablesView === 'raw'
+    (report.scale.tablesView === 'raw'
       ? 'アクセスされるテーブル（ソース上の名称・上位30）'
-      : 'アクセスされるテーブル（名称統一後・上位30）',
+      : 'アクセスされるテーブル（名称統一後・上位30）') +
+      (report.scale.tablesAssumed ? '※スキーマは仮定（DB管理者の確認前）' : ''),
   );
   b.subHeader([
     'テーブル',

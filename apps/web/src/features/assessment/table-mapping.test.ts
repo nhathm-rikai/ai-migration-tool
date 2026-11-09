@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { crudMatrix } from './analysis-dashboard';
 import {
   mappedInventoryFixture,
   unmappedInventoryFixture,
 } from '@portal/contracts/fixtures';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import {
+  crudTables,
   effectiveMapping,
+  hasMappedCrud,
   inferDefaultSchema,
   normalizeTableName,
 } from './table-mapping';
@@ -61,4 +64,23 @@ describe('table name mapping in the UI', () => {
     expect(normalizeTableName('"Orders"', 'HAN01')).toBe('"Orders"');
     expect(normalizeTableName('HAN01."Orders"', 'HAN01')).toBe('"Orders"');
   });
+});
+
+// AR02 review 1: the customer report counts tables with crudTables; step 2
+// counts them with crudMatrix. Both must give the same number.
+describe('table count is the same for step 2 and the customer report', () => {
+  for (const [name, inventory] of [
+    ['mapped fixture', mappedInventoryFixture],
+    [
+      'unmapped fixture (schema assumed from the source)',
+      unmappedInventoryFixture,
+    ],
+  ] as const) {
+    it(name, () => {
+      const view = hasMappedCrud(inventory) ? 'mapped' : 'raw';
+      expect(crudTables(inventory).tables.size).toBe(
+        crudMatrix(inventory, view).length,
+      );
+    });
+  }
 });

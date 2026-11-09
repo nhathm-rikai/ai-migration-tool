@@ -1,4 +1,5 @@
 import {
+  crudTables,
   normalizeScreenReportTotals,
   type SourceInventoryDocument,
 } from '@portal/contracts';
@@ -97,7 +98,10 @@ export type CustomerReport = {
     physicalLines: number;
     procedures: number;
     tables: number;
+    // null: no program has analysis data (not 0).
     tablesView: 'normalized' | 'raw' | null;
+    // The table names rest on an assumed or unconfirmed schema mapping.
+    tablesAssumed: boolean;
     // null: the inventory has no screen/report data (not zero).
     screenReport: ScreenReportTotals | null;
   };
@@ -127,6 +131,8 @@ export type CustomerReport = {
       codeLines: number;
     }[];
     components: {
+      // Declared as Reference= (type library) or Object= (OCX component).
+      kind: 'reference' | 'component';
       identifier: string;
       fileName: string | null;
       description: string | null;
@@ -173,6 +179,10 @@ export function buildRisks(
   warnings: readonly ReportWarning[],
   components: readonly { programIds: readonly string[] }[],
   apis: readonly { programIds: readonly string[] }[],
+  concatenatedSql: { count: number; programIds: readonly string[] } = {
+    count: 0,
+    programIds: [],
+  },
 ): RiskRow[] {
   type Group = { count: number; programs: Set<string>; known: boolean };
   const groups = new Map<string, Group>();
@@ -230,6 +240,13 @@ export function buildRisks(
       programs,
       known: true,
     });
+  // String-built SQL is a risk of its own, whether or not dynamic SQL exists.
+  if (concatenatedSql.count > 0)
+    push('CONCATENATED_SQL', 'data', {
+      count: concatenatedSql.count,
+      programs: new Set(concatenatedSql.programIds),
+      known: true,
+    });
   return rows.sort(
     (a, b) =>
       SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity) ||
@@ -245,7 +262,20 @@ export function buildCustomerReport(
   origin: ReportOrigin | null = null,
 ): CustomerReport {
   const core = buildInventoryReport(inventory, ALL_PROGRAMS, origin);
-  const unique = core.totals.unique;
+  // The unique totals are those of the whole inventory, every analyzed file
+  // (also one no project lists), exactly what step 2 shows; the technical
+  // report only reaches the files the programs list.
+  const unique = {
+    ...inventory.totals.uniqueCounters,
+    procedures: inventory.files.reduce(
+      (sum, file) =>
+        sum +
+        (file.analysis?.status === 'analyzed'
+          ? file.analysis.procedures.length
+          : 0),
+      0,
+    ),
+  };
   // The totals as the project-level list defines them (stored inventories
   // without it are derived by the same function). The list itself carries
   // names and files and stays out of the customer JSON; the items of sheet 6
@@ -263,32 +293,21 @@ export function buildCustomerReport(
   const pathOf = new Map(core.programs.map((p) => [p.id, p.projectPath]));
   const moduleOfProgram = (id: string) => moduleOf(pathOf.get(id) ?? '');
 
-  // Tables: the mapped view when the inventory has one, else as written.
-  const mapped = core.crud.some((row) => row.view === 'normalized');
-  const view = mapped ? 'normalized' : 'raw';
-  const tableRows = new Map<
-    string,
-    { programs: Set<string>; ops: Set<string> }
-  >();
-  for (const row of core.crud) {
-    if (row.view !== view) continue;
-    const entry = tableRows.get(row.table) ?? {
-      programs: new Set<string>(),
-      ops: new Set<string>(),
-    };
-    entry.programs.add(row.programId);
-    for (const op of row.operations) entry.ops.add(op);
-    tableRows.set(row.table, entry);
-  }
+  // Tables: by the function step 2 uses (contracts), so both show the same
+  // count; the mapped view when there is one, else as written.
+  const crud = crudTables(inventory);
+  const tableRows = crud.tables;
 
   // Modules: own code by folder, shared files on one row, and whatever no
   // program lists, so the rows add up to the unique totals.
   const sharedFiles = core.files.filter(
     (file) => file.analysisStatus === 'analyzed' && file.usedBy.length > 1,
   );
+  // Keyed by kind and label: a folder may carry the label of a special row.
   const modules = new Map<string, ModuleRow>();
   const moduleRow = (name: string, kind: ModuleRow['kind']): ModuleRow => {
-    let row = modules.get(name);
+    const key = kind + '\u0000' + name;
+    let row = modules.get(key);
     if (!row) {
       row = {
         module: name,
@@ -301,7 +320,7 @@ export function buildCustomerReport(
         files: 0,
         codeLines: 0,
       };
-      modules.set(name, row);
+      modules.set(key, row);
     }
     return row;
   };
@@ -407,9 +426,10 @@ export function buildCustomerReport(
     CustomerReport['dependencies']['components'][number] & { ids: Set<string> }
   >();
   for (const ref of core.externalReferences) {
-    if (ref.kind !== 'component') continue;
-    const key = `${ref.identifier}|${ref.fileName ?? ''}`;
+    if (ref.kind !== 'component' && ref.kind !== 'reference') continue;
+    const key = `${ref.kind}|${ref.identifier}|${ref.fileName ?? ''}`;
     const entry = components.get(key) ?? {
+      kind: ref.kind,
       identifier: ref.identifier,
       fileName: ref.fileName,
       description: ref.description,
@@ -438,25 +458,33 @@ export function buildCustomerReport(
   // Dynamic and concatenated SQL by module of the file's program.
   const sqlModules = new Map<
     string,
-    { dynamicSql: number; concatenatedSql: number }
+    { module: string; dynamicSql: number; concatenatedSql: number }
   >();
   const countSql = (
     rows: readonly { usedBy: string[] }[],
     field: 'dynamicSql' | 'concatenatedSql',
   ) => {
     for (const row of rows) {
-      const name =
+      const label =
         row.usedBy.length > 1
           ? SHARED_MODULE
           : row.usedBy[0] !== undefined
             ? moduleOfProgram(row.usedBy[0])
             : UNASSIGNED_MODULE;
-      const entry = sqlModules.get(name) ?? {
+      const kind =
+        row.usedBy.length > 1
+          ? 'shared'
+          : row.usedBy[0] !== undefined
+            ? 'module'
+            : 'unassigned';
+      const key = kind + '\u0000' + label;
+      const entry = sqlModules.get(key) ?? {
+        module: label,
         dynamicSql: 0,
         concatenatedSql: 0,
       };
       entry[field] += 1;
-      sqlModules.set(name, entry);
+      sqlModules.set(key, entry);
     }
   };
   countSql(core.dynamicSql, 'dynamicSql');
@@ -479,7 +507,8 @@ export function buildCustomerReport(
       physicalLines: unique.physicalLines,
       procedures: unique.procedures,
       tables: tableRows.size,
-      tablesView: tableRows.size === 0 && !mapped ? null : view,
+      tablesView: !crud.analyzed ? null : crud.mapped ? 'normalized' : 'raw',
+      tablesAssumed: crud.analyzed && crud.assumed,
       screenReport,
     },
     modules: moduleList,
@@ -495,6 +524,7 @@ export function buildCustomerReport(
       shared,
       components: [...components.values()]
         .map((c) => ({
+          kind: c.kind,
           identifier: c.identifier,
           fileName: c.fileName,
           description: c.description,
@@ -517,7 +547,7 @@ export function buildCustomerReport(
         .map(([table, entry]) => ({
           table,
           programs: entry.programs.size,
-          operations: [...entry.ops]
+          operations: [...entry.operations]
             .sort(
               (a, b) => OPERATION_ORDER.indexOf(a) - OPERATION_ORDER.indexOf(b),
             )
@@ -525,9 +555,9 @@ export function buildCustomerReport(
         }))
         .sort((a, b) => b.programs - a.programs || byText(a.table, b.table))
         .slice(0, TOP_TABLES),
-      sqlByModule: [...sqlModules]
-        .map(([module, counts]) => ({ module, ...counts }))
-        .sort((a, b) => byText(a.module, b.module)),
+      sqlByModule: [...sqlModules.values()].sort((a, b) =>
+        byText(a.module, b.module),
+      ),
       dynamicSql: core.dynamicSql.length,
       concatenatedSql: core.concatenatedSql.length,
     },
@@ -535,6 +565,10 @@ export function buildCustomerReport(
       core.warnings,
       [...components.values()].map((c) => ({ programIds: [...c.ids] })),
       [...apis.values()].map((a) => ({ programIds: [...a.ids] })),
+      {
+        count: core.concatenatedSql.length,
+        programIds: core.concatenatedSql.flatMap((row) => row.usedBy),
+      },
     ),
     items: buildItems(inventory),
     recommendations: RECOMMENDATIONS,

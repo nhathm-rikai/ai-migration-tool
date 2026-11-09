@@ -440,3 +440,225 @@ describe('customer report keeps two absolute-path screens apart (AR04 review rou
     expect(JSON.stringify(built)).not.toContain('PrivateCustomer');
   });
 });
+
+// ---- AR02 review round 1 (aebc2bf): six P2 findings -------------------------
+
+type InvFile = SourceInventoryDocument['files'][number];
+const firstAnalyzed = (inventory: SourceInventoryDocument) => {
+  const file = inventory.files.find((f) => f.analysis?.status === 'analyzed');
+  if (!file) throw new Error('no analyzed file');
+  return file;
+};
+// An analyzed file that no VBP lists, with its lines in the unique totals,
+// as a real inventory stores it (totals count every analyzed file).
+function withUnlistedFile(
+  inventory: SourceInventoryDocument,
+  path = 'loose/EXTRA.BAS',
+) {
+  const source = firstAnalyzed(inventory);
+  const extra = JSON.parse(JSON.stringify(source)) as InvFile;
+  extra.manifest.relativePath = path;
+  inventory.files.push(extra);
+  const analysis = extra.analysis;
+  if (analysis?.status !== 'analyzed') throw new Error('fixture');
+  const keys = Object.keys(
+    analysis.counters,
+  ) as (keyof typeof analysis.counters)[];
+  for (const key of keys)
+    inventory.totals.uniqueCounters[key] += analysis.counters[key];
+  inventory.totals.files += 1;
+  inventory.totals.codeFiles += 1;
+  inventory.totals.analyzedCodeFiles += 1;
+  return {
+    lines: analysis.counters.codeLines,
+    procedures: analysis.procedures.length,
+  };
+}
+const analyzedProcedures = (inventory: SourceInventoryDocument) =>
+  inventory.files.reduce(
+    (sum, f) =>
+      sum +
+      (f.analysis?.status === 'analyzed' ? f.analysis.procedures.length : 0),
+    0,
+  );
+const moduleSum = (
+  r: CustomerReport,
+  pick: (m: CustomerReport['modules'][number]) => number,
+) => r.modules.reduce((total, m) => total + pick(m), 0);
+
+describe('AR02 review 1 — finding 1: files no VBP lists are in the totals', () => {
+  it('counts the lines and procedures of every analyzed file, like step 2', () => {
+    const inventory = clone();
+    const extra = withUnlistedFile(inventory);
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.scale.codeLines).toBe(
+      inventory.totals.uniqueCounters.codeLines,
+    );
+    expect(built.scale.codeLines).toBe(655 + extra.lines);
+    expect(built.scale.procedures).toBe(analyzedProcedures(inventory));
+    expect(built.scale.procedures).toBe(6 + extra.procedures);
+    expect(built.scale.analyzedFiles).toBe(inventory.totals.analyzedCodeFiles);
+  });
+
+  it('puts them on the unowned row, and the module rows still add up', () => {
+    const inventory = clone();
+    const extra = withUnlistedFile(inventory);
+    const built = buildCustomerReport(inventory, origin);
+    const rest = built.modules.find((m) => m.kind === 'unassigned');
+    expect(rest).toMatchObject({ codeLines: extra.lines, files: 1 });
+    expect(moduleSum(built, (m) => m.codeLines)).toBe(built.scale.codeLines);
+    expect(moduleSum(built, (m) => m.files)).toBe(built.scale.analyzedFiles);
+  });
+});
+
+describe('AR02 review 1 — finding 2: Reference= libraries are dependencies', () => {
+  it('lists reference and component entries, with their kind, and counts both as risk', () => {
+    const inventory = clone();
+    const [first] = inventory.programs;
+    if (!first) throw new Error('fixture');
+    first.externalReferences = [
+      {
+        kind: 'reference',
+        identifier: '{00000205-0000-0010-8000-00AA006D2EA4}',
+        fileName: 'msado15.dll',
+        description: 'Microsoft ActiveX Data Objects 2.5 Library',
+      },
+      {
+        kind: 'component',
+        identifier: 'MSCOMCTL.OCX',
+        fileName: 'MSCOMCTL.OCX',
+        description: null,
+      },
+    ];
+    const built = buildCustomerReport(inventory, origin);
+    const listed = built.dependencies.components;
+    expect(listed.map((c) => [c.kind, c.fileName])).toEqual(
+      expect.arrayContaining([
+        ['reference', 'msado15.dll'],
+        ['component', 'MSCOMCTL.OCX'],
+      ]),
+    );
+    const risk = built.risks.find((r) => r.code === 'EXTERNAL_COMPONENT');
+    expect(risk?.count).toBe(2);
+    const text = JSON.stringify(
+      customerReportSheets(built).flatMap((s) => s.rows),
+    );
+    expect(text).toContain('msado15.dll');
+  });
+});
+
+describe('AR02 review 1 — finding 3: the table count is the one step 2 shows', () => {
+  it('merges HAN01.ORDERS and ORDERS when no schema is configured, and says assumed', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: null,
+      status: 'unconfigured',
+    };
+    // The source writes the schema prefix, so step 2 assumes it (HAN01).
+    const sqlFile = firstAnalyzed(inventory);
+    if (sqlFile.analysis?.status !== 'analyzed') throw new Error('fixture');
+    sqlFile.analysis.sqlTables = [
+      { table: 'HAN01.ORDERS', operation: 'R', line: 3, procedureId: null },
+      { table: 'HAN01.ORDERS', operation: 'U', line: 4, procedureId: null },
+    ];
+    const target = inventory.programs.find((p) => p.analysis);
+    if (!target?.analysis) throw new Error('fixture');
+    const evidence = { relativePath: 'programs/ORDER/ORDERFORM.FRM', line: 3 };
+    target.analysis.crud = [
+      {
+        table: 'HAN01.ORDERS',
+        operations: ['R'],
+        evidence,
+        viaSharedOnly: false,
+      },
+      { table: 'ORDERS', operations: ['U'], evidence, viaSharedOnly: false },
+    ] as typeof target.analysis.crud;
+    for (const other of inventory.programs)
+      if (other !== target && other.analysis) other.analysis.crud = [];
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.database.tables.map((t) => t.table)).toEqual(['ORDERS']);
+    expect(built.scale.tables).toBe(1);
+    expect(built.scale.tablesView).toBe('normalized');
+    expect(built.scale.tablesAssumed).toBe(true);
+    expect(built.database.tables[0]?.operations).toBe('RU');
+  });
+});
+
+describe('AR02 review 1 — finding 4: analyzed with no SQL is 0, not 未解析', () => {
+  const noSql = () => {
+    const inventory = clone();
+    for (const program of inventory.programs) {
+      if (!program.analysis) continue;
+      program.analysis.crud = [];
+      program.analysis.normalizedCrud = [];
+    }
+    return inventory;
+  };
+  it('shows 0 tables for fully analyzed programs without SQL', () => {
+    const built = buildCustomerReport(noSql(), origin);
+    expect(built.scale.tables).toBe(0);
+    expect(built.scale.tablesView).not.toBeNull();
+    const row = sheetOf('1_規模概要', built).rows.find(
+      (r) => r[0] === 'DBテーブル数',
+    );
+    expect(row?.[1]).toBe(0);
+  });
+  it('still says 未解析 when no program has analysis data', () => {
+    const inventory = clone();
+    for (const program of inventory.programs)
+      (program as { analysis?: unknown }).analysis = undefined;
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.scale.tablesView).toBeNull();
+  });
+});
+
+describe('AR02 review 1 — finding 5: concatenated SQL is a risk', () => {
+  it('adds a risk row when concatenated SQL exists and dynamic SQL is 0', () => {
+    const inventory = clone();
+    const file = firstAnalyzed(inventory);
+    if (file.analysis?.status !== 'analyzed') throw new Error('fixture');
+    for (const other of inventory.files)
+      if (other.analysis?.status === 'analyzed') {
+        other.analysis.dynamicSql = [];
+        other.analysis.concatenatedSql = [];
+      }
+    file.analysis.concatenatedSql = [
+      { procedureId: null, operation: 'R', line: 4 },
+    ];
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.database.dynamicSql).toBe(0);
+    expect(built.database.concatenatedSql).toBe(1);
+    const risk = built.risks.find((r) => r.code === 'CONCATENATED_SQL');
+    expect(risk).toMatchObject({ count: 1, source: 'data' });
+    expect(risk?.confirmation).not.toBe('');
+  });
+  it('has no such row without concatenated SQL', () => {
+    const inventory = clone();
+    for (const f of inventory.files)
+      if (f.analysis?.status === 'analyzed') f.analysis.concatenatedSql = [];
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.risks.some((r) => r.code === 'CONCATENATED_SQL')).toBe(false);
+  });
+});
+
+describe('AR02 review 1 — finding 6: a folder named like the unowned row', () => {
+  it('keeps the folder row apart from the special row; module sums equal the totals', () => {
+    const inventory = clone();
+    const extra = withUnlistedFile(inventory, 'loose/EXTRA.BAS');
+    const [first] = inventory.programs;
+    if (!first) throw new Error('fixture');
+    first.projectPath = 'プログラム未所属/ORDER.VBP';
+    const built = buildCustomerReport(inventory, origin);
+    const folder = built.modules.filter(
+      (m) => m.kind === 'module' && m.module === 'プログラム未所属',
+    );
+    expect(folder).toHaveLength(1);
+    const special = built.modules.filter((m) => m.kind === 'unassigned');
+    expect(special).toHaveLength(1);
+    expect(special[0]?.codeLines).toBe(extra.lines);
+    expect(folder[0]?.codeLines).toBeGreaterThan(0);
+    expect(moduleSum(built, (m) => m.codeLines)).toBe(built.scale.codeLines);
+    expect(moduleSum(built, (m) => m.files)).toBe(built.scale.analyzedFiles);
+  });
+});

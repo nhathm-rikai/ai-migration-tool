@@ -147,10 +147,11 @@ export type CustomerReport = {
     sqlByModule: {
       module: string;
       dynamicSql: number;
-      concatenatedSql: number;
+      concatenatedSql: number | null;
     }[];
     dynamicSql: number;
-    concatenatedSql: number;
+    // null: the inventory predates the field (unknown, not zero).
+    concatenatedSql: number | null;
   };
   risks: RiskRow[];
   items: ItemRow[];
@@ -177,8 +178,13 @@ const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 // ---- Risks -----------------------------------------------------------------
 
+// A warning raised for a location used by several programs names all of them.
+export type RiskWarning = ReportWarning & {
+  programIds?: readonly string[];
+};
+
 export function buildRisks(
-  warnings: readonly ReportWarning[],
+  warnings: readonly RiskWarning[],
   components: readonly { programIds: readonly string[] }[],
   apis: readonly { programIds: readonly string[] }[],
   concatenatedSql: { count: number; programIds: readonly string[] } = {
@@ -190,7 +196,7 @@ export function buildRisks(
   const groups = new Map<string, Group>();
   const add = (
     code: string,
-    programId: string | null,
+    programIds: readonly string[],
     by: number,
     known: boolean,
   ) => {
@@ -200,13 +206,18 @@ export function buildRisks(
       known,
     };
     group.count += by;
-    if (programId) group.programs.add(programId);
+    for (const id of programIds) group.programs.add(id);
     groups.set(code, group);
   };
   for (const warning of warnings) {
     const known =
       warning.code in RISK_CATALOG && warning.code !== OTHER_RISK_CODE;
-    add(known ? warning.code : OTHER_RISK_CODE, warning.programId, 1, known);
+    add(
+      known ? warning.code : OTHER_RISK_CODE,
+      warning.programIds ?? (warning.programId ? [warning.programId] : []),
+      1,
+      known,
+    );
   }
   const data = new Map<string, Set<string>>();
   for (const [code, rows] of [
@@ -263,12 +274,12 @@ export function buildRisks(
 function unlistedFileWarnings(
   inventory: Inventory,
   listed: ReadonlyMap<string, readonly string[]>,
-): ReportWarning[] {
-  const out: ReportWarning[] = [];
+): RiskWarning[] {
+  const out: RiskWarning[] = [];
   for (const file of inventory.files) {
     const path = file.manifest.relativePath;
     if (listed.has(path)) continue;
-    const warning = (code: string, detail: string): ReportWarning => ({
+    const warning = (code: string, detail: string): RiskWarning => ({
       code,
       programId: null,
       relativePath: path,
@@ -277,8 +288,6 @@ function unlistedFileWarnings(
     });
     if (file.manifest.kind === 'error')
       out.push(warning('FILE_ERROR', file.manifest.errorCode));
-    else if (file.analysis?.status === 'unsupported')
-      out.push(warning('FILE_UNSUPPORTED', file.analysis.reason));
     else if (
       file.analysis?.status === 'analyzed' &&
       file.analysis.counters.unclassifiedLines > 0
@@ -290,6 +299,38 @@ function unlistedFileWarnings(
         ),
       );
   }
+  return out;
+}
+
+// Step 2 warns FILE_UNSUPPORTED when totals.unsupportedFiles > 0, which counts
+// files whose manifest role or analysis is unsupported, and unsupported
+// programs. One warning per such item, listed by a program or not.
+function unsupportedWarnings(inventory: Inventory): RiskWarning[] {
+  const out: RiskWarning[] = [];
+  for (const file of inventory.files)
+    if (
+      file.manifest.role === 'unsupported' ||
+      file.analysis?.status === 'unsupported'
+    )
+      out.push({
+        code: 'FILE_UNSUPPORTED',
+        programId: null,
+        relativePath: file.manifest.relativePath,
+        line: null,
+        detail:
+          file.analysis?.status === 'unsupported'
+            ? file.analysis.reason
+            : 'unsupported file type',
+      });
+  for (const program of inventory.programs)
+    if (program.status === 'unsupported')
+      out.push({
+        code: 'FILE_UNSUPPORTED',
+        programId: null,
+        relativePath: redactAbsolutePath(program.projectPath),
+        line: null,
+        detail: program.issue?.reason ?? '',
+      });
   return out;
 }
 
@@ -490,7 +531,7 @@ export function buildCustomerReport(
   // Dynamic and concatenated SQL by module of the file's program.
   const sqlModules = new Map<
     string,
-    { module: string; dynamicSql: number; concatenatedSql: number }
+    { module: string; dynamicSql: number; concatenatedSql: number | null }
   >();
   const countSql = (
     rows: readonly { usedBy: string[] }[],
@@ -513,9 +554,10 @@ export function buildCustomerReport(
       const entry = sqlModules.get(key) ?? {
         module: label,
         dynamicSql: 0,
-        concatenatedSql: 0,
+        concatenatedSql: concatenatedKnown ? 0 : null,
       };
-      entry[field] += 1;
+      if (field === 'dynamicSql') entry.dynamicSql += 1;
+      else entry.concatenatedSql = (entry.concatenatedSql ?? 0) + 1;
       sqlModules.set(key, entry);
     }
   };
@@ -528,6 +570,8 @@ export function buildCustomerReport(
   }));
   const dynamicRows = sqlRows.filter((row) => row.kind === 'dynamic');
   const concatenatedRows = sqlRows.filter((row) => row.kind === 'concatenated');
+  // null = no analyzed file carries the field: unknown, not zero.
+  const concatenatedKnown = kpis.concatenatedSql !== null;
   countSql(dynamicRows, 'dynamicSql');
   countSql(concatenatedRows, 'concatenatedSql');
 
@@ -600,17 +644,23 @@ export function buildCustomerReport(
         byText(a.module, b.module),
       ),
       dynamicSql: dynamicRows.length,
-      concatenatedSql: concatenatedRows.length,
+      concatenatedSql: concatenatedKnown ? concatenatedRows.length : null,
     },
     risks: buildRisks(
       // One DYNAMIC_SQL warning per location of every analyzed file; the
       // technical report only warns for files a program lists.
       [
-        ...core.warnings.filter((warning) => warning.code !== 'DYNAMIC_SQL'),
+        ...core.warnings.filter(
+          (warning) =>
+            warning.code !== 'DYNAMIC_SQL' &&
+            warning.code !== 'FILE_UNSUPPORTED',
+        ),
+        ...unsupportedWarnings(inventory),
         ...unlistedFileWarnings(inventory, usedByFile),
         ...dynamicRows.map((row) => ({
           code: 'DYNAMIC_SQL',
           programId: row.usedBy[0] ?? null,
+          programIds: row.usedBy,
           relativePath: row.relativePath,
           line: row.line,
           detail: row.operation,

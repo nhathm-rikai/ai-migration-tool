@@ -1,5 +1,12 @@
 # Tiến độ kỹ thuật Portal
 
+## 09/11/2026 — AR02: sửa review tại `5d8e7da` (3 lỗi P2: cảnh báo và dữ liệu cũ)
+
+- (1) **Đúng.** File `manifest.role = unsupported` không có `analysis` (ví dụ `.ctl`) bị bỏ khỏi rủi ro vì code chỉ xét `analysis.status`. Bước 2 đếm `totals.unsupportedFiles` = file có role hoặc analysis unsupported + program unsupported. Sửa: `unsupportedWarnings` sinh một `FILE_UNSUPPORTED` cho mỗi mục như vậy (kể cả file do program liệt kê; thay cho cảnh báo cùng mã của báo cáo kỹ thuật), nên số dòng bằng `totals.unsupportedFiles` (test so sánh trực tiếp, cả demo inventory).
+- (2) **Đúng.** Cảnh báo SQL động chỉ mang `usedBy[0]`. Sửa: `RiskWarning.programIds` mang mọi program trong `usedBy`; số vị trí vẫn một, chỉ danh sách 影響プログラム đủ (vẫn ≤10 + "他N件").
+- (3) **Đúng.** Inventory cũ không có `concatenatedSql`: `inventoryKpis` và bước 2 trả `null` nhưng báo cáo ghi 0. Sửa: `database.concatenatedSql` và `sqlByModule[].concatenatedSql` là `number | null`; Excel ghi 未解析（再解析が必要）, không sinh rủi ro `CONCATENATED_SQL`. Schema `CustomerReportSchema` và `AssessmentDocument` (AR03) cập nhật ở nhánh AR03.
+- Test tái hiện trước (4 test fail) trong `customer-report.test.ts` mục "AR02 review 3".
+
 ## 09/11/2026 — AR02: sửa review tại `6087498` (SQL của file chưa thuộc program) và rà phạm vi mọi số liệu
 
 - **Lỗi (đúng):** số SQL động/ghép chuỗi vẫn lấy từ báo cáo kỹ thuật (chỉ file thuộc program) trong khi LoC/procedure đã lấy toàn inventory. Test thất bại trước: `customer-report.test.ts` mục "AR02 review 2 — SQL of a file no VBP lists" (fixture `Extra.bas` có 1 SQL động + 1 SQL ghép chuỗi). Sửa: `sqlUses`/`inventoryKpis` (`packages/contracts/src/inventory-kpis.ts`) đếm mọi file đã phân tích, mỗi (file, loại, dòng) một lần; báo cáo khách dùng kết quả đó cho sheet DB, bảng SQL theo module (dòng `プログラム未所属`) và sheet rủi ro; bước 2 (`dashboardKpis`) dùng chính hàm đó cho procedure, số file phân tích, vị trí SQL và SQL ghép chuỗi.

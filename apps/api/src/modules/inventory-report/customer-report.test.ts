@@ -861,6 +861,12 @@ describe('AR02 review 3 — finding 3: unknown concatenated SQL is not 0', () =>
       expect(row.concatenatedSql).toBeNull();
     expect(built.risks.some((r) => r.code === 'CONCATENATED_SQL')).toBe(false);
   });
+  it('stays valid for CustomerReportSchema (null is allowed)', () => {
+    const built = buildCustomerReport(legacySql(), origin);
+    expect(Check(CustomerReportSchema, JSON.parse(JSON.stringify(built)))).toBe(
+      true,
+    );
+  });
   it('says 未解析 in the workbook instead of 0', () => {
     const built = buildCustomerReport(legacySql(), origin);
     const sheet = sheetOf('4_データベース', built);

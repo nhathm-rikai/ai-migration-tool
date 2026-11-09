@@ -171,11 +171,12 @@ export const CustomerReportSchema = Type.Object({
       Type.Object({
         module: Type.String(),
         dynamicSql: Count,
-        concatenatedSql: Count,
+        // null: the inventory predates the field (unknown, not zero).
+        concatenatedSql: Nullable(Count),
       }),
     ),
     dynamicSql: Count,
-    concatenatedSql: Count,
+    concatenatedSql: Nullable(Count),
   }),
   risks: Type.Array(
     Type.Object({

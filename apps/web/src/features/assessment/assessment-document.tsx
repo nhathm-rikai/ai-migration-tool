@@ -644,13 +644,15 @@ export function AssessmentDocument({
           }))}
         />
         <Table
-          title={`動的SQL・文字列連結SQLの箇所数（動的 ${n(report.database.dynamicSql)} / 連結 ${n(report.database.concatenatedSql)}）`}
+          title={`動的SQL・文字列連結SQLの箇所数（動的 ${n(report.database.dynamicSql)} / 連結 ${report.database.concatenatedSql === null ? NOT_ANALYZED : n(report.database.concatenatedSql)}）`}
           head={[TABLE.module, TABLE.dynamicSql, TABLE.concatSql]}
           numeric={[1, 2]}
           rows={report.database.sqlByModule.map((row) => [
             row.module,
             n(row.dynamicSql),
-            n(row.concatenatedSql),
+            row.concatenatedSql === null
+              ? NOT_ANALYZED
+              : n(row.concatenatedSql),
           ])}
         />
       </div>

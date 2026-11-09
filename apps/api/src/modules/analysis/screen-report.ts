@@ -1,5 +1,5 @@
 import { projectReportItems } from '@portal/contracts';
-import { redactAbsolutePath } from './redact-path.js';
+import { redactWithId } from './redact-path.js';
 import type {
   CodeFileAnalysis,
   LanguageAnalyzer,
@@ -376,13 +376,12 @@ export function buildProgramScreenReport(input: {
       // Two resolved files that differ only in case are two files (a
       // case-sensitive file system); an unresolved path is matched loosely.
       const key =
-        member.relativePath ??
-        redactAbsolutePath(member.displayPath).toLowerCase();
+        member.relativePath ?? redactWithId(member.displayPath).toLowerCase();
       if (!seenScreens.has(key)) {
         seenScreens.add(key);
         screens.push({
           name: member.name,
-          file: redactAbsolutePath(member.displayPath),
+          file: redactWithId(member.displayPath),
           shared: member.shared,
           warnings: screenWarnings(member),
         });

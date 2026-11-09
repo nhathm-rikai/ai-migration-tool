@@ -126,3 +126,47 @@ describe('finding 2: paths declared by the customer never reach an export', () =
       });
   });
 });
+
+describe('review round 4: redaction is display only, never an identity', () => {
+  const build = (...forms: string[]) =>
+    buildSourceInventory({
+      profile,
+      files: [
+        vbp('a/A.vbp', ...forms, 'Module=M; M.bas'),
+        bas('a/M.bas', ...sub('S', '    x = 1')),
+      ],
+    });
+  it('counts two different absolute paths with the same file name as two screens', () => {
+    const inventory = build('Form=C:/one/Main.frm', 'Form=D:/two/Main.frm');
+    expect(inventory.programs[0]?.screens).toHaveLength(2);
+    expect(inventory.totals.screenReport?.screens).toBe(2);
+  });
+  it('counts the same declared path once, in a program and across programs', () => {
+    const once = build('Form=C:/one/Main.frm', 'Form=C:/one/Main.frm');
+    expect(once.programs[0]?.screens).toHaveLength(1);
+    const two = buildSourceInventory({
+      profile,
+      files: [
+        vbp('a/A.vbp', 'Form=C:/one/Main.frm'),
+        vbp('b/B.vbp', 'Form=C:/one/Main.frm'),
+      ],
+    });
+    expect(two.totals.screenReport?.screens).toBe(1);
+  });
+  it('lists both screens in the exports without showing the original paths', () => {
+    const inventory = build(
+      'Form=C:/one/PrivateCustomer/Main.frm',
+      'Form=D:/two/PrivateCustomer/Main.frm',
+    );
+    const doc = JSON.parse(
+      JSON.stringify({ ...inventory, skipped: [] }),
+    ) as SourceInventoryDocument;
+    const report = buildInventoryReport(doc, ALL_PROGRAMS);
+    expect(report.screens).toHaveLength(2);
+    expect(report.totals.screenReport?.screens).toBe(2);
+    expect(JSON.stringify(report)).not.toContain(PRIVATE);
+    const parts = unzip(writeXlsx(inventoryReportSheets(report)));
+    for (const [, xml] of parts) expect(xml).not.toContain(PRIVATE);
+    expect(JSON.stringify(doc.programs[0]?.screens)).not.toContain(PRIVATE);
+  });
+});

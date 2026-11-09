@@ -98,7 +98,7 @@ Tất cả là fact từ code/project file, không gọi AI. Trường mới đ�
 
 ### 6.1. Màn hình (画面) và batch
 
-- Màn hình = member kind `form` hoặc `user-document`, đếm theo file thật (`relativePath`), không theo tên. `programs[].screens[]`: `name`, `file`, `shared` (file do ≥ 2 program khai báo), `warnings`. Form không tìm thấy hoặc không phân tích được vẫn đếm, kèm `SCREEN_FILE_MISSING` / `SCREEN_FILE_NOT_ANALYZED` (file là đường dẫn đã khai báo khi chưa resolve được).
+- Màn hình = member kind `form` hoặc `user-document`, đếm theo file thật (`relativePath`), không theo tên. `programs[].screens[]`: `name`, `file`, `shared` (file do ≥ 2 program khai báo), `warnings`. Form không tìm thấy hoặc không phân tích được vẫn đếm, kèm `SCREEN_FILE_MISSING` / `SCREEN_FILE_NOT_ANALYZED` (file là đường dẫn đã khai báo khi chưa resolve được). Đường dẫn khai báo tuyệt đối (ổ đĩa/UNC/gốc) chỉ được che ở phần hiển thị, nhưng định danh không dùng chuỗi đã che: `file` có dạng `<absolute path>/<tên file> [8 hex đầu của SHA-256 đường dẫn gốc đã chuẩn hóa]`, nên hai đường dẫn khác nhau cùng tên file vẫn là hai màn hình, cùng một đường dẫn khai báo hai lần chỉ tính một lần, và không lộ đường dẫn gốc.
 - Toàn dự án: số form duy nhất (không phân biệt hoa thường), form dùng chung chỉ tính một lần: `totals.screenReport.screens`, `sharedScreens`.
 - `programs[].programType`: `screen` nếu có ít nhất một màn hình; `batch` nếu không có màn hình và `Startup` của `.vbp` là `Sub Main`; còn lại `unknown`. Program có form nhưng startup `Sub Main` vẫn là `screen`. Project không parse được không có các trường này.
 

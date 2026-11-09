@@ -268,8 +268,10 @@ export function parsePackage(
   expected: readonly string[],
 ): ParsedPackage {
   const files: { name: string; content: string }[] = [];
+  // A block without its end marker was cut by an output limit and the answer
+  // restarted it: only complete blocks count.
   const pattern =
-    /^=== FILE: ([a-z-]+\.md) ===\r?\n([\s\S]*?)\r?\n=== END FILE ===$/gm;
+    /^=== FILE: ([a-z-]+\.md) ===\r?\n((?:(?!^=== FILE: )[\s\S])*?)\r?\n=== END FILE ===$/gm;
   for (const match of raw.matchAll(pattern)) {
     const name = match[1] ?? '';
     if (!expected.includes(name))

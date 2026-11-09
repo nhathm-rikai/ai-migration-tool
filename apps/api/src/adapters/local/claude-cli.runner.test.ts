@@ -99,6 +99,16 @@ describe('claude CLI runner', { timeout: 20_000 }, () => {
     expect(processes).toEqual(['started', 'exited']);
   });
 
+  it('keeps the whole answer when the CLI resumes it after an output limit', async () => {
+    // `result` only holds the last message: earlier files must not be lost.
+    expect(await run('continued').result).toEqual({
+      status: 'completed',
+      rawOutput:
+        '=== FILE: a.md ===\n# A\n=== END FILE ===\n=== FILE: b.md ===\n# B, cut of\n=== FILE: b.md ===\n# B\n=== END FILE ===',
+      usage: { inputTokens: 10, outputTokens: 7 },
+    });
+  });
+
   it('classifies an auth error result', async () => {
     expect(await run('auth').result).toMatchObject({
       status: 'failed',

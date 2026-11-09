@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mappedInventoryFixture } from '@portal/contracts/fixtures';
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  mappedInventoryFixture,
+  UNOWNED_SQL_EXPECTED,
+  unownedSqlInventoryFixture,
+} from '@portal/contracts/fixtures';
+import { inventoryKpis, type SourceInventoryDocument } from '@portal/contracts';
 import { summarizeInventory } from './assessment-summary';
 import { inferredCorpus } from '../../testing/inventory-fixtures';
 import {
@@ -473,5 +477,31 @@ describe('analysis dashboard (UI02)', () => {
     expect(
       rowsForMappedView(inventory, summary.programs)[0]?.mappedTables,
     ).toBe(1);
+  });
+});
+
+// AR02 review 2: the same fixture (an analyzed file no project lists, with
+// SQL and unclassified lines) is read by the customer report in the API test
+// customer-report.test.ts "cross-check"; both must give these numbers.
+describe('step 2 KPIs on an inventory with an unowned file (cross-check with the customer report)', () => {
+  const inventory = unownedSqlInventoryFixture();
+  const kpis = dashboardKpis(inventory, summarizeInventory(inventory));
+  const shared = inventoryKpis(inventory);
+
+  it('counts the unowned file in every shared KPI', () => {
+    expect(shared.dynamicSql).toBe(UNOWNED_SQL_EXPECTED.dynamicSql);
+    expect(kpis.concatenatedSql).toBe(UNOWNED_SQL_EXPECTED.concatenatedSql);
+    expect(kpis.procedures).toBe(shared.procedures);
+    expect(kpis.analyzedFiles).toBe(shared.analyzedFiles);
+    expect(kpis.analyzedFiles).toBe(inventory.totals.analyzedCodeFiles);
+    expect(kpis.sqlLocations).toBe(shared.sqlLocations);
+    expect(kpis.tables).toBe(shared.tables);
+    expect(kpis.codeLines).toBe(inventory.totals.uniqueCounters.codeLines);
+  });
+
+  it('warns about the unclassified lines of the unowned file', () => {
+    expect(summarizeInventory(inventory).warnings).toContain(
+      'UNCLASSIFIED_LINES',
+    );
   });
 });

@@ -1,4 +1,8 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import { inventoryKpis, type SourceInventoryDocument } from '@portal/contracts';
+import {
+  UNOWNED_SQL_EXPECTED,
+  unownedSqlInventoryFixture,
+} from '@portal/contracts/fixtures';
 import { describe, expect, it } from 'vitest';
 import { demoInventory } from '../../adapters/fake/demo-inventory.js';
 import {
@@ -660,5 +664,102 @@ describe('AR02 review 1 — finding 6: a folder named like the unowned row', () 
     expect(folder[0]?.codeLines).toBeGreaterThan(0);
     expect(moduleSum(built, (m) => m.codeLines)).toBe(built.scale.codeLines);
     expect(moduleSum(built, (m) => m.files)).toBe(built.scale.analyzedFiles);
+  });
+});
+
+describe('AR02 review 2 — SQL of a file no VBP lists', () => {
+  function withUnlistedSql() {
+    const inventory = clone();
+    for (const f of inventory.files)
+      if (f.analysis?.status === 'analyzed') {
+        f.analysis.dynamicSql = [];
+        f.analysis.concatenatedSql = [];
+      }
+    withUnlistedFile(inventory);
+    const extra = inventory.files.find(
+      (f) => f.manifest.relativePath === 'loose/EXTRA.BAS',
+    );
+    if (extra?.analysis?.status !== 'analyzed') throw new Error('fixture');
+    extra.analysis.dynamicSql = [
+      { procedureId: null, operation: 'R', line: 7 },
+    ];
+    extra.analysis.concatenatedSql = [
+      { procedureId: null, operation: 'U', line: 9 },
+    ];
+    return inventory;
+  }
+  it('counts both kinds once per location, like step 2', () => {
+    const built = buildCustomerReport(withUnlistedSql(), origin);
+    expect(built.database.dynamicSql).toBe(1);
+    expect(built.database.concatenatedSql).toBe(1);
+    const rest = built.database.sqlByModule.filter(
+      (m) => m.module === 'プログラム未所属',
+    );
+    expect(rest).toEqual([
+      { module: 'プログラム未所属', dynamicSql: 1, concatenatedSql: 1 },
+    ]);
+  });
+  it('shows both as risks', () => {
+    const built = buildCustomerReport(withUnlistedSql(), origin);
+    expect(built.risks.find((r) => r.code === 'DYNAMIC_SQL')?.count).toBe(1);
+    expect(built.risks.find((r) => r.code === 'CONCATENATED_SQL')?.count).toBe(
+      1,
+    );
+  });
+});
+
+// AR02 review 2 cross-check: the same fixture as the step 2 test in
+// analysis-dashboard.test.ts. Every KPI both show must be equal; scopes of
+// the others are listed in progress.md.
+describe('AR02 review 2 — cross-check with step 2 on an inventory with an unowned file', () => {
+  const inventory = unownedSqlInventoryFixture();
+  const built = buildCustomerReport(inventory, origin);
+  const shared = inventoryKpis(inventory);
+
+  it('shows the KPIs step 2 shows', () => {
+    expect(built.scale.programs).toBe(inventory.programs.length);
+    expect(built.scale.files).toBe(inventory.totals.files);
+    expect(built.scale.analyzedFiles).toBe(shared.analyzedFiles);
+    expect(built.scale.codeLines).toBe(
+      inventory.totals.uniqueCounters.codeLines,
+    );
+    expect(built.scale.physicalLines).toBe(
+      inventory.totals.uniqueCounters.physicalLines,
+    );
+    expect(built.scale.procedures).toBe(shared.procedures);
+    expect(built.scale.tables).toBe(shared.tables);
+    expect(built.database.dynamicSql).toBe(shared.dynamicSql);
+    expect(built.database.dynamicSql).toBe(UNOWNED_SQL_EXPECTED.dynamicSql);
+    expect(built.database.concatenatedSql).toBe(shared.concatenatedSql);
+    expect(built.database.concatenatedSql).toBe(
+      UNOWNED_SQL_EXPECTED.concatenatedSql,
+    );
+  });
+
+  it('puts the unowned file on the unowned row (lines, files, SQL)', () => {
+    const rest = built.modules.find((m) => m.kind === 'unassigned');
+    expect(rest?.files).toBe(1);
+    expect(built.database.sqlByModule).toContainEqual({
+      module: 'プログラム未所属',
+      dynamicSql: UNOWNED_SQL_EXPECTED.dynamicSql,
+      concatenatedSql: UNOWNED_SQL_EXPECTED.concatenatedSql,
+    });
+    expect(moduleSum(built, (m) => m.codeLines)).toBe(built.scale.codeLines);
+  });
+
+  it('raises the risks step 2 warns about', () => {
+    const codes = built.risks.map((r) => r.code);
+    expect(codes).toContain('DYNAMIC_SQL');
+    expect(codes).toContain('CONCATENATED_SQL');
+    expect(codes).toContain('UNCLASSIFIED_LINES');
+  });
+
+  it('keeps program-scope figures to the programs (apis, references)', () => {
+    const fromPrograms = new Set(
+      inventory.programs.flatMap((p) =>
+        (p.analysis?.externalApis ?? []).map((a) => `${a.library}|${a.name}`),
+      ),
+    );
+    expect(built.dependencies.apis).toHaveLength(fromPrograms.size);
   });
 });

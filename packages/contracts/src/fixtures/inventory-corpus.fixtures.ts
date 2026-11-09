@@ -370,3 +370,48 @@ export function syntheticCorpusFixture(size: SyntheticCorpusSize): Inventory {
     skipped: [],
   };
 }
+
+// A synthetic inventory plus one analyzed file that no project lists, with
+// one dynamic and one concatenated SQL and one table access (AR02 review 2).
+export function unownedSqlInventoryFixture(): Inventory {
+  const inventory = syntheticCorpusFixture({
+    programs: 2,
+    sharedModules: 1,
+    tables: 3,
+  });
+  const source = inventory.files.find(
+    (file) => file.analysis?.status === 'analyzed',
+  );
+  if (source?.analysis?.status !== 'analyzed')
+    throw new Error('fixture has no analyzed file');
+  const extra = JSON.parse(JSON.stringify(source)) as InventoryFile;
+  extra.manifest.relativePath = 'loose/EXTRA.BAS';
+  if (extra.analysis?.status !== 'analyzed') throw new Error('fixture');
+  extra.analysis.sqlTables = [
+    { table: 'UNOWNED_T', operation: 'R', line: 5, procedureId: null },
+  ];
+  extra.analysis.dynamicSql = [{ procedureId: null, operation: 'R', line: 7 }];
+  extra.analysis.concatenatedSql = [
+    { procedureId: null, operation: 'U', line: 9 },
+  ];
+  extra.analysis.counters = {
+    ...extra.analysis.counters,
+    unclassifiedLines: 3,
+  };
+  inventory.files.push(extra);
+  const total: Counters = inventory.totals.uniqueCounters;
+  inventory.totals.uniqueCounters = addCounters(total, extra.analysis.counters);
+  inventory.totals.files += 1;
+  inventory.totals.codeFiles += 1;
+  inventory.totals.analyzedCodeFiles += 1;
+  return inventory;
+}
+
+// What every view must show for unownedSqlInventoryFixture() about the file
+// no project lists, as counted by hand: one location of each SQL kind, and
+// unclassified lines that raise the warning.
+export const UNOWNED_SQL_EXPECTED = {
+  dynamicSql: 1,
+  concatenatedSql: 1,
+  unclassifiedLines: 3,
+} as const;

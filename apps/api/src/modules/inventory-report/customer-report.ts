@@ -1,5 +1,7 @@
 import {
   crudTables,
+  inventoryKpis,
+  sqlUses,
   normalizeScreenReportTotals,
   type SourceInventoryDocument,
 } from '@portal/contracts';
@@ -255,6 +257,42 @@ export function buildRisks(
   );
 }
 
+// The technical report warns about files a program lists; step 2 warns by
+// the totals of the whole inventory. Files no project lists are added here so
+// both raise the same warnings (error, unsupported, unclassified lines).
+function unlistedFileWarnings(
+  inventory: Inventory,
+  listed: ReadonlyMap<string, readonly string[]>,
+): ReportWarning[] {
+  const out: ReportWarning[] = [];
+  for (const file of inventory.files) {
+    const path = file.manifest.relativePath;
+    if (listed.has(path)) continue;
+    const warning = (code: string, detail: string): ReportWarning => ({
+      code,
+      programId: null,
+      relativePath: path,
+      line: null,
+      detail,
+    });
+    if (file.manifest.kind === 'error')
+      out.push(warning('FILE_ERROR', file.manifest.errorCode));
+    else if (file.analysis?.status === 'unsupported')
+      out.push(warning('FILE_UNSUPPORTED', file.analysis.reason));
+    else if (
+      file.analysis?.status === 'analyzed' &&
+      file.analysis.counters.unclassifiedLines > 0
+    )
+      out.push(
+        warning(
+          'UNCLASSIFIED_LINES',
+          `${file.analysis.counters.unclassifiedLines} lines`,
+        ),
+      );
+  }
+  return out;
+}
+
 // ---- Builder ---------------------------------------------------------------
 
 export function buildCustomerReport(
@@ -265,16 +303,10 @@ export function buildCustomerReport(
   // The unique totals are those of the whole inventory, every analyzed file
   // (also one no project lists), exactly what step 2 shows; the technical
   // report only reaches the files the programs list.
+  const kpis = inventoryKpis(inventory);
   const unique = {
     ...inventory.totals.uniqueCounters,
-    procedures: inventory.files.reduce(
-      (sum, file) =>
-        sum +
-        (file.analysis?.status === 'analyzed'
-          ? file.analysis.procedures.length
-          : 0),
-      0,
-    ),
+    procedures: kpis.procedures,
   };
   // The totals as the project-level list defines them (stored inventories
   // without it are derived by the same function). The list itself carries
@@ -487,8 +519,17 @@ export function buildCustomerReport(
       sqlModules.set(key, entry);
     }
   };
-  countSql(core.dynamicSql, 'dynamicSql');
-  countSql(core.concatenatedSql, 'concatenatedSql');
+  // Every analyzed file counts (also one no project lists, which falls on
+  // the unowned row), each (file, line) once: the same rows step 2 counts.
+  const usedByFile = new Map(core.files.map((f) => [f.relativePath, f.usedBy]));
+  const sqlRows = sqlUses(inventory).map((use) => ({
+    ...use,
+    usedBy: usedByFile.get(use.relativePath) ?? [],
+  }));
+  const dynamicRows = sqlRows.filter((row) => row.kind === 'dynamic');
+  const concatenatedRows = sqlRows.filter((row) => row.kind === 'concatenated');
+  countSql(dynamicRows, 'dynamicSql');
+  countSql(concatenatedRows, 'concatenatedSql');
 
   return {
     reportVersion: CUSTOMER_REPORT_VERSION,
@@ -558,16 +599,28 @@ export function buildCustomerReport(
       sqlByModule: [...sqlModules.values()].sort((a, b) =>
         byText(a.module, b.module),
       ),
-      dynamicSql: core.dynamicSql.length,
-      concatenatedSql: core.concatenatedSql.length,
+      dynamicSql: dynamicRows.length,
+      concatenatedSql: concatenatedRows.length,
     },
     risks: buildRisks(
-      core.warnings,
+      // One DYNAMIC_SQL warning per location of every analyzed file; the
+      // technical report only warns for files a program lists.
+      [
+        ...core.warnings.filter((warning) => warning.code !== 'DYNAMIC_SQL'),
+        ...unlistedFileWarnings(inventory, usedByFile),
+        ...dynamicRows.map((row) => ({
+          code: 'DYNAMIC_SQL',
+          programId: row.usedBy[0] ?? null,
+          relativePath: row.relativePath,
+          line: row.line,
+          detail: row.operation,
+        })),
+      ],
       [...components.values()].map((c) => ({ programIds: [...c.ids] })),
       [...apis.values()].map((a) => ({ programIds: [...a.ids] })),
       {
-        count: core.concatenatedSql.length,
-        programIds: core.concatenatedSql.flatMap((row) => row.usedBy),
+        count: concatenatedRows.length,
+        programIds: concatenatedRows.flatMap((row) => row.usedBy),
       },
     ),
     items: buildItems(inventory),

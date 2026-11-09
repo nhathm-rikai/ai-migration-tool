@@ -1,4 +1,4 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import { inventoryKpis, type SourceInventoryDocument } from '@portal/contracts';
 import type {
   AssessmentSummary,
   ComplexityLevel,
@@ -86,20 +86,9 @@ export function dashboardKpis(
   inventory: Inventory,
   summary: AssessmentSummary,
 ): DashboardKpis {
-  const files = analyzedFiles(inventory);
-  let procedures = 0;
-  let concatenated = 0;
-  let concatenatedKnown = false;
-  const locations = new Set<string>();
-  for (const [path, file] of files) {
-    procedures += file.procedures.length;
-    for (const use of [...file.sqlTables, ...file.dynamicSql])
-      locations.add(`${path}\u0000${use.line}`);
-    if (file.concatenatedSql) {
-      concatenatedKnown = true;
-      concatenated += file.concatenatedSql.length;
-    }
-  }
+  // Counted over every analyzed file by the function the customer report
+  // uses too (AR02 review 2).
+  const shared = inventoryKpis(inventory);
   const mapped = hasMappedCrud(inventory);
   const tables = crudMatrix(inventory, mapped ? 'mapped' : 'raw').length;
   const analyzed = summary.programs.filter((row) => row.complexity);
@@ -109,10 +98,10 @@ export function dashboardKpis(
       .length,
     physicalLines: summary.unique.physicalLines,
     codeLines: summary.unique.codeLines,
-    procedures,
-    analyzedFiles: files.size,
-    sqlLocations: locations.size,
-    concatenatedSql: concatenatedKnown ? concatenated : null,
+    procedures: shared.procedures,
+    analyzedFiles: shared.analyzedFiles,
+    sqlLocations: shared.sqlLocations,
+    concatenatedSql: shared.concatenatedSql,
     tables,
     tablesMapped: mapped,
     highPrograms: analyzed.filter(

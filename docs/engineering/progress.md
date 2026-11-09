@@ -1,5 +1,30 @@
 # Tiến độ kỹ thuật Portal
 
+## 09/11/2026 — AR02: sửa review tại `6087498` (SQL của file chưa thuộc program) và rà phạm vi mọi số liệu
+
+- **Lỗi (đúng):** số SQL động/ghép chuỗi vẫn lấy từ báo cáo kỹ thuật (chỉ file thuộc program) trong khi LoC/procedure đã lấy toàn inventory. Test thất bại trước: `customer-report.test.ts` mục "AR02 review 2 — SQL of a file no VBP lists" (fixture `Extra.bas` có 1 SQL động + 1 SQL ghép chuỗi). Sửa: `sqlUses`/`inventoryKpis` (`packages/contracts/src/inventory-kpis.ts`) đếm mọi file đã phân tích, mỗi (file, loại, dòng) một lần; báo cáo khách dùng kết quả đó cho sheet DB, bảng SQL theo module (dòng `プログラム未所属`) và sheet rủi ro; bước 2 (`dashboardKpis`) dùng chính hàm đó cho procedure, số file phân tích, vị trí SQL và SQL ghép chuỗi.
+- **Rà phạm vi (số liệu → phạm vi → bằng bước 2?):**
+
+| Số liệu | Phạm vi dùng | Bằng bước 2 |
+|---|---|---|
+| Program, program hoàn chỉnh | mọi program trong inventory | có |
+| Tổng file, file đã phân tích | `totals` (mọi file) | có |
+| LoC, dòng comment/trống/vật lý | `totals.uniqueCounters` (mọi file) | có |
+| Procedure | mọi file đã phân tích (`inventoryKpis`) | có (cùng hàm) |
+| Bảng DB / CRUD | theo program, ánh xạ `crudTables` (cùng hàm với bước 2) | có (test chéo `table-mapping.test.ts`) |
+| SQL động, SQL ghép chuỗi | mọi file đã phân tích, mỗi (file, dòng) một lần (`sqlUses`) | có (cùng hàm) |
+| Dòng module / `プログラム未所属` | file của program theo thư mục; phần dư (LoC, file, SQL) vào dòng chưa thuộc program; tổng bằng tổng | có |
+| Cảnh báo FILE_ERROR / FILE_UNSUPPORTED / UNCLASSIFIED_LINES | mọi file (bổ sung cho file chưa thuộc program, `unlistedFileWarnings`; trước đó chỉ file thuộc program, bước 2 theo `totals`) | có — **lệch thứ hai, đã sửa** |
+| Cảnh báo FILES_SKIPPED, TABLE_NAMES_NOT_CONFIRMED, COMPLEXITY_*, PROCEDURE_LINES_MISSING | cấp inventory | có |
+| Cảnh báo PROGRAM_*, MEMBER_*, CALL_AMBIGUOUS, SCREEN_*, REPORT_* | theo program (khai báo/analyzer của chính program) | cùng nguồn |
+| Thành phần ngoài (`Reference=`/`Object=`) | khai báo trong project, nên theo program | bước 2 không liệt kê tổng; chi tiết theo program |
+| Windows API (`Declare`) | `program.analysis.externalApis` do analyzer tính cho từng program; một `Declare` trong file không thuộc program nào không thuộc API của program nào | bước 2 chỉ hiện theo program; hai bên cùng nguồn (test đối chiếu số API khác nhau) |
+| Màn hình, report, batch | `totals.screenReport` / `reportItems` (một lần ở mức dự án, AR04) | có |
+| Module dùng chung | file có ≥2 program liệt kê; theo định nghĩa chỉ file thuộc program | có |
+
+- **Test đối chiếu:** cùng fixture `unownedSqlInventoryFixture()` (`packages/contracts/src/fixtures`, có file chưa thuộc program với SQL động, SQL ghép chuỗi, truy cập bảng và dòng chưa phân loại) và cùng số mong đợi `UNOWNED_SQL_EXPECTED`: phía bước 2 trong `analysis-dashboard.test.ts`, phía báo cáo khách trong `customer-report.test.ts` mục "cross-check" (hai test cùng fixture vì web và API không import lẫn nhau). Không đưa vào fixture một `Declare` ở file chưa thuộc program: API là số liệu cấp program (xem bảng), không so với tổng toàn dự án.
+- Ghi chú trung thực: test cảnh báo UNCLASSIFIED_LINES của file chưa thuộc program được viết cùng lúc với chỗ sửa (sau khi rà), không có lần chạy thất bại riêng; hai test SQL đã thất bại trước khi sửa.
+
 ## 09/11/2026 — AR02: sửa review tại `aebc2bf` (6 lỗi P2)
 
 - Base: stack được rebase lên master có hotfix của người dùng (`origin/master` `471222b`, 3 commit về log tài liệu và việc CLI trả tiếp câu trả lời) bằng một merge vào master local; AR04 → AR02 không xung đột.

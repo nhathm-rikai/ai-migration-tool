@@ -25,7 +25,7 @@ Mỗi sheet: tiêu đề, 1–3 dòng "このシートの見方" (`notes`), bả
 | `1_規模概要` | Nguồn gốc (nhãn DEMO với dự án demo, run, artifact + version, snapshot rút gọn, version báo cáo/complexity); quy mô; 画面 (共通 tính một lần), 帳票 (検出 = detected + referenced; 疑い riêng, không cộng), バッチ; dòng `お客様提示数：未入力` (R8); 帳票 theo `kind` và theo mức (gồm 未評価); bảng theo module (folder chứa file project, giống `moduleOf` của báo giá) có dòng `共通` riêng, dòng `プログラム未所属` nếu còn LoC/file đã phân tích mà không program nào liệt kê (tổng LoC, procedure, file là của **mọi** file đã phân tích, như bước 2); module được định danh bằng loại + nhãn nên thư mục trùng nhãn đặc biệt vẫn là một dòng riêng, dòng 合計 bằng tổng duy nhất; đoạn khuyến nghị (R9) |
 | `2_複雑度` | Phân bố 4 mức + 未解析 của program (số, %, version, 参考値); phân bố mức của report (`report-complexity-v1-draft`); 20 program phức tạp nhất |
 | `3_依存関係` | Module dùng chung nhiều program tham chiếu nhất (top 15), COM/OCX, API native |
-| `4_データベース` | Top 30 bảng theo số program truy cập kèm thao tác C/R/U/D/X; số vị trí SQL động và SQL ghép chuỗi theo module (`共通` cho file nhiều program) |
+| `4_データベース` | Top 30 bảng theo số program truy cập kèm thao tác C/R/U/D/X; số vị trí SQL động và SQL ghép chuỗi theo module (`共通` cho file nhiều program); số SQL tính trên mọi file đã phân tích (kể cả file không thuộc program, vào dòng `プログラム未所属`) bằng `sqlUses`/`inventoryKpis` của contracts, cùng hàm với bước 2 |
 | `5_リスク・確認事項` | 区分, 重要度 (高/中/低), 件数, 内容, 影響プログラム (≤10 + `他N件`), お客様への確認事項 |
 | `6_画面・帳票一覧` | Mỗi dòng một màn hình, một report (mọi mức tin cậy) hoặc một batch, có file (và dòng); report thêm 複雑度 (mức, 点数, モデル版, 評価要因) và 備考; `suspected`/unrated là 未評価 kèm lý do; file dùng chung hiển thị một lần |
 

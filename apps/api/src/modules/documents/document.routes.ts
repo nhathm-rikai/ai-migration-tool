@@ -1,12 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
+import { Type } from 'typebox';
 import {
   DOCUMENTS_API_OPERATIONS,
   ErrorResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
+  INVENTORY_REPORT_CONTENT_TYPES,
   cancelDocumentRunSuccessStatus,
   documentRunLocation,
 } from '@portal/contracts';
+import { contentDisposition } from '../inventory-report/report-download.service.js';
 import type { DocumentReviewService } from '../reviews/document-review.service.js';
 import type { DocumentRunService } from './document-run.service.js';
 
@@ -135,6 +138,44 @@ export function registerDocumentRoutes(
         request.params.item,
         request.params.file,
       ),
+  );
+  // TC01: Japanese Excel of the unit test specification of one package.
+  app.get(
+    ops.exportUtTestSpec.path,
+    {
+      schema: {
+        params: ops.exportUtTestSpec.params,
+        querystring: ops.exportUtTestSpec.querystring,
+        response: { 200: Type.Unknown(), default: ErrorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const { projectId, runId, item } = request.params;
+      const board = reviews.board(projectId);
+      const download = await service.utSpecExcel(
+        projectId,
+        runId,
+        item,
+        (file) =>
+          board.programs
+            .find(
+              (program) =>
+                program.runId === runId && program.item === Number(item),
+            )
+            ?.documents.find(
+              (document) =>
+                document.name === file.name && document.sha256 === file.sha256,
+            )?.status === 'approved'
+            ? 'approved'
+            : 'pending',
+      );
+      return reply
+        .header('content-type', INVENTORY_REPORT_CONTENT_TYPES.xlsx)
+        .header('content-disposition', contentDisposition(download.fileName))
+        .header('cache-control', 'no-store')
+        .header('x-content-type-options', 'nosniff')
+        .send(Buffer.from(download.bytes));
+    },
   );
   app.get(
     ops.getReviewBoard.path,

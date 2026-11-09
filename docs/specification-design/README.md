@@ -1,6 +1,6 @@
 # Bộ tài liệu specification-design từ source đa ngôn ngữ
 
-**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.11.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.10.0-draft` cho cả bảy template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
+**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.11.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.11.0-draft` cho cả tám template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
 
 ## Thứ tự đọc
 
@@ -9,7 +9,7 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 1. [Nguồn và truy vết yêu cầu](requirements-map.md), [gate](../engineering/delivery-gates.md), [CORE](../engineering/rules/core.md).
 2. [Phạm vi/pilot](rules/scope.md), [context/evidence](rules/context-evidence.md), [quy trình phân tích đa ngôn ngữ](analysis-method.md).
 3. [Yêu cầu đầu ra](rules/deliverables.md), [artifact](rules/artifacts.md), [mapping contract](contract-mapping.md).
-4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [Security audit](templates/security-audit.md) cùng [rule](rules/security-audit.md). Khi chạy, agent chỉ đọc template của tài liệu ở mục 3 phiếu input (được chọn + sinh kèm) ([SD-CT-07](rules/artifacts.md)); phần đầu và phần cuối chung của mọi tài liệu ở mục [Phần đầu và phần cuối chung](#phần-đầu-và-phần-cuối-chung).
+4. [BR](templates/business-rules.md), [Basic](templates/basic-design.md), [Detail](templates/detail-design.md), [DB](templates/db-design.md), [Security audit](templates/security-audit.md), [UT test spec](templates/ut-test-spec.md) cùng [rule](rules/security-audit.md). Khi chạy, agent chỉ đọc template của tài liệu ở mục 3 phiếu input (được chọn + sinh kèm) ([SD-CT-07](rules/artifacts.md)); phần đầu và phần cuối chung của mọi tài liệu ở mục [Phần đầu và phần cuối chung](#phần-đầu-và-phần-cuối-chung).
 5. [Phiếu input](templates/input-context.md) và cách kết hợp bên dưới.
 6. [Luồng phase](analysis-method.md#8-luồng-vận-hành-theo-phase).
 7. [Checklist review](review-checklist.md), [KB](knowledge-base.md), [quyết định chờ duyệt](decisions.md), [runbook](runbook.md).
@@ -18,13 +18,13 @@ Template set 0.2.0 gộp các revision riêng trước đó (`p2-detail-design-0
 
 Source ngôn ngữ nào trong allowlist thì phân tích ngôn ngữ đó; không có profile theo ngôn ngữ và người vận hành không bắt buộc khai báo ngôn ngữ. Agent tự nhận diện ngôn ngữ/runtime có căn cứ ở bước 0, ghi vào coverage, rồi áp cùng quy trình, checklist semantics chung và template trung lập theo [quy trình phân tích](analysis-method.md). Quy trình này cũng quy định cách xử lý khi thiếu parser, encoding chưa decode được hoặc gặp binary/generated code. Chưa tuyên bố parser Portal hỗ trợ mọi ngôn ngữ.
 
-Giữ bảy file template output (năm tài liệu + hai report section), thứ tự section và packaging tối đa năm Markdown (TL chọn tài liệu cần tạo). Từ 0.9.0 không còn `coverage.md`/`open-questions.md` riêng: đây là phân tích source hiện trạng, trạng thái sinh, phạm vi đã đọc và điểm chưa xác định nằm ngay trong từng tài liệu. Gói KUNO0020 đã sinh giữ version cũ; chưa có calibration ngoài VB6.
+Giữ tám file template output (sáu tài liệu gồm `ut-test-spec` + hai report section), thứ tự section và packaging tối đa sáu Markdown (TL chọn tài liệu cần tạo). Từ 0.9.0 không còn `coverage.md`/`open-questions.md` riêng: đây là phân tích source hiện trạng, trạng thái sinh, phạm vi đã đọc và điểm chưa xác định nằm ngay trong từng tài liệu. Gói KUNO0020 đã sinh giữ version cũ; chưa có calibration ngoài VB6.
 
 ## Flow nghiệp vụ trên Portal
 
 1. TL mở Portal và chọn thư mục source legacy.
 2. TL chọn program cần phân tích: tất cả, một hoặc một số program trong Source Inventory (output P1 1.1).
-3. TL chọn tài liệu cần tạo: một, nhiều hoặc tất cả trong `business-rules`, `basic-design`, `detail-design`, `db-design`, `security-audit`. Tài liệu được tham chiếu tự sinh kèm theo [SD-CT-07](rules/artifacts.md): chọn Basic thì kèm BR; chọn Detail thì kèm BR, Basic, DB — trừ tài liệu đã có bản duyệt.
+3. TL chọn tài liệu cần tạo: một, nhiều hoặc tất cả trong `business-rules`, `basic-design`, `detail-design`, `db-design`, `security-audit`, `ut-test-spec` (đặc tả test đơn vị: agent liệt kê case ở mức nhánh theo checklist tất định `context/p1/1.4-ut-skeleton.json` của Portal; xem [template](templates/ut-test-spec.md)). Tài liệu được tham chiếu tự sinh kèm theo [SD-CT-07](rules/artifacts.md): chọn Basic thì kèm BR; chọn Detail thì kèm BR, Basic, DB — trừ tài liệu đã có bản duyệt.
 4. Portal lập [phiếu input](templates/input-context.md) (source legacy + output P1 1.1–1.3 + lựa chọn của TL) và gọi agent CLI cho từng program. Phiếu ghi cả tài liệu sinh kèm; tài liệu đã có bản duyệt từ run trước thì Portal đưa bản đó vào mục 4 thay vì sinh lại ([SD-CT-07](rules/artifacts.md)).
 5. Agent CLI phân tích theo phiếu input và bộ tài liệu chuẩn này, sinh các tài liệu ở mục 3 phiếu input (được chọn + sinh kèm), rồi trả output về Portal. Nếu phiên bị dừng giữa chừng (vd. usage limit), Portal chạy tiếp bằng phiên mới từ trạng thái trên đĩa ([SD-CT-08](rules/artifacts.md)); chỉ output mà mọi tài liệu ghi "Trạng thái sinh" `hoàn tất` mới sang bước review.
 6. TL review output trên Portal theo [checklist](review-checklist.md).

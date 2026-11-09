@@ -1,6 +1,6 @@
 # DB Design — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.10.0-draft.** [Phần đầu chung](../README.md), [yêu cầu DB](../rules/deliverables.md).
+**DRAFT TEMPLATE — spec-design-templates-0.11.0-draft.** [Phần đầu chung](../README.md), [yêu cầu DB](../rules/deliverables.md).
 
 ## 1. Nguồn và giới hạn
 

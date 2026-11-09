@@ -14,6 +14,8 @@ import type {
 import type { ArtifactStore } from '../../ports/artifact-store.js';
 import type { SpecWorkspace } from '../../adapters/local/spec-workspace.js';
 import type { NewLogEntry } from './document-run.repository.js';
+import { buildUtChecklist } from '../analysis/ut-checklist.js';
+import { validateUtSpec } from './ut-spec.js';
 import {
   createPackageTracker,
   templateSections,
@@ -24,6 +26,7 @@ import {
   taskPrompt,
   WORKSPACE,
   FILE_END,
+  UT_SKELETON_FILE,
 } from './spec-context.js';
 
 const FILE_LINE = /^=== FILE: [a-z-]+\.md ===$/;
@@ -152,6 +155,8 @@ export function createDocumentExecutor(deps: {
             fail('INPUT_UNAVAILABLE', 'Program is not in the inventory.');
             continue;
           }
+          // TC01: the checklist the agent has to cover, from the inventory.
+          const utChecklist = buildUtChecklist(inventory, program.projectPath);
           const files_ = source.snapshotId === null ? null : source.files;
           const sourceFiles = files_
             ? programFilePaths(program).flatMap((path) => {
@@ -176,6 +181,15 @@ export function createDocumentExecutor(deps: {
                   language: run.config.outputLanguage,
                 }),
               },
+              ...(run.config.generated.includes('ut-test-spec')
+                ? [
+                    {
+                      path: `${WORKSPACE.p1}/${UT_SKELETON_FILE}`,
+                      content: `${JSON.stringify(utChecklist, null, 1)}
+`,
+                    },
+                  ]
+                : []),
               ...Object.entries(programP1(inventory, program)).map(
                 ([name, value]) => ({
                   path: `${WORKSPACE.p1}/${name}`,
@@ -228,6 +242,9 @@ export function createDocumentExecutor(deps: {
             ...run.config.generated.map(
               (id) => `${WORKSPACE.pack}/templates/${id}.md`,
             ),
+            ...(run.config.generated.includes('ut-test-spec')
+              ? [`${WORKSPACE.p1}/${UT_SKELETON_FILE}`]
+              : []),
             ...Object.keys(programP1(inventory, program)).map(
               (name) => `${WORKSPACE.p1}/${name}`,
             ),
@@ -371,6 +388,31 @@ export function createDocumentExecutor(deps: {
                 .join(', ')}.`,
             );
             continue;
+          }
+          // TC01: the unit test specification must cover the checklist.
+          const utFile = parsed.files.find(
+            (file) => file.name === 'ut-test-spec.md',
+          );
+          if (utFile) {
+            const checked = validateUtSpec(
+              utFile.content,
+              utChecklist,
+              new Set(programFilePaths(program)),
+            );
+            if (!checked.ok) {
+              fail(
+                'AGENT_OUTPUT_INVALID',
+                `ut-test-spec rejected: ${checked.errors
+                  .slice(0, 5)
+                  .map(
+                    (error) => `${error.code}${error.id ? ` ${error.id}` : ''}`,
+                  )
+                  .join(
+                    ', ',
+                  )}${checked.errors.length > 5 ? ` (+${checked.errors.length - 5} more)` : ''}.`,
+              );
+              continue;
+            }
           }
           const packageId = deps.nextId();
           const stored = [];

@@ -23,6 +23,10 @@ import { AppError } from '../../shared/app-error.js';
 import { requestFingerprint as fingerprint } from '../jobs/job.service.js';
 import type { DocumentJobControl } from './document-dispatcher.js';
 import { programName, SPEC_TASK_VERSION } from './spec-context.js';
+import { buildUtChecklist } from '../analysis/ut-checklist.js';
+import { SheetLimitError, writeXlsx } from '../inventory-report/xlsx-writer.js';
+import { parseUtSpec } from './ut-spec.js';
+import { utSpecSheets } from './ut-spec-workbook.js';
 import type { DocumentRunRepository } from './document-run.repository.js';
 
 export type DocumentRunLimits = DocumentRunConfig['limits'];
@@ -247,6 +251,58 @@ export function createDocumentRunService(deps: {
     // A program's package is readable once the run ended and that package
     // was published complete (coverage `hoàn tất`); a package of an active,
     // cancelled or interrupted run is never shown as a result (DATA-05).
+    // TC01: the unit test specification of one package as the Japanese
+    // Excel, for exactly that run and program (no "latest").
+    async utSpecExcel(
+      projectId: string,
+      runId: string,
+      itemIndex: string,
+      reviewOf: (file: {
+        name: string;
+        sha256: string;
+      }) => 'approved' | 'pending',
+    ): Promise<{ bytes: Uint8Array; fileName: string }> {
+      const file = await this.packageFile(
+        projectId,
+        runId,
+        itemIndex,
+        'ut-test-spec.md',
+      );
+      const run = findRun(projectId, runId);
+      const item = run.items[Number(itemIndex)];
+      const inventory = await deps.loadInventory(projectId, run.inventory);
+      const program = inventory.programs.find(
+        (entry) => entry.projectPath === item?.program,
+      );
+      const parsed = parseUtSpec(file.content);
+      if (!item || !program || !parsed)
+        throw new AppError('DOCUMENT_NOT_FOUND');
+      const checklist = buildUtChecklist(inventory, program.projectPath);
+      try {
+        return {
+          bytes: writeXlsx(
+            utSpecSheets({
+              program: program.projectPath,
+              runId: run.id,
+              sha256: file.sha256,
+              specPack: run.config.specPack,
+              createdAt: item.finishedAt ?? run.updatedAt,
+              model: run.config.model,
+              runner: run.config.runner,
+              review: reviewOf({ name: file.name, sha256: file.sha256 }),
+              cases: parsed.cases,
+              checklist,
+            }),
+          ),
+          fileName: `単体テスト仕様書_${checklist.program}.xlsx`,
+        };
+      } catch (error) {
+        if (error instanceof SheetLimitError)
+          throw new AppError('REPORT_TOO_LARGE');
+        throw error;
+      }
+    },
+
     async packageFile(
       projectId: string,
       runId: string,

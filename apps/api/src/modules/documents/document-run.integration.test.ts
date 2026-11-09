@@ -28,6 +28,11 @@ import type { DocumentOptions } from '../../composition.js';
 import { loadConfig } from '../../config.js';
 import type { AgentRunner } from '../../ports/agent-runner.js';
 import { createTrustedInject } from '../../testing/test-app.js';
+import { demoInventory } from '../../adapters/fake/demo-inventory.js';
+import { buildUtChecklist } from '../analysis/ut-checklist.js';
+import { programFilePaths } from './spec-context.js';
+import { validateUtSpec } from './ut-spec.js';
+import { unzip } from '../../testing/zip-reader.js';
 
 // Specification-design document runs over HTTP -> service -> SQLite ->
 // filesystem, with a fake agent: admission, idempotency, one package per
@@ -176,7 +181,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       ],
       runner: 'fake',
       effort: 'medium',
-      promptVersion: 'spec-design-task-v6',
+      promptVersion: 'spec-design-task-v7',
     });
     expect(queued.config.specPack).toMatch(
       /^spec-design-rules-.+ \+ spec-design-templates-/,
@@ -601,5 +606,129 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       await gone(`/api/v1/projects/${project.id}/document-runs/current`)
     ).json<CurrentDocumentRunResponse>();
     expect(ready.runtime.status).toBe('ready');
+  });
+
+  // TC01-AC03: ut-test-spec through the same pipeline, with the fake runner.
+  describe('ut-test-spec (TC01)', () => {
+    async function runUt(
+      scenario?: 'ut-missing-item',
+      programsOverride?: (all: string[]) => string[],
+    ) {
+      const inject = await open({
+        agentRunner: createFakeDocumentRunner(scenario ? { scenario } : {}),
+      });
+      const { project, analysis, programs } = await analyzedProject(inject);
+      const chosen = programsOverride
+        ? programsOverride(programs)
+        : [programs[0] ?? ''];
+      const started = await start(
+        inject,
+        project.id,
+        analysis.id,
+        chosen,
+        undefined,
+        ['ut-test-spec'],
+      );
+      return { inject, project, started, programs };
+    }
+
+    it('writes one package for one program, covering its checklist, and stores it like any document', async () => {
+      const { inject, project, started, programs } = await runUt();
+      expect(started.statusCode).toBe(202);
+      const run = await finished(inject, started.json<DocumentRun>());
+      expect(run.status).toBe('succeeded');
+      expect(run.config.promptVersion).toBe('spec-design-task-v7');
+      expect(run.config.generated).toEqual(['ut-test-spec']);
+      expect(run.items).toHaveLength(1);
+      expect(run.items[0]?.files.map((file) => file.name)).toEqual([
+        'ut-test-spec.md',
+      ]);
+      const file = (
+        await inject(
+          `/api/v1/projects/${project.id}/document-runs/${run.id}/items/0/files/ut-test-spec.md`,
+        )
+      ).json<PackageFileContent>();
+      const program = demoInventory.programs.find(
+        (entry) => entry.projectPath === programs[0],
+      );
+      if (!program) throw new Error('program');
+      const checklist = buildUtChecklist(demoInventory, program.projectPath);
+      expect(checklist.items.length).toBeGreaterThan(0);
+      expect(
+        validateUtSpec(
+          file.content,
+          checklist,
+          new Set(programFilePaths(program)),
+        ),
+      ).toMatchObject({ ok: true });
+    });
+
+    it('is reviewed in step 4 like the other documents', async () => {
+      const { inject, project, started } = await runUt();
+      await finished(inject, started.json<DocumentRun>());
+      const board = (
+        await inject(`/api/v1/projects/${project.id}/document-reviews`)
+      ).json<{
+        programs: { documents: { name: string; status: string }[] }[];
+      }>();
+      expect(board.programs[0]?.documents).toEqual([
+        expect.objectContaining({ name: 'ut-test-spec.md', status: 'pending' }),
+      ]);
+    });
+
+    it('downloads the Excel of exactly that package, and refuses another file or item', async () => {
+      const { inject, project, started } = await runUt();
+      const run = await finished(inject, started.json<DocumentRun>());
+      const url = (item: number) =>
+        `/api/v1/projects/${project.id}/document-runs/${run.id}/items/${item}/ut-test-spec`;
+      const response = await inject(url(0));
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toContain('spreadsheetml');
+      const disposition = String(response.headers['content-disposition']);
+      expect(decodeURIComponent(disposition)).toContain('単体テスト仕様書_');
+      const workbook = unzip(response.rawPayload).get('xl/workbook.xml') ?? '';
+      expect(
+        [...workbook.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]),
+      ).toEqual(['表紙', 'テストケース', 'カバレッジ']);
+      // No such item in the run, and a run without ut-test-spec has no file.
+      expect((await inject(url(3))).statusCode).toBe(404);
+    });
+
+    it('has no Excel for a package without the unit test specification', async () => {
+      const inject = await open();
+      const { project, analysis, programs } = await analyzedProject(inject);
+      const started = await start(inject, project.id, analysis.id, [
+        programs[0] ?? '',
+      ]);
+      const run = await finished(inject, started.json<DocumentRun>());
+      const response = await inject(
+        `/api/v1/projects/${project.id}/document-runs/${run.id}/items/0/ut-test-spec`,
+      );
+      expect(response.statusCode).toBe(404);
+    });
+
+    it('rejects a package that leaves a checklist item without a case', async () => {
+      const { inject, started } = await runUt('ut-missing-item');
+      const run = await finished(inject, started.json<DocumentRun>());
+      expect(run.status).toBe('failed');
+      expect(run.items[0]).toMatchObject({
+        status: 'failed',
+        errorCode: 'AGENT_OUTPUT_INVALID',
+        files: [],
+      });
+      const log = (
+        await inject(
+          `/api/v1/projects/${run.projectId}/document-runs/${run.id}/log`,
+        )
+      ).json<DocumentLogPage>();
+      expect(log.items.map((entry) => entry.text).join(' ')).toContain(
+        'MISSING_ITEM',
+      );
+    });
+
+    it('keeps one program per request: two programs are refused, no batching', async () => {
+      const { started } = await runUt(undefined, (all) => all.slice(0, 2));
+      expect(started.statusCode).toBe(400);
+    });
   });
 });

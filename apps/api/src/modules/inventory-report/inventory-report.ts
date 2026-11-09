@@ -528,8 +528,8 @@ export function buildInventoryReport(
     (program.reports ?? []).map((row) => ({
       programId: id,
       kind: row.kind,
-      name: row.name,
-      file: row.file,
+      name: redactAbsolutePath(row.name),
+      file: redactAbsolutePath(row.file),
       line: row.line,
       confidence: row.confidence,
       shared: row.shared,
@@ -544,11 +544,15 @@ export function buildInventoryReport(
       warnings: row.warnings,
     })),
   );
-  const hasScreenReport = selected.every(
-    ({ program }) =>
-      program.status !== 'parsed' ||
-      (program.screens !== undefined && program.reports !== undefined),
-  );
+  // Decided by the inventory (the field AR04 writes), not by its programs:
+  // an old inventory whose programs are all unsupported has no data either.
+  const hasScreenReport =
+    inventory.totals.screenReport !== undefined &&
+    selected.every(
+      ({ program }) =>
+        program.status !== 'parsed' ||
+        (program.screens !== undefined && program.reports !== undefined),
+    );
   const screenReport: ScreenReportTotals | null = hasScreenReport
     ? buildScreenReportTotals(
         selected.flatMap(({ program }) =>

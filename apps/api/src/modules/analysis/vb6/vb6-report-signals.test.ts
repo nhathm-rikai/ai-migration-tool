@@ -15,7 +15,11 @@ describe('AR04-AC02 report signals in VB6 code', () => {
       'Invoice.rpt',
     ],
     ['crystal', ['    x = OpenReport("sales.RPT")'], 'sales.RPT'],
-    ['crystal', ['    f = App.Path & "\\reports\\daily.rpt"'], 'daily.rpt'],
+    [
+      'crystal',
+      ['    f = App.Path & "\\reports\\daily.rpt"'],
+      'reports/daily.rpt',
+    ],
     [
       'excel',
       ['    Set xl = CreateObject("Excel.Application")'],
@@ -33,7 +37,9 @@ describe('AR04-AC02 report signals in VB6 code', () => {
     ['file-output', ['    Open "out.csv" For Output As #1'], 'Open For Output'],
     ['file-output', ['    Open f For Append As #2'], 'Open For Append'],
   ])('positive %s: %j', (kind, lines, name) => {
-    expect(scan(...lines)).toEqual([{ kind, name, line: 1 }]);
+    expect(scan(...lines)).toEqual([
+      expect.objectContaining({ kind, name, line: 1 }),
+    ]);
   });
 
   it.each([

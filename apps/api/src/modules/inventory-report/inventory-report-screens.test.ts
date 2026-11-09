@@ -113,3 +113,27 @@ describe('AR04-AC05 inventory without screen/report data', () => {
     expect(programs?.rows.every((row) => row[column ?? 0] === null)).toBe(true);
   });
 });
+
+describe('review finding 6: old inventory whose programs are all unsupported', () => {
+  const old: SourceInventoryDocument = JSON.parse(
+    JSON.stringify(demoInventory),
+  ) as SourceInventoryDocument;
+  delete old.screenReportVersion;
+  delete old.reportComplexityVersion;
+  delete old.totals.screenReport;
+  for (const program of old.programs) {
+    delete program.programType;
+    delete program.screens;
+    delete program.reports;
+    program.status = 'unsupported';
+    program.issue = { reason: 'PROJECT_TYPE_MISSING', line: null };
+    program.analysis = null;
+  }
+  it('is still "no data", not zero', () => {
+    const report = buildInventoryReport(old, ALL_PROGRAMS);
+    expect(report.totals.screenReport).toBeNull();
+    expect(report.warnings.map((w) => w.code)).toContain(
+      'SCREEN_REPORT_MISSING',
+    );
+  });
+});

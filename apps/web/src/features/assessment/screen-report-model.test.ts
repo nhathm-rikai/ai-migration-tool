@@ -115,3 +115,19 @@ describe('AR04-AC06/AC11 screen and report model', () => {
     expect(programScreenReport(program)).toEqual({ available: false });
   });
 });
+
+describe('review finding 5: files that differ only in case', () => {
+  it('lists reports of two resolved files as two rows', () => {
+    const inventory = screenReportCorpus();
+    const [first] = inventory.programs;
+    const report = first?.reports?.[0];
+    if (!first || !report) throw new Error('fixture');
+    first.reports = [
+      { ...report, file: 'a/Main.frm' },
+      { ...report, file: 'a/main.frm' },
+    ];
+    expect(
+      reportListRows(inventory)?.filter((r) => r.name === report.name),
+    ).toHaveLength(2);
+  });
+});

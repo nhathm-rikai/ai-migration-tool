@@ -149,7 +149,7 @@ describe('AR04-AC02/AC03 report rows', () => {
           ),
         ),
       ],
-      knownPaths: ['a/rpt/has.rpt'],
+      knownPaths: ['a/has.rpt'],
     });
     expect(program(inventory, 'a/A.vbp').reports).toEqual([
       expect.objectContaining({

@@ -94,6 +94,11 @@ export type ReportSignal = {
   kind: ReportSignalKind;
   name: string;
   line: number;
+  // crystal only: the design file path as written, with "/" separators and
+  // no leading "./". `absolute` paths (drive, UNC, root) cannot be resolved
+  // against the source tree, so `name` is then the file name alone.
+  path?: string;
+  absolute?: boolean;
 };
 
 // What a project reference says about reports, by runtime component.

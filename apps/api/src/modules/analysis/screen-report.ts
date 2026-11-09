@@ -1,6 +1,5 @@
 import type {
   CodeFileAnalysis,
-  CodeReference,
   LanguageAnalyzer,
   ProjectExternalReference,
 } from './language-analyzer.js';
@@ -187,6 +186,8 @@ export type ProgramScreen = {
   warnings: string[];
 };
 
+const fileNameOf = (text: string) => text.split(/[\\/]/).at(-1) ?? text;
+
 export type ProgramType = 'screen' | 'batch' | 'unknown';
 
 export type ScreenReportTotals = {
@@ -203,20 +204,32 @@ export type ScreenReportTotals = {
   suspectedPrograms: number;
 };
 
-// Report rows of one analyzed code file. `hasFile(name)` says whether a file
-// with that base name exists in the source (design file of a Crystal report).
+// What only the program a row is listed under can tell: whether the design
+// file of a Crystal report resolves from that program's project file, and the
+// procedures the report's procedure calls inside that program.
+export type ProgramContext = {
+  projectPath: string;
+  // A design file path as written (relative, "/" separated) found in the
+  // source from this project's folder or from the source root.
+  designExists(projectPath: string, written: string): boolean;
+  // Distinct procedures the program resolves from this procedure (local or
+  // program level; ambiguous and native calls are not counted).
+  callsOf(procedureId: string): number;
+};
+// A row of a file, completed for one program.
+export type FileReport = (context: ProgramContext) => ReportRow;
+
+// Report rows of one analyzed code file, each finished per program.
 export function buildCodeFileReportRows(input: {
   analyzer: LanguageAnalyzer;
   relativePath: string;
   lines: string[];
   analysis: AnalyzedFile;
-  references: readonly CodeReference[];
-  hasFile: (name: string) => boolean;
   config?: ReportComplexityConfig;
-}): ReportRow[] {
+}): FileReport[] {
   const { analysis, relativePath } = input;
   const seen = new Set<string>();
-  const rows: ReportRow[] = [];
+  const rows: FileReport[] = [];
   for (const signal of input.analyzer.findReportSignals(
     relativePath,
     input.lines,
@@ -225,54 +238,60 @@ export function buildCodeFileReportRows(input: {
       (candidate) =>
         candidate.startLine <= signal.line && signal.line <= candidate.endLine,
     );
-    const key = `${signal.kind}\u0000${signal.name.toLowerCase()}\u0000${procedure?.id ?? ''}`;
+    // A Crystal report is told apart by the path written in the code, so
+    // two reports with the same file name in different folders stay two.
+    const key = `${signal.kind}\u0000${(signal.path ?? signal.name).toLowerCase()}\u0000${procedure?.id ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const crystal = signal.kind === 'crystal';
-    const present = crystal && input.hasFile(signal.name);
-    const confidence: ReportConfidence = !crystal
-      ? 'suspected'
-      : present
-        ? 'detected'
-        : 'referenced';
-    const complexity: ReportComplexity =
-      confidence === 'suspected'
-        ? unratedComplexity('SUSPECTED', false)
-        : !procedure
-          ? unratedComplexity('NO_PROCEDURE', true)
-          : scoreReportComplexity(
-              evidenceOf(procedure.id, analysis, input.references),
-              input.config,
-              { designNotAnalyzed: true },
-            );
-    rows.push({
-      kind: signal.kind,
-      name: signal.name,
-      file: relativePath,
-      line: signal.line,
-      confidence,
-      procedureId: procedure?.id ?? null,
-      warnings: confidence === 'referenced' ? ['REPORT_FILE_MISSING'] : [],
-      complexity,
+    rows.push((context) => {
+      const found =
+        crystal &&
+        signal.absolute !== true &&
+        signal.path !== undefined &&
+        context.designExists(context.projectPath, signal.path);
+      const confidence: ReportConfidence = !crystal
+        ? 'suspected'
+        : found
+          ? 'detected'
+          : 'referenced';
+      const complexity: ReportComplexity =
+        confidence === 'suspected'
+          ? unratedComplexity('SUSPECTED', false)
+          : !procedure
+            ? unratedComplexity('NO_PROCEDURE', true)
+            : scoreReportComplexity(
+                {
+                  ...evidenceOf(procedure.id, analysis),
+                  calls: context.callsOf(procedure.id),
+                },
+                input.config,
+                { designNotAnalyzed: true },
+              );
+      return {
+        kind: signal.kind,
+        name: signal.name,
+        file: relativePath,
+        line: signal.line,
+        confidence,
+        procedureId: procedure?.id ?? null,
+        warnings: confidence === 'referenced' ? ['REPORT_FILE_MISSING'] : [],
+        complexity,
+      };
     });
   }
   return rows;
 }
 
+// Evidence of the procedure that holds a report, without its calls (those
+// depend on the program, see ProgramContext.callsOf).
 function evidenceOf(
   procedureId: string,
   analysis: AnalyzedFile,
-  references: readonly CodeReference[],
-): ReportEvidence {
+): Omit<ReportEvidence, 'calls'> {
   const procedure = analysis.procedures.find((item) => item.id === procedureId);
   const own = (fact: { procedureId: string | null }) =>
     fact.procedureId === procedureId;
-  const callee = new Set(
-    references
-      .filter((reference) => reference.procedureId === procedureId)
-      .map((reference) => reference.name.toLowerCase())
-      .filter((name) => name !== procedure?.name.toLowerCase()),
-  );
   return {
     decisionPoints: procedure?.decisionPoints ?? 0,
     executableLines: procedure?.executableLines ?? 0,
@@ -282,7 +301,6 @@ function evidenceOf(
     dynamicSql:
       analysis.dynamicSql.filter(own).length +
       analysis.concatenatedSql.filter(own).length,
-    calls: callee.size,
   };
 }
 
@@ -291,8 +309,8 @@ function evidenceOf(
 export function designerReportRow(
   relativePath: string,
   header: { line: number; name: string },
-): ReportRow {
-  return {
+): FileReport {
+  return () => ({
     kind: 'data-report',
     name: header.name,
     file: relativePath,
@@ -301,7 +319,7 @@ export function designerReportRow(
     procedureId: null,
     warnings: [],
     complexity: unratedComplexity('NO_PROCEDURE', true),
-  };
+  });
 }
 
 // ---- Per program -----------------------------------------------------------
@@ -330,7 +348,8 @@ export function buildProgramScreenReport(input: {
   startup: string | undefined;
   members: readonly ScreenReportMember[];
   externalReferences: readonly ProjectExternalReference[];
-  rowsByFile: ReadonlyMap<string, readonly ReportRow[]>;
+  rowsByFile: ReadonlyMap<string, readonly FileReport[]>;
+  context: Omit<ProgramContext, 'projectPath'>;
 }): {
   programType: ProgramType;
   screens: ProgramScreen[];
@@ -343,7 +362,9 @@ export function buildProgramScreenReport(input: {
   const seenFiles = new Set<string>();
   for (const member of input.members) {
     if (analyzer.isScreenMemberKind(member.kind)) {
-      const key = member.displayPath.toLowerCase();
+      // Two resolved files that differ only in case are two files (a
+      // case-sensitive file system); an unresolved path is matched loosely.
+      const key = member.relativePath ?? member.displayPath.toLowerCase();
       if (!seenScreens.has(key)) {
         seenScreens.add(key);
         screens.push({
@@ -355,11 +376,13 @@ export function buildProgramScreenReport(input: {
       }
     }
     if (member.relativePath === null) continue;
-    const fileKey = member.relativePath.toLowerCase();
-    if (seenFiles.has(fileKey)) continue;
-    seenFiles.add(fileKey);
-    for (const row of input.rowsByFile.get(member.relativePath) ?? [])
-      reports.push({ ...row, shared: member.shared });
+    if (seenFiles.has(member.relativePath)) continue;
+    seenFiles.add(member.relativePath);
+    for (const finish of input.rowsByFile.get(member.relativePath) ?? [])
+      reports.push({
+        ...finish({ ...input.context, projectPath: input.projectPath }),
+        shared: member.shared,
+      });
   }
 
   // A report runtime (Crystal, DataReport) among the references without a
@@ -371,7 +394,9 @@ export function buildProgramScreenReport(input: {
   if (gap)
     reports.push({
       kind: 'unknown',
-      name: gap.fileName ?? gap.description ?? gap.identifier,
+      // File name only: the reference may carry a path of the author's
+      // machine (the same rule as the redacted external references).
+      name: fileNameOf(gap.fileName ?? gap.description ?? gap.identifier),
       file: input.projectPath,
       line: null,
       confidence: 'suspected',
@@ -413,14 +438,16 @@ export function buildScreenReportTotals(
     if (program.reports.some((row) => row.confidence === 'suspected'))
       suspectedPrograms += 1;
     for (const screen of program.screens) {
-      const key = screen.file.toLowerCase();
+      const key = screen.warnings.includes('SCREEN_FILE_MISSING')
+        ? screen.file.toLowerCase()
+        : screen.file;
       const existing = screens.get(key);
       if (!existing) screens.set(key, screen);
       else if (screen.shared) existing.shared = true;
     }
     for (const row of program.reports)
       rows.set(
-        `${row.kind}\u0000${row.file.toLowerCase()}\u0000${row.line ?? ''}\u0000${row.name.toLowerCase()}`,
+        `${row.kind}\u0000${row.file}\u0000${row.line ?? ''}\u0000${row.name.toLowerCase()}`,
         row,
       );
   }

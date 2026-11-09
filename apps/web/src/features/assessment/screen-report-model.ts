@@ -121,7 +121,8 @@ export function reportListRows(inventory: Inventory): ReportListRow[] | null {
     for (const report of program.reports ?? []) {
       const key = [
         report.kind,
-        report.file.toLowerCase(),
+        // Exact path: files that differ only in case are two files.
+        report.file,
         report.line ?? '',
         report.name.toLowerCase(),
       ].join('\u0000');

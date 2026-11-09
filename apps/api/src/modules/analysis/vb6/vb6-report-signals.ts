@@ -17,9 +17,25 @@ const DECLARATION =
 const maskStrings = (code: string) =>
   code.replace(STRING_LITERAL, (text) => `"${' '.repeat(text.length - 2)}"`);
 
-function fileName(literal: string): string {
+// The path of a .rpt literal as written, "/" separated.
+function designPath(literal: string): {
+  path: string;
+  absolute: boolean;
+  name: string;
+} {
   const body = literal.slice(1, -1).replaceAll('""', '"').trim();
-  return body.split(/[\\/]/).at(-1) ?? body;
+  // A leading single separator is what follows `App.Path &`: relative to the
+  // application folder. A drive or UNC path is the author's machine.
+  const path = body
+    .replaceAll('\\', '/')
+    .replace(/^(?:\.\/)+/, '')
+    .replace(/^\/(?!\/)/, '');
+  const absolute = /^(?:[A-Za-z]:|\/\/)/.test(path);
+  return {
+    path,
+    absolute,
+    name: absolute ? (path.split('/').at(-1) ?? path) : path,
+  };
 }
 
 function signalsOf(statement: string): Omit<ReportSignal, 'line'>[] {
@@ -31,8 +47,15 @@ function signalsOf(statement: string): Omit<ReportSignal, 'line'>[] {
   );
   for (const literal of literals) {
     const body = literal.slice(1, -1);
-    if (RPT_FILE.test(body))
-      found.push({ kind: 'crystal', name: fileName(literal) });
+    if (RPT_FILE.test(body)) {
+      const design = designPath(literal);
+      found.push({
+        kind: 'crystal',
+        name: design.name,
+        path: design.path,
+        absolute: design.absolute,
+      });
+    }
   }
   const excel =
     /(?<![\w.])(?:CreateObject|GetObject)\s*\([^)]*\)/gi.exec(masked) ??
@@ -96,15 +119,26 @@ export function findVb6ReportSignals(
 
 // A DataReport / ActiveReports designer (.dsr) starts a top-level
 // `Begin {guid} DataReport <name>`; a DataEnvironment .dsr is not a report.
-const REPORT_DESIGNER =
-  /^\s*Begin\s+\{[0-9A-Fa-f-]+\}\s+(?:DataReport|ActiveReport\d*)\s+(\S+)/i;
+// Designer GUIDs of the report designers a .dsr can start with. The
+// instance name that follows is the user's own (`Begin {guid} rptSales`).
+const REPORT_DESIGNER_GUIDS = new Set(['78e93846-85fd-11d0-8487-00a0c90dc8a9']);
+const DESIGNER_BEGIN = /^\s*Begin\s+\{([0-9A-Fa-f-]+)\}\s+(\S+)(?:\s+(\S+))?/;
+// Older/other exports write the designer type before the instance name.
+const REPORT_WORD = /^(?:DataReport|ActiveReport\d*)$/i;
 
 export function detectVb6ReportDesigner(
   lines: string[],
 ): { line: number; name: string } | null {
   for (const [index, text] of lines.entries()) {
-    const match = REPORT_DESIGNER.exec(text);
-    if (match) return { line: index + 1, name: match[1] ?? '' };
+    const match = DESIGNER_BEGIN.exec(text);
+    if (!match) continue;
+    const [, guid = '', first = '', second] = match;
+    // `Begin {guid} <Type> <Name>`: the type word names the designer.
+    if (second !== undefined && REPORT_WORD.test(first))
+      return { line: index + 1, name: second };
+    // `Begin {guid} <Name>`: the designer type is the GUID.
+    if (second === undefined && REPORT_DESIGNER_GUIDS.has(guid.toLowerCase()))
+      return { line: index + 1, name: first };
   }
   return null;
 }

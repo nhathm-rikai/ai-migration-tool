@@ -31,7 +31,7 @@ import {
   type ProgramReport,
   type ProgramScreen,
   type ProgramType,
-  type ReportRow,
+  type FileReport,
   type ScreenReportTotals,
 } from './screen-report.js';
 import type { SourceProfile } from './source-profiles.js';
@@ -332,12 +332,21 @@ export function buildSourceInventory(input: {
   }
 
   // Report rows per file: code signals, and designer members (.dsr).
-  const designFiles = new Set(
+  // Files of the source (and names of files seen but not loaded), lower
+  // case: a report design file counts as found only where its path resolves,
+  // from the project folder or from the source root.
+  const knownFiles = new Set(
     [...sources.keys(), ...(input.knownPaths ?? [])].map((path) =>
-      (path.split('/').at(-1) ?? path).toLowerCase(),
+      path.toLowerCase(),
     ),
   );
-  const rowsByFile = new Map<string, ReportRow[]>();
+  const designExists = (projectPath: string, written: string) => {
+    const baseDir = projectPath.split('/').slice(0, -1).join('/');
+    return [joinRelative(baseDir, written), joinRelative('', written)].some(
+      (path) => path !== null && knownFiles.has(path.toLowerCase()),
+    );
+  };
+  const rowsByFile = new Map<string, FileReport[]>();
   for (const [path, lines] of codeLines) {
     const analysis = files.get(path)?.analysis;
     if (analysis?.status !== 'analyzed') continue;
@@ -348,8 +357,6 @@ export function buildSourceInventory(input: {
         relativePath: path,
         lines,
         analysis,
-        references: references.get(path) ?? [],
-        hasFile: (name) => designFiles.has(name.toLowerCase()),
       }),
     );
   }
@@ -413,12 +420,32 @@ export function buildSourceInventory(input: {
         });
       }
       const baseDir = path.split('/').slice(0, -1).join('/');
+      const analysis = analyzeProgram(
+        programFiles,
+        parsed.externalReferences,
+        tableNames,
+      );
+      // Procedures this program resolves from a procedure (call graph of the
+      // program, not names of the whole corpus).
+      const resolvedCalls = new Map<string, Set<string>>();
+      for (const call of analysis.calls) {
+        if (call.resolution !== 'local' && call.resolution !== 'program')
+          continue;
+        const targets = resolvedCalls.get(call.from) ?? new Set<string>();
+        for (const target of call.targets)
+          if (target !== call.from) targets.add(target);
+        resolvedCalls.set(call.from, targets);
+      }
       const screenReport = buildProgramScreenReport({
         analyzer,
         projectPath: path,
         startup: parsed.startup,
         externalReferences: parsed.externalReferences,
         rowsByFile,
+        context: {
+          designExists,
+          callsOf: (procedureId) => resolvedCalls.get(procedureId)?.size ?? 0,
+        },
         members: members.map((member) => {
           const relative = analyzer.toRelativeMemberPath(member.declaredPath);
           const joined =
@@ -440,11 +467,7 @@ export function buildSourceInventory(input: {
         complete:
           members.every((member) => member.fileStatus === 'analyzed') &&
           counters.unclassifiedLines === 0,
-        analysis: analyzeProgram(
-          programFiles,
-          parsed.externalReferences,
-          tableNames,
-        ),
+        analysis,
         ...screenReport,
       };
     },

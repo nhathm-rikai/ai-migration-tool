@@ -195,7 +195,7 @@ describe('buildRunInventory report design files (AR04)', () => {
     expect(
       rowOf([
         {
-          relativePath: 'app/reports/FORM1.RPT',
+          relativePath: 'app/FORM1.RPT',
           kind: 'file',
           reason: 'excluded',
           byteLength: 10,

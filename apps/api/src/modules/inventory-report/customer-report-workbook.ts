@@ -342,7 +342,7 @@ function sheet4(report: CustomerReport): Sheet {
   ]);
   b.table(database.tables.map((t) => [t.table, t.programs, t.operations]));
   b.heading(
-    `動的SQL・文字列連結SQLの箇所数（動的 ${database.dynamicSql} / 連結 ${database.concatenatedSql}）`,
+    `動的SQL・文字列連結SQLの箇所数（動的 ${database.dynamicSql} / 連結 ${database.concatenatedSql ?? NOT_ANALYZED}）`,
   );
   b.subHeader([
     'モジュール',
@@ -353,7 +353,7 @@ function sheet4(report: CustomerReport): Sheet {
     database.sqlByModule.map((m) => [
       m.module,
       m.dynamicSql,
-      m.concatenatedSql,
+      m.concatenatedSql ?? NOT_ANALYZED,
     ]),
   );
   return sheetOf(

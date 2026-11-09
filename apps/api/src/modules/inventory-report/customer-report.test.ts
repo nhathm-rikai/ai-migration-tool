@@ -779,3 +779,99 @@ describe('AR02 review 2 — cross-check with step 2 on an inventory with an unow
     expect(built.dependencies.apis).toHaveLength(fromPrograms.size);
   });
 });
+
+// ---- AR02 review 3 (5d8e7da): three P2 findings -----------------------------
+
+describe('AR02 review 3 — finding 1: an unsupported file no VBP lists is a risk', () => {
+  function withUnsupportedFile() {
+    const inventory = clone();
+    const source = firstAnalyzed(inventory);
+    const extra = JSON.parse(JSON.stringify(source)) as InvFile;
+    extra.manifest.relativePath = 'loose/EXTRA.CTL';
+    extra.manifest.role = 'unsupported';
+    (extra as { analysis?: unknown }).analysis = undefined;
+    inventory.files.push(extra);
+    inventory.totals.files += 1;
+    inventory.totals.unsupportedFiles += 1;
+    return inventory;
+  }
+  it('raises FILE_UNSUPPORTED as many times as step 2 counts unsupported files', () => {
+    const inventory = withUnsupportedFile();
+    const built = buildCustomerReport(inventory, origin);
+    const risk = built.risks.find((r) => r.code === 'FILE_UNSUPPORTED');
+    expect(risk?.count).toBe(inventory.totals.unsupportedFiles);
+  });
+  it('still counts a file whose analysis says unsupported', () => {
+    const inventory = clone();
+    const extra = JSON.parse(
+      JSON.stringify(firstAnalyzed(inventory)),
+    ) as InvFile;
+    extra.manifest.relativePath = 'loose/EXTRA2.CTL';
+    extra.analysis = { status: 'unsupported', reason: 'user-control' } as never;
+    inventory.files.push(extra);
+    inventory.totals.files += 1;
+    inventory.totals.unsupportedFiles += 1;
+    const built = buildCustomerReport(inventory, origin);
+    expect(built.risks.find((r) => r.code === 'FILE_UNSUPPORTED')?.count).toBe(
+      inventory.totals.unsupportedFiles,
+    );
+  });
+});
+
+describe('AR02 review 3 — finding 2: shared dynamic SQL names every program', () => {
+  it('counts the location once and lists both programs', () => {
+    const inventory = clone();
+    for (const f of inventory.files)
+      if (f.analysis?.status === 'analyzed') {
+        f.analysis.dynamicSql = [];
+        f.analysis.concatenatedSql = [];
+      }
+    const shared = buildInventoryReport(inventory, ALL_PROGRAMS).files.find(
+      (f) => f.usedBy.length > 1 && f.analysisStatus === 'analyzed',
+    );
+    if (!shared) throw new Error('fixture has no shared file');
+    const file = inventory.files.find(
+      (f) => f.manifest.relativePath === shared.relativePath,
+    );
+    if (file?.analysis?.status !== 'analyzed') throw new Error('fixture');
+    file.analysis.dynamicSql = [{ procedureId: null, operation: 'R', line: 3 }];
+    const built = buildCustomerReport(inventory, origin);
+    const risk = built.risks.find((r) => r.code === 'DYNAMIC_SQL');
+    expect(built.database.dynamicSql).toBe(1);
+    expect(risk?.count).toBe(1);
+    expect(risk?.programs.length).toBe(shared.usedBy.length);
+    expect(risk?.programs.length).toBeGreaterThan(1);
+  });
+});
+
+describe('AR02 review 3 — finding 3: unknown concatenated SQL is not 0', () => {
+  const legacySql = () => {
+    const inventory = clone();
+    for (const f of inventory.files)
+      if (f.analysis?.status === 'analyzed')
+        (f.analysis as { concatenatedSql?: unknown }).concatenatedSql =
+          undefined;
+    return inventory;
+  };
+  it('keeps null in the JSON, never 0, and no risk row', () => {
+    const built = buildCustomerReport(legacySql(), origin);
+    expect(inventoryKpis(legacySql()).concatenatedSql).toBeNull();
+    expect(built.database.concatenatedSql).toBeNull();
+    for (const row of built.database.sqlByModule)
+      expect(row.concatenatedSql).toBeNull();
+    expect(built.risks.some((r) => r.code === 'CONCATENATED_SQL')).toBe(false);
+  });
+  it('stays valid for CustomerReportSchema (null is allowed)', () => {
+    const built = buildCustomerReport(legacySql(), origin);
+    expect(Check(CustomerReportSchema, JSON.parse(JSON.stringify(built)))).toBe(
+      true,
+    );
+  });
+  it('says 未解析 in the workbook instead of 0', () => {
+    const built = buildCustomerReport(legacySql(), origin);
+    const sheet = sheetOf('4_データベース', built);
+    const text = JSON.stringify(sheet.rows);
+    expect(text).toContain(NOT_ANALYZED);
+    expect(text).toContain('連結 ' + NOT_ANALYZED);
+  });
+});

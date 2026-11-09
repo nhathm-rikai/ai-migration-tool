@@ -133,6 +133,16 @@ describe('AssessmentDocument sections 2 to 6', () => {
     );
   });
 
+  it('writes 未解析 for concatenated SQL when the inventory has no such data (AR02 review 3)', () => {
+    const report = customerReportFixture();
+    report.database.concatenatedSql = null;
+    for (const row of report.database.sqlByModule) row.concatenatedSql = null;
+    const { section } = draw(report);
+    const database = section('database').textContent ?? '';
+    expect(database).toContain('連結 未解析');
+    expect(database).not.toContain('連結 0');
+  });
+
   it('dependencies and database show the JSON rows', () => {
     const report = customerReportFixture();
     const { section } = draw(report);

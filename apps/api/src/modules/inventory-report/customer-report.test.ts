@@ -411,3 +411,32 @@ describe('customer report never carries a declared absolute path (AR04 review ro
     );
   });
 });
+
+describe('customer report keeps two absolute-path screens apart (AR04 review round 4)', () => {
+  it('lists both screens on sheet 6 and shows no original path', () => {
+    const inv = clone();
+    const program = inv.programs[0];
+    if (!program) throw new Error('fixture');
+    program.screens = [
+      {
+        name: null,
+        file: '<absolute path>/Main.frm [e0e001a3]',
+        shared: false,
+        warnings: ['SCREEN_FILE_MISSING'],
+      },
+      {
+        name: null,
+        file: '<absolute path>/Main.frm [61c6ddad]',
+        shared: false,
+        warnings: ['SCREEN_FILE_MISSING'],
+      },
+    ];
+    const built = buildCustomerReport(inv, origin);
+    const screens = built.items.filter((i) =>
+      i.file.startsWith('<absolute path>/Main.frm'),
+    );
+    expect(screens).toHaveLength(2);
+    expect(new Set(screens.map((s) => s.file)).size).toBe(2);
+    expect(JSON.stringify(built)).not.toContain('PrivateCustomer');
+  });
+});

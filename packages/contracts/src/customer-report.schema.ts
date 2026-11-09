@@ -85,6 +85,8 @@ export const CustomerReportSchema = Type.Object({
     tablesView: Nullable(
       Type.Union([Type.Literal('normalized'), Type.Literal('raw')]),
     ),
+    // The table names rest on an assumed schema mapping (AR02 review 1).
+    tablesAssumed: Type.Optional(Type.Boolean()),
     // null: the inventory has no screen/report data (not zero).
     screenReport: Nullable(ScreenReportTotals),
   }),
@@ -139,6 +141,10 @@ export const CustomerReportSchema = Type.Object({
     ),
     components: Type.Array(
       Type.Object({
+        // Reference= (type library) or Object= (OCX component).
+        kind: Type.Optional(
+          Type.Union([Type.Literal('reference'), Type.Literal('component')]),
+        ),
         identifier: Type.String(),
         fileName: Nullable(Type.String()),
         description: Nullable(Type.String()),

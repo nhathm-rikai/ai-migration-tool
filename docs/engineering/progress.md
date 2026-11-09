@@ -30,7 +30,8 @@
 - Base: stack được rebase lên master có hotfix của người dùng (`origin/master` `471222b`, 3 commit về log tài liệu và việc CLI trả tiếp câu trả lời) bằng một merge vào master local; AR04 → AR02 không xung đột.
 - (1) Tổng quy mô lấy từ `totals.uniqueCounters` và mọi file đã phân tích (như bước 2), không chỉ file VBP liệt kê; phần dư vào dòng `プログラム未所属`, tổng bảng module = tổng. (2) COM: giữ cả `reference` và `component`, có `kind` ở JSON và nhãn 【参照設定】/【コンポーネント】 ở sheet 3, rủi ro `EXTERNAL_COMPONENT` đếm cả hai. (3) Số bảng dùng `crudTables`/`effectiveMapping`/`hasMappedCrud` chuyển sang `packages/contracts/src/table-mapping.ts` (web re-export, bước 2 dùng cùng hàm; test chéo `table-mapping.test.ts`); thêm `scale.tablesAssumed` và ghi chú ở sheet 4. (4) `tablesView` chỉ `null` khi không program nào có dữ liệu phân tích; không có SQL cho 0. (5) Thêm nhóm rủi ro `CONCATENATED_SQL` (từ dữ liệu, 中) khi có SQL ghép chuỗi. (6) Khóa module theo loại + nhãn, nên thư mục tên `プログラム未所属` hoặc `共通` không đè dòng đặc biệt (cả bảng SQL theo module).
 - Test viết trước (7 test fail trước khi sửa) trong `customer-report.test.ts` mục "AR02 review 1".
-- Còn lại cho AR03: contract `CustomerReportSchema` cần thêm `scale.tablesAssumed` và `dependencies.components[].kind` (optional để đọc bản cũ).
+- AR03: `CustomerReportSchema` đã thêm `scale.tablesAssumed` và `dependencies.components[].kind` (optional, đọc được bản cũ).
+
 ## 06/11/2026 — AR03: PDF báo cáo cho khách
 
 - **Nhánh chồng:** `feat/ar03-customer-pdf` cắt từ `feat/ar02-customer-report` tại `09e1ce9` (AR02; bên dưới là AR04 `71fd9f7` và AR01 trong master `ff68b9d`). AR04 và AR02 chưa review độc lập; nếu một trong hai đổi sau review thì rebase theo thứ tự AR04 → AR02 → AR03. Chưa push, chưa merge.

@@ -441,6 +441,35 @@ export function screenReportCorpus(): Inventory {
       byLevel: { low: 0, medium: 1, high: 1, 'very-high': 1, unrated: 2 },
     },
     suspectedPrograms: 2,
+    // The project-level list the analyzer computes once: each report once,
+    // a report of a shared module at its highest score.
+    reportItems: (() => {
+      const seen = new Set<string>();
+      const items: NonNullable<
+        Inventory['totals']['screenReport']
+      >['reportItems'] = [];
+      for (const owner of inventory.programs)
+        for (const row of owner.reports ?? []) {
+          const key = `${row.file}|${row.name}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          items.push({
+            ...row,
+            programs: inventory.programs
+              .filter((candidate) =>
+                (candidate.reports ?? []).some(
+                  (r) => r.file === row.file && r.name === row.name,
+                ),
+              )
+              .map((candidate) => ({
+                program: candidate.projectPath,
+                level: row.complexity.level,
+                score: row.complexity.score,
+              })),
+          });
+        }
+      return items;
+    })(),
   };
   return inventory;
 }

@@ -599,6 +599,7 @@ export const demoInventory: SourceInventoryDocument = {
     uniqueCounters,
     screenReport: buildScreenReportTotals(
       programs.map((entry) => ({
+        program: entry.projectPath,
         programType: entry.programType ?? 'unknown',
         screens: entry.screens ?? [],
         reports: entry.reports ?? [],

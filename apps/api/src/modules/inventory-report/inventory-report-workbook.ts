@@ -221,6 +221,8 @@ export function inventoryReportSheets(report: InventoryReport): Sheet[] {
         ['complexityVersion', 26, (r) => r.complexityVersion],
         ['complexityFactors', 50, (r) => list(r.complexityFactors)],
         ['complexityReason', 26, (r) => r.complexityReason],
+        ['projectComplexityLevel', 16, (r) => r.projectComplexityLevel],
+        ['projectComplexityScore', 16, (r) => r.projectComplexityScore],
         ['warnings', 22, (r) => list(r.warnings)],
       ],
       report.reports,

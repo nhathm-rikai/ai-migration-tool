@@ -116,18 +116,44 @@ describe('AR04-AC06/AC11 screen and report model', () => {
   });
 });
 
-describe('review finding 5: files that differ only in case', () => {
-  it('lists reports of two resolved files as two rows', () => {
+describe('review: the list reads the project-level entries the analyzer computed', () => {
+  it('keeps files that differ only in case as two rows', () => {
     const inventory = screenReportCorpus();
-    const [first] = inventory.programs;
-    const report = first?.reports?.[0];
-    if (!first || !report) throw new Error('fixture');
-    first.reports = [
-      { ...report, file: 'a/Main.frm' },
-      { ...report, file: 'a/main.frm' },
+    const items = inventory.totals.screenReport?.reportItems;
+    const base = items?.[0];
+    if (!items || !base) throw new Error('fixture');
+    items.splice(
+      0,
+      items.length,
+      { ...base, file: 'a/Main.frm' },
+      { ...base, file: 'a/main.frm' },
+    );
+    expect(reportListRows(inventory)).toHaveLength(2);
+  });
+
+  it('shows the level the totals count, not a program row (shared report)', () => {
+    const inventory = screenReportCorpus();
+    const totals = inventory.totals.screenReport;
+    const shared = totals?.reportItems.find((item) => item.shared);
+    if (!totals || !shared) throw new Error('fixture');
+    // Program rows disagree (medium in one, high in the other); the entry
+    // says high, which is what totals.byLevel counts.
+    shared.complexity = { ...shared.complexity, level: 'high', score: 6 };
+    shared.programs = [
+      { program: 'programs/Order/Order.vbp', level: 'medium', score: 5 },
+      { program: 'programs/Invoice/Invoice.vbp', level: 'high', score: 6 },
     ];
-    expect(
-      reportListRows(inventory)?.filter((r) => r.name === report.name),
-    ).toHaveLength(2);
+    const row = reportListRows(inventory)?.find((r) => r.shared);
+    expect(row).toMatchObject({ level: 'high', score: 6 });
+    expect(row?.programs).toHaveLength(2);
+  });
+
+  it('has totals by level equal to the levels of the list', () => {
+    const inventory = screenReportCorpus();
+    const rows = reportListRows(inventory) ?? [];
+    const byLevel: Record<string, number> =
+      inventory.totals.screenReport?.reports.byLevel ?? {};
+    for (const [level, count] of Object.entries(byLevel))
+      expect(rows.filter((row) => row.level === level)).toHaveLength(count);
   });
 });

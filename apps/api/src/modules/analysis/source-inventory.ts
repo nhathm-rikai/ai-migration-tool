@@ -518,6 +518,7 @@ export function buildSourceInventory(input: {
             ? []
             : [
                 {
+                  program: program.projectPath,
                   programType: program.programType,
                   screens: program.screens ?? [],
                   reports: program.reports ?? [],

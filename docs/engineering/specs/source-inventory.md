@@ -117,6 +117,8 @@ Tất cả là fact từ code/project file, không gọi AI. Trường mới đ�
 
 `totals.screenReport.reports`: `rows` (số dòng duy nhất, bằng tổng `byKind` và tổng `byLevel`), `counted` (detected + referenced, "báo cáo phát hiện được"), `suspected` (hiển thị riêng, không cộng vào `counted`); `suspectedPrograms` = số program có ít nhất một dòng suspected; `batches` = số program `batch`.
 
+**Report dùng chung (quy tắc gộp duy nhất):** report trong file do nhiều program khai báo có thể được chấm khác nhau ở mỗi program (yếu tố `calls` lấy từ call graph của program đó). Dòng của từng program (`programs[].reports[]`) giữ điểm riêng; mục cấp dự án `totals.screenReport.reportItems[]` là một dòng cho mỗi report, mang **điểm cao nhất** của các program khai báo nó (bằng điểm: program đầu theo thứ tự inventory, không phụ thuộc gì khác), mức tính từ điểm đó, và ghi điểm/mức riêng từng program ở `programs[]` (`{program, level, score}`). Chỉ phân tích tính mục này một lần: tổng theo kind/mức (`byKind`, `byLevel`), danh sách report ở bước 2, sheet `Reports` (cột `projectComplexity*`), báo cáo khách (AR02) và PDF (AR03) đều đọc nó, không gộp lại. Tổng theo mức luôn bằng số dòng theo mức của danh sách.
+
 Giới hạn: lexical. `file-output` gồm cả ghi log/work file; xuất Excel bằng `Shell` hoặc file CSV không phải `excel`; một `.rpt` được dựng động từ biến không thấy; số mẫu report thật không biết với `suspected`.
 
 ### 6.3. Độ phức tạp từng report (`report-complexity-v1-draft`)

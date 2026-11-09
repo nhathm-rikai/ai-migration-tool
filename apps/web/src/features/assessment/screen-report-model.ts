@@ -114,46 +114,35 @@ export function moduleOfProgram(projectPath: string): string {
 }
 
 // null when the inventory has no report data (distinct from "no report").
+// The project-level report list, as the analyzer computed it once: a report
+// of a shared file is one entry whose complexity is the highest any program
+// gave it. Nothing is aggregated again here, so the list always agrees with
+// the totals by level.
 export function reportListRows(inventory: Inventory): ReportListRow[] | null {
-  if (!inventory.totals.screenReport) return null;
-  const rows = new Map<string, ReportListRow>();
-  for (const program of inventory.programs)
-    for (const report of program.reports ?? []) {
-      const key = [
-        report.kind,
-        // Exact path: files that differ only in case are two files.
-        report.file,
-        report.line ?? '',
-        report.name.toLowerCase(),
-      ].join('\u0000');
-      const owner = {
-        projectPath: program.projectPath,
-        label: programLabel(program.projectPath),
-      };
-      const existing = rows.get(key);
-      if (existing) {
-        existing.programs.push(owner);
-        continue;
-      }
-      rows.set(key, {
-        key,
-        programs: [owner],
-        module: moduleOfProgram(program.projectPath),
-        kind: report.kind,
-        name: report.name,
-        file: report.file,
-        line: report.line,
-        confidence: report.confidence,
-        shared: report.shared,
-        level: report.complexity.level,
-        score: report.complexity.score,
-        version: report.complexity.version,
-        factors: report.complexity.factors,
-        reason: report.complexity.reason ?? null,
-        warnings: report.warnings,
-      });
-    }
-  return [...rows.values()];
+  const totals = inventory.totals.screenReport;
+  if (!totals) return null;
+  return totals.reportItems.map((item) => ({
+    key: [item.kind, item.file, item.line ?? '', item.name.toLowerCase()].join(
+      '\u0000',
+    ),
+    programs: item.programs.map((entry) => ({
+      projectPath: entry.program,
+      label: programLabel(entry.program),
+    })),
+    module: moduleOfProgram(item.programs[0]?.program ?? ''),
+    kind: item.kind,
+    name: item.name,
+    file: item.file,
+    line: item.line,
+    confidence: item.confidence,
+    shared: item.shared,
+    level: item.complexity.level,
+    score: item.complexity.score,
+    version: item.complexity.version,
+    factors: item.complexity.factors,
+    reason: item.complexity.reason ?? null,
+    warnings: item.warnings,
+  }));
 }
 
 export type ReportListFilter = {

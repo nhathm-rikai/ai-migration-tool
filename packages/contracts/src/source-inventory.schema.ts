@@ -408,6 +408,27 @@ const ProgramReportSchema = Type.Object(
   Strict,
 );
 
+// One report of the project (a report of a shared file appears in several
+// programs but is one report). Its complexity is the highest score of any
+// program that lists it (ties: the first program in inventory order); the
+// score each program gave it is kept in `programs`.
+const ProjectReportSchema = Type.Object(
+  {
+    ...ProgramReportSchema.properties,
+    programs: Type.Array(
+      Type.Object(
+        {
+          program: Type.String(),
+          level: ReportLevelSchema,
+          score: Nullable(Count),
+        },
+        Strict,
+      ),
+    ),
+  },
+  Strict,
+);
+
 const ProgramSchema = Type.Object(
   {
     projectPath: Type.String(),
@@ -490,6 +511,9 @@ const ScreenReportTotalsSchema = Type.Object(
     ),
     // Programs with at least one suspected report row.
     suspectedPrograms: Count,
+    // The project-level report list, computed once here; every view of the
+    // project totals reads it instead of aggregating program rows again.
+    reportItems: Type.Array(ProjectReportSchema),
   },
   Strict,
 );

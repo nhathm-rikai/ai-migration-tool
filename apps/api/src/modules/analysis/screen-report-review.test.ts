@@ -264,3 +264,87 @@ describe('review finding 5: files that differ only in case, both resolved', () =
     });
   });
 });
+
+describe('review round 2: one project-level entry per shared report', () => {
+  const branches = Array.from({ length: 16 }, (_, i) => [
+    `    If a${i} > 0 Then`,
+    `        b = b + ${i}`,
+    '    End If',
+  ]).flat();
+  const shared = bas(
+    's/M.bas',
+    ...sub(
+      'Show1',
+      '    r.ReportFileName = "r.rpt"',
+      ...branches,
+      '    s = "SELECT A FROM T1"',
+      '    s = "SELECT A FROM T2"',
+      '    s = "SELECT A FROM T3"',
+      '    s = "SELECT A FROM T4"',
+      '    Foo',
+      '    Bar',
+      '    Baz',
+    ),
+  );
+  const build = (order: 'AB' | 'BA') => {
+    const a = vbp('a/A.vbp', 'Module=M; ../s/M.bas');
+    const b = vbp('b/B.vbp', 'Module=M; ../s/M.bas', 'Module=O; O.bas');
+    return buildSourceInventory({
+      profile,
+      files: [
+        ...(order === 'AB' ? [a, b] : [b, a]),
+        shared,
+        bas('b/O.bas', ...sub('Foo'), ...sub('Bar'), ...sub('Baz')),
+      ],
+      knownPaths: ['r.rpt'],
+    });
+  };
+  it('scores the same report differently per program (the premise)', () => {
+    const inventory = build('AB');
+    expect(program(inventory, 'a/A.vbp').reports?.[0]?.complexity.level).toBe(
+      'medium',
+    );
+    expect(program(inventory, 'b/B.vbp').reports?.[0]?.complexity.level).toBe(
+      'high',
+    );
+  });
+  it('keeps the highest score once, with every program own score recorded', () => {
+    const entries = ['AB', 'BA'].map((order) => {
+      const items = build(order as 'AB' | 'BA').totals.screenReport
+        ?.reportItems;
+      expect(items).toHaveLength(1);
+      return items?.[0];
+    });
+    expect(entries[0]?.complexity).toMatchObject({ level: 'high', score: 6 });
+    // Same entry whatever the order; only the order of programScores follows it.
+    expect({ ...entries[0], programs: undefined }).toEqual({
+      ...entries[1],
+      programs: undefined,
+    });
+    expect(
+      Object.fromEntries(
+        (entries[0]?.programs ?? []).map((p) => [
+          p.program,
+          [p.level, p.score],
+        ]),
+      ),
+    ).toEqual({
+      'a/A.vbp': ['medium', 5],
+      'b/B.vbp': ['high', 6],
+    });
+  });
+  it('has totals by level equal to the levels of the project list', () => {
+    for (const order of ['AB', 'BA'] as const) {
+      const totals = build(order).totals.screenReport;
+      const fromItems: Record<string, number> = {};
+      for (const item of totals?.reportItems ?? [])
+        fromItems[item.complexity.level] =
+          (fromItems[item.complexity.level] ?? 0) + 1;
+      for (const [level, count] of Object.entries(
+        totals?.reports.byLevel ?? {},
+      ))
+        expect(fromItems[level] ?? 0).toBe(count);
+      expect(totals?.reports.byLevel).toMatchObject({ high: 1, medium: 0 });
+    }
+  });
+});

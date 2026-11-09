@@ -1,6 +1,7 @@
 import type { SourceInventoryDocument } from '@portal/contracts';
 import {
   buildScreenReportTotals,
+  reportKey,
   type ScreenReportTotals,
 } from '../analysis/screen-report.js';
 
@@ -155,6 +156,11 @@ export type InventoryReport = {
     // "factor=value:points; ..." as in the inventory.
     complexityFactors: string[];
     complexityReason: string | null;
+    // The project-level entry of the same report (highest score of any
+    // program that lists it); the complexity* columns above are this
+    // program's own value.
+    projectComplexityLevel: string | null;
+    projectComplexityScore: number | null;
     warnings: string[];
   }[];
   members: {
@@ -524,6 +530,36 @@ export function buildInventoryReport(
       warnings: screen.warnings,
     })),
   );
+  // Decided by the inventory (the field AR04 writes), not by its programs:
+  // an old inventory whose programs are all unsupported has no data either.
+  const hasScreenReport =
+    inventory.totals.screenReport !== undefined &&
+    selected.every(
+      ({ program }) =>
+        program.status !== 'parsed' ||
+        (program.screens !== undefined && program.reports !== undefined),
+    );
+  const projectItems = new Map(
+    (hasScreenReport
+      ? buildScreenReportTotals(
+          selected.flatMap(({ program }) =>
+            program.programType === undefined
+              ? []
+              : [
+                  {
+                    program: program.projectPath,
+                    programType: program.programType,
+                    screens: program.screens ?? [],
+                    reports: program.reports ?? [],
+                  },
+                ],
+          ),
+        ).reportItems
+      : []
+    ).map((item) => [reportKey(item), item]),
+  );
+  const projectEntry = (row: Parameters<typeof reportKey>[0]) =>
+    projectItems.get(reportKey(row));
   const reports = selected.flatMap(({ id, program }) =>
     (program.reports ?? []).map((row) => ({
       programId: id,
@@ -541,25 +577,19 @@ export function buildInventoryReport(
         (item) => `${item.factor}=${item.value}:${item.points}`,
       ),
       complexityReason: row.complexity.reason ?? null,
+      projectComplexityLevel: projectEntry(row)?.complexity.level ?? null,
+      projectComplexityScore: projectEntry(row)?.complexity.score ?? null,
       warnings: row.warnings,
     })),
   );
-  // Decided by the inventory (the field AR04 writes), not by its programs:
-  // an old inventory whose programs are all unsupported has no data either.
-  const hasScreenReport =
-    inventory.totals.screenReport !== undefined &&
-    selected.every(
-      ({ program }) =>
-        program.status !== 'parsed' ||
-        (program.screens !== undefined && program.reports !== undefined),
-    );
-  const screenReport: ScreenReportTotals | null = hasScreenReport
+  const rawScreenReport: ScreenReportTotals | null = hasScreenReport
     ? buildScreenReportTotals(
         selected.flatMap(({ program }) =>
           program.programType === undefined
             ? []
             : [
                 {
+                  program: program.projectPath,
                   programType: program.programType,
                   screens: program.screens ?? [],
                   reports: program.reports ?? [],
@@ -568,6 +598,15 @@ export function buildInventoryReport(
         ),
       )
     : null;
+  // Same redaction as the Reports rows: the list carries names and files.
+  const screenReport: ScreenReportTotals | null = rawScreenReport && {
+    ...rawScreenReport,
+    reportItems: rawScreenReport.reportItems.map((item) => ({
+      ...item,
+      name: redactAbsolutePath(item.name),
+      file: redactAbsolutePath(item.file),
+    })),
+  };
 
   const members = selected.flatMap(({ id, program }) =>
     program.members.map((member) => ({

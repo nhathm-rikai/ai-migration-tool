@@ -190,6 +190,14 @@ const fileNameOf = (text: string) => text.split(/[\\/]/).at(-1) ?? text;
 
 export type ProgramType = 'screen' | 'batch' | 'unknown';
 
+// One report of the project. A report of a shared file is listed by several
+// programs and may be scored differently in each (its calls are resolved per
+// program); the project-level entry keeps the HIGHEST score (ties: the first
+// program in inventory order) and records every program's own score.
+export type ProjectReport = ProgramReport & {
+  programs: { program: string; level: ReportLevel; score: number | null }[];
+};
+
 export type ScreenReportTotals = {
   screens: number;
   sharedScreens: number;
@@ -202,6 +210,7 @@ export type ScreenReportTotals = {
     byLevel: Record<ReportLevel, number>;
   };
   suspectedPrograms: number;
+  reportItems: ProjectReport[];
 };
 
 // What only the program a row is listed under can tell: whether the design
@@ -418,6 +427,8 @@ export function buildProgramScreenReport(input: {
 // ---- Project totals --------------------------------------------------------
 
 type ProgramView = {
+  // Project path of the program.
+  program: string;
   screens: readonly ProgramScreen[];
   reports: readonly ProgramReport[];
   programType: ProgramType;
@@ -426,11 +437,19 @@ type ProgramView = {
 const zeroRecord = <K extends string>(keys: readonly K[]) =>
   Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
 
+// Identity of a report across programs.
+export const reportKey = (row: {
+  kind: string;
+  file: string;
+  line: number | null;
+  name: string;
+}) => `${row.kind} ${row.file} ${row.line ?? ''} ${row.name.toLowerCase()}`;
+
 export function buildScreenReportTotals(
   programs: readonly ProgramView[],
 ): ScreenReportTotals {
   const screens = new Map<string, ProgramScreen>();
-  const rows = new Map<string, ProgramReport>();
+  const rows = new Map<string, ProjectReport>();
   let suspectedPrograms = 0;
   let batches = 0;
   for (const program of programs) {
@@ -445,11 +464,27 @@ export function buildScreenReportTotals(
       if (!existing) screens.set(key, screen);
       else if (screen.shared) existing.shared = true;
     }
-    for (const row of program.reports)
-      rows.set(
-        `${row.kind}\u0000${row.file}\u0000${row.line ?? ''}\u0000${row.name.toLowerCase()}`,
-        row,
-      );
+    for (const row of program.reports) {
+      const key = `${row.kind}\u0000${row.file}\u0000${row.line ?? ''}\u0000${row.name.toLowerCase()}`;
+      const own = {
+        program: program.program,
+        level: row.complexity.level,
+        score: row.complexity.score,
+      };
+      const existing = rows.get(key);
+      if (!existing) {
+        rows.set(key, { ...row, programs: [own] });
+        continue;
+      }
+      if (!existing.programs.some((entry) => entry.program === own.program))
+        existing.programs.push(own);
+      // Strictly higher only: a tie keeps the first program's entry, so the
+      // result does not depend on anything but the program order.
+      if ((row.complexity.score ?? -1) > (existing.complexity.score ?? -1)) {
+        const programs = existing.programs;
+        Object.assign(existing, row, { programs });
+      } else if (row.shared) existing.shared = true;
+    }
   }
   const byKind = zeroRecord(REPORT_KIND_LIST);
   const byLevel = zeroRecord(REPORT_LEVEL_LIST);
@@ -472,5 +507,6 @@ export function buildScreenReportTotals(
       byLevel,
     },
     suspectedPrograms,
+    reportItems: [...rows.values()],
   };
 }

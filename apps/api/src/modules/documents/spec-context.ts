@@ -258,7 +258,12 @@ Every document starts with the common header table of the pack README, including
 export type ParsedPackage =
   | { status: 'ok'; files: { name: string; content: string }[] }
   | { status: 'invalid'; reason: string }
-  | { status: 'incomplete' };
+  // `pending`: the documents not "hoàn tất" and the state read from each
+  // (undefined = no status row), for the run log.
+  | {
+      status: 'incomplete';
+      pending: { name: string; state: string | undefined }[];
+    };
 
 // Blocks of the answer. Every expected file exactly once, nothing else, and
 // every document `hoàn tất` in its header (SD-CT-08); otherwise the package
@@ -287,8 +292,13 @@ export function parsePackage(
   );
   if (missing.length)
     return { status: 'invalid', reason: `missing ${missing.join(', ')}` };
-  if (files.some((file) => generationState(file.content) !== 'hoàn tất'))
-    return { status: 'incomplete' };
+  const pending = files
+    .map((file) => ({
+      name: file.name,
+      state: generationState(file.content),
+    }))
+    .filter((entry) => entry.state !== 'hoàn tất');
+  if (pending.length) return { status: 'incomplete', pending };
   return {
     status: 'ok',
     files: expected.map(

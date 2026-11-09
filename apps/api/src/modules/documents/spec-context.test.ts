@@ -119,7 +119,7 @@ describe('specification-design package', () => {
         }),
         expected,
       ),
-    ).toEqual({ status: 'incomplete' });
+    ).toMatchObject({ status: 'incomplete' });
     expect(
       parsePackage(
         answer({
@@ -128,7 +128,7 @@ describe('specification-design package', () => {
         }),
         expected,
       ),
-    ).toEqual({ status: 'incomplete' });
+    ).toMatchObject({ status: 'incomplete' });
     expect(generationState('| **Trạng thái sinh** | `hoàn tất` |')).toBe(
       'hoàn tất',
     );

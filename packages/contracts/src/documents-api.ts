@@ -1,4 +1,4 @@
-import type { TSchema } from 'typebox';
+import { Type, type TSchema } from 'typebox';
 import { EmptyQuerySchema } from './health.schema.js';
 import { ProjectParamsSchema } from './project.schema.js';
 import { StartRunHeadersSchema } from './run.schema.js';
@@ -36,6 +36,14 @@ const PROJECT_READ_ERRORS = ['INVALID_INPUT', 'PROJECT_NOT_FOUND'] as const;
 const RUN_READ_ERRORS = [...PROJECT_READ_ERRORS, 'RUN_NOT_FOUND'] as const;
 
 const RunsPath = '/api/v1/projects/:projectId/document-runs';
+const PackageFileParamsSchemaWithoutFile = Type.Object(
+  {
+    projectId: PackageFileParamsSchema.properties.projectId,
+    runId: PackageFileParamsSchema.properties.runId,
+    item: PackageFileParamsSchema.properties.item,
+  },
+  { additionalProperties: false },
+);
 const ReviewsPath = '/api/v1/projects/:projectId/document-reviews';
 
 export const DOCUMENTS_API_OPERATIONS = {
@@ -97,6 +105,16 @@ export const DOCUMENTS_API_OPERATIONS = {
     params: PackageFileParamsSchema,
     querystring: EmptyQuerySchema,
     response: PackageFileContentSchema,
+    errorCodes: [...RUN_READ_ERRORS, 'DOCUMENT_NOT_FOUND'],
+  },
+  // TC01: the unit test specification of one program's package as the
+  // Japanese Excel (表紙 / テストケース / カバレッジ), for that exact version.
+  exportUtTestSpec: {
+    method: 'GET',
+    path: `${RunsPath}/:runId/items/:item/ut-test-spec`,
+    params: PackageFileParamsSchemaWithoutFile,
+    querystring: EmptyQuerySchema,
+    response: Type.Unknown(),
     errorCodes: [...RUN_READ_ERRORS, 'DOCUMENT_NOT_FOUND'],
   },
   getReviewBoard: {

@@ -54,6 +54,10 @@ export const vb6Analyzer: LanguageAnalyzer = {
       names,
     }),
   parseProjectFile: parseVb6ProjectFile,
+  // Object modules (forms, classes, controls): `<control>_<Event>`.
+  isEventHandler: (relativePath, procedureName) =>
+    moduleKind(relativePath) !== 'standard' &&
+    /^[A-Za-z_]\w*_[A-Za-z]\w*$/.test(procedureName),
   isScreenMemberKind: (kind) => kind === 'form' || kind === 'user-document',
   isBatchStartup: (startup) =>
     startup !== undefined && /^sub\s+main$/i.test(startup.trim()),

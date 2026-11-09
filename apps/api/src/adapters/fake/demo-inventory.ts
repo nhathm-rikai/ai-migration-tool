@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { buildUtChecklist } from '../../modules/analysis/ut-checklist.js';
 import type { SourceInventoryDocument } from '@portal/contracts';
 import {
   buildScreenReportTotals,
@@ -585,7 +586,18 @@ export const demoInventory: SourceInventoryDocument = {
   },
   snapshotHash: DEMO_SNAPSHOT_HASH,
   files,
-  programs,
+  // TC01: size of each program's unit test checklist.
+  programs: programs.map((program) =>
+    program.status === 'parsed'
+      ? {
+          ...program,
+          utPoints: buildUtChecklist(
+            { files, programs, profileId: 'vb6-cp932-v1' },
+            program.projectPath,
+          ).items.length,
+        }
+      : program,
+  ),
   totals: {
     files: files.length,
     codeFiles: files.filter((file) => file.manifest.role === 'code').length,

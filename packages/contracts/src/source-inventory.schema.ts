@@ -455,6 +455,9 @@ const ProgramSchema = Type.Object(
     counters: LineCountersSchema,
     complete: Type.Boolean(),
     analysis: Nullable(ProgramAnalysisSchema),
+    // TC01: number of items of the unit test checklist (procedures, event
+    // handlers, SQL statements, reports); absent in older inventories.
+    utPoints: Type.Optional(Count),
     programType: Type.Optional(
       Type.Union([
         Type.Literal('screen'),

@@ -44,6 +44,7 @@ import {
   type ProgramFile,
 } from './program-analysis.js';
 import { SQL_ACCESS_VERSION } from './sql-access.js';
+import { buildUtChecklist } from './ut-checklist.js';
 import {
   UNCONFIGURED_TABLE_NAMES,
   type TableNameMapping,
@@ -95,6 +96,8 @@ export type InventoryProgram = {
   complete: boolean;
   // Call graph, CRUD, metrics and draft complexity; null when not parsed.
   analysis: ProgramAnalysis | null;
+  // ut-checklist-v1: number of checklist items; absent when not parsed.
+  utPoints?: number;
   // screen-report-v1; absent when the project is unsupported.
   programType?: ProgramType;
   screens?: ProgramScreen[];
@@ -474,6 +477,18 @@ export function buildSourceInventory(input: {
   );
 
   const inventoryFiles = [...files.values()];
+  // TC01: size of each program's unit test checklist (step 2 shows it).
+  const withChecklist = programs.map((program) =>
+    program.status === 'parsed'
+      ? {
+          ...program,
+          utPoints: buildUtChecklist(
+            { files: inventoryFiles, programs, profileId: input.profile.id },
+            program.projectPath,
+          ).items.length,
+        }
+      : program,
+  );
   const uniqueCounters = zeroCounters();
   for (const file of inventoryFiles)
     if (file.analysis?.status === 'analyzed')
@@ -496,7 +511,7 @@ export function buildSourceInventory(input: {
     tableNames,
     snapshotHash: computeSnapshotHash(entries, input.profile.id),
     files: inventoryFiles,
-    programs,
+    programs: withChecklist,
     totals: {
       files: entries.length,
       codeFiles: entries.filter((entry) => entry.role === 'code').length,

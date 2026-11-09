@@ -17,6 +17,9 @@ export const SPEC_DOCUMENT_IDS = [
   'detail-design',
   'db-design',
   'security-audit',
+  // TC01: unit test specification (単体テスト仕様書), written by the agent
+  // against the deterministic checklist the Portal builds from the inventory.
+  'ut-test-spec',
 ] as const;
 export const SpecDocumentIdSchema = Type.Union([
   Type.Literal('business-rules'),
@@ -24,6 +27,7 @@ export const SpecDocumentIdSchema = Type.Union([
   Type.Literal('detail-design'),
   Type.Literal('db-design'),
   Type.Literal('security-audit'),
+  Type.Literal('ut-test-spec'),
 ]);
 export type SpecDocumentId = Static<typeof SpecDocumentIdSchema>;
 
@@ -35,6 +39,7 @@ export const SPEC_DOCUMENT_COMPANIONS: Record<
   'business-rules': [],
   'db-design': [],
   'security-audit': [],
+  'ut-test-spec': [],
   'basic-design': ['business-rules'],
   'detail-design': ['business-rules', 'basic-design', 'db-design'],
 };
@@ -44,6 +49,7 @@ export const SPEC_GENERATION_ORDER: readonly SpecDocumentId[] = [
   'basic-design',
   'detail-design',
   'security-audit',
+  'ut-test-spec',
 ];
 // Selected + companions, in generation order.
 export function documentsToGenerate(

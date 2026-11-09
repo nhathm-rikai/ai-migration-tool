@@ -144,6 +144,9 @@ export interface LanguageAnalyzer {
     names: ReadonlySet<string>,
   ): CodeReference[];
   parseProjectFile(lines: string[]): ProjectFileAnalysis;
+  // A procedure of this file the runtime calls on an event (e.g. a form's
+  // Command1_Click), not one the program calls itself.
+  isEventHandler(relativePath: string, procedureName: string): boolean;
   // Member kinds that are one screen each (forms, user documents).
   isScreenMemberKind(kind: string): boolean;
   // True when the startup object is a Sub Main style entry (no UI).

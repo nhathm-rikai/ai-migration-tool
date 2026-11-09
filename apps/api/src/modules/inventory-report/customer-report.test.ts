@@ -13,6 +13,7 @@ import {
 } from './customer-report-constants.js';
 import { customerReportSheets } from './customer-report-workbook.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
+import { unzip } from '../../testing/zip-reader.js';
 import { writeXlsx, type Sheet } from './xlsx-writer.js';
 
 // Fixtures: the invented demo inventory (hand-written AR04 data included).
@@ -67,7 +68,11 @@ describe('AR02-AC01 figures equal the assessment step and AR04', () => {
     // Mapped table view: AUDIT_LOG, ORDER_LINES, ORDERS, CUSTOMERS.
     expect(scale.tables).toBe(4);
     expect(scale.tablesView).toBe('normalized');
-    expect(scale.screenReport).toEqual(demoInventory.totals.screenReport);
+    expect(scale.screenReport).not.toHaveProperty('reportItems');
+    expect({ ...scale.screenReport, reportItems: undefined }).toEqual({
+      ...demoInventory.totals.screenReport,
+      reportItems: undefined,
+    });
     expect(scale.screenReport).toMatchObject({
       screens: 3,
       sharedScreens: 1,
@@ -370,7 +375,7 @@ describe('customer report reads the project-level entry of a shared report (AR04
   it('shows the highest score, not a program row', () => {
     const inv = clone();
     const sr = inv.totals.screenReport;
-    const item = sr?.reportItems.find((entry) => entry.kind === 'crystal');
+    const item = sr?.reportItems?.find((entry) => entry.kind === 'crystal');
     if (!sr || !item) throw new Error('fixture');
     item.complexity = { ...item.complexity, level: 'very-high', score: 12 };
     const built = buildCustomerReport(inv, origin);
@@ -378,5 +383,34 @@ describe('customer report reads the project-level entry of a shared report (AR04
       (i) => i.type === '帳票' && i.name === item.name,
     );
     expect(row).toMatchObject({ level: 'very-high', score: 12 });
+  });
+});
+
+describe('customer report never carries a declared absolute path (AR04 review round 3)', () => {
+  const leaking = () => {
+    const inv = clone();
+    const row = inv.programs.flatMap((p) => p.reports ?? [])[0];
+    const item = inv.totals.screenReport?.reportItems?.[0];
+    if (!row || !item) throw new Error('fixture');
+    row.name = 'C:/PrivateCustomer/Legacy/crystl32.ocx';
+    item.name = 'C:/PrivateCustomer/Legacy/crystl32.ocx';
+    item.file = 'C:/PrivateCustomer/Legacy/X.BAS';
+    return inv;
+  };
+  it('keeps it out of the JSON the PDF is drawn from and out of every sheet', () => {
+    const built = buildCustomerReport(leaking(), origin);
+    expect(JSON.stringify(built)).not.toContain('PrivateCustomer');
+    const parts = unzip(writeXlsx(customerReportSheets(built)));
+    for (const [, xml] of parts) expect(xml).not.toContain('PrivateCustomer');
+  });
+  it('reads an inventory stored before reportItems existed like a new one', () => {
+    const fresh = JSON.parse(
+      JSON.stringify(buildCustomerReport(demoInventory, origin)),
+    );
+    const stored = clone();
+    delete stored.totals.screenReport?.reportItems;
+    expect(
+      JSON.parse(JSON.stringify(buildCustomerReport(stored, origin))),
+    ).toEqual(fresh);
   });
 });

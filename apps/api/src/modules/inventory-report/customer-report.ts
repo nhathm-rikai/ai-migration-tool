@@ -1,4 +1,7 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  normalizeScreenReportTotals,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 import {
   CONFIDENCE_LABELS,
   CUSTOMER_REPORT_VERSION,
@@ -243,7 +246,20 @@ export function buildCustomerReport(
 ): CustomerReport {
   const core = buildInventoryReport(inventory, ALL_PROGRAMS, origin);
   const unique = core.totals.unique;
-  const screenReport = inventory.totals.screenReport ?? null;
+  // The totals as the project-level list defines them (stored inventories
+  // without it are derived by the same function). The list itself carries
+  // names and files and stays out of the customer JSON; the items of sheet 6
+  // are built from it with redacted paths.
+  const normalized = normalizeScreenReportTotals(inventory);
+  const screenReport: ScreenReportTotals | null = normalized
+    ? {
+        screens: normalized.screens,
+        sharedScreens: normalized.sharedScreens,
+        batches: normalized.batches,
+        reports: normalized.reports,
+        suspectedPrograms: normalized.suspectedPrograms,
+      }
+    : null;
   const pathOf = new Map(core.programs.map((p) => [p.id, p.projectPath]));
   const moduleOfProgram = (id: string) => moduleOf(pathOf.get(id) ?? '');
 
@@ -536,7 +552,8 @@ const WARNING_LABELS: Record<string, string> = {
 };
 
 function buildItems(inventory: Inventory): ItemRow[] {
-  if (!inventory.totals.screenReport) return [];
+  const projectReports = normalizeScreenReportTotals(inventory);
+  if (!projectReports) return [];
   type Owner = { label: string; module: string };
   const screens = new Map<
     string,
@@ -588,7 +605,7 @@ function buildItems(inventory: Inventory): ItemRow[] {
   }
   // Reports come from the project-level list the analyzer computed once (a
   // shared report at its highest score), never from the program rows.
-  for (const item of inventory.totals.screenReport.reportItems)
+  for (const item of projectReports.reportItems)
     reports.set(
       [item.kind, item.file, item.line, item.name.toLowerCase()].join('\u0000'),
       {

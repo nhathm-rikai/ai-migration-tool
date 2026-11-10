@@ -70,6 +70,30 @@ function cellsOf(line: string): string[] | null {
   return inner.split('|').map((cell) => clean(cell));
 }
 
+// Shared with the integration test specification (it-spec.ts), which has the
+// same contract with other columns: the data rows of the first table whose
+// second header cell is the item ID column, null when there is none.
+export function itemTableRows(markdown: string): string[][] | null {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex((line) => {
+    const cells = cellsOf(line);
+    return cells !== null && ID_HEADERS.has((cells[1] ?? '').toLowerCase());
+  });
+  if (start < 0) return null;
+  const rows: string[][] = [];
+  for (const line of lines.slice(start + 1)) {
+    const cells = cellsOf(line);
+    if (cells === null) break;
+    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) continue;
+    rows.push(cells);
+  }
+  return rows;
+}
+
+// The 区分 cell marks an exclusion, in the languages of the pack.
+export const isExcludedKind = (cell: string) =>
+  EXCLUDED.some((word) => cell.toLowerCase().startsWith(word));
+
 // The case rows of the first table whose second header cell is the item ID
 // column; null when there is none.
 export function parseUtSpec(markdown: string): { cases: UtCase[] } | null {
@@ -163,6 +187,19 @@ function evidenceFileOf(
     (file) => (file.toLowerCase().split('/').pop() ?? '') === name,
   );
   return named.length === 1 ? (named[0] as string) : null;
+}
+
+// True when the cell is a file:line of a file of the program, line >= 1.
+export function isProgramEvidence(
+  raw: string,
+  programFiles: ReadonlySet<string>,
+): boolean {
+  const match = EVIDENCE.exec(normalizeEvidence(raw));
+  return (
+    match?.[1] !== undefined &&
+    evidenceFileOf(match[1], programFiles) !== null &&
+    Number(match[2]) >= 1
+  );
 }
 
 export function validateUtSpec(

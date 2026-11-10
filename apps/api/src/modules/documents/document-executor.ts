@@ -14,7 +14,9 @@ import type {
 import type { ArtifactStore } from '../../ports/artifact-store.js';
 import type { SpecWorkspace } from '../../adapters/local/spec-workspace.js';
 import type { NewLogEntry } from './document-run.repository.js';
+import { buildItChecklist } from '../analysis/it-checklist.js';
 import { buildUtChecklist } from '../analysis/ut-checklist.js';
+import { validateItSpec } from './it-spec.js';
 import { validateUtSpec } from './ut-spec.js';
 import {
   createPackageTracker,
@@ -26,6 +28,7 @@ import {
   taskPrompt,
   WORKSPACE,
   FILE_END,
+  IT_SKELETON_FILE,
   UT_SKELETON_FILE,
 } from './spec-context.js';
 
@@ -157,6 +160,16 @@ export function createDocumentExecutor(deps: {
           }
           // TC01: the checklist the agent has to cover, from the inventory.
           const utChecklist = buildUtChecklist(inventory, program.projectPath);
+          // TC02: the integration checklist, same role for it-test-spec.
+          const itChecklist = buildItChecklist(inventory, program.projectPath);
+          const skeletons = [
+            ...(run.config.generated.includes('ut-test-spec')
+              ? [{ file: UT_SKELETON_FILE, checklist: utChecklist }]
+              : []),
+            ...(run.config.generated.includes('it-test-spec')
+              ? [{ file: IT_SKELETON_FILE, checklist: itChecklist }]
+              : []),
+          ];
           const files_ = source.snapshotId === null ? null : source.files;
           const sourceFiles = files_
             ? programFilePaths(program).flatMap((path) => {
@@ -181,15 +194,11 @@ export function createDocumentExecutor(deps: {
                   language: run.config.outputLanguage,
                 }),
               },
-              ...(run.config.generated.includes('ut-test-spec')
-                ? [
-                    {
-                      path: `${WORKSPACE.p1}/${UT_SKELETON_FILE}`,
-                      content: `${JSON.stringify(utChecklist, null, 1)}
+              ...skeletons.map(({ file, checklist }) => ({
+                path: `${WORKSPACE.p1}/${file}`,
+                content: `${JSON.stringify(checklist, null, 1)}
 `,
-                    },
-                  ]
-                : []),
+              })),
               ...Object.entries(programP1(inventory, program)).map(
                 ([name, value]) => ({
                   path: `${WORKSPACE.p1}/${name}`,
@@ -242,9 +251,7 @@ export function createDocumentExecutor(deps: {
             ...run.config.generated.map(
               (id) => `${WORKSPACE.pack}/templates/${id}.md`,
             ),
-            ...(run.config.generated.includes('ut-test-spec')
-              ? [`${WORKSPACE.p1}/${UT_SKELETON_FILE}`]
-              : []),
+            ...skeletons.map(({ file }) => `${WORKSPACE.p1}/${file}`),
             ...Object.keys(programP1(inventory, program)).map(
               (name) => `${WORKSPACE.p1}/${name}`,
             ),
@@ -408,6 +415,32 @@ export function createDocumentExecutor(deps: {
                   // row number). Without it a failed run says only which code
                   // fired, and the document itself is not kept, so the cause
                   // cannot be found afterwards.
+                  .map(
+                    (error) =>
+                      `${error.code}${error.id ? ` ${error.id}` : ''}: ${error.detail}`,
+                  )
+                  .join(
+                    ', ',
+                  )}${checked.errors.length > 5 ? ` (+${checked.errors.length - 5} more)` : ''}.`,
+              );
+              continue;
+            }
+          }
+          // TC02: the integration test specification, same rule.
+          const itFile = parsed.files.find(
+            (file) => file.name === 'it-test-spec.md',
+          );
+          if (itFile) {
+            const checked = validateItSpec(
+              itFile.content,
+              itChecklist,
+              new Set(programFilePaths(program)),
+            );
+            if (!checked.ok) {
+              fail(
+                'AGENT_OUTPUT_INVALID',
+                `it-test-spec rejected: ${checked.errors
+                  .slice(0, 5)
                   .map(
                     (error) =>
                       `${error.code}${error.id ? ` ${error.id}` : ''}: ${error.detail}`,

@@ -22,7 +22,7 @@ import { isActiveRun } from '../jobs/use-analyze-runs';
 import { hasErrorCode, runRequestErrorMessage } from '../jobs/run-messages';
 import { useDocumentRun } from './use-document-run';
 import { downloadMarkdown } from './download-markdown';
-import { UtExcelButton } from './ut-excel-button';
+import { SpecExcelButton } from './ut-excel-button';
 
 // The Markdown renderer is only needed once a document is opened.
 const MarkdownView = lazy(() =>
@@ -900,16 +900,15 @@ function DocumentsWorkspace({
                     {copy.downloadMd}
                   </button>
                 )}
-                {viewing.status === 'ready' &&
-                  viewing.file.name === 'ut-test-spec.md' &&
-                  run && (
-                    <UtExcelButton
-                      api={api}
-                      projectId={projectId}
-                      runId={run.id}
-                      item={viewing.item}
-                    />
-                  )}
+                {viewing.status === 'ready' && run && (
+                  <SpecExcelButton
+                    fileName={viewing.file.name}
+                    api={api}
+                    projectId={projectId}
+                    runId={run.id}
+                    item={viewing.item}
+                  />
+                )}
                 <button
                   type="button"
                   className="button small"

@@ -1,5 +1,23 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — TC02: `it-test-spec` thành loại tài liệu thứ bảy (BE + FE, fake runner)
+
+- **Base:** nhánh `feat/tc02-it-test-cases` cắt từ `0b4d463` (`fix/TC01-ut-template` sau khi merge `origin/master`). Người dùng chốt: IT đi đúng 6 bước của các loại tài liệu hiện có, không phải agent riêng.
+- **Bước đầu của TC02 — dữ liệu cho `screen-flow`: KHÔNG CÓ.** `call-graph-v2` resolve một tên trong chính file hoặc tới procedure `global`; procedure của form là `public`, không bao giờ `global` (`vb6-code-file.ts`). Fixture hai form có `F2.ShowOrder` và `F2.Show` cho `analysis.calls` không có lời gọi nào tới `F2.frm`. Theo TC02 ("không có thì bỏ qua loại đó, không mở rộng analyzer") checklist chỉ có **4 loại**: `shared-module`, `db-chain`, `report`, `cross-program`. Test `it-checklist.test.ts` khóa quan sát này để khi analyzer đổi thì biết.
+- **Đã làm:**
+  1. `it-checklist.ts` (`it-checklist-v1`, thuần): ID `IT-<program>-<loại>-<n>`, mỗi hạng mục có `file:line` trong program; `cross-program` mang `counterpart` và dùng cùng view bảng với bước 2 (`crudTables`/`mappedCrud`).
+  2. Contracts: `it-test-spec` trong `SPEC_DOCUMENT_IDS`/`SpecDocumentIdSchema`, không companion, sinh cuối; operation `exportItTestSpec`.
+  3. `spec-context.ts`: `IT_SKELETON_FILE = 1.5-it-skeleton.json`, đoạn prompt riêng, `SPEC_TASK_VERSION` v7 → **v8**. Executor ghi skeleton khi run có `it-test-spec` và chạy `validateItSpec` sau `parsePackage`.
+  4. `it-spec.ts`: validator dùng chung với UT phần tìm bảng, `区分` và `normalizeEvidence` (export thêm `itemTableRows`, `isExcludedKind`, `isProgramEvidence` từ `ut-spec.ts`, không đổi hành vi UT); thêm `NO_COUNTERPART`; **checklist rỗng + bảng rỗng là hợp lệ** (khác UT: program có thể không có gì để tích hợp).
+  5. `it-spec-workbook.ts` + service `itSpecExcel` + route: `結合テスト仕様書_<program>.xlsx`, 3 sheet (12 cột / 8 cột).
+  6. Fake runner sinh `it-test-spec.md` hợp lệ từ skeleton; scenario `it-missing-item`.
+  7. Web: lựa chọn "Test case IT" ở bước 3, nút Excel ở bước 3 và 4 (`SpecExcelButton` chọn nút theo tên file; `UtExcelButton` giữ nguyên API), i18n vi/ja.
+  8. Docs: template bỏ `screen-flow`, thêm quy tắc checklist rỗng và `counterpart`; đăng ký vào README pack (chín template, bảy tài liệu); bộ template `0.12.0-draft` → **`0.13.0-draft`** trên README pack và các file mang chuỗi version; spec mới [it-test-spec](specs/it-test-spec.md).
+- **Lệch so với TC02, có chủ ý:** (a) không có `screen-flow` (lý do trên); (b) **không** thêm `programs[].itPoints` và cột "Điểm test IT" ở bước 2, vì cột "Điểm test UT" cùng loại đã bị bỏ 10/11/2026 theo yêu cầu người dùng — TC02-AC05 phần "bước 2 có cột Điểm test IT" vì vậy không làm; (c) fixture AC01 không có cặp form gọi nhau được resolve.
+- **AC:** AC01 (checklist, 8 test), AC02 (validator, 13 test), AC03 (integration fake runner, 6 test: gói lưu + vào bước 4, thiếu hạng mục → `AGENT_OUTPUT_INVALID` với `MISSING_ITEM`, 2 program → 400, sinh cùng UT + BR đúng thứ tự), AC04 (workbook, 7 test: 3 sheet/cột, mọi hạng mục trên カバレッジ, version, không đường dẫn tuyệt đối, chống formula injection), AC05 (web: 3 file test; E2E `tests/e2e/it-test-spec.spec.ts` đã viết).
+- **Kiểm chứng (Windows x64, Node 24.16.0):** `format:check`, `lint`, `typecheck` pass. `test -w @portal/contracts`: 50 pass. `test -w @portal/api`: 67 file, **830 pass / 1 fail** — fail là `adapters/local/local-source-root.test.ts`, có sẵn và không liên quan (repo ở `D:`, temp ở `C:`). `test -w @portal/web`: 38 file, **395 pass**. `npm run e2e`: build pass nhưng **cả 21 test không chạy được** vì máy chưa có Chromium của Playwright (`browserType.launch: Executable doesn't exist`), kể cả các spec có sẵn — nên `tests/e2e/it-test-spec.spec.ts` **chưa từng chạy**; cần `npx playwright install chromium` rồi chạy lại. macOS/Linux chưa kiểm.
+- **Chưa làm / chưa kiểm chứng:** **AC06 LIVE** (người dùng/TL chạy với agent thật, tốn quota) — chưa lần nào `it-test-spec` chạy với Claude, nên chưa biết agent có tuân thủ bảng 11 cột và `counterpart` không. Số hạng mục `cross-program` trên dự án thật chưa đo (xem mục Giới hạn của spec). Chưa có review độc lập.
+
 ## 10/11/2026 — TC02: template `it-test-spec` (chỉ template, chưa nối vào Portal)
 
 - Thêm [template IT](../specification-design/templates/it-test-spec.md) theo [TC02.md](../TC02.md): checklist `context/p1/1.5-it-skeleton.json`, 5 loại hạng mục (`screen-flow`, `shared-module`, `db-chain`, `report`, `cross-program`), bảng scenario **11 cột** khớp sheet `テストシナリオ` của TC02 (No, 対象ID, 種別, シナリオ, 関連要素, 前提条件, 手順, 期待結果, 根拠, 区分, 対象外理由; ba cột 実施日/結果/確認者 do writer Excel thêm, không nằm trong Markdown).

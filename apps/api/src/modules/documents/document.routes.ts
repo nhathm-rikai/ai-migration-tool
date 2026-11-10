@@ -177,6 +177,44 @@ export function registerDocumentRoutes(
         .send(Buffer.from(download.bytes));
     },
   );
+  // TC02: Japanese Excel of the integration test specification of one package.
+  app.get(
+    ops.exportItTestSpec.path,
+    {
+      schema: {
+        params: ops.exportItTestSpec.params,
+        querystring: ops.exportItTestSpec.querystring,
+        response: { 200: Type.Unknown(), default: ErrorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const { projectId, runId, item } = request.params;
+      const board = reviews.board(projectId);
+      const download = await service.itSpecExcel(
+        projectId,
+        runId,
+        item,
+        (file) =>
+          board.programs
+            .find(
+              (program) =>
+                program.runId === runId && program.item === Number(item),
+            )
+            ?.documents.find(
+              (document) =>
+                document.name === file.name && document.sha256 === file.sha256,
+            )?.status === 'approved'
+            ? 'approved'
+            : 'pending',
+      );
+      return reply
+        .header('content-type', INVENTORY_REPORT_CONTENT_TYPES.xlsx)
+        .header('content-disposition', contentDisposition(download.fileName))
+        .header('cache-control', 'no-store')
+        .header('x-content-type-options', 'nosniff')
+        .send(Buffer.from(download.bytes));
+    },
+  );
   app.get(
     ops.getReviewBoard.path,
     {

@@ -46,6 +46,7 @@ RIKAI là portal chạy local để chọn thư mục source legacy, phân tích
 - [Đọc source, encoding, evidence và LoC](specs/source-analysis.md): CP932 cho profile BSN; binary không decode; metric `vb6-physical-code-v1` và cách đối chiếu baseline.
 - [Source inventory](specs/source-inventory.md): JSON `source-inventory-v1` cho agent/report: SQL/CRUD, call graph, complexity v0 và CLI.
 - [Báo cáo inventory theo program](specs/inventory-report.md): JSON/XLSX `inventory-report-v1` từ inventory, LoC theo function, dependency/CRUD, totals per-program và unique, cảnh báo.
+- [Test case IT do agent sinh](specs/it-test-spec.md): checklist `it-checklist-v1` (module dùng chung/chuỗi DB/report/program khác), validator, Excel 結合テスト仕様書.
 - [Test case UT do agent sinh](specs/ut-test-spec.md): checklist `ut-checklist-v1` (procedure/event/SQL/report), validator độ phủ + bằng chứng, Excel 単体テスト仕様書, route và nút ở bước 3/4.
 - [Báo cáo Assessment cho khách](specs/customer-assessment-report.md): Excel/JSON `customer-assessment-report-v1`, 6 sheet tiếng Nhật, số liệu từ inventory và AR04, catalog rủi ro, route và hai nút xuất ở bước 2.
 - [Hợp đồng Analyze: source/run/artifact](specs/analyze-run-contract.md): API đăng ký source, start/list/cancel run, SSE, artifact inventory, mã lỗi và fixture `@portal/contracts/fixtures` (C01, chưa có route).

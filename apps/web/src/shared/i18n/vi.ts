@@ -456,7 +456,7 @@ export const viMessages = {
         'design-not-analyzed': 'Thiết kế chưa phân tích',
       } as Record<string, string>,
       warnings: {
-        REPORT_FILE_MISSING: 'Thiếu file .rpt trong source: cần khách cung cấp',
+        REPORT_FILE_MISSING: 'Thiếu file .rpt trong source',
         SCREEN_FILE_MISSING: 'Thiếu file form trong source',
         SCREEN_FILE_NOT_ANALYZED: 'File form chưa phân tích được',
       } as Record<string, string>,
@@ -675,6 +675,8 @@ export const viMessages = {
       UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
+      SCREEN_REPORT_OUTDATED:
+        'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code. Cần phân tích lại.',
     } satisfies Record<AssessmentWarning, string>,
     programs: {
       title: 'Danh sách program',

@@ -147,6 +147,13 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
       '複雑度は移行の難しさの分類であり、工数・金額の算定根拠ではありません。ファイル処理・DB更新・トランザクションは点数に含まれません。',
     confirmation: '特にありません。',
   },
+  SCREEN_REPORT_OUTDATED: {
+    category: '解析の前提',
+    severity: '中',
+    content:
+      '帳票の検出ルールが古い版の解析結果です。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。',
+    confirmation: 'ソースの再解析を実施します（ご対応は不要です）。',
+  },
   PROCEDURE_LINES_MISSING: {
     category: '解析の前提',
     severity: '低',
@@ -314,6 +321,12 @@ export const RISK_CATALOG_VI: Record<string, RiskWording> = {
     content:
       'Độ phức tạp là phân loại mức khó migrate, không phải cơ sở tính effort hay chi phí. Xử lý file, cập nhật DB và transaction không nằm trong điểm.',
     confirmation: NONE,
+  },
+  SCREEN_REPORT_OUTDATED: {
+    category: PREMISE,
+    content:
+      'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code. Cần phân tích lại mã nguồn.',
+    confirmation: REANALYZE,
   },
   PROCEDURE_LINES_MISSING: {
     category: PREMISE,

@@ -444,8 +444,7 @@ export const jaMessages = {
         'design-not-analyzed': 'デザイン未解析',
       },
       warnings: {
-        REPORT_FILE_MISSING:
-          'ソースに .rpt がありません。お客様に提供を依頼してください',
+        REPORT_FILE_MISSING: 'ソースに .rpt がありません',
         SCREEN_FILE_MISSING: 'ソースにフォームファイルがありません',
         SCREEN_FILE_NOT_ANALYZED: 'フォームファイルを解析できませんでした',
       },
@@ -665,6 +664,8 @@ export const jaMessages = {
       UNCLASSIFIED_LINES: '分類できない行があります。',
       TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
       COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
+      SCREEN_REPORT_OUTDATED:
+        '解析結果が古い帳票検出ルールで作成されています。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。再解析が必要です。',
     },
     programs: {
       title: 'プログラム一覧',

@@ -11,7 +11,7 @@ import type {
 // lexical evidence: a report row says where code can produce output, and a
 // `suspected` row is never added to the report total.
 
-export const SCREEN_REPORT_VERSION = 'screen-report-v3';
+export { SCREEN_REPORT_VERSION } from '@portal/contracts';
 export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v1-draft';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;

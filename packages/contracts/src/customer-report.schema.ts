@@ -225,6 +225,7 @@ export const CustomerReportSchema = Type.Object({
       levelLabel: Nullable(Type.String()),
       score: Nullable(Count),
       modelVersion: Nullable(Type.String()),
+      usages: Type.Optional(Nullable(Count)),
       factors: Type.String(),
       note: Type.String(),
     }),

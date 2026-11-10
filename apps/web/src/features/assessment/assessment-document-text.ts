@@ -38,9 +38,8 @@ const JA = {
     complexity: '2. 複雑度',
     dependencies: '3. 依存関係',
     database: '4. データベース',
-    risks: '5. リスク・確認事項',
+    risks: '5. リスク',
     items: '6. 画面・帳票一覧',
-    next: '今後の進め方',
     appendix: '付録',
   },
   kpi: {
@@ -59,7 +58,6 @@ const JA = {
     linesSub: (physical: string) => `物理行数 ${physical}`,
     procedures: 'プロシージャ',
     tables: 'DBテーブル',
-    customerCount: 'お客様提示数：未入力',
   },
   // Order of the list of screens and reports: reports first.
   itemOrder: { 帳票: 0, 出力機能: 1, バッチ: 2, 画面: 3 } as Record<
@@ -103,8 +101,9 @@ const JA = {
     category: '区分',
     severity: '重要度',
     content: '内容',
-    confirmation: 'お客様への確認事項',
-    type: '区分',
+    design: '設計ファイル',
+    designYes: 'あり',
+    designNo: 'なし',
     name: '名称',
     location: 'ファイル:行',
     confidence: '信頼度',
@@ -142,7 +141,7 @@ const JA = {
     database: (note: string) =>
       `アクセスされるテーブルと、動的SQL・文字列連結SQLの箇所数です。${note}`,
     risks:
-      '解析で判断できなかった点・注意が必要な点を重要度別にまとめています。ご回答をお願いする内容を右端に記載しています。',
+      '解析で判断できなかった点・注意が必要な点を重要度別にまとめています。',
     items: (shown: string, total: string, all: string) =>
       `帳票・バッチ・画面の順に最大${shown}件を表示しています（全${total}件）。${all}。`,
   },
@@ -200,9 +199,8 @@ const VI: DocText = {
     complexity: '2. Độ phức tạp',
     dependencies: '3. Phụ thuộc',
     database: '4. Cơ sở dữ liệu',
-    risks: '5. Rủi ro và đề nghị khách hàng',
+    risks: '5. Rủi ro',
     items: '6. Danh sách màn hình, report',
-    next: 'Bước tiếp theo',
     appendix: 'Phụ lục',
   },
   kpi: {
@@ -221,7 +219,6 @@ const VI: DocText = {
     linesSub: (physical: string) => `Số dòng vật lý ${physical}`,
     procedures: 'Procedure',
     tables: 'Bảng DB',
-    customerCount: 'Số liệu khách hàng cung cấp: chưa nhập',
   },
   itemOrder: {
     Report: 0,
@@ -266,8 +263,9 @@ const VI: DocText = {
     category: 'Phân loại',
     severity: 'Mức độ',
     content: 'Nội dung',
-    confirmation: 'Đề nghị khách hàng',
-    type: 'Nhóm',
+    design: 'File thiết kế',
+    designYes: 'Có',
+    designNo: 'Thiếu file',
     name: 'Tên',
     location: 'File:dòng',
     confidence: 'Độ tin cậy',
@@ -305,7 +303,7 @@ const VI: DocText = {
     database: (note: string) =>
       `Các bảng được truy cập và số vị trí SQL động / SQL ghép chuỗi. ${note}`,
     risks:
-      'Tổng hợp theo mức độ những điểm chưa xác định được qua phân tích hoặc cần lưu ý. Cột bên phải ghi những việc mong nhận phản hồi.',
+      'Tổng hợp theo mức độ những điểm chưa xác định được qua phân tích hoặc cần lưu ý.',
     items: (shown: string, total: string, all: string) =>
       `Hiển thị tối đa ${shown} dòng theo thứ tự report, batch, màn hình (tổng ${total} dòng). ${all}.`,
   },

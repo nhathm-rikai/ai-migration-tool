@@ -29,8 +29,12 @@ type DocumentText = ReturnType<typeof documentText>;
 // Rows of the screen/report list shown in the PDF (two pages at most); the
 // rest is in the Excel.
 export const MAX_LIST_ROWS = 40;
-const ROWS_PER_BLOCK = 14;
-const RISK_ROWS_PER_BLOCK = 5;
+// A table is one block: the page layout of the PDF (a4-pdf paginate) splits it
+// between rows and repeats the header where a page ends.
+const ROWS_PER_BLOCK = Number.MAX_SAFE_INTEGER;
+const RISK_ROWS_PER_BLOCK = Number.MAX_SAFE_INTEGER;
+// Programs named in a risk row; the rest is a count.
+const MAX_RISK_PROGRAMS = 5;
 
 export { jaDate } from './assessment-document-text';
 
@@ -284,7 +288,10 @@ export function AssessmentDocument({
   const levels = sr ? Object.entries(sr.reports.byLevel) : [];
   const levelLabel = (level: string) => T.levels[level] ?? level;
 
-  const listed = [...report.items]
+  const counted = report.items.filter(
+    (item) => item.confidence !== 'suspected',
+  );
+  const listed = [...counted]
     .sort((a, b) => (T.itemOrder[a.type] ?? 9) - (T.itemOrder[b.type] ?? 9))
     .slice(0, MAX_LIST_ROWS);
   const moduleTotal = {
@@ -343,7 +350,6 @@ export function AssessmentDocument({
             T.sections.database,
             T.sections.risks,
             T.sections.items,
-            T.sections.next,
             T.sections.appendix,
           ].join(' · ')}
         </p>
@@ -410,7 +416,6 @@ export function AssessmentDocument({
             value={scale.tablesView === null ? T.notAnalyzed : n(scale.tables)}
           />
         </div>
-        <Note>{T.kpi.customerCount}</Note>
         <div className="qd-block">
           <h3>{T.charts.programLevels}</h3>
           <BarChart
@@ -701,11 +706,10 @@ export function AssessmentDocument({
             T.table.count,
             T.table.content,
             T.table.affected,
-            T.table.confirmation,
           ]}
           per={RISK_ROWS_PER_BLOCK}
           numeric={[2]}
-          widths={[13, 8, 7, 28, 14, 30]}
+          widths={[14, 9, 8, 45, 24]}
           rows={report.risks.map((risk) => ({
             key: risk.code,
             attr: 'data-risk',
@@ -716,11 +720,12 @@ export function AssessmentDocument({
               risk.content,
               risk.programs.length === 0
                 ? T.table.wholeSystem
-                : risk.programs.join(T.table.join) +
-                  (risk.otherPrograms > 0
-                    ? ` ${T.table.other(n(risk.otherPrograms))}`
+                : risk.programs.slice(0, MAX_RISK_PROGRAMS).join(T.table.join) +
+                  (risk.otherPrograms +
+                    Math.max(0, risk.programs.length - MAX_RISK_PROGRAMS) >
+                  0
+                    ? ` ${T.table.other(n(risk.otherPrograms + Math.max(0, risk.programs.length - MAX_RISK_PROGRAMS)))}`
                     : ''),
-              risk.confirmation,
             ],
           }))}
         />
@@ -731,34 +736,32 @@ export function AssessmentDocument({
         {sr ? (
           <>
             <Note>
-              {T.notes.items(
-                n(MAX_LIST_ROWS),
-                n(report.items.length),
-                T.allInExcel,
-              )}
+              {T.notes.items(n(MAX_LIST_ROWS), n(counted.length), T.allInExcel)}
             </Note>
             <KeyedTable
               empty={T.notApplicable}
               head={[
-                T.table.type,
                 T.table.kind,
-                T.table.program,
                 T.table.name,
+                T.table.program,
                 T.table.location,
-                T.table.confidence,
+                T.table.design,
                 T.table.level,
               ]}
-              widths={[7, 17, 12, 14, 22, 14, 14]}
+              widths={[17, 16, 14, 31, 10, 12]}
               rows={listed.map((item) => ({
                 key: `${item.type}:${item.name || item.file}`,
                 attr: 'data-item',
                 cells: [
-                  item.type,
                   item.kindLabel,
-                  item.programs,
                   item.name,
+                  item.programs,
                   item.file + (item.line === null ? '' : `:${item.line}`),
-                  item.confidenceLabel,
+                  item.confidence === 'design-file'
+                    ? T.table.designYes
+                    : item.confidence === 'missing-file'
+                      ? T.table.designNo
+                      : '',
                   item.levelLabel === null
                     ? ''
                     : item.score === null
@@ -774,17 +777,6 @@ export function AssessmentDocument({
             <p className="qd-note">{T.notAnalyzed}</p>
           </div>
         )}
-      </div>
-
-      <div className="ad-section" data-doc="next">
-        <Heading>{T.sections.next}</Heading>
-        <div className="qd-block">
-          <ol className="qd-notes">
-            {report.recommendations.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ol>
-        </div>
       </div>
 
       <div className="ad-section" data-doc="appendix" data-page-break>

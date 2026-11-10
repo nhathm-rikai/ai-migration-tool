@@ -81,6 +81,8 @@ export type ItemRow = {
   levelLabel: string | null;
   score: number | null;
   modelVersion: string | null;
+  // Where the report is made (reports only), a number so a sheet can show it.
+  usages: number | null;
   factors: string;
   note: string;
 };
@@ -754,7 +756,8 @@ export function buildCustomerReport(
       lang,
     ),
     items: buildItems(inventory, reportSummary, t),
-    recommendations: t.recommendations,
+    // No "next steps" in the report any more (kept empty for the contract).
+    recommendations: [],
   };
 }
 
@@ -807,6 +810,7 @@ function buildItems(
         levelLabel: null,
         score: null,
         modelVersion: null,
+        usages: null,
         factors: '',
         note: '',
       });
@@ -833,6 +837,7 @@ function buildItems(
       levelLabel: null,
       score: null,
       modelVersion: null,
+      usages: null,
       factors: '',
       note: row.warnings
         .map((code) => t.warningLabels[code] ?? code)
@@ -876,6 +881,7 @@ function buildItems(
       levelLabel: t.levelLabels[complexity.level] ?? complexity.level,
       score: complexity.score,
       modelVersion: complexity.version,
+      usages: report.usages.length,
       factors: complexity.factors
         .map((f) =>
           f.factor === 'design-not-analyzed'
@@ -884,7 +890,6 @@ function buildItems(
         )
         .join(t.items.sep),
       note: [
-        t.items.usages(report.usages.length),
         ...(complexity.reason
           ? [t.reasonLabels[complexity.reason] ?? complexity.reason]
           : []),
@@ -912,6 +917,7 @@ function buildItems(
       levelLabel: null,
       score: null,
       modelVersion: null,
+      usages: null,
       factors: '',
       note: t.items.dataFileNote,
     });

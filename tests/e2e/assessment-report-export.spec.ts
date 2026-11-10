@@ -79,11 +79,11 @@ test(
     await mkdir('test-results/customer-report-vi', { recursive: true });
     await download.saveAs('test-results/customer-report-vi/report-vi.xlsx');
     expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
-    for (let sheet = 1; sheet <= 6; sheet++)
+    for (let sheet = 1; sheet <= 7; sheet++)
       expect(
         bytes.includes(Buffer.from(`xl/worksheets/sheet${sheet}.xml`)),
       ).toBe(true);
-    expect(bytes.includes(Buffer.from('xl/worksheets/sheet7.xml'))).toBe(false);
+    expect(bytes.includes(Buffer.from('xl/worksheets/sheet8.xml'))).toBe(false);
 
     await expect(page.getByRole('alert')).toHaveCount(0);
   },

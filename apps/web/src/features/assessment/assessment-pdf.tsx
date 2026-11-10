@@ -22,6 +22,13 @@ export const ASSESSMENT_PDF_OPTIONS: A4Options = {
   // stays sharp, with JPEG pages of a reasonable size.
   sharp: true,
   jpegQuality: 0.92,
+  // Laid out page by page in the DOM: no row, card or heading is cut by a
+  // page edge, long tables split between rows with the header repeated.
+  paginate: {
+    containers: '.ad-section, .ad-summary',
+    keepWithNext: '.ad-heading, .ad-note',
+    splittable: '.qd-block',
+  },
 };
 
 export async function renderAssessmentPdf(

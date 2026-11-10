@@ -33,6 +33,17 @@ type Inventory = Pick<SourceInventoryDocument, 'programs'> & {
 };
 type Level = 'low' | 'medium' | 'high' | 'very-high' | 'unrated';
 
+// The version of the screen / report counting the analyzer writes. An
+// inventory stored with an older one has no CSV / Excel detection, no log
+// exclusion and no complexity for the code print / export reports, and
+// cannot be derived: it needs an analysis again.
+export const SCREEN_REPORT_VERSION = 'screen-report-v3';
+export const isScreenReportOutdated = (inventory: {
+  screenReportVersion?: string | undefined;
+}): boolean =>
+  inventory.screenReportVersion !== undefined &&
+  inventory.screenReportVersion !== SCREEN_REPORT_VERSION;
+
 export const REPORT_ORIGINS = ['crystal', 'print', 'export'] as const;
 export type ReportOrigin = (typeof REPORT_ORIGINS)[number];
 export type ReportTemplateKind = 'crystal' | 'data-report';

@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 (chiều) — Báo cáo cho khách: bố cục lại 7 sheet, bỏ nội dung đòi khách, PDF xếp trang trong DOM
+
+Theo review của người dùng trên dự án thật (10 điểm):
+- **Excel:** mỗi bảng một khối riêng (tiêu đề đậm không nền, header riêng, đúng số cột của bảng; writer `rowSpans`/`sectionRows`/`noHeader`/`filterRows`); thời điểm phân tích dạng ngày giờ dễ đọc; bỏ dòng số khách cung cấp, "Bước tiếp theo", cột đề nghị khách hàng, GUID, độ tin cậy; cơ sở tính chuyển sang sheet 7 (rộng 100, wrap); sheet 3 đặt lại tên cột (File dùng chung, Tên/Loại/Mô tả/Số program dùng); sheet 6: Loại, Tên, …, File thiết kế (Có/Thiếu file), Số nơi dùng (số), ghi chú wrap, ghi file dữ liệu thành bảng riêng bên dưới.
+- **Inventory cũ:** `SCREEN_REPORT_VERSION` chuyển vào contracts; inventory có `screenReportVersion` khác bản hiện tại → cảnh báo `SCREEN_REPORT_OUTDATED` ở bước 2 và rủi ro cùng mã trong báo cáo khách (cần phân tích lại; CSV/Excel, log và độ phức tạp report in không suy ra được từ dữ liệu cũ). Report in bằng code của inventory mới có độ phức tạp theo procedure in (không có "Chưa đánh giá" hàng loạt).
+- **PDF:** `a4-pdf.ts` có tùy chọn `paginate`: xếp trang trong DOM (đo, không cắt dòng/thẻ/đoạn, bảng dài tách giữa dòng và lặp header, tiêu đề không đứng cuối trang một mình), rồi vẽ từng trang ở scale 3; bảng không còn bị chia khối cứng 14 dòng; rủi ro ≤5 tên program. Kiểm bằng e2e `pdf-layout.spec.ts` với báo cáo dài (10 trang, 276 dòng đủ, không tràn, trang giữa đầy ≥86%).
+- Chưa push.
+
 ## 10/11/2026 — Báo cáo cho khách: tiếng Việt (lang=vi), bỏ version nội bộ, PDF nét hơn, trang 1 gọn
 
 - **Bỏ version nội bộ khỏi Excel và PDF:** bảng 解析モデルの版 (phụ lục PDF), dòng データの出所 và 解析モデル ở bìa, dòng 報告書版 / 複雑度モデル / スナップショット / 解析ラン / 解析結果 ở sheet 1, cột モデル版 ở sheet 1, 2, 6, và "モデル vN" trong chú thích. Giữ dự án, thời điểm phân tích, "解析 #N". JSON (`format=json`) giữ nguyên. Test: Excel/PDF không chứa `-v1`, `-draft`, `customer-assessment-report`, id, hash.

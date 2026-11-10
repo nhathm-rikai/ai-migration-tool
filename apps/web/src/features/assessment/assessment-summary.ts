@@ -1,5 +1,6 @@
 import {
   deriveReportSummary,
+  isScreenReportOutdated,
   type SourceInventoryDocument,
 } from '@portal/contracts';
 
@@ -28,7 +29,8 @@ export type AssessmentWarning =
   | 'FILES_SKIPPED'
   | 'UNCLASSIFIED_LINES'
   | 'TABLE_NAMES_NOT_CONFIRMED'
-  | 'COMPLEXITY_DRAFT';
+  | 'COMPLEXITY_DRAFT'
+  | 'SCREEN_REPORT_OUTDATED';
 
 export type ComplexityView = {
   score: number;
@@ -218,6 +220,8 @@ export function summarizeInventory(
     isDraft(inventory.complexityVersion) ||
       programs.some((row) => row.complexity?.draft),
   );
+
+  warn('SCREEN_REPORT_OUTDATED', isScreenReportOutdated(inventory));
 
   const missing = new Map<string, MissingMember>();
   for (const program of inventory.programs) {

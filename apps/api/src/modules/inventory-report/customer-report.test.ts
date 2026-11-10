@@ -240,7 +240,9 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     );
     expect(report.items.every((i) => i.file !== '')).toBe(true);
     const order = reports.find((r) => r.name === 'order.rpt');
-    expect(order?.note).toContain('使用箇所 2 か所');
+    // The number of uses is a number of its own, not text in the note.
+    expect(order?.usages).toBe(2);
+    expect(order?.note).not.toContain('使用箇所');
   });
 
   it('rows of reports equal the total by kind and by level; unrated is 未評価 with a reason', () => {
@@ -261,9 +263,12 @@ describe('AR02-AC04/AC09 screen and report list', () => {
       modelVersion: 'report-complexity-v1-draft',
     });
     expect(crystal?.factors).toContain('定義ファイル未解析');
-    // Sheet 6 shows the same rows plus the reference note.
+    // Sheet 6: the list (screens, batches, reports) with the file output that
+    // is not a report as a second table under it.
     const sheet = sheetOf('6_画面・帳票一覧');
-    expect(sheet.rows).toHaveLength(report.items.length);
+    const listed = report.items.filter((i) => i.confidence !== 'suspected');
+    expect(sheet.filterRows).toBe(listed.length);
+    expect(sheet.rows.length).toBeGreaterThanOrEqual(report.items.length);
     expect(sheet.columns.map((c) => c.header)).toEqual(
       expect.arrayContaining(['複雑度', '点数', '評価要因']),
     );
@@ -313,9 +318,9 @@ describe('AR02-AC05 inventory without AR04 data', () => {
 describe('AR02-AC06 workbook', () => {
   const sheets = customerReportSheets(report);
 
-  it('has exactly the six sheets in order', () => {
+  it('has exactly the seven sheets in order (the last one is the counting basis)', () => {
     expect(sheets.map((s) => s.name)).toEqual([...SHEET_NAMES]);
-    expect(SHEET_NAMES).toHaveLength(6);
+    expect(SHEET_NAMES).toHaveLength(7);
   });
 
   it('writes a valid xlsx and puts 該当なし in an empty table', () => {
@@ -360,7 +365,8 @@ describe('AR02-AC06 workbook', () => {
     expect(text).toContain('解析 #1');
     expect(text).not.toContain(report.source.snapshotHash.slice(0, 12));
     expect(text).not.toContain('artifact');
-    expect(text).toContain('お客様提示数：未入力');
+    // The customer's own count is not collected: no line for it.
+    expect(text).not.toContain('お客様提示');
   });
 
   it('keeps absolute paths out and formula text as text', () => {
@@ -1003,7 +1009,7 @@ describe('report count (customer report)', () => {
       confidenceLabel: '設計ファイルあり',
       level: 'high',
     });
-    expect(order?.note).toContain('使用箇所 2 か所');
+    expect(order?.usages).toBe(2);
     const summary = items.find((i) => i.name === 'summary.rpt');
     expect(summary?.confidenceLabel).toBe('設計ファイルなし');
     const print = items.find((i) => i.kindLabel === 'コード印刷');
@@ -1030,21 +1036,22 @@ describe('report count (customer report)', () => {
     expect(old.scale.reportBreakdown).toBeNull();
   });
 
-  it('sheet 1 ends with the counting basis, the same text as step 2 and the PDF', () => {
-    const rows = sheetOf('1_規模概要').rows;
-    const heading = rows.findIndex((r) => r[0] === '算定基準');
-    expect(heading).toBeGreaterThan(0);
-    const lines = rows
-      .slice(heading + 1, heading + 1 + REPORT_COUNTING_BASIS.length)
-      .map((r) => String(r[0]));
-    expect(lines).toEqual(
-      REPORT_COUNTING_BASIS.map((item) => `${item.ja.label}：${item.ja.text}`),
+  it('sheet 7 is the counting basis, the same text as step 2 and the PDF', () => {
+    const sheet = sheetOf('7_算定基準');
+    expect(sheet.columns.map((c) => c.header)).toEqual(['項目', '内容']);
+    expect(sheet.columns[1]?.wrap).toBe(true);
+    expect(sheet.rows).toEqual(
+      REPORT_COUNTING_BASIS.map((item) => [item.ja.label, item.ja.text]),
     );
-    const text = lines.join('\n');
+    const text = sheet.rows.map((r) => String(r[1])).join('');
     expect(text).toContain('換算単位');
     expect(text).toContain('レイアウトの設計内容は含みません');
     expect(text).toContain('すべてを除外できるとは限りません');
     expect(text).toContain('業務上の帳票数ではありません');
+    // Sheet 1 only points at it (in its notes) and carries no basis text.
+    const one = sheetOf('1_規模概要');
+    expect(one.notes?.join('')).toContain('7_算定基準');
+    expect(cells(one).join('')).not.toContain('換算単位');
   });
 
   it('says no uncertain thing in the fixed texts: assumptions only', () => {

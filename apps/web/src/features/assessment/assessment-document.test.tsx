@@ -63,7 +63,8 @@ describe('AssessmentDocument cover and scale', () => {
     expect(kpi('lines')).toContain('655');
     expect(kpi('procedures')).toContain(String(report.scale.procedures));
     expect(kpi('tables')).toContain(String(report.scale.tables));
-    expect(scale.textContent).toContain('お客様提示数：未入力');
+    // The customer's own count is not collected: no line for it.
+    expect(scale.textContent).not.toContain('お客様提示');
   });
 
   it('lists the report breakdown and the levels, each total equal to the rows', () => {
@@ -149,7 +150,7 @@ describe('AssessmentDocument sections 2 to 6', () => {
     );
   });
 
-  it('repeats the header of the module table on every block of a long list (AR03 review 1)', () => {
+  it('keeps the module table as one block with one header (the PDF page layout splits it)', () => {
     const report = customerReportFixture();
     const base = report.modules[0];
     if (!base) throw new Error('fixture');
@@ -162,9 +163,10 @@ describe('AssessmentDocument sections 2 to 6', () => {
     const moduleTables = Array.from(scale.querySelectorAll('table')).filter(
       (table) => table.querySelector('[data-module-row]'),
     );
-    expect(moduleTables.length).toBeGreaterThan(1);
-    for (const table of moduleTables)
-      expect(table.querySelector('thead th')?.textContent).toBe('モジュール');
+    expect(moduleTables).toHaveLength(1);
+    expect(moduleTables[0]?.querySelector('thead th')?.textContent).toBe(
+      'モジュール',
+    );
     expect(scale.querySelectorAll('[data-module-row]')).toHaveLength(40);
     expect(scale.querySelectorAll('[data-module-total]')).toHaveLength(1);
   });
@@ -288,7 +290,9 @@ describe('AssessmentDocument sections 2 to 6', () => {
     );
     const missing = rows[0];
     expect(missing?.textContent).toContain('高');
-    expect(missing?.textContent).toContain('帳票定義ファイル(.rpt)のご提供');
+    // The risk table states what is missing; it asks for nothing.
+    expect(missing?.textContent).toContain('帳票定義ファイル（.rpt）');
+    expect(missing?.textContent).not.toContain('ご提供');
     expect(rows[1]?.textContent).toContain('ORDER、REPORT');
   });
 
@@ -342,9 +346,10 @@ describe('AssessmentDocument sections 2 to 6', () => {
 
   it('next steps and appendix carry the fixed text and the counting rules', () => {
     const report = customerReportFixture();
-    const { section } = draw(report);
-    for (const line of report.recommendations)
-      expect(section('next').textContent).toContain(line);
+    const { root, section } = draw(report);
+    // No "next steps" section any more.
+    expect(root.querySelector('[data-doc="next"]')).toBeNull();
+    expect(root.textContent).not.toContain('今後の進め方');
     const appendix = section('appendix').textContent ?? '';
     for (const rule of [
       '画面：',
@@ -377,7 +382,7 @@ describe('AssessmentDocument layout hooks (AR03-AC03)', () => {
     expect(root.querySelectorAll('.qd-block').length).toBeGreaterThanOrEqual(8);
   });
 
-  it('splits a long table into blocks that each repeat the header row', () => {
+  it('keeps a long table as one block (the PDF page layout splits it between rows)', () => {
     const report = customerReportFixture();
     const template = report.items.find((i) => i.type === '画面');
     if (!template) throw new Error('fixture');
@@ -388,9 +393,9 @@ describe('AssessmentDocument layout hooks (AR03-AC03)', () => {
     }));
     const { section } = draw(report);
     const tables = Array.from(section('items').querySelectorAll('table'));
-    expect(tables.length).toBeGreaterThan(1);
-    for (const table of tables)
-      expect(table.querySelector('thead th')?.textContent).toBe('区分');
+    expect(tables).toHaveLength(1);
+    expect(tables[0]?.querySelector('thead th')?.textContent).toBe('種別');
+    expect(tables[0]?.querySelectorAll('tbody tr')).toHaveLength(30);
   });
 });
 

@@ -68,14 +68,11 @@ describe('customer report language', () => {
     expect(viSheets.length).toBe(jaSheets.length);
     viSheets.forEach((sheet, index) => {
       const other = jaSheets[index];
-      expect(sheet.rows.length).toBe(other?.rows.length);
-      sheet.rows.forEach((row, r) =>
-        row.forEach((cell, c) => {
-          const jaCell: CellValue | undefined = other?.rows[r]?.[c];
-          if (typeof cell === 'number' || typeof jaCell === 'number')
-            expect(cell).toBe(jaCell);
-        }),
-      );
+      // Long texts wrap into a different number of lines in each language, so
+      // compare the numbers in reading order, not cell by cell.
+      const numbers = (rows: readonly (readonly CellValue[])[]) =>
+        rows.flatMap((row) => row.filter((cell) => typeof cell === 'number'));
+      expect(numbers(sheet.rows)).toEqual(numbers(other?.rows ?? []));
     });
   });
 
@@ -109,16 +106,17 @@ describe('customer report language', () => {
       expect(sheet.name.length).toBeLessThanOrEqual(31);
       expect(sheet.name).not.toMatch(/[[\]:*?/\\]/);
     }
-    expect(new Set(viSheets.map((s) => s.name)).size).toBe(6);
+    expect(new Set(viSheets.map((s) => s.name)).size).toBe(7);
   });
 
-  it('names the report in Vietnamese by the shared counting basis', () => {
-    const rows = viSheets[0]?.rows.map((r) => String(r[0] ?? '')) ?? [];
-    expect(rows).toContain('Cơ sở tính');
-    const text = rows.join('\n');
-    expect(text).toContain('Report theo quy ước Assessment');
-    for (const item of REPORT_COUNTING_BASIS)
-      expect(text).toContain(item.vi.text);
+  it('has the shared counting basis in Vietnamese on sheet 7', () => {
+    const sheet = viSheets[6];
+    expect(sheet?.name).toBe('7_Cơ sở tính');
+    expect(sheet?.rows).toEqual(
+      REPORT_COUNTING_BASIS.map((item) => [item.vi.label, item.vi.text]),
+    );
+    const first = (viSheets[0]?.rows ?? []).map((r) => String(r[0] ?? ''));
+    expect(first.join('\n')).toContain('Report theo quy ước Assessment');
   });
 
   it('writes no internal id, model version or hash into either language', () => {

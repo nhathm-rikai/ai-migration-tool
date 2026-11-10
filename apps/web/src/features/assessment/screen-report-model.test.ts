@@ -17,7 +17,7 @@ describe('AR04-AC06/AC11 screen and report model', () => {
       screens: 3,
       sharedScreens: 1,
       batches: 1,
-      reportVersion: 'screen-report-v1',
+      reportVersion: 'screen-report-v3',
       complexityVersion: 'report-complexity-v1-draft',
     });
   });
@@ -93,5 +93,18 @@ describe('an inventory stored before reportItems existed', () => {
     delete stored.totals.screenReport?.reportItems;
     expect(deriveReportSummary(stored)).toEqual(deriveReportSummary(fresh));
     expect(screenReportView(stored)).toEqual(screenReportView(fresh));
+  });
+});
+
+describe('an inventory counted by an older report counting', () => {
+  it('warns in step 2 that it needs an analysis again', () => {
+    const old = structuredClone(screenReportCorpus());
+    old.screenReportVersion = 'screen-report-v2';
+    expect(summarizeInventory(old).warnings).toContain(
+      'SCREEN_REPORT_OUTDATED',
+    );
+    expect(summarizeInventory(screenReportCorpus()).warnings).not.toContain(
+      'SCREEN_REPORT_OUTDATED',
+    );
   });
 });

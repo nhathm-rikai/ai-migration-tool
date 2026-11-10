@@ -1,4 +1,7 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  isScreenReportOutdated,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 import {
   REDACTED_PREFIX,
   redactAbsolutePath,
@@ -831,6 +834,14 @@ export function buildInventoryReport(
       null,
       null,
       'Inventory has no screen/report data (画面・帳票・バッチ): run the analysis again; the figures are unknown, not zero',
+    );
+  if (hasScreenReport && isScreenReportOutdated(inventory))
+    warn(
+      'SCREEN_REPORT_OUTDATED',
+      null,
+      null,
+      null,
+      `Inventory counted with ${inventory.screenReportVersion ?? ''}: no CSV/Excel detection, log exclusion or complexity of code print reports; run the analysis again`,
     );
   for (const { id, program } of selected) {
     for (const screen of program.screens ?? [])

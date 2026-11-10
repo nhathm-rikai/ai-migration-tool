@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (2) — Nhận diện Excel/CSV: vòng 3 (4 lỗi P2 tại 07ed8cf) và bộ mẫu chấp nhận
+
+- **4 lỗi:** connection mở lại tới DB khác vẫn là Excel; chỉ in SQL + biến connection cùng câu bị tính; tham số không kiểu không che biến module; ghi qua tham số `As Excel.*` bị sót (không có tín hiệu). Câu "giới hạn chỉ gây sót" ở vòng trước là SAI (có giới hạn gây nhầm); spec §6.2b ghi từng giới hạn là sót (S) hay nhầm (N).
+- **Sửa:** loại connection/recordset theo lần cấu hình gần nhất (Open/ConnectionString/ActiveConnection/Set); chỉ tính khi có lời gọi ghi (Execute/Open INSERT-UPDATE-DELETE, CommandText, AddNew/Update/Delete/UpdateBatch trên recordset Excel); tham số/Dim không kiểu che biến module; ghi trên đối tượng Excel biết qua khai báo sinh tín hiệu tại dòng ghi.
+- **Bộ mẫu chấp nhận:** `vb6-report-signals.acceptance.test.ts` (58 ca, qua inventory → tổng report), mô tả ở spec §6.2b. 7 ca fail trên 07ed8cf, pass sau sửa.
+- **Quy ước review nhận diện (từ nay):** ca biên NGOÀI bộ mẫu xếp P3 (ghi vào "Giới hạn đã biết") trừ khi đổi số pilot hoặc là pattern phổ biến; khi đó thêm vào bộ mẫu rồi mới sửa. Mỗi sửa kèm ca vào bộ mẫu thay vì vá điểm.
+- Chưa push.
+
 ## 11/11/2026 — Nhận diện Excel/CSV: một lượt quét theo procedure (review tại 902023b, 3 lỗi P2)
 
 - **Cấu trúc:** mọi tín hiệu (Crystal, in, Open/Write/Print #, Excel, ADO) sinh từ lệnh đã tách (If một dòng = điều kiện + lệnh sau Then/Else), không quét dòng gốc. Bảng ký hiệu theo procedure (biến khai báo che biến module, quên ở End Sub, gán lại đổi loại, Set ... = Nothing). Theo dõi connection ADO (cn.Open/ConnectionString, rs.Open ... cn, ActiveConnection) và recordset/command trên connection Excel.

@@ -608,14 +608,14 @@ describe('Excel objects and connections are followed by scope', () => {
       ),
     ).toContain('excel');
   });
-  it('a parameter is declared in its procedure', () => {
+  it('a parameter As Excel.* is a known Excel object: its write is a signal at the write', () => {
     expect(
       kinds(
         'Sub Fill(wb As Excel.Workbook)',
         '    wb.Sheets(1).Cells(1, 1) = "a"',
         'End Sub',
       ),
-    ).toEqual([]);
+    ).toEqual(['excel']);
     expect(
       kinds(
         'Sub Fill(wb As Excel.Workbook)',

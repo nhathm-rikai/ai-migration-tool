@@ -170,24 +170,36 @@ function statementsOf(statement: string): string[] {
 }
 
 // Evidence that code WRITES to Excel (opening or reading it is not an output).
-// Variables are followed by name and by procedure: a variable declared in a
-// procedure is that procedure's own (it hides a module variable of the same
-// name and is forgotten at End Sub), and an assignment changes what the name
-// holds. A write counts only on:
-//  - an Excel object: declared As Excel.*, or set from CreateObject/GetObject
-//    ("Excel.Application"), New Excel.Application, Workbooks.Add/Open or
-//    another Excel object, or the block of a With on one: Save/SaveAs, a cell,
-//    range or Value assigned, Workbooks.Add;
-//  - an Excel ADO connection (opened or given a connection string with an
-//    Excel source): INSERT / UPDATE run on THAT connection.
-// So rs.Save, Text1.Value = 1, a grid's Cells or an UPDATE on another
-// connection are not Excel writes.
+// One pass over the split statements with a symbol table per procedure:
+//  - a variable declared in a procedure (Dim/Static, a parameter with or
+//    without a type) is that procedure's own: it hides a module variable of
+//    the same name and is forgotten at End Sub; an undeclared name that a
+//    module declares is the module's variable;
+//  - what a name holds is what it was last declared or set to before the
+//    statement: Set again, Set ... = Nothing, a connection opened again with
+//    another connection string, a recordset or command tied to another
+//    connection all change it.
+// A write counts only as a CALL that writes:
+//  - on an Excel object (declared As Excel.*, or set from CreateObject /
+//    GetObject("Excel.Application"), New Excel.Application, Workbooks.Add/Open
+//    or another Excel object, or a With on one): Save/SaveAs, a cell, range or
+//    Value assigned, Workbooks.Add;
+//  - on an Excel ADO connection (its connection string has an Excel source):
+//    Execute / Open of an INSERT, UPDATE or DELETE run on that connection or
+//    on a recordset or command tied to it (a command by its CommandText), and
+//    AddNew / Update / Delete / UpdateBatch of a recordset opened on it.
+// Printing a SQL text, or a variable next to a connection, is not a call.
 type Kind =
-  'excel' | 'excel-conn' | 'excel-rs' | 'excel-string' | 'sql' | 'other';
-const TYPED =
-  /([A-Za-z_]\w*)(?:\(\s*\d*\s*\))?\s+As\s+(?:New\s+)?([A-Za-z_][\w.]*)/gi;
+  | 'excel'
+  | 'conn'
+  | 'excel-conn'
+  | 'excel-rs'
+  | 'excel-string'
+  | 'sql'
+  | 'other';
 const EXCEL_TYPE =
   /^(?:Excel\.(?:Application|Workbooks?|Worksheets?|Range)|Workbooks?|Worksheets?)$/i;
+const CONNECTION_TYPE = /^(?:ADODB\.)?Connection$/i;
 const DECLARING =
   /^\s*(?:Dim|ReDim|Static|Public|Private|Global|Friend|Sub|Function|Property)\b/i;
 const PROCEDURE_START =
@@ -196,11 +208,30 @@ const STATEMENT_ROOT = /^\s*(?:Call\s+)?(\.|[A-Za-z_]\w*)/i;
 const CELL_TARGET = /\.\s*(?:Cells|Range|Item|Value2?|Formula)\b/i;
 const EXCEL_SOURCE =
   /\bExcel\s+\d+\.\d+|Extended\s+Properties\s*=\s*"?\s*Excel|\.xls[xmb]?\b/i;
-const SQL_WRITE = /^"\s*(?:insert\s+into|update\s+\S+\s+set)\b/i;
+const SQL_WRITE = /^"\s*(?:insert\s+into|update\s+\S+\s+set|delete\s+from)\b/i;
+
+// The comma separated items of the first level of a list.
+function listItems(text: string): string[] {
+  const items: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let at = 0; at < text.length; at += 1) {
+    const char = text[at];
+    if (char === '(') depth += 1;
+    else if (char === ')') depth -= 1;
+    else if (char === ',' && depth === 0) {
+      items.push(text.slice(start, at));
+      start = at + 1;
+    }
+  }
+  items.push(text.slice(start));
+  return items;
+}
 
 class ExcelWrites {
   private readonly modules = new Map<string, Kind>();
   private locals = new Map<string, Kind>();
+  private readonly commandText = new Set<string>();
   private inProcedure = false;
   private readonly withs: boolean[] = [];
   private written = false;
@@ -238,118 +269,202 @@ class ExcelWrites {
       : this.kindOf(root) === 'excel';
   }
 
-  read(statement: string): void {
+  // Dim / Static / module declarations and the parameters of a procedure:
+  // every name is declared, typed or not (an untyped one is unknown).
+  private declareNames(masked: string): void {
+    let list: string;
+    if (PROCEDURE_START.test(masked.trim())) {
+      const open = masked.indexOf('(');
+      if (open < 0) return;
+      let depth = 0;
+      let end = masked.length;
+      for (let at = open; at < masked.length; at += 1) {
+        if (masked[at] === '(') depth += 1;
+        else if (masked[at] === ')') {
+          depth -= 1;
+          if (depth === 0) {
+            end = at;
+            break;
+          }
+        }
+      }
+      list = masked.slice(open + 1, end);
+    } else
+      list = masked.replace(
+        /^\s*(?:(?:Public|Private|Friend|Static|Global)\s+)*(?:Dim|ReDim|Static|Public|Private|Global)\s+/i,
+        '',
+      );
+    for (const item of listItems(list)) {
+      const match =
+        /^\s*(?:Optional\s+|ByVal\s+|ByRef\s+|ParamArray\s+|WithEvents\s+)*([A-Za-z_]\w*)(?:\(\s*\d*\s*\))?(?:\s+As\s+(?:New\s+)?([A-Za-z_][\w.]*))?/i.exec(
+          item,
+        );
+      if (!match) continue;
+      const type = match[2] ?? '';
+      this.declare(
+        match[1] ?? '',
+        EXCEL_TYPE.test(type)
+          ? 'excel'
+          : CONNECTION_TYPE.test(type)
+            ? 'conn'
+            : 'other',
+      );
+    }
+  }
+
+  // True when the statement is a write to Excel.
+  read(statement: string): boolean {
     const masked = maskStrings(statement);
     if (/^\s*End\s+(?:Sub|Function|Property)\b/i.test(masked)) {
       this.locals = new Map();
+      this.commandText.clear();
       this.withs.length = 0;
       this.inProcedure = false;
-      return;
+      return false;
     }
     if (PROCEDURE_START.test(masked.trim())) {
       this.locals = new Map();
+      this.commandText.clear();
       this.withs.length = 0;
       this.inProcedure = true;
     }
-    if (DECLARING.test(masked))
-      for (const match of masked.matchAll(TYPED))
-        this.declare(
-          match[1] ?? '',
-          EXCEL_TYPE.test(match[2] ?? '') ? 'excel' : 'other',
-        );
+    if (DECLARING.test(masked)) this.declareNames(masked);
     const literals = [...statement.matchAll(STRING_LITERAL)].map((m) => m[0]);
     const identifiers = (masked.match(/[A-Za-z_]\w*/g) ?? []).map((word) =>
       word.toLowerCase(),
     );
+    const kinds = (list: string[]) => list.map((word) => this.kindOf(word));
     const excelSource =
       literals.some((text) => EXCEL_SOURCE.test(text)) ||
-      identifiers.some((word) => this.kindOf(word) === 'excel-string');
+      kinds(identifiers).includes('excel-string');
+    const sqlWrite =
+      literals.some((text) => SQL_WRITE.test(text)) ||
+      kinds(identifiers).includes('sql');
+    const onExcelConnection = (list: string[]) =>
+      kinds(list).some((kind) => kind === 'excel-conn' || kind === 'excel-rs');
     const withBlock = /^\s*With\s+(.+)$/i.exec(masked);
     if (withBlock) {
       this.withs.push(this.isExcel(withBlock[1] ?? ''));
-      return;
+      return false;
     }
     if (/^\s*End\s+With\b/i.test(masked)) {
       this.withs.pop();
-      return;
+      return false;
     }
-    if (/(?<!\w)Workbooks\s*\.\s*Add\b/i.test(masked)) this.written = true;
+    let wrote = /(?<!\w)Workbooks\s*\.\s*Add\b/i.test(masked);
     const set = /^\s*Set\s+([A-Za-z_]\w*)\s*=\s*(.+)$/i.exec(masked);
     if (set) {
       const rhs = set[2] ?? '';
-      const excel =
+      const alias = /^\s*([A-Za-z_]\w*)\s*$/.exec(rhs)?.[1];
+      const aliased = alias === undefined ? undefined : this.kindOf(alias);
+      this.assign(
+        set[1] ?? '',
         signalsOf(statement).some((s) => s.name === 'Excel.Application') ||
-        this.isExcel(rhs) ||
-        /(?<!\w)Workbooks\s*\.\s*(?:Add|Open)\b/i.test(rhs);
-      this.assign(set[1] ?? '', excel ? 'excel' : 'other');
-      return;
+          this.isExcel(rhs) ||
+          /(?<!\w)Workbooks\s*\.\s*(?:Add|Open)\b/i.test(rhs)
+          ? 'excel'
+          : /\bADODB\s*\.\s*Connection\b/i.test(rhs)
+            ? 'conn'
+            : aliased === 'conn' ||
+                aliased === 'excel-conn' ||
+                aliased === 'excel-rs'
+              ? aliased
+              : 'other',
+      );
     }
     // A string that holds an Excel connection string or an INSERT / UPDATE.
     const text =
       /^\s*(?:(?:Let|Public|Private|Global|Static|Dim|Const)\s+)*([A-Za-z_]\w*)(?:\s+As\s+\w+)?\s*=(?!=)\s*(.+)$/i.exec(
         masked,
       );
-    if (text) {
-      const sql =
-        SQL_WRITE.test(literals[0] ?? '') ||
-        identifiers.slice(1).some((word) => this.kindOf(word) === 'sql');
+    if (text)
       this.assign(
         text[1] ?? '',
-        excelSource ? 'excel-string' : sql ? 'sql' : 'other',
+        excelSource
+          ? 'excel-string'
+          : SQL_WRITE.test(literals[0] ?? '') ||
+              kinds(identifiers.slice(1)).includes('sql')
+            ? 'sql'
+            : 'other',
       );
+    // A connection, recordset or command configured: its kind is what the
+    // LAST configuration before a statement made it.
+    const configured =
+      /^\s*(?:Call\s+|Set\s+)?([A-Za-z_]\w*)\s*\.\s*(Open|ConnectionString|ActiveConnection)\b/i.exec(
+        masked,
+      );
+    if (configured) {
+      const name = configured[1] ?? '';
+      const member = (configured[2] ?? '').toLowerCase();
+      const others = identifiers.filter((word) => word !== name.toLowerCase());
+      const now = this.kindOf(name);
+      if (member === 'activeconnection')
+        this.assign(
+          name,
+          onExcelConnection(others) || excelSource ? 'excel-rs' : 'other',
+        );
+      else if (excelSource && !onExcelConnection(others))
+        this.assign(name, 'excel-conn');
+      else if (member === 'open' && onExcelConnection(others))
+        this.assign(name, 'excel-rs');
+      else if (member === 'open' && kinds(others).includes('conn'))
+        this.assign(name, 'other');
+      else if (now === 'excel-conn') this.assign(name, 'conn');
     }
-    // A connection opened or configured with an Excel source.
-    const connection =
-      /^\s*(?:Call\s+)?([A-Za-z_]\w*)\s*\.\s*(?:Open|ConnectionString)\b/i.exec(
+    const commandText = /^\s*([A-Za-z_]\w*)\s*\.\s*CommandText\s*=/i.exec(
+      masked,
+    )?.[1];
+    if (commandText !== undefined) {
+      if (sqlWrite) this.commandText.add(commandText.toLowerCase());
+      else this.commandText.delete(commandText.toLowerCase());
+    }
+    // A call that runs an INSERT / UPDATE / DELETE on an Excel connection.
+    const call =
+      /(?<![\w.])([A-Za-z_]\w*)\s*\.\s*(Execute|Open|UpdateBatch|AddNew|Update|Delete)\b/i.exec(
         masked,
-      )?.[1];
-    if (connection !== undefined && excelSource)
-      this.assign(connection, 'excel-conn');
-    // A command or recordset tied to an Excel connection.
-    const tied =
-      /^\s*(?:Set\s+)?([A-Za-z_]\w*)\s*\.\s*ActiveConnection\s*=/i.exec(
-        masked,
-      )?.[1] ??
-      /^\s*(?:Call\s+)?([A-Za-z_]\w*)\s*\.\s*Open\b/i.exec(masked)?.[1];
-    if (
-      tied !== undefined &&
-      identifiers.some(
-        (word) =>
-          word !== tied.toLowerCase() && this.kindOf(word) === 'excel-conn',
+      );
+    if (call) {
+      const root = call[1] ?? '';
+      const method = (call[2] ?? '').toLowerCase();
+      const others = identifiers.filter((word) => word !== root.toLowerCase());
+      const rootKind = this.kindOf(root);
+      const tied =
+        rootKind === 'excel-conn' ||
+        rootKind === 'excel-rs' ||
+        onExcelConnection(others);
+      if (
+        (method === 'execute' || method === 'open') &&
+        tied &&
+        (sqlWrite ||
+          (method === 'execute' && this.commandText.has(root.toLowerCase())))
       )
-    )
-      this.assign(tied, 'excel-rs');
-    // INSERT / UPDATE run on an Excel connection.
-    const writesSql =
-      literals.some((item) => SQL_WRITE.test(item)) ||
-      identifiers.some((word) => this.kindOf(word) === 'sql');
-    if (
-      writesSql &&
-      identifiers.some((word) => {
-        const kind = this.kindOf(word);
-        return kind === 'excel-conn' || kind === 'excel-rs';
-      })
-    )
-      this.written = true;
-    // A recordset opened on an Excel connection, changed.
-    const changed =
-      /^\s*(?:Call\s+)?([A-Za-z_]\w*)\s*\.\s*(?:AddNew|Update|Delete)\b/i.exec(
-        masked,
-      )?.[1];
-    if (changed !== undefined && this.kindOf(changed) === 'excel-rs')
-      this.written = true;
-    if (/(?<!\w)Workbooks\s*\.\s*Add\b/i.test(masked)) this.written = true;
+        wrote = true;
+      if (
+        (method === 'updatebatch' ||
+          method === 'addnew' ||
+          method === 'update' ||
+          method === 'delete') &&
+        rootKind === 'excel-rs'
+      )
+        wrote = true;
+    }
+    if (/^\s*Set\b/i.test(masked)) {
+      if (wrote) this.written = true;
+      return wrote;
+    }
     if (
       /\.\s*(?:SaveAs|SaveCopyAs|Save)\b/i.test(masked) &&
       this.isExcel(masked)
     )
-      this.written = true;
+      wrote = true;
     // A cell, range or value assigned (the first "=" of the statement).
     const equals = masked.search(/(?<![<>=!])=(?!=)/);
     if (equals > 0) {
       const target = masked.slice(0, equals);
-      if (CELL_TARGET.test(target) && this.isExcel(target)) this.written = true;
+      if (CELL_TARGET.test(target) && this.isExcel(target)) wrote = true;
     }
+    if (wrote) this.written = true;
+    return wrote;
   }
 }
 
@@ -379,6 +494,8 @@ export function findVb6ReportSignals(
   const opens = new Map<string, ReportSignal>();
   // Excel signals count only when the file writes to an Excel object.
   const excel = new ExcelWrites();
+  // The first line that writes to a known Excel object or connection.
+  let firstWrite: number | undefined;
   let incoming: Vb6Continuation = 'none';
   let buffer: { text: string; line: number } | null = null;
   for (
@@ -401,7 +518,7 @@ export function findVb6ReportSignals(
         // Every signal comes from a split statement: a one-line If is its
         // condition and the statements after Then / Else, each of its own.
         for (const body of statementsOf(part)) {
-          excel.read(body);
+          if (excel.read(body)) firstWrite ??= buffer.line;
           const masked = maskStrings(body);
           if (/^\s*Close\b/i.test(masked)) {
             // Close #1, #2 closes those; a bare Close closes every file.
@@ -439,9 +556,12 @@ export function findVb6ReportSignals(
     }
   }
   // Opening, starting or reading Excel is not an output.
-  return excel.any
-    ? signals
-    : signals.filter((signal) => signal.kind !== 'excel');
+  if (!excel.any) return signals.filter((signal) => signal.kind !== 'excel');
+  // A write on an Excel object known only by its declaration (a parameter
+  // As Excel.Workbook) is a signal where it is written.
+  if (firstWrite !== undefined && !signals.some((s) => s.kind === 'excel'))
+    signals.push({ kind: 'excel', name: 'Excel', line: firstWrite });
+  return signals;
 }
 
 // A DataReport / ActiveReports designer (.dsr) starts a top-level

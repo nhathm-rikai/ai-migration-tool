@@ -5,6 +5,12 @@ type Item = CustomerReportDocument['items'][number];
 // Hand-written customer report JSON (numbers are set here, not computed):
 // the invented demo corpus. 3 programs, 3 screens (1 shared), 5 reports
 // (2 Crystal, 1 DataReport) + 1 code print + 1 CSV/Excel export, 1 batch.
+const REPORT_KINDS: Record<string, string | undefined> = {
+  'Crystal Reports': 'crystal',
+  'DataReport / ActiveReports': 'data-report',
+  コード印刷: 'print',
+  'CSV・Excel出力': 'export',
+};
 const item = (
   row: Partial<Item> & Pick<Item, 'type' | 'name' | 'file'>,
 ): Item => ({
@@ -22,6 +28,10 @@ const item = (
   factors: '',
   note: '',
   ...row,
+  // How a report is made, from its label (the JSON has it as a code).
+  reportKind: row.reportKind ?? REPORT_KINDS[row.kindLabel ?? ''] ?? null,
+  usages:
+    row.usages ?? (REPORT_KINDS[row.kindLabel ?? ''] === undefined ? null : 1),
 });
 
 export function customerReportFixture(): CustomerReportDocument {
@@ -262,6 +272,7 @@ export function customerReportFixture(): CustomerReportDocument {
         type: '帳票',
         kindLabel: 'Crystal Reports',
         name: 'order.rpt',
+        confidence: 'design-file',
         file: 'programs/ORDER/ORDER.BAS',
         line: 130,
         level: 'high',
@@ -278,8 +289,8 @@ export function customerReportFixture(): CustomerReportDocument {
         line: 40,
         programs: 'REPORT',
         module: 'programs/REPORT',
-        confidence: 'referenced',
-        confidenceLabel: '参照（定義ファイル不足）',
+        confidence: 'missing-file',
+        confidenceLabel: '設計ファイルなし',
         level: 'medium',
         levelLabel: '中',
         score: 2,
@@ -290,6 +301,7 @@ export function customerReportFixture(): CustomerReportDocument {
         type: '帳票',
         kindLabel: 'DataReport / ActiveReports',
         name: 'rptMonthly',
+        confidence: 'design-file',
         file: 'programs/REPORT/MONTHLY.DSR',
         line: 2,
         programs: 'REPORT',

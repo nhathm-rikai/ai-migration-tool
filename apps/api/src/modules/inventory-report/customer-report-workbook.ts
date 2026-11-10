@@ -119,6 +119,41 @@ const col = (header: string, width: number, wrap = false): SheetColumn => ({
   ...(wrap ? { wrap } : {}),
 });
 
+// Width of a text in Excel column units.
+export const textWidth = (text: string) =>
+  Array.from(text).reduce((sum, char) => sum + unitsOf(char), 0);
+
+// The widest a column is made to fit its text; a longer text wraps instead.
+const FIT_MAX = 60;
+const FIT_MIN = 10;
+
+// Column widths from the content: the widest text of the column (a
+// full-width character counts two) with a little room, between a minimum and
+// a maximum; a column whose text is longer than the maximum wraps. Only the
+// cells inside the span of their row count (the cells after it are empty), and
+// a one-cell row (a section title, 該当なし) runs on over its empty neighbours.
+function fitColumns(
+  columns: readonly SheetColumn[],
+  rows: readonly (readonly CellValue[])[],
+  spans: readonly number[] | undefined,
+): SheetColumn[] {
+  return columns.map((column, c) => {
+    if (column.wrap === true && column.width !== undefined) return column;
+    let widest = textWidth(column.header) + 2;
+    rows.forEach((row, index) => {
+      const span = spans?.[index] ?? columns.length;
+      if (c >= span || span === 1) return;
+      const cell = row[c];
+      if (typeof cell === 'string')
+        widest = Math.max(widest, textWidth(cell) + 2);
+      else if (typeof cell === 'number')
+        widest = Math.max(widest, String(cell).length + 4);
+    });
+    if (widest > FIT_MAX) return { ...column, width: FIT_MAX, wrap: true };
+    return { ...column, width: Math.max(FIT_MIN, widest) };
+  });
+}
+
 const totalWidth = (columns: readonly SheetColumn[]) =>
   columns.reduce((sum, column) => sum + (column.width ?? 14), 0);
 
@@ -128,11 +163,18 @@ function sheetOf(
   columns: SheetColumn[],
   rows: SheetBuilder | readonly (readonly CellValue[])[],
   extra: Partial<Sheet> = {},
+  // Column widths from the content (not for the counting basis, whose
+  // column has a fixed width).
+  fit = true,
 ): Sheet {
   const name = t.sheetNames[index] ?? '';
+  const table = rows instanceof SheetBuilder ? rows.rows : rows;
+  const spans =
+    extra.rowSpans ?? (rows instanceof SheetBuilder ? rows.spans : undefined);
+  const fitted = fit ? fitColumns(columns, table, spans) : columns;
   // Notes run on over the empty cells beside them: wrap them to the width of
   // the table.
-  const limit = Math.floor(totalWidth(columns) * 0.85);
+  const limit = Math.floor(totalWidth(fitted) * 0.85);
   const notes = [
     ...(t.sheetNotes[index] ?? []),
     ...(extra.notes ?? []),
@@ -141,8 +183,8 @@ function sheetOf(
     name,
     title: name.replace(/^\d_/, '') + t.sheetTitleSuffix,
     tabColor: 'FF1F3864',
-    columns,
-    rows: rows instanceof SheetBuilder ? rows.rows : rows,
+    columns: fitted,
+    rows: table,
     ...(rows instanceof SheetBuilder ? rows.layout() : {}),
     ...extra,
     notes,
@@ -440,7 +482,7 @@ function sheet6(report: CustomerReport, t: ReportText): Sheet {
   const w = t.wb;
   const widths = [24, 24, 24, 22, 40, 7, 12, 14, 8, 11, 36, 40];
   const wraps = [
-    false,
+    true,
     true,
     true,
     true,
@@ -533,10 +575,14 @@ function sheet7(report: CustomerReport, t: ReportText): Sheet {
     entry[lang].label,
     entry[lang].text,
   ]);
-  return sheetOf(t, 6, [col(item, 28), col(content, 100, true)], rows, {
-    boldFirstColumn: true,
-    filter: false,
-  });
+  return sheetOf(
+    t,
+    6,
+    [col(item, 28), col(content, 100, true)],
+    rows,
+    { boldFirstColumn: true, filter: false },
+    false,
+  );
 }
 
 export function customerReportSheets(report: CustomerReport): Sheet[] {

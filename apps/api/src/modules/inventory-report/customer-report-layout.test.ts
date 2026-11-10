@@ -3,7 +3,7 @@ import { demoInventory } from '../../adapters/fake/demo-inventory.js';
 import { unzip } from '../../testing/zip-reader.js';
 import { buildCustomerReport } from './customer-report.js';
 import { customerReportSheets, wrapText } from './customer-report-workbook.js';
-import { writeXlsx } from './xlsx-writer.js';
+import { columnWidth, writeXlsx } from './xlsx-writer.js';
 
 // Layout of the customer workbook (review of 10/11): every table is a block of
 // its own and only as wide as it is, section titles have no fill, nothing asks
@@ -205,5 +205,79 @@ describe('an inventory counted by an older report counting', () => {
         (r) => r.code === 'SCREEN_REPORT_OUTDATED',
       ),
     ).toBe(false);
+  });
+});
+
+describe('components of sheet 3: one row per file name, whatever its case', () => {
+  const inventory = JSON.parse(
+    JSON.stringify(demoInventory),
+  ) as typeof demoInventory;
+  const [first, second] = inventory.programs;
+  if (!first || !second) throw new Error('fixture');
+  const component = (fileName: string) => ({
+    kind: 'component' as const,
+    identifier: '{F9043C88-F6F2-101A-A3C9-08002B2F49FB}',
+    fileName,
+    description: null,
+  });
+  first.externalReferences = [
+    component('COMDLG32.OCX'),
+    component('comdlg32.ocx'),
+  ];
+  second.externalReferences = [component('ComDlg32.ocx')];
+  for (const lang of ['ja', 'vi'] as const) {
+    it(`counts distinct programs once (${lang})`, () => {
+      const report = buildCustomerReport(inventory, origin, lang);
+      const rows = report.dependencies.components.filter(
+        (c) => c.fileName?.toLowerCase() === 'comdlg32.ocx',
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.programs).toBe(2);
+    });
+  }
+});
+
+describe('column widths follow the content', () => {
+  const widthOf = (text: string) =>
+    Array.from(text).reduce((n, ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return (
+        n +
+        ((code >= 0x3000 && code <= 0x9fff) ||
+        (code >= 0xff00 && code <= 0xffef)
+          ? 2
+          : 1)
+      );
+    }, 0);
+  for (const lang of ['ja', 'vi'] as const) {
+    it(`no text is wider than its column unless the column wraps (${lang})`, () => {
+      const report = buildCustomerReport(demoInventory, origin, lang);
+      for (const sheet of customerReportSheets(report)) {
+        sheet.rows.forEach((row, index) => {
+          const span = sheet.rowSpans?.[index] ?? sheet.columns.length;
+          // A one-cell row (a title, 該当なし) runs on over its empty neighbours.
+          if (span <= 1) return;
+          row.slice(0, span).forEach((cell, c) => {
+            const column = sheet.columns[c];
+            if (typeof cell !== 'string' || column === undefined) return;
+            if (column.wrap) return;
+            expect(
+              widthOf(cell),
+              `${sheet.name} row ${index} column ${c}: ${cell}`,
+            ).toBeLessThanOrEqual(columnWidth(column));
+          });
+        });
+      }
+    });
+  }
+  it('makes the label column of sheet 1 wide enough for the longest label', () => {
+    for (const lang of ['ja', 'vi'] as const) {
+      const sheet = customerReportSheets(
+        buildCustomerReport(demoInventory, origin, lang),
+      )[0];
+      expect(columnWidth(sheet?.columns[0] ?? { header: '' })).toBeGreaterThan(
+        lang === 'ja' ? 34 : 38,
+      );
+    }
   });
 });

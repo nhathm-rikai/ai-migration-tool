@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 (tối) — Báo cáo cho khách: PDF mục 6 gọn, OCX gộp theo tên file, phân trang chống cắt dòng, độ rộng cột Excel
+
+- **PDF:** mục 6 thành tổng hợp (cách tạo × độ phức tạp + top 15 mẫu Crystal/DataReport + trỏ tới Excel); thành phần ngoài không còn GUID, gộp theo tên file không phân biệt hoa thường, top 15; API và SQL theo module top 15.
+- **Phân trang:** phát hiện lệch giữa chiều cao đo trong khung và ảnh vẽ thật (dòng cuối bị cắt nửa). Mỗi trang được vẽ thử và quét dòng thấp nhất; nếu chạm biên dưới thì xếp lại với chừa thêm chỗ, tới khi mọi trang vừa (trên e2e dữ liệu dài, lần thử đầu bị lệch, lần hai vừa).
+- **Rủi ro:** bỏ COMPLEXITY_REFERENCE_ONLY và COMPLEXITY_DRAFT (định nghĩa).
+- **Excel:** độ rộng cột theo nội dung (full-width tính 2), không ô nào bị cắt chữ; thành phần ngoài gộp theo tên file (distinct program).
+- Chưa push.
+
 ## 10/11/2026 (chiều) — Báo cáo cho khách: bố cục lại 7 sheet, bỏ nội dung đòi khách, PDF xếp trang trong DOM
 
 Theo review của người dùng trên dự án thật (10 điểm):

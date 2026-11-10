@@ -52,6 +52,14 @@ Workbook có **7 sheet**: `1_Quy mô` (ja `1_規模概要`), `2_Độ phức t�
 - **Inventory cũ:** nếu `screenReportVersion` khác `SCREEN_REPORT_VERSION` (contracts, hiện `screen-report-v3`) thì không suy ra được số CSV/Excel, log và độ phức tạp của report in/xuất: bước 2 có cảnh báo `SCREEN_REPORT_OUTDATED` ("cần phân tích lại") và báo cáo khách có rủi ro cùng mã (ja/vi).
 - **PDF:** tài liệu được xếp trang trong DOM (`a4-pdf.ts`, `paginate`): đo chiều cao từng khối, không cắt ngang dòng bảng/thẻ/đoạn, bảng dài tách giữa các dòng và lặp header ở trang sau (không để một dòng, thường là dòng tổng, đứng một mình), tiêu đề mục đi cùng ghi chú và khối đầu của nó; sau đó từng trang được vẽ riêng ở scale 3. Bảng rủi ro: ≤5 tên program + "và N program khác"; không có cột đề nghị. Bảng 6: Loại | Tên | Program | File:dòng | File thiết kế | Độ phức tạp (không gồm ghi file dữ liệu). Kiểm bằng e2e `pdf-layout.spec.ts` (báo cáo dài: mọi dòng đúng một trang, không tràn, các trang giữa đầy ≥75%).
 
+### 4b. Sửa tiếp 10/11/2026 (tối)
+
+- **Thành phần ngoài (sheet 3, PDF mục 3):** một dòng cho mỗi tên file không phân biệt hoa thường (`COMDLG32.OCX` = `comdlg32.ocx`), số program là số program khác nhau; cột Tên (tên file, không GUID), Loại, Mô tả, Số program. PDF: top 15 + "Còn N dòng nữa, xem file Excel"; danh sách API và SQL theo module cũng top 15.
+- **Rủi ro:** không còn `COMPLEXITY_REFERENCE_ONLY` và `COMPLEXITY_DRAFT` (là định nghĩa, đã ở Cơ sở tính). Mọi rủi ro chỉ nêu điều thiếu/cần lưu ý.
+- **PDF mục 6** là tổng hợp (không còn danh sách từng dòng): bảng cách tạo (Crystal/DataReport, in bằng code, xuất CSV/Excel) × mức độ phức tạp, top 15 mẫu Crystal/DataReport (tên, số nơi dùng, file thiết kế, độ phức tạp) và câu trỏ tới sheet 6 của Excel. JSON `items[].reportKind` (crystal | data-report | print | export).
+- **Phân trang PDF chống lệch đo/vẽ:** mỗi lần xếp trang, từng trang được vẽ thành ảnh (cao hơn vùng nội dung 300px) và quét dòng thấp nhất có nét vẽ; nếu có trang chạm biên dưới thì xếp lại với chừa thêm chỗ (0, 24, 48, 80, 120, 180 px) cho tới khi mọi trang vừa. Lý do: trình duyệt có thể ngắt dòng khác nhau giữa khung đo và ảnh (lỗi "dòng bị cắt nửa ở cuối trang"). E2E `pdf-layout.spec.ts` kiểm cả vi và ja với ô 3–5 dòng chữ.
+- **Độ rộng cột Excel** theo nội dung dài nhất của cột (ký tự full-width tính 2, tối thiểu 10, tối đa 60; dài hơn thì wrap), trừ sheet 7 (cột nội dung rộng 100, wrap). Test: không ô chữ nào rộng hơn cột trừ cột wrap.
+
 ## 5. Giới hạn
 
 Không có chữ ký, logo, kiểu mẫu của khách; chưa xuất theo bộ lọc (R5); chưa ô nhập số khách nêu và đối chiếu (R8); chưa tự chia wave (R9); PDF là AR03. Đã sinh file mở được bằng writer đã test, chưa mở bằng Excel Desktop.

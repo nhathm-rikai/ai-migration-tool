@@ -83,6 +83,8 @@ export type ItemRow = {
   modelVersion: string | null;
   // Where the report is made (reports only), a number so a sheet can show it.
   usages: number | null;
+  // How a report is made (crystal, data-report, print, export); null otherwise.
+  reportKind: string | null;
   factors: string;
   note: string;
 };
@@ -555,7 +557,9 @@ export function buildCustomerReport(
   >();
   for (const ref of core.externalReferences) {
     if (ref.kind !== 'component' && ref.kind !== 'reference') continue;
-    const key = `${ref.kind}|${ref.identifier}|${ref.fileName ?? ''}`;
+    // One row per file name whatever its case (COMDLG32.OCX, comdlg32.ocx),
+    // counted over distinct programs.
+    const key = `${ref.kind}|${(ref.fileName ?? ref.identifier).toLowerCase()}`;
     const entry = components.get(key) ?? {
       kind: ref.kind,
       identifier: ref.identifier,
@@ -566,6 +570,8 @@ export function buildCustomerReport(
     };
     entry.ids.add(ref.programId);
     entry.programs = entry.ids.size;
+    if (!entry.description && ref.description)
+      entry.description = ref.description;
     components.set(key, entry);
   }
   const apis = new Map<
@@ -720,6 +726,9 @@ export function buildCustomerReport(
         ...core.warnings.filter(
           (warning) =>
             warning.code !== 'DYNAMIC_SQL' &&
+            // Definitions of the complexity, in the counting basis, not risks.
+            warning.code !== 'COMPLEXITY_REFERENCE_ONLY' &&
+            warning.code !== 'COMPLEXITY_DRAFT' &&
             warning.code !== 'FILE_UNSUPPORTED' &&
             warning.code !== 'REPORT_FILE_MISSING' &&
             warning.code !== 'REPORT_SUSPECTED',
@@ -811,6 +820,7 @@ function buildItems(
         score: null,
         modelVersion: null,
         usages: null,
+        reportKind: null,
         factors: '',
         note: '',
       });
@@ -838,6 +848,7 @@ function buildItems(
       score: null,
       modelVersion: null,
       usages: null,
+      reportKind: null,
       factors: '',
       note: row.warnings
         .map((code) => t.warningLabels[code] ?? code)
@@ -882,6 +893,10 @@ function buildItems(
       score: complexity.score,
       modelVersion: complexity.version,
       usages: report.usages.length,
+      reportKind:
+        report.origin === 'crystal'
+          ? (report.kind ?? 'crystal')
+          : report.origin,
       factors: complexity.factors
         .map((f) =>
           f.factor === 'design-not-analyzed'
@@ -918,6 +933,7 @@ function buildItems(
       score: null,
       modelVersion: null,
       usages: null,
+      reportKind: null,
       factors: '',
       note: t.items.dataFileNote,
     });

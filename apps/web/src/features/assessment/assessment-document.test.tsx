@@ -4,7 +4,7 @@ import {
   customerReportFixture,
   legacyCustomerReportFixture,
 } from '../../testing/customer-report-fixture';
-import { AssessmentDocument, MAX_LIST_ROWS } from './assessment-document';
+import { AssessmentDocument } from './assessment-document';
 
 // AR03-AC01: every number in the document is the number in the JSON.
 
@@ -296,52 +296,58 @@ describe('AssessmentDocument sections 2 to 6', () => {
     expect(rows[1]?.textContent).toContain('ORDER、REPORT');
   });
 
-  it('items: reports first with level, score and 未評価; says 全件は Excel 参照', () => {
+  it('section 6 is a summary: reports by how they are made and by level, the top templates, a pointer to the Excel', () => {
     const report = customerReportFixture();
     const { section } = draw(report);
     const items = section('items');
-    const rows = Array.from(items.querySelectorAll('[data-item]'));
-    expect(rows).toHaveLength(report.items.length);
-    expect(
-      rows.map((row) => row.getAttribute('data-item')?.split(':')[0]),
-    ).toEqual([
-      '帳票',
-      '帳票',
-      '帳票',
-      '帳票',
-      '帳票',
-      'バッチ',
-      '画面',
-      '画面',
-      '画面',
+    // No line per screen, batch or report any more.
+    expect(items.textContent).not.toContain('programs/ORDER/ORDERFORM.FRM');
+    const kinds = Array.from(items.querySelectorAll('[data-kind-row]'));
+    expect(kinds.map((row) => row.getAttribute('data-kind-row'))).toEqual([
+      'crystal',
+      'print',
+      'export',
     ]);
-    const high = items.querySelector('[data-item="帳票:order.rpt"]');
-    expect(high?.textContent).toContain('高 · 6');
-    const unrated = items.querySelector('[data-item="帳票:rptMonthly"]');
-    expect(unrated?.textContent).toContain('未評価');
-    expect(unrated?.textContent).not.toContain('低');
-    // Code print and CSV/Excel export are reports like the others.
-    expect(
-      items.querySelector('[data-item="帳票:CUSTOMER.BAS"]')?.textContent,
-    ).toContain('コード印刷');
-    expect(items.textContent).toContain('全件は Excel 参照');
-    expect(items.textContent).toContain(`全${report.items.length}件`);
+    // Crystal / DataReport 3 (high, medium, unrated), code print 1, export 1.
+    const cells = (key: string) =>
+      Array.from(
+        items
+          .querySelector(`[data-kind-row="${key}"]`)
+          ?.querySelectorAll('td') ?? [],
+      ).map((cell) => cell.textContent);
+    expect(cells('crystal')).toEqual([
+      'Crystal Reports / DataReport',
+      '0',
+      '1',
+      '1',
+      '0',
+      '1',
+      '3',
+    ]);
+    expect(cells('print')?.at(-1)).toBe('1');
+    expect(cells('export')?.at(-1)).toBe('1');
+    // The templates by complexity: order.rpt (6) first, rptMonthly (unrated) last.
+    const templates = Array.from(items.querySelectorAll('[data-item]'));
+    expect(templates).toHaveLength(3);
+    expect(templates[0]?.textContent).toContain('order.rpt');
+    expect(templates[0]?.textContent).toContain('高 · 6');
+    expect(templates[0]?.textContent).toContain('あり');
+    expect(templates[1]?.textContent).toContain('なし');
+    expect(templates[2]?.textContent).toContain('未評価');
+    expect(items.textContent).toContain('6_画面・帳票一覧');
   });
 
-  it('caps a long list and keeps the total in the sentence', () => {
+  it('lists at most 15 templates and says how many are left', () => {
     const report = customerReportFixture();
-    const template = report.items.find((i) => i.type === '画面');
+    const template = report.items.find((i) => i.reportKind === 'crystal');
     if (!template) throw new Error('fixture');
-    report.items = Array.from({ length: MAX_LIST_ROWS + 25 }, (_, index) => ({
+    report.items = Array.from({ length: 40 }, (_, index) => ({
       ...template,
-      name: `F${index}`,
-      file: `a/F${index}.FRM`,
+      name: `T${index}.rpt`,
     }));
     const { section } = draw(report);
-    expect(section('items').querySelectorAll('[data-item]')).toHaveLength(
-      MAX_LIST_ROWS,
-    );
-    expect(section('items').textContent).toContain(`全${MAX_LIST_ROWS + 25}件`);
+    expect(section('items').querySelectorAll('[data-item]')).toHaveLength(15);
+    expect(section('items').textContent).toContain('ほか 25 件は Excel を参照');
   });
 
   it('next steps and appendix carry the fixed text and the counting rules', () => {
@@ -382,20 +388,31 @@ describe('AssessmentDocument layout hooks (AR03-AC03)', () => {
     expect(root.querySelectorAll('.qd-block').length).toBeGreaterThanOrEqual(8);
   });
 
-  it('keeps a long table as one block (the PDF page layout splits it between rows)', () => {
+  it('keeps a long table as one block, shows the top 15 components by file name (no id) and the rest as a count', () => {
     const report = customerReportFixture();
-    const template = report.items.find((i) => i.type === '画面');
-    if (!template) throw new Error('fixture');
-    report.items = Array.from({ length: 30 }, (_, index) => ({
-      ...template,
-      name: `F${index}`,
-      file: `a/F${index}.FRM`,
+    report.dependencies.components = Array.from({ length: 40 }, (_, index) => ({
+      kind: index % 2 === 0 ? ('component' as const) : ('reference' as const),
+      identifier: `{B16553C3-06DB-101B-85B2-${String(index).padStart(12, '0')}}`,
+      fileName: `LIB${index}.OCX`,
+      description: index % 2 === 0 ? '' : 'Library',
+      programs: 40 - index,
     }));
     const { section } = draw(report);
-    const tables = Array.from(section('items').querySelectorAll('table'));
-    expect(tables).toHaveLength(1);
-    expect(tables[0]?.querySelector('thead th')?.textContent).toBe('種別');
-    expect(tables[0]?.querySelectorAll('tbody tr')).toHaveLength(30);
+    const dependencies = section('dependencies');
+    const table = Array.from(dependencies.querySelectorAll('table')).find((t) =>
+      t.textContent?.includes('LIB0.OCX'),
+    );
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(15);
+    expect(
+      Array.from(table?.querySelectorAll('thead th') ?? []).map(
+        (th) => th.textContent,
+      ),
+    ).toEqual(['名称', '種別', '説明', 'プログラム数']);
+    // The id is not printed; the kind is.
+    expect(dependencies.textContent).not.toContain('B16553C3');
+    expect(dependencies.textContent).toContain('コントロール（OCX）');
+    expect(dependencies.textContent).toContain('参照設定（ライブラリ）');
+    expect(dependencies.textContent).toContain('ほか 25 件は Excel を参照');
   });
 });
 
@@ -460,25 +477,13 @@ describe('AssessmentDocument in Vietnamese (report.language = vi)', () => {
     expect(appendix).not.toMatch(/-v1|-draft|customer-assessment-report/);
   });
 
-  it('orders the list reports first in Vietnamese too', () => {
-    const report = vi();
-    const labels: Record<string, string> = {
-      画面: 'Màn hình',
-      帳票: 'Report',
-      バッチ: 'Batch',
-      出力機能: 'Ghi file dữ liệu',
-    };
-    report.items = report.items.map((item) => ({
-      ...item,
-      type: labels[item.type] ?? item.type,
-    }));
-    const { section } = draw(report);
-    const types = Array.from(
-      section('items').querySelectorAll('[data-item]'),
-    ).map((row) => row.getAttribute('data-item')?.split(':')[0]);
-    const firstBatch = types.indexOf('Batch');
-    const firstScreen = types.indexOf('Màn hình');
-    expect(types[0]).toBe('Report');
-    expect(firstBatch).toBeLessThan(firstScreen);
+  it('has the summary of section 6 in Vietnamese', () => {
+    const { section } = draw(vi());
+    const items = section('items');
+    expect(section('items').textContent).toContain('6. Tổng hợp report');
+    expect(items.textContent).toContain('Cách tạo');
+    expect(items.textContent).toContain('In bằng code');
+    expect(items.textContent).toContain('Xuất CSV/Excel');
+    expect(items.textContent).toContain('6_Màn hình-Report');
   });
 });

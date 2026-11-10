@@ -39,7 +39,7 @@ const JA = {
     dependencies: '3. 依存関係',
     database: '4. データベース',
     risks: '5. リスク',
-    items: '6. 画面・帳票一覧',
+    items: '6. 帳票の内訳',
     appendix: '付録',
   },
   kpi: {
@@ -102,6 +102,10 @@ const JA = {
     severity: '重要度',
     content: '内容',
     design: '設計ファイル',
+    usages: '使用箇所数',
+    templates: 'Crystal ／ DataReport の帳票（複雑度の高い順）',
+    moreRows: (count: string) => `ほか ${count} 件は Excel を参照`,
+    byKind: '作成方法',
     designYes: 'あり',
     designNo: 'なし',
     name: '名称',
@@ -127,6 +131,8 @@ const JA = {
     shared: '共通部品（参照プログラム数の多い順）',
     components: '外部コンポーネント（COM / OCX）',
     apis: '外部ライブラリの関数（Windows API など）',
+    ocxKind: 'コントロール（OCX）',
+    referenceKind: '参照設定（ライブラリ）',
   },
   db: {
     tablesTop: (label: string) => `${label}（上位）`,
@@ -142,8 +148,8 @@ const JA = {
       `アクセスされるテーブルと、動的SQL・文字列連結SQLの箇所数です。${note}`,
     risks:
       '解析で判断できなかった点・注意が必要な点を重要度別にまとめています。',
-    items: (shown: string, total: string, all: string) =>
-      `帳票・バッチ・画面の順に最大${shown}件を表示しています（全${total}件）。${all}。`,
+    items:
+      '画面・帳票・バッチの一覧は Excel の「6_画面・帳票一覧」シートに記載しています。',
   },
   appendix: {
     definitionsTitle: '指標の定義',
@@ -200,7 +206,7 @@ const VI: DocText = {
     dependencies: '3. Phụ thuộc',
     database: '4. Cơ sở dữ liệu',
     risks: '5. Rủi ro',
-    items: '6. Danh sách màn hình, report',
+    items: '6. Tổng hợp report',
     appendix: 'Phụ lục',
   },
   kpi: {
@@ -264,6 +270,10 @@ const VI: DocText = {
     severity: 'Mức độ',
     content: 'Nội dung',
     design: 'File thiết kế',
+    usages: 'Số nơi dùng',
+    templates: 'Mẫu Crystal / DataReport (theo độ phức tạp giảm dần)',
+    moreRows: (count: string) => `Còn ${count} dòng nữa, xem file Excel`,
+    byKind: 'Cách tạo',
     designYes: 'Có',
     designNo: 'Thiếu file',
     name: 'Tên',
@@ -289,6 +299,8 @@ const VI: DocText = {
     shared: 'Thành phần dùng chung (nhiều program tham chiếu nhất)',
     components: 'Thành phần ngoài (COM / OCX)',
     apis: 'Hàm của thư viện ngoài (Windows API, v.v.)',
+    ocxKind: 'Control (OCX)',
+    referenceKind: 'Thư viện tham chiếu',
   },
   db: {
     tablesTop: (label: string) => `${label} (top)`,
@@ -304,8 +316,8 @@ const VI: DocText = {
       `Các bảng được truy cập và số vị trí SQL động / SQL ghép chuỗi. ${note}`,
     risks:
       'Tổng hợp theo mức độ những điểm chưa xác định được qua phân tích hoặc cần lưu ý.',
-    items: (shown: string, total: string, all: string) =>
-      `Hiển thị tối đa ${shown} dòng theo thứ tự report, batch, màn hình (tổng ${total} dòng). ${all}.`,
+    items:
+      'Danh sách đầy đủ màn hình, report và batch: xem sheet "6_Màn hình-Report" của file Excel.',
   },
   appendix: {
     definitionsTitle: 'Định nghĩa các chỉ số',

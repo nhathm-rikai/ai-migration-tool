@@ -158,10 +158,19 @@ export type PaginationInfo = {
   room: number;
   rowsBefore: number;
   rowsAfter: number;
-  pages: { height: number; fill: number; overflow: number }[];
+  // How many times the pages were laid out (1 = the first try fitted).
+  attempts: number;
+  // overflow: 1 when anything is drawn past the room; bottom: the lowest row
+  // drawn, in page pixels.
+  pages: { height: number; fill: number; overflow: number; bottom: number }[];
 };
 
 const MIN_SPLIT_ROWS = 2;
+// Room kept free on a page while laying it out, tried in turn until the pages
+// drawn as images fit (see renderA4Pdf); the image is drawn this much taller
+// than the room so an overrun can be seen.
+const PAGINATE_SLACKS = [0, 24, 48, 80, 120, 180];
+const OVERRUN = 300;
 
 // Places the items of the document on pages of `room` pixels, in the frame's
 // DOM. Returns the page elements (the original root is removed).
@@ -451,36 +460,98 @@ export async function renderA4Pdf(
     await new Promise((resolve) => requestAnimationFrame(resolve));
     if (options.paginate) {
       const room = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
-      const laid = paginateDom(root, room, options, options.paginate);
+      const SCALE = SHARP_SCALE;
+      // The page is drawn into an image taller than the room, so content that
+      // runs past it (text that wraps differently in the image than in the
+      // frame the pages were measured in) can be seen, not just clipped.
+      const drawn = room + OVERRUN;
+      const pageSvg = (page: HTMLElement) =>
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${drawn * SCALE}" viewBox="0 0 ${PAGE_W} ${drawn}">` +
+        `<foreignObject width="${PAGE_W}" height="${drawn}">` +
+        `<div xmlns="${ns}"><style>${escapeText(css)}</style>${new XMLSerializer().serializeToString(page)}</div>` +
+        '</foreignObject></svg>';
+      // The lowest row (in page pixels) with anything drawn on it.
+      const scratch = document.createElement('canvas');
+      scratch.width = PAGE_W * SCALE;
+      scratch.height = drawn * SCALE;
+      const scratchContext = scratch.getContext('2d', {
+        willReadFrequently: true,
+      });
+      if (!scratchContext) throw new Error('The page could not be drawn.');
+      const lowestInk = (image: HTMLImageElement) => {
+        scratchContext.fillStyle = '#ffffff';
+        scratchContext.fillRect(0, 0, scratch.width, scratch.height);
+        scratchContext.drawImage(image, 0, 0);
+        const top = Math.max(0, (room - 160) * SCALE);
+        const data = scratchContext.getImageData(
+          0,
+          top,
+          scratch.width,
+          scratch.height - top,
+        ).data;
+        for (let row = scratch.height - top - 1; row >= 0; row -= 1) {
+          const at = row * scratch.width * 4;
+          for (let x = 0; x < scratch.width; x += 2)
+            if (
+              Math.min(
+                data[at + x * 4] ?? 255,
+                data[at + x * 4 + 1] ?? 255,
+                data[at + x * 4 + 2] ?? 255,
+              ) < 244
+            )
+              return Math.ceil((top + row + 1) / SCALE);
+        }
+        return 0;
+      };
+      // Lay the pages out with a little more room kept free each time until
+      // every page, drawn as it will be, fits (a browser that wraps a line
+      // differently in the image than in the frame is then still safe).
+      const pristine = root.cloneNode(true) as HTMLElement;
+      root.remove();
+      type Placed = {
+        element: HTMLElement;
+        image: HTMLImageElement;
+        bottom: number;
+      };
+      let placed: Placed[] = [];
+      let laid: { pages: HTMLElement[]; rowsBefore: number } | null = null;
+      let attempts = 0;
+      for (const slack of PAGINATE_SLACKS) {
+        attempts += 1;
+        const working = pristine.cloneNode(true) as HTMLElement;
+        frameDocument.body.append(working);
+        laid = paginateDom(working, room - slack, options, options.paginate);
+        placed = [];
+        for (const element of laid.pages) {
+          const image = await loadImage(
+            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pageSvg(element))}`,
+          );
+          placed.push({ element, image, bottom: lowestInk(image) });
+        }
+        if (placed.every((entry) => entry.bottom <= room - 2)) break;
+        // Too tight: take the pages away and try again with more room free.
+        if (slack !== PAGINATE_SLACKS[PAGINATE_SLACKS.length - 1])
+          for (const entry of placed) entry.element.remove();
+      }
+      if (!laid) throw new Error('The report could not be laid out.');
       const rendered: { jpeg: Uint8Array; width: number; height: number }[] =
         [];
       const info: PaginationInfo = {
         room,
         rowsBefore: laid.rowsBefore,
         rowsAfter: 0,
+        attempts,
         pages: [],
       };
-      for (const [index, page] of laid.pages.entries()) {
-        const h = Math.ceil(page.getBoundingClientRect().height);
-        const bottom = page.getBoundingClientRect().top + h;
-        info.rowsAfter += page.querySelectorAll('tbody tr').length;
+      for (const [index, entry] of placed.entries()) {
+        const h = Math.ceil(entry.element.getBoundingClientRect().height);
+        info.rowsAfter += entry.element.querySelectorAll('tbody tr').length;
         info.pages.push({
           height: h,
-          fill: h / room,
-          overflow: Array.from(
-            page.querySelectorAll('tr, .qd-kpi, p, h2, h3, li'),
-          ).filter((el) => el.getBoundingClientRect().bottom > bottom + 1)
-            .length,
+          fill: Math.max(h, entry.bottom) / room,
+          overflow: entry.bottom > room ? 1 : 0,
+          bottom: entry.bottom,
         });
-        const SCALE = SHARP_SCALE;
-        const svg =
-          `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${h * SCALE}" viewBox="0 0 ${PAGE_W} ${h}">` +
-          `<foreignObject width="${PAGE_W}" height="${h}">` +
-          `<div xmlns="${ns}"><style>${escapeText(css)}</style>${new XMLSerializer().serializeToString(page)}</div>` +
-          '</foreignObject></svg>';
-        const pageImage = await loadImage(
-          `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-        );
         const canvas = document.createElement('canvas');
         canvas.width = PAGE_W * SCALE;
         canvas.height = PAGE_H * SCALE;
@@ -488,7 +559,14 @@ export async function renderA4Pdf(
         if (!context) throw new Error('The page could not be drawn.');
         context.fillStyle = '#ffffff';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(pageImage, 0, MARGIN_TOP * SCALE);
+        context.drawImage(entry.image, 0, MARGIN_TOP * SCALE);
+        // Anything past the room would show over the footer: clear it.
+        context.fillRect(
+          0,
+          (MARGIN_TOP + room) * SCALE,
+          canvas.width,
+          canvas.height - (MARGIN_TOP + room) * SCALE,
+        );
         const footerY = (PAGE_H - 30) * SCALE;
         context.fillStyle = '#d5dde6';
         context.fillRect(
@@ -504,7 +582,7 @@ export async function renderA4Pdf(
         context.fillText(footerLabel, SIDE * SCALE, footerY);
         context.textAlign = 'right';
         context.fillText(
-          `${index + 1} / ${laid.pages.length}`,
+          `${index + 1} / ${placed.length}`,
           (PAGE_W - SIDE) * SCALE,
           footerY,
         );

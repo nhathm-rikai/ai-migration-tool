@@ -150,9 +150,19 @@ describe('AR02-AC03 risks', () => {
       (w) => w.code === 'REPORT_FILE_MISSING' || w.code === 'REPORT_SUSPECTED',
     ).length;
     expect(perSign).toBeGreaterThan(0);
+    // The definitions of the complexity are in the counting basis, not risks.
+    const definitions = core.warnings.filter(
+      (w) =>
+        w.code === 'COMPLEXITY_REFERENCE_ONLY' || w.code === 'COMPLEXITY_DRAFT',
+    ).length;
+    expect(definitions).toBeGreaterThan(0);
+    expect(fromWarnings.some((r) => r.code.startsWith('COMPLEXITY_'))).toBe(
+      false,
+    );
     expect(fromWarnings.reduce((n, r) => n + r.count, 0)).toBe(
       core.warnings.length -
-        perSign +
+        perSign -
+        definitions +
         (report.scale.reportBreakdown?.missingFile ?? 0),
     );
     expect(new Set(fromWarnings.map((r) => r.code)).size).toBe(

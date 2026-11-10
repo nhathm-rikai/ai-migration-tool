@@ -29,12 +29,16 @@ type DocumentText = ReturnType<typeof documentText>;
 // Rows of the screen/report list shown in the PDF (two pages at most); the
 // rest is in the Excel.
 export const MAX_LIST_ROWS = 40;
+const LEVEL_ORDER = ['low', 'medium', 'high', 'very-high', 'unrated'] as const;
 // A table is one block: the page layout of the PDF (a4-pdf paginate) splits it
 // between rows and repeats the header where a page ends.
 const ROWS_PER_BLOCK = Number.MAX_SAFE_INTEGER;
 const RISK_ROWS_PER_BLOCK = Number.MAX_SAFE_INTEGER;
 // Programs named in a risk row; the rest is a count.
 const MAX_RISK_PROGRAMS = 5;
+// Rows of the lists of section 3, 4 and 6: the top ones, the rest is in the Excel.
+const MAX_DEP_ROWS = 15;
+const MAX_TEMPLATE_ROWS = 15;
 
 export { jaDate } from './assessment-document-text';
 
@@ -288,17 +292,55 @@ export function AssessmentDocument({
   const levels = sr ? Object.entries(sr.reports.byLevel) : [];
   const levelLabel = (level: string) => T.levels[level] ?? level;
 
-  const counted = report.items.filter(
-    (item) => item.confidence !== 'suspected',
+  // Reports (not screens, batches or file output) by how they are made and by
+  // level; the Crystal / DataReport templates by complexity.
+  const reportItems = report.items.filter(
+    (item) => item.reportKind !== null && item.reportKind !== undefined,
   );
-  const listed = [...counted]
-    .sort((a, b) => (T.itemOrder[a.type] ?? 9) - (T.itemOrder[b.type] ?? 9))
-    .slice(0, MAX_LIST_ROWS);
+  const kindRows = (
+    [
+      ['crystal', T.breakdown.crystal],
+      ['print', T.breakdown.print],
+      ['export', T.breakdown.export],
+    ] as const
+  ).map(([key, label]) => {
+    const rows = reportItems.filter((item) =>
+      key === 'crystal'
+        ? item.reportKind === 'crystal' || item.reportKind === 'data-report'
+        : item.reportKind === key,
+    );
+    const byLevel: Record<string, number> = {};
+    for (const item of rows)
+      byLevel[item.level ?? 'unrated'] =
+        (byLevel[item.level ?? 'unrated'] ?? 0) + 1;
+    return { key, label, byLevel, total: rows.length };
+  });
+  const templates = reportItems
+    .filter(
+      (item) =>
+        item.reportKind === 'crystal' || item.reportKind === 'data-report',
+    )
+    .sort(
+      (a, b) =>
+        (b.score ?? -1) - (a.score ?? -1) ||
+        (b.usages ?? 0) - (a.usages ?? 0) ||
+        a.name.localeCompare(b.name),
+    );
   const moduleTotal = {
     files: report.modules.reduce((sum, row) => sum + row.files, 0),
   };
   const breakdown = scale.reportBreakdown;
   const date = (iso: string) => formatDate(lang, iso);
+  // A component is named by its file (the registry id is not a name).
+  const componentName = (row: Report['dependencies']['components'][number]) =>
+    row.fileName ??
+    (/^\{?[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}?$/.test(
+      row.identifier,
+    )
+      ? (row.description ?? '')
+      : row.identifier);
+  const more = (rest: number) =>
+    rest > 0 ? <Note>{T.table.moreRows(n(rest))}</Note> : null;
 
   return (
     <div
@@ -635,30 +677,32 @@ export function AssessmentDocument({
           empty={T.notApplicable}
           title={T.deps.components}
           head={[
-            T.table.identifier,
-            T.table.fileName,
+            T.table.name,
+            T.table.kind,
             T.table.description,
-            T.table.refPrograms,
+            T.table.programs,
           ]}
           numeric={[3]}
-          rows={report.dependencies.components.map((row) => [
-            row.identifier,
-            row.fileName,
-            row.description,
-            n(row.programs),
-          ])}
+          rows={report.dependencies.components
+            .slice(0, MAX_DEP_ROWS)
+            .map((row) => [
+              componentName(row),
+              row.kind === 'reference' ? T.deps.referenceKind : T.deps.ocxKind,
+              row.description ?? '',
+              n(row.programs),
+            ])}
         />
+        {more(report.dependencies.components.length - MAX_DEP_ROWS)}
         <Table
           empty={T.notApplicable}
           title={T.deps.apis}
           head={[T.table.function, T.table.library, T.table.callers]}
           numeric={[2]}
-          rows={report.dependencies.apis.map((row) => [
-            row.name,
-            row.library,
-            n(row.programs),
-          ])}
+          rows={report.dependencies.apis
+            .slice(0, MAX_DEP_ROWS)
+            .map((row) => [row.name, row.library, n(row.programs)])}
         />
+        {more(report.dependencies.apis.length - MAX_DEP_ROWS)}
       </div>
 
       <div className="ad-section" data-doc="database">
@@ -685,14 +729,17 @@ export function AssessmentDocument({
           )}
           head={[T.table.module, T.table.dynamicSql, T.table.concatSql]}
           numeric={[1, 2]}
-          rows={report.database.sqlByModule.map((row) => [
-            row.module,
-            n(row.dynamicSql),
-            row.concatenatedSql === null
-              ? T.notAnalyzed
-              : n(row.concatenatedSql),
-          ])}
+          rows={report.database.sqlByModule
+            .slice(0, MAX_DEP_ROWS)
+            .map((row) => [
+              row.module,
+              n(row.dynamicSql),
+              row.concatenatedSql === null
+                ? T.notAnalyzed
+                : n(row.concatenatedSql),
+            ])}
         />
+        {more(report.database.sqlByModule.length - MAX_DEP_ROWS)}
       </div>
 
       <div className="ad-section" data-doc="risks">
@@ -735,33 +782,48 @@ export function AssessmentDocument({
         <Heading>{T.sections.items}</Heading>
         {sr ? (
           <>
-            <Note>
-              {T.notes.items(n(MAX_LIST_ROWS), n(counted.length), T.allInExcel)}
-            </Note>
+            <Note>{T.notes.items}</Note>
             <KeyedTable
               empty={T.notApplicable}
               head={[
-                T.table.kind,
+                T.table.byKind,
+                ...LEVEL_ORDER.map(levelLabel),
+                T.table.total,
+              ]}
+              numeric={[1, 2, 3, 4, 5, 6]}
+              rows={kindRows.map((row) => ({
+                key: row.key,
+                attr: 'data-kind-row',
+                cells: [
+                  row.label,
+                  ...LEVEL_ORDER.map((level) => n(row.byLevel[level] ?? 0)),
+                  n(row.total),
+                ],
+              }))}
+            />
+            <KeyedTable
+              empty={T.notApplicable}
+              title={T.table.templates}
+              head={[
                 T.table.name,
-                T.table.program,
-                T.table.location,
+                T.table.kind,
+                T.table.usages,
                 T.table.design,
                 T.table.level,
               ]}
-              widths={[17, 16, 14, 31, 10, 12]}
-              rows={listed.map((item) => ({
-                key: `${item.type}:${item.name || item.file}`,
+              numeric={[2]}
+              rows={templates.slice(0, MAX_TEMPLATE_ROWS).map((item) => ({
+                key: `${item.kindLabel}:${item.name || item.file}`,
                 attr: 'data-item',
                 cells: [
-                  item.kindLabel,
                   item.name,
-                  item.programs,
-                  item.file + (item.line === null ? '' : `:${item.line}`),
+                  item.kindLabel,
+                  item.usages === null || item.usages === undefined
+                    ? ''
+                    : n(item.usages),
                   item.confidence === 'design-file'
                     ? T.table.designYes
-                    : item.confidence === 'missing-file'
-                      ? T.table.designNo
-                      : '',
+                    : T.table.designNo,
                   item.levelLabel === null
                     ? ''
                     : item.score === null
@@ -770,7 +832,7 @@ export function AssessmentDocument({
                 ],
               }))}
             />
-            <Note>{T.allInExcel}</Note>
+            {more(templates.length - MAX_TEMPLATE_ROWS)}
           </>
         ) : (
           <div className="qd-block">

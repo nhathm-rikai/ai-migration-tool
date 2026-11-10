@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 (đêm, 3) — Sửa 2 lỗi P2 nhận diện ghi Excel (review tại 4dd4d79)
+
+- **Ghi Excel phải gắn với đối tượng Excel:** theo dõi biến Excel (khai báo `As Excel.*`, gán từ CreateObject/GetObject/New Excel.Application/Workbooks.Add/Open, Set từ đối tượng Excel, khối With); `rs.Save`, `Text1.Value =`, `grid.Cells(...) =`, UPDATE/INSERT DB thường không còn mở khóa tính Excel. INSERT/UPDATE chỉ tính khi file có nguồn ADO Excel (mức file; giới hạn đã biết).
+- **If một dòng:** phần sau Then/Else được quét như lệnh riêng (ghi Excel và Write # CSV).
+- Pilot `source_vb6` (số tổng): 帳票 175 → 175 (Crystal 63, in 104, CSV/Excel 8), file dữ liệu 51 → 51, loại trừ 7 → 7. Chưa push.
+
 ## 10/11/2026 (đêm, 2) — Độ phức tạp report chỉ hiện mức
 
 - Bước 2 (danh sách report), Excel sheet 6 (10 cột, bỏ Điểm và Yếu tố đánh giá) và PDF mục 6: chỉ hiện mức, không "Cao · 7" / "Trung bình · 0". "Chưa đánh giá" giữ riêng.

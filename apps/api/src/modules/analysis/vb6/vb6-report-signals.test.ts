@@ -172,6 +172,7 @@ describe('output signals for the output-function list', () => {
     expect(
       scan(
         '    Shell "C:\\Program Files\\Office\\EXCEL.EXE " & f, 1',
+        '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       ),
     ).toEqual([{ kind: 'excel', name: 'EXCEL.EXE', line: 1 }]);
@@ -255,6 +256,7 @@ describe('CSV and Excel output signals', () => {
     expect(
       scan(
         '    sFile = "report.xls"',
+        '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       )[0],
     ).toMatchObject({
@@ -264,12 +266,14 @@ describe('CSV and Excel output signals', () => {
     expect(
       scan(
         '    cs = "Extended Properties=Excel 8.0;HDR=Yes"',
+        '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       )[0],
     ).toMatchObject({ kind: 'excel', name: 'Excel (ADO)' });
     expect(
       scan(
         '    Shell "excel.exe " & f',
+        '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       )[0],
     ).toMatchObject({
@@ -335,6 +339,7 @@ describe('Excel is output only when the code writes to it', () => {
     expect(
       kinds(
         '    Set xl = CreateObject("Excel.Application")',
+        '    Set ws = xl.ActiveSheet',
         '    With ws',
         '        .Range("A1") = "Title"',
         '    End With',
@@ -438,5 +443,98 @@ describe('a CSV write belongs to its own file handle', () => {
         'End Sub',
       ),
     ).toEqual(['Open For Output:-:-', 'Open For Output:csv:-']);
+  });
+});
+
+// Only a write on an object known to be Excel counts (review 10/11: rs.Save,
+// Text1.Value and a grid's Cells are not Excel), and a write after a one-line
+// If or Else is a write.
+describe('a write counts only on an Excel object', () => {
+  const kinds = (...lines: string[]) => scan(...lines).map((s) => s.kind);
+  const open = [
+    '    Set xl = CreateObject("Excel.Application")',
+    '    Set wb = xl.Workbooks.Open("in.xls")',
+  ];
+  it.each([
+    ['an ADO Recordset Save', '    rs.Save "a.xml", adPersistXML'],
+    ['a control Value', '    Text1.Value = 1'],
+    ['a check box Value', '    chkAll.Value = vbChecked'],
+    ['a grid Cells', '    grid.Cells(1, 1) = x'],
+    [
+      'an UPDATE on an ordinary database',
+      '    cn.Execute "UPDATE t SET a = 1"',
+    ],
+    [
+      'an INSERT on an ordinary database',
+      '    cn.Execute "INSERT INTO t VALUES (1)"',
+    ],
+    ['a Save of another object', '    doc.Save'],
+  ])('does not count %s', (_name, line) => {
+    expect(kinds(...open, line)).toEqual([]);
+  });
+  it('does not count a read of an Excel cell', () => {
+    expect(kinds(...open, '    v = wb.Sheets(1).Cells(1, 1).Value')).toEqual(
+      [],
+    );
+    expect(
+      kinds(...open, '    If wb.Sheets(1).Cells(1, 1).Value = 1 Then n = 2'),
+    ).toEqual([]);
+  });
+  it('does not count an INSERT when the file has no Excel ADO source', () => {
+    expect(
+      kinds(
+        '    cn.Open "Provider=SQLOLEDB;Data Source=srv"',
+        '    cn.Execute "INSERT INTO t VALUES (1)"',
+        '    Set xl = CreateObject("Excel.Application")',
+      ),
+    ).toEqual([]);
+  });
+  it.each([
+    [
+      'a variable declared As Excel',
+      ['    Dim ws As Excel.Worksheet', '    ws.Cells(1, 1).Value = "a"'],
+    ],
+    [
+      'a Set from another Excel object',
+      [...open, '    Set ws = wb.Worksheets(1)', '    ws.Range("A1") = "a"'],
+    ],
+    [
+      'the block of a With on an Excel object',
+      [
+        ...open,
+        '    With xl.ActiveSheet',
+        '        .Cells(1, 1) = "a"',
+        '    End With',
+      ],
+    ],
+  ])('counts a write on %s', (_name, lines) => {
+    expect(
+      kinds('    Set xl = CreateObject("Excel.Application")', ...lines),
+    ).toContain('excel');
+  });
+  it.each([
+    ['If ... Then save', [...open, '    If ok Then wb.SaveAs path']],
+    [
+      'Then ... Else a cell',
+      [
+        ...open,
+        '    If a Then n = 1 Else wb.Sheets(1).Cells(1, 1).Value = "x"',
+      ],
+    ],
+    [
+      'a cell after Then',
+      [...open, '    If ok Then xl.ActiveSheet.Range("A1") = "x"'],
+    ],
+    ['a statement after a colon', [...open, '    n = 1: wb.SaveAs path']],
+  ])('counts a write in a one-line statement: %s', (_name, lines) => {
+    expect(kinds(...lines)).toContain('excel');
+  });
+  it('a CSV write after a one-line If belongs to its handle', () => {
+    const [signal] = scan(
+      '    Open sOut For Output As #1',
+      '    If ok Then Write #1, a, b',
+      '    Close #1',
+    );
+    expect(signal?.subkind).toBe('csv');
   });
 });

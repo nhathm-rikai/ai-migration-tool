@@ -153,24 +153,99 @@ function signalsOf(statement: string): Omit<ReportSignal, 'line'>[] {
   return found;
 }
 
-// Evidence that code writes to Excel (not just opens it): a new workbook, a
-// save, a cell or range assigned, or an INSERT / UPDATE through an Excel ADO
-// source. A statement that tests a cell ("If ...Value = x") is not a write.
-const NOT_AN_ASSIGNMENT = /^\s*(?:If|ElseIf|While|Do|Loop|Select|Case|Wend)\b/i;
-function writesExcel(statement: string): boolean {
+// A one-line If holds statements of its own after Then / Else: those are read
+// as statements. Any other statement is read as it is.
+function statementsOf(statement: string): string[] {
   const masked = maskStrings(statement);
-  if (/(?<!\w)Workbooks\s*\.\s*Add\b/i.test(masked)) return true;
-  if (/\.\s*(?:SaveAs|SaveCopyAs|Save)\b/i.test(masked)) return true;
-  if (
-    [...statement.matchAll(STRING_LITERAL)].some((match) =>
-      /^"\s*(?:insert\s+into|update\s+\S+\s+set)\b/i.test(match[0]),
-    )
-  )
-    return true;
-  if (NOT_AN_ASSIGNMENT.test(masked)) return false;
-  return /\.\s*(?:(?:Cells|Range|Item)\s*\([^)]*\)(?:\s*\.\s*(?:Value2?|Formula))?|Value2?|Formula)\s*=(?!=)/i.test(
-    masked,
+  const head = /^\s*(?:If|ElseIf)\b.*?\bThen\b/i.exec(masked);
+  if (!head) return [statement];
+  const rest = statement.slice(head[0].length);
+  const maskedRest = masked.slice(head[0].length);
+  const at = maskedRest.search(/\bElse\b/i);
+  const parts = at < 0 ? [rest] : [rest.slice(0, at), rest.slice(at + 4)];
+  return parts.flatMap((part) =>
+    part.trim() === '' ? [] : statementsOf(part),
   );
+}
+
+// Evidence that code WRITES to Excel (opening or reading it is not an output).
+// Only a write on an object known to be Excel counts: a variable declared As
+// Excel.* or set from CreateObject/GetObject("Excel.Application"), New
+// Excel.Application, Workbooks.Add/Open, or from another Excel object; the
+// block of a With on such an object; INSERT / UPDATE only when the file has an
+// Excel ADO source (file level). So rs.Save, Text1.Value = 1, a grid's Cells or
+// an UPDATE on an ordinary database are not Excel writes.
+const EXCEL_DECLARED =
+  /([A-Za-z_]\w*)(?:\s*\([^)]*\))?\s+As\s+(?:New\s+)?(?:Excel\s*\.\s*(?:Application|Workbooks?|Worksheets?|Range)|Workbooks?|Worksheets?)\b/gi;
+const STATEMENT_ROOT = /^\s*(?:Call\s+)?(\.|[A-Za-z_]\w*)/i;
+const CELL_TARGET = /\.\s*(?:Cells|Range|Item|Value2?|Formula)\b/i;
+
+class ExcelWrites {
+  private readonly objects = new Set<string>();
+  private readonly withs: boolean[] = [];
+  private adoSource = false;
+  private sqlWrite = false;
+  private written = false;
+
+  get any(): boolean {
+    return this.written || (this.adoSource && this.sqlWrite);
+  }
+
+  private isExcel(expression: string): boolean {
+    const root = STATEMENT_ROOT.exec(expression)?.[1];
+    if (root === undefined) return false;
+    return root === '.'
+      ? this.withs[this.withs.length - 1] === true
+      : this.objects.has(root.toLowerCase());
+  }
+
+  read(statement: string): void {
+    const masked = maskStrings(statement);
+    for (const match of masked.matchAll(EXCEL_DECLARED))
+      this.objects.add((match[1] ?? '').toLowerCase());
+    for (const literal of statement.matchAll(STRING_LITERAL)) {
+      const text = literal[0];
+      if (
+        /\bExcel\s+\d+\.\d+/i.test(text) ||
+        /Extended\s+Properties\s*=\s*"?\s*Excel/i.test(text)
+      )
+        this.adoSource = true;
+      if (/^"\s*(?:insert\s+into|update\s+\S+\s+set)\b/i.test(text))
+        this.sqlWrite = true;
+    }
+    const withBlock = /^\s*With\s+(.+)$/i.exec(masked);
+    if (withBlock) {
+      this.withs.push(this.isExcel(withBlock[1] ?? ''));
+      return;
+    }
+    if (/^\s*End\s+With\b/i.test(masked)) {
+      this.withs.pop();
+      return;
+    }
+    const set = /^\s*Set\s+([A-Za-z_]\w*)\s*=\s*(.+)$/i.exec(masked);
+    if (set) {
+      const rhs = set[2] ?? '';
+      if (
+        signalsOf(statement).some((s) => s.name === 'Excel.Application') ||
+        this.isExcel(rhs) ||
+        /(?<!\w)Workbooks\s*\.\s*(?:Add|Open)\b/i.test(rhs)
+      )
+        this.objects.add((set[1] ?? '').toLowerCase());
+    }
+    if (/(?<!\w)Workbooks\s*\.\s*Add\b/i.test(masked)) this.written = true;
+    if (/^\s*Set\b/i.test(masked)) return;
+    if (
+      /\.\s*(?:SaveAs|SaveCopyAs|Save)\b/i.test(masked) &&
+      this.isExcel(masked)
+    )
+      this.written = true;
+    // A cell, range or value assigned (the first "=" of the statement).
+    const equals = masked.search(/(?<![<>=!])=(?!=)/);
+    if (equals > 0) {
+      const target = masked.slice(0, equals);
+      if (CELL_TARGET.test(target) && this.isExcel(target)) this.written = true;
+    }
+  }
 }
 
 // A write that makes the file comma separated: Write # (the statement
@@ -197,8 +272,8 @@ export function findVb6ReportSignals(
   // handle (#1, or a variable from FreeFile): a Write # or a comma separated
   // Print # makes the file of ITS handle CSV, whichever file was opened last.
   const opens = new Map<string, ReportSignal>();
-  // Excel signals count only when the file writes to Excel somewhere.
-  let excelWrite = false;
+  // Excel signals count only when the file writes to an Excel object.
+  const excel = new ExcelWrites();
   let incoming: Vb6Continuation = 'none';
   let buffer: { text: string; line: number } | null = null;
   for (
@@ -218,32 +293,39 @@ export function findVb6ReportSignals(
       // A statement may hold several ':'-separated statements; only the
       // whole text is matched, which is enough for the signals above.
       for (const part of buffer.text.split(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/)) {
-        const masked = maskStrings(part);
-        if (writesExcel(part)) excelWrite = true;
-        if (/^\s*Close\b/i.test(masked)) {
-          // Close #1, #2 closes those; a bare Close closes every file.
-          const handles = masked
-            .replace(/^\s*Close\b/i, '')
-            .split(',')
-            .map((token) => token.replace(/#/g, '').trim().toLowerCase())
-            .filter(Boolean);
-          if (handles.length === 0) opens.clear();
-          for (const handle of handles) opens.delete(handle);
-        } else if (
-          ENDS_PROCEDURE.test(masked) ||
-          DECLARATION.test(masked.trim()) ||
-          /^\s*Reset\b/i.test(masked)
-        )
-          opens.clear();
-        else {
-          const target = HANDLE_WRITE.exec(masked)?.[1]?.toLowerCase();
-          const open = target === undefined ? undefined : opens.get(target);
-          if (open && !open.excludeReason && writesCsv(part))
-            open.subkind = 'csv';
+        // A one-line If holds statements of its own after Then / Else.
+        let handle: string | undefined;
+        for (const body of statementsOf(part)) {
+          excel.read(body);
+          const masked = maskStrings(body);
+          if (/^\s*Close\b/i.test(masked)) {
+            // Close #1, #2 closes those; a bare Close closes every file.
+            const handles = masked
+              .replace(/^\s*Close\b/i, '')
+              .split(',')
+              .map((token) => token.replace(/#/g, '').trim().toLowerCase())
+              .filter(Boolean);
+            if (handles.length === 0) opens.clear();
+            for (const closed of handles) opens.delete(closed);
+          } else if (
+            ENDS_PROCEDURE.test(masked) ||
+            DECLARATION.test(masked.trim()) ||
+            /^\s*Reset\b/i.test(masked)
+          )
+            opens.clear();
+          else {
+            const target = HANDLE_WRITE.exec(masked)?.[1]?.toLowerCase();
+            const open = target === undefined ? undefined : opens.get(target);
+            if (open && !open.excludeReason && writesCsv(body))
+              open.subkind = 'csv';
+          }
+          const opened = HANDLE_OPEN.exec(masked)?.[1]?.toLowerCase();
+          // Reopening a handle for anything else forgets the old file.
+          if (opened !== undefined) {
+            opens.delete(opened);
+            handle = opened;
+          }
         }
-        const handle = HANDLE_OPEN.exec(masked)?.[1]?.toLowerCase();
-        // Reopening a handle for anything else forgets the old file.
-        if (handle !== undefined) opens.delete(handle);
         for (const signal of signalsOf(part)) {
           const found: ReportSignal = { ...signal, line: buffer.line };
           signals.push(found);
@@ -255,7 +337,7 @@ export function findVb6ReportSignals(
     }
   }
   // Opening, starting or reading Excel is not an output.
-  return excelWrite
+  return excel.any
     ? signals
     : signals.filter((signal) => signal.kind !== 'excel');
 }

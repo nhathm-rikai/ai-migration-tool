@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — TC02: template `it-test-spec` (chỉ template, chưa nối vào Portal)
+
+- Thêm [template IT](../specification-design/templates/it-test-spec.md) theo [TC02.md](../TC02.md): checklist `context/p1/1.5-it-skeleton.json`, 5 loại hạng mục (`screen-flow`, `shared-module`, `db-chain`, `report`, `cross-program`), bảng scenario **11 cột** khớp sheet `テストシナリオ` của TC02 (No, 対象ID, 種別, シナリオ, 関連要素, 前提条件, 手順, 期待結果, 根拠, 区分, 対象外理由; ba cột 実施日/結果/確認者 do writer Excel thêm, không nằm trong Markdown).
+- Mục 1.1 "Định dạng bảng" copy đúng các điểm đã trả giá bằng một lượt LIVE fail của TC01: ghim nguyên văn tiêu đề cột thứ hai theo vi/ja/en, ghim giá trị `区分`, đúng 11 ô mỗi hàng, một ô một dòng và escape `\|`, dạng evidence chuẩn `file:dòng`, hàng phân cách ≥ 2 dấu gạch, và rule riêng của IT: `cross-program` phải nêu tên program kia ở `関連要素` (TC02-AC02).
+- Chỉ bảng mục 2 được đặt tiêu đề ID ở vị trí thứ hai; bảng mục 3 đặt cột "Hạng mục" đầu tiên — vì `parseUtSpec` quét **mọi** dòng có ô thứ hai thuộc tập ID header, nên validator IT dùng lại cơ chế này sẽ đọc nhầm bảng khác.
+- **Chưa đến mốc (phần còn lại của TC02, không làm trong task này):** builder `it-checklist-v1`, loại tài liệu `it-test-spec` + `SPEC_TASK_VERSION` tăng một bậc, validator, `it-spec-workbook`, route Excel, UI bước 2/3/4, spec `specs/it-test-spec.md`, và **đăng ký template vào [README pack](../specification-design/README.md)**. Template chưa được liệt kê ở README và chưa được agent nào đọc, nên **version pack giữ `0.12.0-draft`**: bump bây giờ sẽ gán nhãn template mới cho các run UT không liên quan. Bump + sửa câu "cả tám template output" thành chín thuộc bước nối loại tài liệu.
+- **Kiểm chứng:** `prettier --check` trên file mới pass; 3 link trong file (`../README.md`, `ut-test-spec.md`, anchor phần cuối chung) đều tồn tại. Không chạm source/test nên không chạy gate code.
+
 ## 10/11/2026 — TC01: AC06 lượt đầu PASS; sửa Excel theo output thật
 
 - **AC06 lượt đầu (người dùng chạy, program `NTHO013`, runner `claude-cli`, model `haiku`, output tiếng Nhật): PASS.** Gói được publish, vào bước 4, tải được Excel. `文書バージョン` ghi `spec-design-rules-0.11.0-draft + spec-design-templates-0.12.0-draft` → đúng template mới. Không còn `NO_EVIDENCE`: evidence là đường dẫn tương đối đầy đủ kèm dải dòng (`kousyosr/NTH/NTHO013.frm:137-141`). 6/6 hạng mục checklist được phủ, 11 case, không hạng mục nào trống.

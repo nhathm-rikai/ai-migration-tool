@@ -447,6 +447,21 @@ export const viMessages = {
         measured: 'Giá trị đo',
         points: 'Điểm cộng',
         score: (score: string) => `Tổng điểm: ${score}`,
+        scope: {
+          title: 'Procedure được chấm',
+          procedure: 'Tên procedure',
+          file: 'File',
+          tier: 'Vị trí',
+          tiers: {
+            '0': 'Gốc (tạo/gọi report)',
+            '1': 'Được gọi, tầng 1',
+            '2': 'Được gọi, tầng 2',
+          } as Record<string, string>,
+          unresolved: (count: string) =>
+            `Lời gọi chưa phân giải (không suy đoán, không đổi điểm): ${count}`,
+          printOps: (content: string, drawing: string, position: string) =>
+            `Lệnh in/vẽ: in nội dung ${content}, vẽ đường/khung ${drawing}, đặt vị trí ${position} (không cộng điểm)`,
+        },
       },
       reasons: {
         NO_PROCEDURE:
@@ -460,6 +475,7 @@ export const viMessages = {
         tables: 'Bảng truy cập',
         dynamicSql: 'SQL động / ghép chuỗi',
         calls: 'Lời gọi procedure khác',
+        printDensity: 'Mật độ lệnh in/vẽ',
         'design-not-analyzed': 'Thiết kế chưa phân tích',
       } as Record<string, string>,
       warnings: {
@@ -683,7 +699,7 @@ export const viMessages = {
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
       SCREEN_REPORT_OUTDATED:
-        'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code. Cần phân tích lại.',
+        'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code, hoặc độ phức tạp report chưa chấm theo phạm vi call graph hiện hành. Cần phân tích lại.',
     } satisfies Record<AssessmentWarning, string>,
     programs: {
       title: 'Danh sách program',

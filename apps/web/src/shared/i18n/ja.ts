@@ -441,6 +441,21 @@ export const jaMessages = {
         measured: '計測値',
         points: '加点',
         score: (score: string) => `合計点: ${score}`,
+        scope: {
+          title: '算出対象のプロシージャ',
+          procedure: 'プロシージャ名',
+          file: 'ファイル',
+          tier: '位置づけ',
+          tiers: {
+            '0': '起点（帳票の作成・呼び出し）',
+            '1': '呼び出し先（1階層）',
+            '2': '呼び出し先（2階層）',
+          },
+          unresolved: (count: string) =>
+            `未解決の呼び出し（推測せず、点数に影響しません）: ${count}`,
+          printOps: (content: string, drawing: string, position: string) =>
+            `印刷／描画命令: 内容出力 ${content}、線・枠 ${drawing}、位置指定 ${position}（位置指定は加点なし）`,
+        },
       },
       factors: {
         decisionPoints: '分岐数',
@@ -448,6 +463,7 @@ export const jaMessages = {
         tables: 'アクセステーブル数',
         dynamicSql: '動的SQL・文字列連結SQL',
         calls: '他プロシージャの呼び出し',
+        printDensity: '印刷／描画命令の密度',
         'design-not-analyzed': 'デザイン未解析',
       },
       warnings: {
@@ -672,7 +688,7 @@ export const jaMessages = {
       TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
       COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
       SCREEN_REPORT_OUTDATED:
-        '解析結果が古い帳票検出ルールで作成されています。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。再解析が必要です。',
+        '解析結果が古い帳票検出ルールで作成されています。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度、または現行の呼び出しグラフ範囲による帳票複雑度が反映されていません。再解析が必要です。',
     },
     programs: {
       title: 'プログラム一覧',

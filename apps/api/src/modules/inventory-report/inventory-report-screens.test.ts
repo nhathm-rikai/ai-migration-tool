@@ -1,4 +1,7 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  REPORT_COMPLEXITY_VERSION,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 import { describe, expect, it } from 'vitest';
 import { demoInventory } from '../../adapters/fake/demo-inventory.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
@@ -36,7 +39,7 @@ describe('AR04 technical report: Screens and Reports', () => {
     expect(high).toMatchObject({
       complexityLevel: 'high',
       complexityScore: 6,
-      complexityVersion: 'report-complexity-v1-draft',
+      complexityVersion: REPORT_COMPLEXITY_VERSION,
     });
     expect(high?.complexityFactors).toContain('decisionPoints=28:2');
   });

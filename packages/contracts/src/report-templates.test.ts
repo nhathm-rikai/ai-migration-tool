@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { deriveReportSummary } from './report-templates.js';
+import {
+  deriveReportSummary,
+  isScreenReportOutdated,
+  REPORT_COMPLEXITY_VERSION,
+  SCREEN_REPORT_VERSION,
+} from './report-templates.js';
 import type { SourceInventoryDocument } from './source-inventory.schema.js';
 
 // Reports counted once each: Crystal / DataReport templates, files that print
@@ -409,5 +414,63 @@ describe('one file that makes output in several ways', () => {
       export: 1,
       overlapFiles: 1,
     });
+  });
+});
+
+describe('AR06-AC01 an inventory scored by an older model needs an analysis again', () => {
+  it('is outdated when only the complexity version is old', () => {
+    expect(
+      isScreenReportOutdated({
+        screenReportVersion: SCREEN_REPORT_VERSION,
+        reportComplexityVersion: 'report-complexity-v1-draft',
+      }),
+    ).toBe(true);
+  });
+
+  it('is outdated when only the counting version is old', () => {
+    expect(
+      isScreenReportOutdated({
+        screenReportVersion: 'screen-report-v2',
+        reportComplexityVersion: REPORT_COMPLEXITY_VERSION,
+      }),
+    ).toBe(true);
+  });
+
+  it('is current with both versions, and when an inventory carries neither', () => {
+    expect(
+      isScreenReportOutdated({
+        screenReportVersion: SCREEN_REPORT_VERSION,
+        reportComplexityVersion: REPORT_COMPLEXITY_VERSION,
+      }),
+    ).toBe(false);
+    expect(isScreenReportOutdated({})).toBe(false);
+  });
+});
+
+describe('AR06 the scope of a report reaches the Portal detail', () => {
+  const scope = {
+    procedures: [
+      { id: 'a/M.bas#sub:Root', tier: 0 as const },
+      { id: 'a/M.bas#sub:Load', tier: 1 as const },
+    ],
+    unresolvedCalls: 2,
+    printOps: { content: 4, drawing: 1, position: 3 },
+  };
+  const inventoryWith = (withScope: boolean) =>
+    inventory({
+      'a/A.vbp': [
+        crystal('A.rpt', {
+          complexity: { ...rated('high', 7), ...(withScope ? { scope } : {}) },
+        }),
+      ],
+    });
+
+  it('keeps the scope of a v2 report and none for a v1 report', () => {
+    expect(
+      deriveReportSummary(inventoryWith(true))?.reports[0]?.complexity.scope,
+    ).toEqual(scope);
+    expect(
+      deriveReportSummary(inventoryWith(false))?.reports[0]?.complexity.scope,
+    ).toBeUndefined();
   });
 });

@@ -38,11 +38,19 @@ type Level = 'low' | 'medium' | 'high' | 'very-high' | 'unrated';
 // exclusion and no complexity for the code print / export reports, and
 // cannot be derived: it needs an analysis again.
 export const SCREEN_REPORT_VERSION = 'screen-report-v4';
+//
+// The report complexity model has its own version (AR06): scores stored by an
+// older model are never recomputed on read, so an older one also needs a new
+// analysis, even when the counting version is current.
+export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v2-draft';
 export const isScreenReportOutdated = (inventory: {
   screenReportVersion?: string | undefined;
+  reportComplexityVersion?: string | undefined;
 }): boolean =>
-  inventory.screenReportVersion !== undefined &&
-  inventory.screenReportVersion !== SCREEN_REPORT_VERSION;
+  (inventory.screenReportVersion !== undefined &&
+    inventory.screenReportVersion !== SCREEN_REPORT_VERSION) ||
+  (inventory.reportComplexityVersion !== undefined &&
+    inventory.reportComplexityVersion !== REPORT_COMPLEXITY_VERSION);
 
 export const REPORT_ORIGINS = ['crystal', 'print', 'export'] as const;
 export type ReportOrigin = (typeof REPORT_ORIGINS)[number];
@@ -56,12 +64,20 @@ export type ReportUsage = {
   programs: string[];
 };
 
+export type ReportScope = {
+  procedures: { id: string; tier: 0 | 1 | 2 }[];
+  unresolvedCalls: number;
+  printOps: { content: number; drawing: number; position: number };
+};
+
 export type ReportComplexity = {
   level: Level;
   score: number | null;
   version: string;
   factors: { factor: string; value: number; points: number }[];
   reason?: string | undefined;
+  // report-complexity-v2 and later; absent in an inventory written by v1.
+  scope?: ReportScope | undefined;
 };
 
 export type ReportEntry = {
@@ -143,6 +159,7 @@ type Item = {
     version: string;
     factors: { factor: string; value: number; points: number }[];
     reason?: string | undefined;
+    scope?: ReportScope | undefined;
   };
   programs: { program: string }[];
 };
@@ -153,6 +170,15 @@ const complexityOf = (item: Item): ReportComplexity => ({
   version: item.complexity.version,
   factors: item.complexity.factors.map((factor) => ({ ...factor })),
   ...(item.complexity.reason ? { reason: item.complexity.reason } : {}),
+  ...(item.complexity.scope
+    ? {
+        scope: {
+          procedures: item.complexity.scope.procedures.map((p) => ({ ...p })),
+          unresolvedCalls: item.complexity.scope.unresolvedCalls,
+          printOps: { ...item.complexity.scope.printOps },
+        },
+      }
+    : {}),
 });
 
 const baseName = (path: string) => path.split(/[\\/]/).at(-1) ?? path;

@@ -151,7 +151,7 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     category: '解析の前提',
     severity: '中',
     content:
-      '帳票の検出ルールが古い版の解析結果です。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。',
+      '帳票の検出ルールが古い版の解析結果です。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度、または現行の呼び出しグラフ範囲による帳票複雑度が反映されていません。',
     confirmation: 'ソースの再解析を実施します（ご対応は不要です）。',
   },
   PROCEDURE_LINES_MISSING: {
@@ -325,7 +325,7 @@ export const RISK_CATALOG_VI: Record<string, RiskWording> = {
   SCREEN_REPORT_OUTDATED: {
     category: PREMISE,
     content:
-      'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code. Cần phân tích lại mã nguồn.',
+      'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code, hoặc độ phức tạp report chưa chấm theo phạm vi call graph hiện hành. Cần phân tích lại mã nguồn.',
     confirmation: REANALYZE,
   },
   PROCEDURE_LINES_MISSING: {

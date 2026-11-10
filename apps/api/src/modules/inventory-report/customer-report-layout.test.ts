@@ -211,6 +211,28 @@ describe('an inventory counted by an older report counting', () => {
   });
 });
 
+describe('AR06-AC01 an inventory scored by an older complexity model', () => {
+  // Only the complexity model is old; the counting version is current.
+  const old = JSON.parse(JSON.stringify(demoInventory)) as typeof demoInventory;
+  old.reportComplexityVersion = 'report-complexity-v1-draft';
+
+  it('says it needs an analysis again in the risks of both languages (Excel and PDF)', () => {
+    expect(old.screenReportVersion).toBe(demoInventory.screenReportVersion);
+    for (const lang of ['ja', 'vi'] as const) {
+      const risks = buildCustomerReport(old, origin, lang).risks;
+      expect(risks.some((r) => r.code === 'SCREEN_REPORT_OUTDATED')).toBe(true);
+    }
+  });
+
+  it('keeps showing the stored level of each report, never a recomputed one', () => {
+    const before = buildCustomerReport(demoInventory, origin, 'vi').items;
+    const after = buildCustomerReport(old, origin, 'vi').items;
+    expect(after.map((item) => item.level)).toEqual(
+      before.map((item) => item.level),
+    );
+  });
+});
+
 describe('components of sheet 3: one row per file name, whatever its case', () => {
   const inventory = JSON.parse(
     JSON.stringify(demoInventory),

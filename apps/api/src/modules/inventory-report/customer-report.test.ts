@@ -1,5 +1,6 @@
 import {
   CustomerReportSchema,
+  REPORT_COMPLEXITY_VERSION,
   REPORT_COUNTING_BASIS,
   inventoryKpis,
   type SourceInventoryDocument,
@@ -270,7 +271,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     const crystal = reports.find((r) => r.name === 'summary.rpt');
     expect(crystal).toMatchObject({
       levelLabel: '中',
-      modelVersion: 'report-complexity-v1-draft',
+      modelVersion: REPORT_COMPLEXITY_VERSION,
     });
     expect(crystal?.factors).toContain('定義ファイル未解析');
     // Sheet 6: the list (screens, batches, reports) with the file output that
@@ -300,7 +301,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
       expect(sheet1).toContain(label);
     const sheet2 = cells(sheetOf('2_複雑度'));
     expect(sheet2).toContain('未評価');
-    expect(sheet2).not.toContain('report-complexity-v1-draft');
+    expect(sheet2).not.toContain(REPORT_COMPLEXITY_VERSION);
   });
 });
 

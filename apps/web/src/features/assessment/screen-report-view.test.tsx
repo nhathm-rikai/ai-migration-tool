@@ -209,6 +209,34 @@ describe('AR04-AC11/AC12 one list of reports', () => {
     expect(within(detail).getByText('Bảng truy cập')).toBeTruthy();
   });
 
+  it('AR06-AC11 the detail lists the scored procedures by tier, the print / draw statements and the unresolved calls', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
+    const row = within(table).getByRole('button', { name: 'order.rpt' });
+    fireEvent.click(row);
+    const scope = within(table).getByTestId('report-complexity-scope');
+    expect(within(scope).getByText('Sub:Show')).toBeTruthy();
+    expect(within(scope).getByText('Sub:LoadOrder')).toBeTruthy();
+    expect(within(scope).getByText('Gốc (tạo/gọi report)')).toBeTruthy();
+    expect(within(scope).getByText('Được gọi, tầng 1')).toBeTruthy();
+    expect(within(scope).getByText('Được gọi, tầng 2')).toBeTruthy();
+    expect(
+      within(scope).getByTestId('report-complexity-print-ops').textContent,
+    ).toBe(
+      'Lệnh in/vẽ: in nội dung 25, vẽ đường/khung 4, đặt vị trí 7 (không cộng điểm)',
+    );
+    expect(
+      within(scope).getByTestId('report-complexity-unresolved').textContent,
+    ).toContain('2');
+  });
+
+  it('AR06-AC11 a report stored by v1 has no scope section', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
+    fireEvent.click(within(table).getByRole('button', { name: 'bill.rpt' }));
+    expect(within(table).queryByTestId('report-complexity-scope')).toBeNull();
+  });
+
   it('lists a shared template once with its design-file state, and opens its uses from the row', async () => {
     await openReports();
     const table = screen.getByTestId('report-template-table');

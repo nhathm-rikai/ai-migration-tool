@@ -7,6 +7,7 @@ import { Check } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REPORT_COMPLEXITY_CONFIG,
+  REPORT_COMPLEXITY_VERSION,
   scoreReportComplexity,
 } from './screen-report.js';
 import { buildSourceInventory } from './source-inventory.js';
@@ -291,7 +292,9 @@ describe('AR04-AC04/AC11 totals', () => {
 });
 
 describe('AR04-AC09/AC10 report complexity', () => {
-  const rpt = '    rpt.ReportFileName = "r.rpt"';
+  // One template per procedure: procedures of the same template are one unit
+  // and are scored together (AR06).
+  const rptOf = (name: string) => `    rpt.ReportFileName = "${name}.rpt"`;
   const branches = (count: number) =>
     Array.from({ length: count }, (_, i) => [
       `    If a${i} > 0 Then`,
@@ -305,15 +308,15 @@ describe('AR04-AC09/AC10 report complexity', () => {
         vbp('a/A.vbp', 'Module=M; M.bas'),
         at('a/M.bas', bas('M', ...procedures.flat())),
       ],
-      knownPaths: ['r.rpt'],
+      knownPaths: ['r.rpt', 'r1.rpt', 'r2.rpt', 'r3.rpt'],
     });
     return program(inventory, 'a/A.vbp').reports ?? [];
   };
 
-  const simple = sub('Simple', rpt);
+  const simple = sub('Simple', rptOf('r1'));
   const branchy = sub(
     'Branchy',
-    rpt,
+    rptOf('r2'),
     ...branches(35),
     '    s = "SELECT A FROM T1"',
     '    s = "SELECT A FROM T2"',
@@ -322,7 +325,7 @@ describe('AR04-AC09/AC10 report complexity', () => {
   );
   const dynamic = sub(
     'Dynamic',
-    rpt,
+    rptOf('r3'),
     ...branches(35),
     '    s = "SELECT A FROM T1"',
     '    s = "SELECT A FROM T2"',
@@ -345,7 +348,7 @@ describe('AR04-AC09/AC10 report complexity', () => {
       reason: 'DESIGN_NOT_ANALYZED_FLOOR',
     });
     for (const report of reports) {
-      expect(report.complexity.version).toBe('report-complexity-v1-draft');
+      expect(report.complexity.version).toBe(REPORT_COMPLEXITY_VERSION);
       expect(
         report.complexity.factors.reduce((sum, f) => sum + f.points, 0),
       ).toBe(report.complexity.score);

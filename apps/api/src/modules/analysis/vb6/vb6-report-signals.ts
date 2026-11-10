@@ -61,7 +61,7 @@ function excludeReasonOf(pathExpression: string): string | undefined {
 }
 
 // Keeps the quotes but blanks string contents, so patterns only see code.
-const maskStrings = (code: string) =>
+export const maskStrings = (code: string) =>
   code.replace(STRING_LITERAL, (text) => `"${' '.repeat(text.length - 2)}"`);
 
 // The path of a .rpt literal as written, "/" separated.
@@ -511,19 +511,14 @@ const ENDS_PROCEDURE = /^\s*End\s+(?:Sub|Function|Property)\b/i;
 const HANDLE_WRITE = /^\s*(?:Write|Print)\s+#\s*([A-Za-z_]\w*|\d+)/i;
 const HANDLE_OPEN = /^\s*Open\b.*?\bAs\s+#?\s*([A-Za-z_]\w*|\d+)/i;
 
-export function findVb6ReportSignals(
+// The statements of a code file in order, each with the line it starts on. A
+// statement may hold several ':'-separated statements, and a one-line If is its
+// condition and the statements after Then / Else, each of its own. Shared by
+// every lexical reading of VB6 code that works statement by statement.
+export function* vb6Statements(
   lines: string[],
   options: { module: Vb6ModuleKind },
-): ReportSignal[] {
-  const signals: ReportSignal[] = [];
-  // The files the procedure being read has open For Output / Append, by file
-  // handle (#1, or a variable from FreeFile): a Write # or a comma separated
-  // Print # makes the file of ITS handle CSV, whichever file was opened last.
-  const opens = new Map<string, ReportSignal>();
-  // Excel signals count only when the file writes to an Excel object.
-  const excel = new ExcelWrites();
-  // The first line that writes to a known Excel object or connection.
-  let firstWrite: number | undefined;
+): Generator<{ text: string; line: number }> {
   let incoming: Vb6Continuation = 'none';
   let buffer: { text: string; line: number } | null = null;
   for (
@@ -540,47 +535,59 @@ export function findVb6ReportSignals(
         : { text, line: index + 1 };
     }
     if (buffer && line.continuation !== 'code') {
-      // A statement may hold several ':'-separated statements; only the
-      // whole text is matched, which is enough for the signals above.
-      for (const part of buffer.text.split(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/)) {
-        // Every signal comes from a split statement: a one-line If is its
-        // condition and the statements after Then / Else, each of its own.
-        for (const body of statementsOf(part)) {
-          if (excel.read(body)) firstWrite ??= buffer.line;
-          const masked = maskStrings(body);
-          if (/^\s*Close\b/i.test(masked)) {
-            // Close #1, #2 closes those; a bare Close closes every file.
-            const handles = masked
-              .replace(/^\s*Close\b/i, '')
-              .split(',')
-              .map((token) => token.replace(/#/g, '').trim().toLowerCase())
-              .filter(Boolean);
-            if (handles.length === 0) opens.clear();
-            for (const closed of handles) opens.delete(closed);
-          } else if (
-            ENDS_PROCEDURE.test(masked) ||
-            DECLARATION.test(masked.trim()) ||
-            /^\s*Reset\b/i.test(masked)
-          )
-            opens.clear();
-          else {
-            const target = HANDLE_WRITE.exec(masked)?.[1]?.toLowerCase();
-            const open = target === undefined ? undefined : opens.get(target);
-            if (open && !open.excludeReason && writesCsv(body))
-              open.subkind = 'csv';
-          }
-          const handle = HANDLE_OPEN.exec(masked)?.[1]?.toLowerCase();
-          // Reopening a handle for anything else forgets the old file.
-          if (handle !== undefined) opens.delete(handle);
-          for (const signal of signalsOf(body)) {
-            const found: ReportSignal = { ...signal, line: buffer.line };
-            signals.push(found);
-            if (found.kind === 'file-output' && handle !== undefined)
-              opens.set(handle, found);
-          }
-        }
-      }
+      for (const part of buffer.text.split(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/))
+        for (const body of statementsOf(part))
+          yield { text: body, line: buffer.line };
       buffer = null;
+    }
+  }
+}
+
+export function findVb6ReportSignals(
+  lines: string[],
+  options: { module: Vb6ModuleKind },
+): ReportSignal[] {
+  const signals: ReportSignal[] = [];
+  // The files the procedure being read has open For Output / Append, by file
+  // handle (#1, or a variable from FreeFile): a Write # or a comma separated
+  // Print # makes the file of ITS handle CSV, whichever file was opened last.
+  const opens = new Map<string, ReportSignal>();
+  // Excel signals count only when the file writes to an Excel object.
+  const excel = new ExcelWrites();
+  // The first line that writes to a known Excel object or connection.
+  let firstWrite: number | undefined;
+  for (const statement of vb6Statements(lines, options)) {
+    const body = statement.text;
+    if (excel.read(body)) firstWrite ??= statement.line;
+    const masked = maskStrings(body);
+    if (/^\s*Close\b/i.test(masked)) {
+      // Close #1, #2 closes those; a bare Close closes every file.
+      const handles = masked
+        .replace(/^\s*Close\b/i, '')
+        .split(',')
+        .map((token) => token.replace(/#/g, '').trim().toLowerCase())
+        .filter(Boolean);
+      if (handles.length === 0) opens.clear();
+      for (const closed of handles) opens.delete(closed);
+    } else if (
+      ENDS_PROCEDURE.test(masked) ||
+      DECLARATION.test(masked.trim()) ||
+      /^\s*Reset\b/i.test(masked)
+    )
+      opens.clear();
+    else {
+      const target = HANDLE_WRITE.exec(masked)?.[1]?.toLowerCase();
+      const open = target === undefined ? undefined : opens.get(target);
+      if (open && !open.excludeReason && writesCsv(body)) open.subkind = 'csv';
+    }
+    const handle = HANDLE_OPEN.exec(masked)?.[1]?.toLowerCase();
+    // Reopening a handle for anything else forgets the old file.
+    if (handle !== undefined) opens.delete(handle);
+    for (const signal of signalsOf(body)) {
+      const found: ReportSignal = { ...signal, line: statement.line };
+      signals.push(found);
+      if (found.kind === 'file-output' && handle !== undefined)
+        opens.set(handle, found);
     }
   }
   // Opening, starting or reading Excel is not an output.

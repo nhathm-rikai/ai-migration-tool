@@ -106,6 +106,16 @@ export type ReportSignal = {
   excludeReason?: string;
 };
 
+// A statement that works toward a printed report or leaves the call graph
+// (AR06). Counted per statement, never multiplied by loops.
+//  content: prints text to a printer or report object;
+//  drawing: draws a line, a box, a circle or a point on one;
+//  position: sets or measures the print position (recorded, not scored);
+//  dynamic-call: a call by name at run time (CallByName), not resolvable.
+export type OutputOperationGroup =
+  'content' | 'drawing' | 'position' | 'dynamic-call';
+export type OutputOperation = { line: number; group: OutputOperationGroup };
+
 // What a project reference says about reports, by runtime component.
 // Names the report kind it should produce.
 export type ReportRuntime = 'crystal' | 'data-report';
@@ -158,6 +168,12 @@ export interface LanguageAnalyzer {
   isBatchStartup(startup: string | undefined): boolean;
   // Output hints in one analyzed code file (outside designer sections).
   findReportSignals(relativePath: string, lines: string[]): ReportSignal[];
+  // Print / draw / position statements and dynamic calls of one code file,
+  // by line (AR06); the pipeline attributes them to procedures.
+  findOutputOperations(
+    relativePath: string,
+    lines: string[],
+  ): OutputOperation[];
   // Header of a designer member file that is a report; null otherwise.
   detectReportDesigner(lines: string[]): { line: number; name: string } | null;
   // Report runtime a reference/OCX belongs to, or null.

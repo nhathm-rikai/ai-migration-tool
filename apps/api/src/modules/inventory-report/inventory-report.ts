@@ -841,7 +841,7 @@ export function buildInventoryReport(
       null,
       null,
       null,
-      `Inventory counted with ${inventory.screenReportVersion ?? ''}: no CSV/Excel detection, log exclusion or complexity of code print reports; run the analysis again`,
+      `Inventory counted with ${inventory.screenReportVersion ?? ''} / ${inventory.reportComplexityVersion ?? ''}: older counting (no CSV/Excel detection or log exclusion) or report complexity not scored over the current call graph scope; run the analysis again`,
     );
   for (const { id, program } of selected) {
     for (const screen of program.screens ?? [])

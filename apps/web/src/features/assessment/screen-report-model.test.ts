@@ -1,5 +1,6 @@
 import {
   deriveReportSummary,
+  REPORT_COMPLEXITY_VERSION,
   type SourceInventoryDocument,
 } from '@portal/contracts';
 import { mappedInventoryFixture } from '@portal/contracts/fixtures';
@@ -18,7 +19,7 @@ describe('AR04-AC06/AC11 screen and report model', () => {
       sharedScreens: 1,
       batches: 1,
       reportVersion: 'screen-report-v4',
-      complexityVersion: 'report-complexity-v1-draft',
+      complexityVersion: REPORT_COMPLEXITY_VERSION,
     });
   });
 
@@ -93,6 +94,17 @@ describe('an inventory stored before reportItems existed', () => {
     delete stored.totals.screenReport?.reportItems;
     expect(deriveReportSummary(stored)).toEqual(deriveReportSummary(fresh));
     expect(screenReportView(stored)).toEqual(screenReportView(fresh));
+  });
+});
+
+describe('AR06-AC01 an inventory scored by an older complexity model', () => {
+  it('warns in step 2 even when only reportComplexityVersion is old', () => {
+    const old = structuredClone(screenReportCorpus());
+    old.reportComplexityVersion = 'report-complexity-v1-draft';
+    expect(old.screenReportVersion).toBe('screen-report-v4');
+    expect(summarizeInventory(old).warnings).toContain(
+      'SCREEN_REPORT_OUTDATED',
+    );
   });
 });
 

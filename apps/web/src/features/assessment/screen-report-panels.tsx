@@ -133,10 +133,19 @@ function ComplexityDetail({
     score: number | null;
     factors: { factor: string; value: number; points: number }[];
     reason?: string | null | undefined;
+    // report-complexity-v2; absent in an inventory written by v1.
+    scope?:
+      | {
+          procedures: readonly { id: string; tier: number }[];
+          unresolvedCalls: number;
+          printOps: { content: number; drawing: number; position: number };
+        }
+      | undefined;
   };
 }) {
   const { messages } = useLocale();
   const copy = messages.assessment.screenReport;
+  const number = useNumber();
   const measured = complexity.factors.filter(
     (item) => item.factor !== 'design-not-analyzed',
   );
@@ -175,6 +184,44 @@ function ComplexityDetail({
         </table>
       ) : (
         <p className="muted">{copy.list.noFactors}</p>
+      )}
+      {complexity.scope && (
+        <div data-testid="report-complexity-scope">
+          <h5>{copy.complexityDetail.scope.title}</h5>
+          <table className="detail-table">
+            <thead>
+              <tr>
+                <th scope="col">{copy.complexityDetail.scope.procedure}</th>
+                <th scope="col">{copy.complexityDetail.scope.file}</th>
+                <th scope="col">{copy.complexityDetail.scope.tier}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {complexity.scope.procedures.map((item) => (
+                <tr key={item.id}>
+                  <td className="mono">{item.id.split('#').at(-1)}</td>
+                  <td className="mono">{item.id.split('#')[0]}</td>
+                  <td>
+                    {copy.complexityDetail.scope.tiers[String(item.tier)] ??
+                      item.tier}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="muted" data-testid="report-complexity-print-ops">
+            {copy.complexityDetail.scope.printOps(
+              number(complexity.scope.printOps.content),
+              number(complexity.scope.printOps.drawing),
+              number(complexity.scope.printOps.position),
+            )}
+          </p>
+          <p className="muted" data-testid="report-complexity-unresolved">
+            {copy.complexityDetail.scope.unresolved(
+              number(complexity.scope.unresolvedCalls),
+            )}
+          </p>
+        </div>
       )}
       {complexity.score !== null && !floored && (
         <p data-testid="report-complexity-score">

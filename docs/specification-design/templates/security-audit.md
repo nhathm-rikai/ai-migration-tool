@@ -1,6 +1,6 @@
 # Security Audit — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.11.0-draft.** [Phần đầu chung](../README.md), [rule security audit](../rules/security-audit.md).
+**DRAFT TEMPLATE — spec-design-templates-0.12.0-draft.** [Phần đầu chung](../README.md), [rule security audit](../rules/security-audit.md).
 
 ## 1. Phạm vi và giới hạn
 

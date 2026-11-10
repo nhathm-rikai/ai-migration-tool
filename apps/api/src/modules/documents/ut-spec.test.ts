@@ -158,4 +158,93 @@ describe('TC01-AC02 validator', () => {
       .replace('対象外', 'Loại trừ');
     expect(validateUtSpec(vi, checklist, files)).toMatchObject({ ok: true });
   });
+
+  it.each([
+    ['ID hạng mục', 'Loại trừ'],
+    ['ID mục tiêu', 'Ngoài phạm vi'],
+    ['Target ID', 'Excluded'],
+  ])(
+    'reads the table and the exclusion written as "%s" / "%s"',
+    (idHeader, excluded) => {
+      const document = ok
+        .replaceAll('対象ID', idHeader)
+        .replaceAll('対象外', excluded);
+      expect(validateUtSpec(document, checklist, files)).toMatchObject({
+        ok: true,
+      });
+    },
+  );
+
+  it('rejects the table when the ID header is translated to something else', () => {
+    const document = ok.replace('対象ID', 'ID đối tượng');
+    expect(validateUtSpec(document, checklist, files)).toMatchObject({
+      ok: false,
+      errors: [expect.objectContaining({ code: 'TABLE_MISSING' })],
+    });
+  });
+
+  // A failed run is a lost run: the document is not kept and the agent's
+  // quota is spent. So the location is accepted in the shapes agents really
+  // write, as long as it still names a file of this program and a real line.
+  it.each([
+    ['the full path', 'a/M.bas:5'],
+    ['the source/ prefix the agent sees', 'source/a/M.bas:5'],
+    ['a line range', 'a/M.bas:5-9'],
+    ['a line range with a wave dash', 'a/M.bas:5〜9'],
+    ['only the file name', 'M.bas:5'],
+    ['a full-width colon', 'a/M.bas：5'],
+    ['full-width digits', 'a/M.bas:５'],
+    ['a 行 suffix', 'a/M.bas:5行'],
+    ['a 行目 suffix', 'a/M.bas:5行目'],
+    ['an L before the line', 'a/M.bas:L5'],
+    ['a trailing note', 'a/M.bas:5 (Calc)'],
+    ['the line in parentheses', 'a/M.bas (5)'],
+    ['a line range in parentheses', 'a/M.bas (5-9)'],
+    ['a second reference in the cell', 'a/M.bas:5, a/M.bas:7'],
+    ['a Windows separator', 'a\\M.bas:5'],
+    ['a different case', 'A/m.BAS:5'],
+  ])('accepts evidence written with %s', (_name, evidence) => {
+    const result = validateUtSpec(
+      doc(
+        row(1, 'UT-A-Calc-1', evidence),
+        row(2, 'UT-A-Save-1'),
+        row(3, 'UT-A-Save-2'),
+      ),
+      checklist,
+      files,
+    );
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('still rejects a bare file name shared by several files of the program', () => {
+    const result = validateUtSpec(
+      doc(
+        row(1, 'UT-A-Calc-1', 'M.bas:5'),
+        row(2, 'UT-A-Save-1'),
+        row(3, 'UT-A-Save-2'),
+      ),
+      checklist,
+      new Set(['a/M.bas', 'b/M.bas']),
+    );
+    expect(result.ok ? [] : result.errors).toContainEqual(
+      expect.objectContaining({ code: 'NO_EVIDENCE', id: 'UT-A-Calc-1' }),
+    );
+  });
+
+  it('names the offending string in the error detail', () => {
+    const result = validateUtSpec(
+      doc(
+        row(1, 'UT-A-Calc-1', 'b/Other.bas:3'),
+        row(2, 'UT-A-Save-1'),
+        row(3, 'UT-A-Save-2'),
+      ),
+      checklist,
+      files,
+    );
+    const details = (result.ok ? [] : result.errors)
+      .filter((error) => error.code === 'NO_EVIDENCE')
+      .map((error) => error.detail);
+    expect(details).toHaveLength(1);
+    expect(details[0]).toContain('b/Other.bas:3');
+  });
 });

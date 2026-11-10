@@ -404,8 +404,13 @@ export function createDocumentExecutor(deps: {
                 'AGENT_OUTPUT_INVALID',
                 `ut-test-spec rejected: ${checked.errors
                   .slice(0, 5)
+                  // `detail` names the offending cell (an evidence string, a
+                  // row number). Without it a failed run says only which code
+                  // fired, and the document itself is not kept, so the cause
+                  // cannot be found afterwards.
                   .map(
-                    (error) => `${error.code}${error.id ? ` ${error.id}` : ''}`,
+                    (error) =>
+                      `${error.code}${error.id ? ` ${error.id}` : ''}: ${error.detail}`,
                   )
                   .join(
                     ', ',

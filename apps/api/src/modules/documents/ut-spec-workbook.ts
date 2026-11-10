@@ -7,9 +7,11 @@ import type {
 import type { UtCase } from './ut-spec.js';
 
 // The unit test specification as the Japanese Excel (単体テスト仕様書): a cover
-// sheet, the test cases (the last three columns are for the tester) and a
-// coverage sheet (checklist item × cases). Written with the writer and style
-// of the other reports; text that looks like a formula stays text.
+// sheet, the test cases (14 columns, the last three for the tester) and a
+// coverage sheet (checklist item × cases, with the テスト/対象外 counts so an
+// item whose real output cannot be verified is visible). Written with the
+// writer and style of the other reports; text that looks like a formula
+// stays text.
 
 export type UtSpecMeta = {
   // Project path of the program.
@@ -68,11 +70,10 @@ export function utSpecSheets(meta: UtSpecMeta): Sheet[] {
     c.precondition,
     c.input,
     c.excluded ? `対象外: ${c.reason}` : c.steps,
-    c.excluded
-      ? null
-      : c.viewpoint === ''
-        ? c.expected
-        : `${c.expected}\n確認観点: ${c.viewpoint}`,
+    c.excluded ? null : c.expected,
+    // Its own column: the tester reads and filters it, and an empty one is a
+    // hole in the handover, so it must not hide inside 期待結果.
+    c.excluded ? null : c.viewpoint,
     c.evidence,
     null,
     null,
@@ -83,7 +84,13 @@ export function utSpecSheets(meta: UtSpecMeta): Sheet[] {
     byItem.set(c.itemId, [...(byItem.get(c.itemId) ?? []), c]);
   const coverage: CellValue[][] = meta.checklist.items.map((item) => {
     const cases = byItem.get(item.id) ?? [];
-    const excluded = cases.length > 0 && cases.every((c) => c.excluded);
+    const excludedCases = cases.filter((c) => c.excluded);
+    // Counts, not one label: an item with a testable branch and an untestable
+    // one (a report that needs a real printer) used to read as "テスト" with
+    // no reason, so the coverage sheet hid what cannot be verified.
+    const reasons = [
+      ...new Set(excludedCases.map((c) => c.reason).filter((r) => r !== '')),
+    ];
     return [
       item.id,
       KIND_LABELS[item.kind] ?? item.kind,
@@ -91,8 +98,9 @@ export function utSpecSheets(meta: UtSpecMeta): Sheet[] {
       item.detail,
       `${item.file}:${item.line}`,
       cases.length,
-      excluded ? '対象外' : 'テスト',
-      excluded ? (cases[0]?.reason ?? '') : null,
+      cases.length - excludedCases.length,
+      excludedCases.length,
+      reasons.length > 0 ? reasons.join('\n') : null,
     ];
   });
   const none = (width: number): CellValue[] => [
@@ -122,12 +130,13 @@ export function utSpecSheets(meta: UtSpecMeta): Sheet[] {
         col('入力', 30, true),
         col('手順', 36, true),
         col('期待結果', 36, true),
+        col('確認観点', 28, true),
         col('根拠(file:行)', 28),
         col('実施日', 12),
         col('結果', 10),
         col('確認者', 12),
       ],
-      rows: rows.length > 0 ? rows : [none(13)],
+      rows: rows.length > 0 ? rows : [none(14)],
     },
     {
       name: UT_SHEET_NAMES[2],
@@ -139,10 +148,11 @@ export function utSpecSheets(meta: UtSpecMeta): Sheet[] {
         col('対象', 30),
         col('根拠(file:行)', 28),
         col('ケース数', 10),
-        col('区分', 10),
+        col('テスト', 10),
+        col('対象外', 10),
         col('対象外理由', 36, true),
       ],
-      rows: coverage.length > 0 ? coverage : [none(8)],
+      rows: coverage.length > 0 ? coverage : [none(9)],
     },
   ];
 }

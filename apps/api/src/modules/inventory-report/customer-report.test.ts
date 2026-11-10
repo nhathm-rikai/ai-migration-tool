@@ -16,11 +16,11 @@ import {
   buildRisks,
   type CustomerReport,
 } from './customer-report.js';
-import {
-  CUSTOMER_REPORT_VERSION,
-  NOT_ANALYZED,
-  SHEET_NAMES,
-} from './customer-report-constants.js';
+import { CUSTOMER_REPORT_VERSION } from './customer-report-constants.js';
+import { reportText } from './customer-report-text.js';
+
+const NOT_ANALYZED = reportText('ja').notAnalyzed;
+const SHEET_NAMES = reportText('ja').sheetNames;
 import { customerReportSheets } from './customer-report-workbook.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
 import { unzip } from '../../testing/zip-reader.js';
@@ -265,7 +265,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     const sheet = sheetOf('6_画面・帳票一覧');
     expect(sheet.rows).toHaveLength(report.items.length);
     expect(sheet.columns.map((c) => c.header)).toEqual(
-      expect.arrayContaining(['複雑度', '点数', 'モデル版', '評価要因']),
+      expect.arrayContaining(['複雑度', '点数', '評価要因']),
     );
     expect(sheet.notes?.join('')).toContain('算定基準');
   });
@@ -280,7 +280,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
       expect(sheet1).toContain(label);
     const sheet2 = cells(sheetOf('2_複雑度'));
     expect(sheet2).toContain('未評価');
-    expect(sheet2).toContain('report-complexity-v1-draft');
+    expect(sheet2).not.toContain('report-complexity-v1-draft');
   });
 });
 
@@ -357,8 +357,9 @@ describe('AR02-AC06 workbook', () => {
   it('carries provenance and the DEMO label on sheet 1', () => {
     const text = cells(sheetOf('1_規模概要')).join('\n');
     expect(text).toContain('DEMO');
-    expect(text).toContain('a1');
-    expect(text).toContain(report.source.snapshotHash.slice(0, 12));
+    expect(text).toContain('解析 #1');
+    expect(text).not.toContain(report.source.snapshotHash.slice(0, 12));
+    expect(text).not.toContain('artifact');
     expect(text).toContain('お客様提示数：未入力');
   });
 

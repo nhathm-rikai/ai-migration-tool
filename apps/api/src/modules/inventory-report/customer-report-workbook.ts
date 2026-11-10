@@ -1,24 +1,17 @@
 import {
   REPORT_COUNTING_BASIS,
-  REPORT_TOTAL_LABEL,
-  TABLE_SCHEMA_STATEMENT,
   tableSchemaState,
+  tableSchemaStatement,
 } from '@portal/contracts';
 import type { CustomerReport } from './customer-report.js';
-import {
-  LEVEL_LABELS,
-  NOT_ANALYZED,
-  NOT_APPLICABLE,
-  REPORT_KIND_LABELS,
-  SHEET_NAMES,
-  SHEET_NOTES,
-  CUSTOMER_PROVIDED_COUNT,
-} from './customer-report-constants.js';
+import { reportText, type ReportText } from './customer-report-text.js';
 import type { CellValue, Sheet, SheetColumn } from './xlsx-writer.js';
 
-// Lays the customer report out as the six sheets of scope section 3. The JSON
-// stays the source of truth; every sheet has a title, "how to read" notes and
-// then its tables. A table without rows says 該当なし instead of staying empty.
+// Lays the customer report out as the six sheets of scope section 3, in the
+// language of the report (report.language). The JSON stays the source of
+// truth; every sheet has a title, "how to read" notes and then its tables. A
+// table without rows says 該当なし (Không có) instead of staying empty. No
+// internal id, model version or hash is written here (they stay in the JSON).
 
 const LEVELS = ['low', 'medium', 'high', 'very-high'] as const;
 
@@ -26,7 +19,10 @@ class SheetBuilder {
   readonly rows: CellValue[][] = [];
   readonly headingRows: number[] = [];
   readonly subHeaderRows: number[] = [];
-  constructor(private readonly width: number) {}
+  constructor(
+    private readonly width: number,
+    private readonly empty: string,
+  ) {}
 
   private pad(cells: readonly CellValue[]): CellValue[] {
     if (cells.length > this.width) throw new Error('row wider than sheet');
@@ -48,7 +44,7 @@ class SheetBuilder {
   }
   // Rows of a table, or the 該当なし line.
   table(rows: readonly (readonly CellValue[])[]) {
-    if (rows.length === 0) this.row(NOT_APPLICABLE);
+    if (rows.length === 0) this.row(this.empty);
     for (const row of rows) this.row(...row);
   }
 }
@@ -60,15 +56,17 @@ const col = (header: string, width: number, wrap = false): SheetColumn => ({
 });
 
 function sheetOf(
-  name: (typeof SHEET_NAMES)[number],
+  t: ReportText,
+  index: number,
   columns: SheetColumn[],
   built: SheetBuilder | readonly (readonly CellValue[])[],
   extra: Partial<Sheet> = {},
 ): Sheet {
   const isBuilder = built instanceof SheetBuilder;
+  const name = t.sheetNames[index] ?? '';
   return {
     name,
-    title: name.replace(/^\d_/, '') + '（アセスメント報告書）',
+    title: name.replace(/^\d_/, '') + t.sheetTitleSuffix,
     tabColor: 'FF1F3864',
     columns,
     rows: isBuilder ? built.rows : built,
@@ -79,116 +77,91 @@ function sheetOf(
       ? { subHeaderRows: built.subHeaderRows }
       : {}),
     ...extra,
-    notes: [...SHEET_NOTES[name], ...(extra.notes ?? [])],
+    notes: [...(t.sheetNotes[index] ?? []), ...(extra.notes ?? [])],
   };
 }
 
 const percent = (count: number, total: number) =>
   total === 0 ? 0 : Math.round((count / total) * 1000) / 10;
 
-function sheet1(report: CustomerReport): Sheet {
+function sheet1(report: CustomerReport, t: ReportText): Sheet {
   const { scale, source } = report;
   const origin = source.origin;
-  const b = new SheetBuilder(8);
-  b.heading('データの出所');
+  const w = t.wb;
+  const b = new SheetBuilder(8, t.notApplicable);
+  b.heading(w.origin);
   if (origin) {
-    b.row(
-      'データ区分',
-      origin.mode === 'demo'
-        ? 'DEMO：同梱のサンプルデータです（お客様のシステムではありません）'
-        : 'お客様ソースの解析結果',
-    );
-    b.row('プロジェクト', origin.projectName);
-    b.row('解析ラン', origin.runId);
-    b.row('解析結果', `${origin.artifactId} v${origin.artifactVersion}`);
-    b.row('解析日時', origin.createdAt);
+    b.row(w.dataKind, origin.mode === 'demo' ? w.demo : w.real);
+    b.row(w.project, origin.projectName);
+    b.row(w.analysedOn, origin.createdAt, w.analysisNo(origin.artifactVersion));
   }
-  b.row('スナップショット', source.snapshotHash.slice(0, 12));
-  b.row('報告書版', report.reportVersion);
-  b.row('複雑度モデル', source.versions.complexityVersion);
 
-  b.heading('規模');
-  b.row(
-    'プログラム数',
-    scale.programs,
-    `うち完全に解析 ${scale.completePrograms}`,
-  );
-  b.row('ファイル数', scale.files, `うち解析済みコード ${scale.analyzedFiles}`);
-  b.row('コード行数', scale.codeLines, '共通ファイルは1回のみ集計');
-  b.row('コメント行数', scale.commentLines);
-  b.row('空白行数', scale.blankLines);
-  b.row('物理行数', scale.physicalLines);
-  b.row('プロシージャ数', scale.procedures);
-  b.row(
-    'DBテーブル数',
-    scale.tablesView === null ? NOT_ANALYZED : scale.tables,
-  );
+  b.heading(w.scale);
+  b.row(w.programs, scale.programs, w.ofComplete(scale.completePrograms));
+  b.row(w.files, scale.files, w.ofAnalyzed(scale.analyzedFiles));
+  b.row(w.codeLines, scale.codeLines, w.sharedOnce);
+  b.row(w.commentLines, scale.commentLines);
+  b.row(w.blankLines, scale.blankLines);
+  b.row(w.physicalLines, scale.physicalLines);
+  b.row(w.procedures, scale.procedures);
+  b.row(w.dbTables, scale.tablesView === null ? t.notAnalyzed : scale.tables);
   const sr = scale.screenReport;
   b.row(
-    '画面',
-    sr ? sr.screens : NOT_ANALYZED,
-    sr ? `うち共通 ${sr.sharedScreens}（1回のみ集計）` : null,
+    w.screens,
+    sr ? sr.screens : t.notAnalyzed,
+    sr ? w.ofShared(sr.sharedScreens) : null,
   );
   const breakdown = scale.reportBreakdown;
   b.row(
-    REPORT_TOTAL_LABEL.ja,
-    sr ? sr.reports.counted : NOT_ANALYZED,
+    w.reportTotal,
+    sr ? sr.reports.counted : t.notAnalyzed,
     breakdown
-      ? `Crystal ${breakdown.crystal}／コード印刷 ${breakdown.print}／CSV・Excel出力 ${breakdown.export}`
+      ? w.reportParts(breakdown.crystal, breakdown.print, breakdown.export)
       : null,
   );
   b.row(
-    '　Crystal Reports / DataReport',
-    breakdown ? breakdown.crystal : NOT_ANALYZED,
+    w.crystalRow,
+    breakdown ? breakdown.crystal : t.notAnalyzed,
     breakdown
-      ? `設計ファイルあり ${breakdown.designFile}／なし ${breakdown.missingFile}`
+      ? w.designSplit(breakdown.designFile, breakdown.missingFile)
       : null,
   );
-  b.row('　コードによる印刷', breakdown ? breakdown.print : NOT_ANALYZED);
-  b.row('　CSV・Excel出力', breakdown ? breakdown.export : NOT_ANALYZED);
+  b.row(w.printRow, breakdown ? breakdown.print : t.notAnalyzed);
+  b.row(w.exportRow, breakdown ? breakdown.export : t.notAnalyzed);
   b.row(
-    'データファイル出力（帳票に含めない）',
-    breakdown ? breakdown.dataFiles : NOT_ANALYZED,
-    breakdown ? `ログ・一時ファイルとして除外 ${breakdown.excluded} 件` : null,
+    w.dataFilesRow,
+    breakdown ? breakdown.dataFiles : t.notAnalyzed,
+    breakdown ? w.excluded(breakdown.excluded) : null,
   );
-  b.row('バッチ', sr ? sr.batches : NOT_ANALYZED);
-  b.row('画面・帳票（お客様提示）', CUSTOMER_PROVIDED_COUNT);
+  b.row(w.batches, sr ? sr.batches : t.notAnalyzed);
+  b.row(w.customerCount, t.customerProvidedCount);
 
-  b.heading('帳票の内訳（作成方法別）');
-  b.subHeader(['種別', '件数']);
+  b.heading(w.breakdownByKind);
+  b.subHeader(w.kindHeader);
   b.table(
     sr
       ? (
-          Object.keys(REPORT_KIND_LABELS) as (keyof typeof sr.reports.byKind)[]
+          Object.keys(t.reportKindLabels) as (keyof typeof sr.reports.byKind)[]
         ).map((kind) => [
-          REPORT_KIND_LABELS[kind] ?? kind,
+          t.reportKindLabels[kind] ?? kind,
           sr.reports.byKind[kind],
         ])
-      : [[NOT_ANALYZED]],
+      : [[t.notAnalyzed]],
   );
-  b.heading('帳票の内訳（複雑度）');
-  b.subHeader(['複雑度', '件数', 'モデル版']);
+  b.heading(w.breakdownByLevel);
+  b.subHeader(w.levelHeader);
   b.table(
     sr
       ? [...LEVELS, 'unrated' as const].map((level) => [
-          LEVEL_LABELS[level] ?? level,
+          t.levelLabels[level] ?? level,
           sr.reports.byLevel[level],
-          report.complexity.reportModelVersion,
         ])
-      : [[NOT_ANALYZED]],
+      : [[t.notAnalyzed]],
   );
 
-  b.heading('モジュール別（共通は別行）');
-  b.subHeader([
-    'モジュール',
-    'プログラム数',
-    '画面',
-    '帳票',
-    'バッチ',
-    'ファイル',
-    'コード行数',
-  ]);
-  const count = (value: number) => (sr ? value : NOT_ANALYZED);
+  b.heading(w.byModule);
+  b.subHeader(w.moduleHeader);
+  const count = (value: number) => (sr ? value : t.notAnalyzed);
   b.table([
     ...report.modules.map((m) => [
       m.module,
@@ -202,11 +175,11 @@ function sheet1(report: CustomerReport): Sheet {
     ...(report.modules.length > 0
       ? [
           [
-            '合計',
+            w.total,
             report.modules.reduce((n, m) => n + m.programs, 0),
-            sr ? sr.screens : NOT_ANALYZED,
-            sr ? sr.reports.counted : NOT_ANALYZED,
-            sr ? sr.batches : NOT_ANALYZED,
+            sr ? sr.screens : t.notAnalyzed,
+            sr ? sr.reports.counted : t.notAnalyzed,
+            sr ? sr.batches : t.notAnalyzed,
             report.modules.reduce((n, m) => n + m.files, 0),
             report.modules.reduce((n, m) => n + m.codeLines, 0),
           ],
@@ -214,19 +187,23 @@ function sheet1(report: CustomerReport): Sheet {
       : []),
   ]);
 
-  b.heading('算定基準');
+  b.heading(w.basis);
+  const lang = report.language;
   for (const item of REPORT_COUNTING_BASIS)
-    b.row(`${item.ja.label}：${item.ja.text}`);
+    b.row(
+      `${item[lang].label}${lang === 'ja' ? '：' : ': '}${item[lang].text}`,
+    );
 
-  b.heading('今後の進め方');
+  b.heading(w.nextSteps);
   for (const line of report.recommendations) b.row(line);
 
   return sheetOf(
-    SHEET_NAMES[0],
+    t,
+    0,
     [
-      col('項目', 28),
-      col('値', 22),
-      col('補足', 24),
+      col(w.colItem, 28),
+      col(w.colValue, 22),
+      col(w.colNote, 24),
       col('', 14),
       col('', 14),
       col('', 12),
@@ -238,65 +215,57 @@ function sheet1(report: CustomerReport): Sheet {
   );
 }
 
-function sheet2(report: CustomerReport): Sheet {
+function sheet2(report: CustomerReport, t: ReportText): Sheet {
   const { complexity } = report;
+  const w = t.wb;
   const total = report.scale.programs;
-  const b = new SheetBuilder(7);
-  b.row('モデル', complexity.version);
+  const b = new SheetBuilder(7, t.notApplicable);
   const levelRows: CellValue[][] = LEVELS.map((level) => {
     const value = complexity.levels[level];
     return value === null
-      ? [LEVEL_LABELS[level] ?? level, '対象外（旧モデルにないレベル）', null]
-      : [LEVEL_LABELS[level] ?? level, value, percent(value, total)];
+      ? [t.levelLabels[level] ?? level, w.notApplicableLevel, null]
+      : [t.levelLabels[level] ?? level, value, percent(value, total)];
   });
   levelRows.push([
-    '未解析',
+    w.notAnalyzedLabel,
     complexity.notAnalyzed,
     percent(complexity.notAnalyzed, total),
   ]);
-  b.heading('プログラムの複雑度の分布');
-  b.subHeader(['レベル', 'プログラム数', '割合(%)']);
+  b.heading(w.programLevels);
+  b.subHeader(w.programLevelHeader);
   b.table(total === 0 ? [] : levelRows);
 
-  b.heading(`帳票の複雑度の分布`);
-  b.subHeader(['レベル', '帳票数', 'モデル版']);
+  b.heading(w.reportLevels);
+  b.subHeader(w.reportLevelHeader);
   b.table(
     complexity.reportLevels
       ? [...LEVELS, 'unrated' as const].map((level) => [
-          LEVEL_LABELS[level] ?? level,
+          t.levelLabels[level] ?? level,
           complexity.reportLevels?.[level] ?? 0,
-          complexity.reportModelVersion,
         ])
-      : [[NOT_ANALYZED]],
+      : [[t.notAnalyzed]],
   );
 
-  b.heading('複雑なプログラム上位20');
-  b.subHeader([
-    'プログラム',
-    'モジュール',
-    'レベル',
-    '点数',
-    'コード行数',
-    '画面',
-    '帳票',
-  ]);
+  b.heading(w.topPrograms);
+  b.subHeader(w.topHeader);
   b.table(
     complexity.top.map((p) => [
       p.program,
       p.module,
-      LEVEL_LABELS[p.level] ?? p.level,
+      t.levelLabels[p.level] ?? p.level,
       p.score,
       p.codeLines,
-      p.screens ?? NOT_ANALYZED,
-      p.reports ?? NOT_ANALYZED,
+      p.screens ?? t.notAnalyzed,
+      p.reports ?? t.notAnalyzed,
     ]),
   );
   return sheetOf(
-    SHEET_NAMES[1],
+    t,
+    1,
     [
-      col('項目', 28),
-      col('値', 26),
-      col('補足', 14),
+      col(w.colItem, 28),
+      col(w.colValue, 26),
+      col(w.colNote, 14),
       col('', 10),
       col('', 14),
       col('', 10),
@@ -307,11 +276,12 @@ function sheet2(report: CustomerReport): Sheet {
   );
 }
 
-function sheet3(report: CustomerReport): Sheet {
+function sheet3(report: CustomerReport, t: ReportText): Sheet {
   const { dependencies } = report;
-  const b = new SheetBuilder(4);
-  b.heading('共通部品（参照プログラム数の多い順・上位15）');
-  b.subHeader(['ファイル', '参照プログラム数', 'プロシージャ数', 'コード行数']);
+  const w = t.wb;
+  const b = new SheetBuilder(4, t.notApplicable);
+  b.heading(w.sharedHeading);
+  b.subHeader(w.sharedHeader);
   b.table(
     dependencies.shared.map((s) => [
       s.file,
@@ -320,114 +290,105 @@ function sheet3(report: CustomerReport): Sheet {
       s.codeLines,
     ]),
   );
-  b.heading('外部コンポーネント（COM / OCX）');
-  b.subHeader(['識別子', 'ファイル名', '説明', '参照プログラム数']);
+  b.heading(w.componentsHeading);
+  b.subHeader(w.componentsHeader);
   b.table(
     dependencies.components.map((c) => [
-      (c.kind === 'reference' ? '【参照設定】' : '【コンポーネント】') +
-        c.identifier,
+      (c.kind === 'reference' ? w.referenceTag : w.componentTag) + c.identifier,
       c.fileName,
       c.description,
       c.programs,
     ]),
   );
-  b.heading('Windows API など外部ライブラリの関数');
-  b.subHeader(['関数名', 'ライブラリ', '呼び出しプログラム数']);
+  b.heading(w.apisHeading);
+  b.subHeader(w.apisHeader);
   b.table(dependencies.apis.map((a) => [a.name, a.library, a.programs]));
   return sheetOf(
-    SHEET_NAMES[2],
-    [col('項目', 40), col('値', 24), col('補足', 30), col('', 18)],
+    t,
+    2,
+    [col(w.colItem, 40), col(w.colValue, 24), col(w.colNote, 30), col('', 18)],
     b,
     { boldFirstColumn: true },
   );
 }
 
-function sheet4(report: CustomerReport): Sheet {
+function sheet4(report: CustomerReport, t: ReportText): Sheet {
   const { database } = report;
+  const w = t.wb;
   const state = tableSchemaState(report.scale);
-  const b = new SheetBuilder(3);
+  const b = new SheetBuilder(3, t.notApplicable);
   b.heading(
-    (report.scale.tablesView === 'raw'
-      ? 'アクセスされるテーブル（ソース上の名称・上位30）'
-      : 'アクセスされるテーブル（名称統一後・上位30）') +
-      (state === 'assumed' ? '※スキーマは仮定（DB管理者の確認前）' : ''),
+    (report.scale.tablesView === 'raw' ? w.tablesRaw : w.tablesNormalized) +
+      (state === 'assumed' ? w.schemaAssumed : ''),
   );
-  b.subHeader([
-    'テーブル',
-    '参照プログラム数',
-    '操作（C=作成 R=参照 U=更新 D=削除 X=DDL）',
-  ]);
-  b.table(database.tables.map((t) => [t.table, t.programs, t.operations]));
+  b.subHeader(w.tablesHeader);
+  b.table(database.tables.map((x) => [x.table, x.programs, x.operations]));
   b.heading(
-    `動的SQL・文字列連結SQLの箇所数（動的 ${database.dynamicSql} / 連結 ${database.concatenatedSql ?? NOT_ANALYZED}）`,
+    w.sqlHeading(
+      database.dynamicSql,
+      database.concatenatedSql ?? t.notAnalyzed,
+    ),
   );
-  b.subHeader([
-    'モジュール',
-    '動的SQL（テーブル名が実行時決定）',
-    '文字列連結SQL',
-  ]);
+  b.subHeader(w.sqlHeader);
   b.table(
     database.sqlByModule.map((m) => [
       m.module,
       m.dynamicSql,
-      m.concatenatedSql ?? NOT_ANALYZED,
+      m.concatenatedSql ?? t.notAnalyzed,
     ]),
   );
   return sheetOf(
-    SHEET_NAMES[3],
-    [col('項目', 36), col('値', 30), col('補足', 44)],
+    t,
+    3,
+    [col(w.colItem, 36), col(w.colValue, 30), col(w.colNote, 44)],
     b,
-    { boldFirstColumn: true, notes: [TABLE_SCHEMA_STATEMENT[state].note] },
+    {
+      boldFirstColumn: true,
+      notes: [tableSchemaStatement(state, report.language).note],
+    },
   );
 }
 
-function sheet5(report: CustomerReport): Sheet {
+function sheet5(report: CustomerReport, t: ReportText): Sheet {
+  const w = t.wb;
   const rows: CellValue[][] = report.risks.map((risk) => [
     risk.category,
     risk.severity,
     risk.count,
     risk.content,
     risk.programs.length === 0
-      ? '（全体）'
-      : risk.programs.join('、') +
-        (risk.otherPrograms > 0 ? ` 他${risk.otherPrograms}件` : ''),
+      ? w.wholeSystem
+      : risk.programs.join(w.joinPrograms) +
+        (risk.otherPrograms > 0 ? w.otherPrograms(risk.otherPrograms) : ''),
     risk.confirmation,
   ]);
   if (rows.length === 0)
-    rows.push([NOT_APPLICABLE, null, null, null, null, null]);
+    rows.push([t.notApplicable, null, null, null, null, null]);
+  const [category, severity, number, content, programs, confirmation] =
+    w.riskColumns;
   return sheetOf(
-    SHEET_NAMES[4],
+    t,
+    4,
     [
-      col('区分', 18),
-      col('重要度', 9),
-      col('件数', 8),
-      col('内容', 50, true),
-      col('影響プログラム', 36, true),
-      col('お客様への確認事項', 50, true),
+      col(category, 20),
+      col(severity, 11),
+      col(number, 10),
+      col(content, 50, true),
+      col(programs, 36, true),
+      col(confirmation, 50, true),
     ],
     rows,
   );
 }
 
-function sheet6(report: CustomerReport): Sheet {
-  const columns = [
-    col('区分', 8),
-    col('種別', 22),
-    col('プログラム', 24),
-    col('モジュール', 22),
-    col('名称', 22),
-    col('ファイル', 36),
-    col('行', 7),
-    col('信頼度', 22),
-    col('複雑度', 12),
-    col('点数', 8),
-    col('モデル版', 26),
-    col('評価要因', 40),
-    col('備考', 44),
-  ];
+function sheet6(report: CustomerReport, t: ReportText): Sheet {
+  const widths = [12, 24, 24, 22, 22, 36, 7, 24, 14, 8, 40, 44];
+  const columns = t.wb.itemColumns.map((header, index) =>
+    col(header, widths[index] ?? 20),
+  );
   const rows: CellValue[][] =
     report.scale.screenReport === null
-      ? [[NOT_ANALYZED, ...Array<CellValue>(columns.length - 1).fill(null)]]
+      ? [[t.notAnalyzed, ...Array<CellValue>(columns.length - 1).fill(null)]]
       : report.items.map((item) => [
           item.type,
           item.kindLabel,
@@ -439,27 +400,25 @@ function sheet6(report: CustomerReport): Sheet {
           item.confidenceLabel,
           item.levelLabel,
           item.score,
-          item.modelVersion,
           item.factors,
-          item.type === '帳票' && item.level !== 'unrated'
-            ? item.note
-            : item.note,
+          item.note,
         ]);
   if (rows.length === 0)
     rows.push([
-      NOT_APPLICABLE,
+      t.notApplicable,
       ...Array<CellValue>(columns.length - 1).fill(null),
     ]);
-  return sheetOf(SHEET_NAMES[5], columns, rows);
+  return sheetOf(t, 5, columns, rows);
 }
 
 export function customerReportSheets(report: CustomerReport): Sheet[] {
+  const t = reportText(report.language);
   return [
-    sheet1(report),
-    sheet2(report),
-    sheet3(report),
-    sheet4(report),
-    sheet5(report),
-    sheet6(report),
+    sheet1(report, t),
+    sheet2(report, t),
+    sheet3(report, t),
+    sheet4(report, t),
+    sheet5(report, t),
+    sheet6(report, t),
   ];
 }

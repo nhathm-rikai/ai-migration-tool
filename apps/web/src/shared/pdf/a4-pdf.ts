@@ -13,6 +13,9 @@ export const SIDE = 42;
 // Pixels per CSS pixel; lowered for a very long document (canvas limit).
 const MAX_SCALE = 3;
 const MAX_PIXELS = 15000;
+// "Sharp" documents (the assessment report) are drawn page by page at this
+// scale (about 290 dpi on A4), whatever their length.
+const SHARP_SCALE = 3;
 const FONT =
   '"Yu Gothic", "Meiryo", "Hiragino Sans", "Noto Sans JP", sans-serif';
 
@@ -34,6 +37,12 @@ export type A4Options = {
   pageBreakBeforeSelector?: string;
   // The logo image of the document, if it has one, is inlined.
   logoUrl?: string;
+  // Draw every page from its own slice of the document at a fixed high scale
+  // instead of one tall image (whose scale falls as the document grows), so
+  // a long document stays sharp. The quote keeps the original path.
+  sharp?: boolean;
+  // JPEG quality of the pages (default 0.95).
+  jpegQuality?: number;
 };
 
 // Rules of the stylesheets that style the document, so they can travel
@@ -80,7 +89,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function toBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+function toBytes(
+  canvas: HTMLCanvasElement,
+  quality = 0.95,
+): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -90,7 +102,7 @@ function toBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
           .then((buffer) => resolve(new Uint8Array(buffer)));
       },
       'image/jpeg',
-      0.95,
+      quality,
     );
   });
 }
@@ -245,19 +257,23 @@ export async function renderA4Pdf(
     const height = Math.ceil(root.getBoundingClientRect().height);
     const points = breakPoints(root, options);
     const forced = forcedBreaks(root, options);
-    const SCALE = Math.max(
-      1,
-      Math.min(MAX_SCALE, Math.floor(MAX_PIXELS / height)),
-    );
+    const sharp = options.sharp === true;
+    const SCALE = sharp
+      ? SHARP_SCALE
+      : Math.max(1, Math.min(MAX_SCALE, Math.floor(MAX_PIXELS / height)));
     const markup = new XMLSerializer().serializeToString(root);
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${height * SCALE}" viewBox="0 0 ${PAGE_W} ${height}">` +
+    // The document as an image; a sharp one shows only the slice [from, to]
+    // of it (the viewBox), so the image is as small as a page.
+    const svgOf = (from: number, to: number) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${(to - from) * SCALE}" viewBox="0 ${from} ${PAGE_W} ${to - from}">` +
       `<foreignObject width="${PAGE_W}" height="${height}">` +
       `<div xmlns="${ns}"><style>${escapeText(css)}</style>${markup}</div>` +
       '</foreignObject></svg>';
-    const image = await loadImage(
-      `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    );
+    const imageOf = (from: number, to: number) =>
+      loadImage(
+        `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgOf(from, to))}`,
+      );
+    const image = sharp ? null : await imageOf(0, height);
     const rendered: { jpeg: Uint8Array; width: number; height: number }[] = [];
     const cuts = slices(height, points, forced);
     for (const [index, [start, end]] of cuts.entries()) {
@@ -268,10 +284,11 @@ export async function renderA4Pdf(
       if (!context) throw new Error('The page could not be drawn.');
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
+      const pageImage = image ?? (await imageOf(start, end));
       context.drawImage(
-        image,
+        pageImage,
         0,
-        start * SCALE,
+        sharp ? 0 : start * SCALE,
         PAGE_W * SCALE,
         (end - start) * SCALE,
         0,
@@ -299,7 +316,7 @@ export async function renderA4Pdf(
         footerY,
       );
       rendered.push({
-        jpeg: await toBytes(canvas),
+        jpeg: await toBytes(canvas, options.jpegQuality),
         width: canvas.width,
         height: canvas.height,
       });

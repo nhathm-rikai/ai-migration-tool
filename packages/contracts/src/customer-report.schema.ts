@@ -61,7 +61,7 @@ const Level = Type.Union([
 
 export const CustomerReportSchema = Type.Object({
   reportVersion: Type.Literal(CUSTOMER_REPORT_VERSION),
-  language: Type.Literal('ja'),
+  language: Type.Union([Type.Literal('ja'), Type.Literal('vi')]),
   source: Type.Object({
     origin: Nullable(Origin),
     snapshotHash: Type.String(),
@@ -199,11 +199,8 @@ export const CustomerReportSchema = Type.Object({
       code: Type.String(),
       source: Type.Union([Type.Literal('warning'), Type.Literal('data')]),
       category: Type.String(),
-      severity: Type.Union([
-        Type.Literal('高'),
-        Type.Literal('中'),
-        Type.Literal('低'),
-      ]),
+      // The label in the language of the report (高／中／低, Cao／Trung bình／Thấp).
+      severity: Type.String(),
       count: Count,
       content: Type.String(),
       programs: Type.Array(Type.String()),
@@ -213,12 +210,8 @@ export const CustomerReportSchema = Type.Object({
   ),
   items: Type.Array(
     Type.Object({
-      type: Type.Union([
-        Type.Literal('画面'),
-        Type.Literal('帳票'),
-        Type.Literal('出力機能'),
-        Type.Literal('バッチ'),
-      ]),
+      // The label in the language of the report (画面／帳票／出力機能／バッチ, ...).
+      type: Type.String(),
       kindLabel: Type.String(),
       programs: Type.String(),
       module: Type.String(),

@@ -3,6 +3,7 @@ import {
   ArtifactEnvelopeSchema,
   ArtifactListSchema,
   ArtifactVersionParamsSchema,
+  CustomerReportQuerySchema,
   InventoryReportQuerySchema,
 } from './artifact.schema.js';
 import type { AnalyzeApiErrorCode, ApiErrorCode } from './error.schema.js';
@@ -207,14 +208,14 @@ export const ANALYZE_API_OPERATIONS = {
       'REPORT_TOO_LARGE',
     ],
   },
-  // Customer assessment report (AR02): the six-sheet Japanese workbook, or
-  // its JSON, of the same exact inventory version.
+  // Customer assessment report (AR02): the six-sheet workbook (Japanese, or
+  // Vietnamese with lang=vi), or its JSON, of the same exact inventory version.
   exportCustomerReport: {
     method: 'GET',
     path: `${ProjectsPath}/artifacts/:artifactId/versions/:version/customer-report`,
     successStatuses: [200],
     params: ArtifactVersionParamsSchema,
-    querystring: InventoryReportQuerySchema,
+    querystring: CustomerReportQuerySchema,
     response: Type.Unknown(),
     contentType: 'attachment',
     errorCodes: [

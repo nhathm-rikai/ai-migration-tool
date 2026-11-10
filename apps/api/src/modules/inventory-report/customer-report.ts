@@ -6,20 +6,17 @@ import {
   normalizeScreenReportTotals,
   type SourceInventoryDocument,
 } from '@portal/contracts';
+import { CUSTOMER_REPORT_VERSION } from './customer-report-constants.js';
 import {
-  CONFIDENCE_LABELS,
-  CUSTOMER_REPORT_VERSION,
-  FACTOR_LABELS,
-  LEVEL_LABELS,
-  REASON_LABELS,
-  RECOMMENDATIONS,
-  REPORT_KIND_LABELS,
-  SHARED_MODULE,
-  UNASSIGNED_MODULE,
-} from './customer-report-constants.js';
+  reportText,
+  type ItemTypeCode,
+  type Lang,
+  type ReportText,
+} from './customer-report-text.js';
 import {
   OTHER_RISK_CODE,
   RISK_CATALOG,
+  riskCatalog,
   type RiskSeverity,
 } from './customer-risk-catalog.js';
 import {
@@ -58,7 +55,8 @@ export type RiskRow = {
   // taken from the data (external components, native APIs).
   source: 'warning' | 'data';
   category: string;
-  severity: RiskSeverity;
+  // The label in the language of the report (高／中／低, Cao／Trung bình／Thấp).
+  severity: string;
   count: number;
   content: string;
   programs: string[];
@@ -67,8 +65,9 @@ export type RiskRow = {
 };
 
 export type ItemRow = {
-  // 帳票 = a report template; 出力機能 = a print/export function to confirm.
-  type: '画面' | '帳票' | 'バッチ' | '出力機能';
+  // The label in the language of the report: 画面／帳票／バッチ／出力機能 in
+  // Japanese (出力機能 = file output that is not counted as a report).
+  type: string;
   kindLabel: string;
   programs: string;
   module: string;
@@ -88,7 +87,7 @@ export type ItemRow = {
 
 export type CustomerReport = {
   reportVersion: typeof CUSTOMER_REPORT_VERSION;
-  language: 'ja';
+  language: Lang;
   source: InventoryReport['source'];
   scale: {
     programs: number;
@@ -209,7 +208,10 @@ export function buildRisks(
     count: 0,
     programIds: [],
   },
+  lang: Lang = 'ja',
 ): RiskRow[] {
+  const t = reportText(lang);
+  const catalog = riskCatalog(lang);
   type Group = { count: number; programs: Set<string>; known: boolean };
   const groups = new Map<string, Group>();
   const add = (
@@ -228,8 +230,7 @@ export function buildRisks(
     groups.set(code, group);
   };
   for (const warning of warnings) {
-    const known =
-      warning.code in RISK_CATALOG && warning.code !== OTHER_RISK_CODE;
+    const known = warning.code in catalog && warning.code !== OTHER_RISK_CODE;
     add(
       known ? warning.code : OTHER_RISK_CODE,
       warning.programIds ?? (warning.programId ? [warning.programId] : []),
@@ -249,14 +250,14 @@ export function buildRisks(
     }
   const rows: RiskRow[] = [];
   const push = (code: string, source: RiskRow['source'], group: Group) => {
-    const entry = RISK_CATALOG[code] ?? RISK_CATALOG[OTHER_RISK_CODE];
+    const entry = catalog[code] ?? catalog[OTHER_RISK_CODE];
     if (!entry) throw new Error('risk catalog has no fallback');
     const programs = [...group.programs].sort(byText);
     rows.push({
       code,
       source,
       category: entry.category,
-      severity: entry.severity,
+      severity: t.severity[entry.severity],
       count: group.count,
       content: entry.content,
       programs: programs.slice(0, MAX_LISTED_PROGRAMS),
@@ -278,11 +279,14 @@ export function buildRisks(
       programs: new Set(concatenatedSql.programIds),
       known: true,
     });
+  // Ranked by the internal severity code, not by the label of the language.
+  const rank = (row: RiskRow) =>
+    SEVERITY_ORDER.indexOf(
+      (RISK_CATALOG[row.code] ?? RISK_CATALOG[OTHER_RISK_CODE])?.severity ??
+        '中',
+    );
   return rows.sort(
-    (a, b) =>
-      SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity) ||
-      b.count - a.count ||
-      byText(a.code, b.code),
+    (a, b) => rank(a) - rank(b) || b.count - a.count || byText(a.code, b.code),
   );
 }
 
@@ -357,7 +361,9 @@ function unsupportedWarnings(inventory: Inventory): RiskWarning[] {
 export function buildCustomerReport(
   inventory: Inventory,
   origin: ReportOrigin | null = null,
+  lang: Lang = 'ja',
 ): CustomerReport {
+  const t = reportText(lang);
   const core = buildInventoryReport(inventory, ALL_PROGRAMS, origin);
   // The unique totals are those of the whole inventory, every analyzed file
   // (also one no project lists), exactly what step 2 shows; the technical
@@ -447,7 +453,7 @@ export function buildCustomerReport(
     }
     return row;
   };
-  const sharedRow = moduleRow(SHARED_MODULE, 'shared');
+  const sharedRow = moduleRow(t.sharedModule, 'shared');
   sharedRow.files = sharedFiles.length;
   sharedRow.codeLines = sharedFiles.reduce(
     (sum, file) => sum + (file.counters?.codeLines ?? 0),
@@ -487,7 +493,7 @@ export function buildCustomerReport(
       [...modules.values()].reduce((sum, row) => sum + row.codeLines, 0),
   };
   if (rest.files > 0 || rest.codeLines > 0) {
-    const row = moduleRow(UNASSIGNED_MODULE, 'unassigned');
+    const row = moduleRow(t.unassignedModule, 'unassigned');
     row.files = Math.max(0, rest.files);
     row.codeLines = Math.max(0, rest.codeLines);
   }
@@ -587,10 +593,10 @@ export function buildCustomerReport(
     for (const row of rows) {
       const label =
         row.usedBy.length > 1
-          ? SHARED_MODULE
+          ? t.sharedModule
           : row.usedBy[0] !== undefined
             ? moduleOfProgram(row.usedBy[0])
-            : UNASSIGNED_MODULE;
+            : t.unassignedModule;
       const kind =
         row.usedBy.length > 1
           ? 'shared'
@@ -624,7 +630,7 @@ export function buildCustomerReport(
 
   return {
     reportVersion: CUSTOMER_REPORT_VERSION,
-    language: 'ja',
+    language: lang,
     source: core.source,
     scale: {
       programs: inventory.programs.length,
@@ -745,33 +751,22 @@ export function buildCustomerReport(
         count: concatenatedRows.length,
         programIds: concatenatedRows.flatMap((row) => row.usedBy),
       },
+      lang,
     ),
-    items: buildItems(inventory, reportSummary),
-    recommendations: RECOMMENDATIONS,
+    items: buildItems(inventory, reportSummary, t),
+    recommendations: t.recommendations,
   };
 }
 
 // ---- Screen and report list -----------------------------------------------
 
-const ITEM_TYPE_ORDER = ['画面', '帳票', 'バッチ', '出力機能'];
-const TEMPLATE_STATUS_LABELS = {
-  'design-file': '設計ファイルあり',
-  'missing-file': '設計ファイルなし',
-} as const;
-const ORIGIN_LABELS: Record<string, string> = {
-  print: 'コード印刷',
-  export: 'CSV・Excel出力',
-};
-const WARNING_LABELS: Record<string, string> = {
-  SCREEN_FILE_MISSING: '画面ファイルがソースにありません',
-  SCREEN_FILE_NOT_ANALYZED:
-    '画面ファイルを解析できません（画面数には含みます）',
-  REPORT_FILE_MISSING: '帳票定義ファイル(.rpt)がソースにありません',
-};
+const ITEM_TYPE_ORDER: ItemTypeCode[] = ['画面', '帳票', 'バッチ', '出力機能'];
+type ItemDraft = Omit<ItemRow, 'type'> & { type: ItemTypeCode };
 
 function buildItems(
   inventory: Inventory,
   summary: ReturnType<typeof deriveReportSummary>,
+  t: ReportText,
 ): ItemRow[] {
   if (!summary) return [];
   type Owner = { label: string; module: string };
@@ -782,7 +777,7 @@ function buildItems(
       owners: Owner[];
     }
   >();
-  const items: ItemRow[] = [];
+  const items: ItemDraft[] = [];
   for (const program of inventory.programs) {
     const owner = {
       label: programLabel(program.projectPath),
@@ -799,7 +794,7 @@ function buildItems(
     if (program.programType === 'batch')
       items.push({
         type: 'バッチ',
-        kindLabel: 'バッチ（Sub Main 起動・画面なし）',
+        kindLabel: t.items.batchKind,
         programs: owner.label,
         module: owner.module,
         name: program.name ?? owner.label,
@@ -807,7 +802,7 @@ function buildItems(
         line: null,
         shared: false,
         confidence: 'detected',
-        confidenceLabel: CONFIDENCE_LABELS['detected'] ?? '',
+        confidenceLabel: t.confidenceLabels['detected'] ?? '',
         level: null,
         levelLabel: null,
         score: null,
@@ -819,27 +814,29 @@ function buildItems(
   const who = (owners: Owner[]) => {
     const labels = [...new Set(owners.map((o) => o.label))];
     return labels.length <= 3
-      ? labels.join('、')
-      : `${labels.slice(0, 3).join('、')} 他${labels.length - 3}件`;
+      ? labels.join(t.wb.joinPrograms)
+      : t.items.morePrograms(labels.slice(0, 3), labels.length - 3);
   };
   for (const { row, owners } of screens.values())
     items.push({
       type: '画面',
-      kindLabel: '画面（フォーム）',
+      kindLabel: t.items.screenKind,
       programs: who(owners),
-      module: row.shared ? SHARED_MODULE : (owners[0]?.module ?? ''),
+      module: row.shared ? t.sharedModule : (owners[0]?.module ?? ''),
       name: row.name ?? '',
       file: redactAbsolutePath(row.file),
       line: null,
       shared: row.shared,
       confidence: 'detected',
-      confidenceLabel: CONFIDENCE_LABELS['detected'] ?? '',
+      confidenceLabel: t.confidenceLabels['detected'] ?? '',
       level: null,
       levelLabel: null,
       score: null,
       modelVersion: null,
       factors: '',
-      note: row.warnings.map((code) => WARNING_LABELS[code] ?? code).join('；'),
+      note: row.warnings
+        .map((code) => t.warningLabels[code] ?? code)
+        .join(t.items.sep),
     });
   const ownersOf = (paths: readonly string[]): Owner[] =>
     paths.map((path) => ({
@@ -849,7 +846,7 @@ function buildItems(
   const moduleOfOwners = (owners: Owner[]) =>
     new Set(owners.map((o) => o.module)).size === 1
       ? (owners[0]?.module ?? '')
-      : SHARED_MODULE;
+      : t.sharedModule;
   // One row per report: a template name, a form that prints, a form that
   // exports.
   for (const report of summary.reports) {
@@ -860,8 +857,8 @@ function buildItems(
       type: '帳票',
       kindLabel:
         report.origin === 'crystal'
-          ? (REPORT_KIND_LABELS[report.kind ?? 'crystal'] ?? 'Crystal Reports')
-          : (ORIGIN_LABELS[report.origin] ?? report.origin),
+          ? (t.reportKindLabels[report.kind ?? 'crystal'] ?? 'Crystal Reports')
+          : (t.originLabels[report.origin] ?? report.origin),
       programs: who(owners),
       module: moduleOfOwners(owners),
       name: redactAbsolutePath(report.name),
@@ -873,28 +870,28 @@ function buildItems(
       confidence: report.status ?? 'detected',
       confidenceLabel:
         report.status === null
-          ? (ORIGIN_LABELS[report.origin] ?? '')
-          : TEMPLATE_STATUS_LABELS[report.status],
+          ? (t.originLabels[report.origin] ?? '')
+          : t.templateStatus[report.status],
       level: complexity.level,
-      levelLabel: LEVEL_LABELS[complexity.level] ?? complexity.level,
+      levelLabel: t.levelLabels[complexity.level] ?? complexity.level,
       score: complexity.score,
       modelVersion: complexity.version,
       factors: complexity.factors
         .map((f) =>
           f.factor === 'design-not-analyzed'
-            ? (FACTOR_LABELS[f.factor] ?? f.factor)
-            : `${FACTOR_LABELS[f.factor] ?? f.factor} ${f.value} (+${f.points})`,
+            ? (t.factorLabels[f.factor] ?? f.factor)
+            : `${t.factorLabels[f.factor] ?? f.factor} ${f.value} (+${f.points})`,
         )
-        .join('；'),
+        .join(t.items.sep),
       note: [
-        `使用箇所 ${report.usages.length} か所`,
+        t.items.usages(report.usages.length),
         ...(complexity.reason
-          ? [REASON_LABELS[complexity.reason] ?? complexity.reason]
+          ? [t.reasonLabels[complexity.reason] ?? complexity.reason]
           : []),
         ...(report.status === 'missing-file'
-          ? [WARNING_LABELS['REPORT_FILE_MISSING'] ?? '']
+          ? [t.warningLabels['REPORT_FILE_MISSING'] ?? '']
           : []),
-      ].join('；'),
+      ].join(t.items.sep),
     });
   }
   // Other file output: listed, not counted as a report.
@@ -902,7 +899,7 @@ function buildItems(
     const owners = ownersOf(entry.programs);
     items.push({
       type: '出力機能',
-      kindLabel: 'ファイル出力（帳票に含めない）',
+      kindLabel: t.items.dataFileKind,
       programs: who(owners),
       module: moduleOfOwners(owners),
       name: entry.procedure ?? '',
@@ -910,20 +907,22 @@ function buildItems(
       line: entry.evidence[0]?.line ?? null,
       shared: owners.length > 1,
       confidence: 'suspected',
-      confidenceLabel: '帳票に含めない',
+      confidenceLabel: t.items.dataFileConfidence,
       level: null,
       levelLabel: null,
       score: null,
       modelVersion: null,
       factors: '',
-      note: '算定基準：CSV・Excel以外のファイル出力は帳票に数えません。',
+      note: t.items.dataFileNote,
     });
   }
-  return items.sort(
-    (a, b) =>
-      ITEM_TYPE_ORDER.indexOf(a.type) - ITEM_TYPE_ORDER.indexOf(b.type) ||
-      byText(a.module, b.module) ||
-      byText(a.file, b.file) ||
-      (a.line ?? 0) - (b.line ?? 0),
-  );
+  return items
+    .sort(
+      (a, b) =>
+        ITEM_TYPE_ORDER.indexOf(a.type) - ITEM_TYPE_ORDER.indexOf(b.type) ||
+        byText(a.module, b.module) ||
+        byText(a.file, b.file) ||
+        (a.line ?? 0) - (b.line ?? 0),
+    )
+    .map((item) => ({ ...item, type: t.itemType[item.type] }));
 }

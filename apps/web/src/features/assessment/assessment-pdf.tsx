@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { branding } from '../../app/branding';
 import { renderA4Pdf, type A4Options } from '../../shared/pdf/a4-pdf';
 import { AssessmentDocument } from './assessment-document';
-import { DOC_TITLE } from './assessment-document-text';
+import { docTitle } from './assessment-document-text';
 
 // The customer PDF: the shared A4 renderer over the hidden assessment
 // document. The document is drawn off screen for the length of the export.
@@ -18,6 +18,10 @@ export const ASSESSMENT_PDF_OPTIONS: A4Options = {
   rowTableBodySelector: '.qd-table tbody',
   pageBreakBeforeSelector: '[data-page-break]',
   logoUrl: branding.logoUrl,
+  // The report is long: draw each page at a fixed high scale so the text
+  // stays sharp, with JPEG pages of a reasonable size.
+  sharp: true,
+  jpegQuality: 0.92,
 };
 
 export async function renderAssessmentPdf(
@@ -35,7 +39,7 @@ export async function renderAssessmentPdf(
     if (!source) throw new Error('The report could not be laid out.');
     return await renderA4Pdf(
       source,
-      `${branding.logoAlt} · ${DOC_TITLE}`,
+      `${branding.logoAlt} · ${docTitle(report.language)}`,
       ASSESSMENT_PDF_OPTIONS,
     );
   } finally {

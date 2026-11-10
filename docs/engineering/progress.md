@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — Báo cáo cho khách: tiếng Việt (lang=vi), bỏ version nội bộ, PDF nét hơn, trang 1 gọn
+
+- **Bỏ version nội bộ khỏi Excel và PDF:** bảng 解析モデルの版 (phụ lục PDF), dòng データの出所 và 解析モデル ở bìa, dòng 報告書版 / 複雑度モデル / スナップショット / 解析ラン / 解析結果 ở sheet 1, cột モデル版 ở sheet 1, 2, 6, và "モデル vN" trong chú thích. Giữ dự án, thời điểm phân tích, "解析 #N". JSON (`format=json`) giữ nguyên. Test: Excel/PDF không chứa `-v1`, `-draft`, `customer-assessment-report`, id, hash.
+- **Tiếng Việt:** route `customer-report?lang=ja|vi` (mặc định ja), `language` trong JSON, `customer-report-text.ts` (ja + vi cùng key), `RISK_CATALOG_VI`, `TABLE_SCHEMA_STATEMENT_VI`, `REPORT_COUNTING_BASIS` (đã có vi), PDF `documentText(lang)`. Nút Xuất Excel/PDF truyền ngôn ngữ UI; tên file `Bao-cao-Assessment_<dự án>_<date>`. Test: cùng key, cùng số từng ô, không còn chữ Nhật ở chuỗi cố định bản vi, tên sheet hợp lệ, route và e2e (UI vi → file vi, UI ja → file ja).
+- **PDF nét:** `a4-pdf.ts` thêm tùy chọn `sharp` (từng trang vẽ ở scale 3, JPEG 0,92) chỉ cho báo cáo Assessment; trước đây tài liệu dài bị hạ scale (chữ mờ). Báo giá giữ nguyên byte. PDF demo 5 trang, khoảng 2,9 MB. Bản vi dùng Segoe UI/Arial vì font tiếng Nhật vẽ rời dấu thanh.
+- **Trang 1 PDF:** bìa gọn (bỏ id/mô hình, mục lục một dòng) + thẻ KPI + phân bố độ phức tạp program; mục 1 chạy tiếp ngay dưới (chỉ 付録 còn ngắt trang cứng).
+- Chưa push.
+
 ## 10/11/2026 — Bước 2: header bảng program một dòng; "Cơ sở tính" dùng chevron của Portal
 
 - **Header danh sách program:** mọi header một dòng (`white-space: nowrap`), dấu sắp xếp cùng dòng ngay sau chữ. Nhãn rút gọn, nhãn đầy đủ nằm trong `title`: vi LoC riêng / LoC + chung / Procedure / Bảng / Màn hình / Report / Độ phức tạp; ja 固有LoC / 共通込LoC / 固有Proc / テーブル / 画面 / 帳票 / 複雑度. Độ rộng cột tính lại theo chữ header cộng dấu sắp xếp, padding ngang 7px; "(gốc: N)" / "（元: N）" cùng dòng sau số, chữ nhỏ màu nhạt; chip loại một dòng, cắt bằng dấu … (đầy đủ trong tooltip). Đo ở 1280 và 1600 px, vi và ja: không header nào xuống dòng, không tràn ngang (bảng và trang).

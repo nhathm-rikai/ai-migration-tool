@@ -35,14 +35,17 @@ describe('AssessmentDocument cover and scale', () => {
     expect(cover).toContain('2026年11月6日');
     expect(cover).toContain('2026年11月7日');
     expect(cover).toContain('DEMO');
-    expect(cover).toContain('artifact-0001 v1');
-    expect(cover).toContain('56c0b728afaa');
+    // No internal id, model version or hash on the cover.
+    expect(cover).not.toContain('artifact-0001');
+    expect(cover).not.toContain('56c0b728afaa');
+    expect(cover).not.toContain('-v1');
+    expect(cover).not.toContain('解析モデル');
   });
 
   it('draws the KPI cards from the JSON, including 画面 / 帳票 / バッチ', () => {
     const report = customerReportFixture();
     const { section, text } = draw(report);
-    const scale = section('scale');
+    const scale = section('summary');
     const kpi = (name: string) => text(`[data-kpi="${name}"]`, scale);
     const sr = report.scale.screenReport;
     expect(sr).not.toBeNull();
@@ -119,10 +122,13 @@ describe('AssessmentDocument sections 2 to 6', () => {
     const report = customerReportFixture();
     const { section } = draw(report);
     const complexity = section('complexity');
-    expect(complexity.querySelectorAll('svg')).toHaveLength(2);
+    // The program levels are on page 1 (summary), the report levels here.
+    const summary = section('summary');
+    expect(summary.querySelectorAll('svg')).toHaveLength(1);
+    expect(complexity.querySelectorAll('svg')).toHaveLength(1);
     for (const [level, count] of Object.entries(report.complexity.levels))
       expect(
-        complexity
+        summary
           .querySelector(`[data-bar="program-${level}"]`)
           ?.getAttribute('data-count'),
       ).toBe(count === null ? 'na' : String(count));
@@ -137,7 +143,7 @@ describe('AssessmentDocument sections 2 to 6', () => {
     expect(complexity.textContent).toContain(
       'レイアウトの設計内容は含みません',
     );
-    expect(complexity.textContent).toContain('report-complexity-v1-draft');
+    expect(complexity.textContent).not.toContain('report-complexity-v1');
     expect(complexity.querySelectorAll('[data-top-row]')).toHaveLength(
       report.complexity.top.length,
     );
@@ -354,7 +360,9 @@ describe('AssessmentDocument sections 2 to 6', () => {
     expect(appendix).toContain('換算単位');
     expect(appendix).toContain('業務上の帳票数ではありません');
     expect(appendix).toContain('帳票の複雑度');
-    expect(appendix).toContain('report-complexity-v1-draft');
+    expect(appendix).not.toContain('report-complexity-v1');
+    expect(appendix).not.toContain('customer-assessment-report');
+    expect(appendix).not.toContain('解析モデルの版');
   });
 });
 
@@ -362,7 +370,7 @@ describe('AssessmentDocument layout hooks (AR03-AC03)', () => {
   it('starts sections on their own page where asked and keeps blocks whole', () => {
     const { root } = draw();
     expect(root.querySelectorAll('[data-page-break]').length).toBeGreaterThan(
-      1,
+      0,
     );
     expect(root.querySelector('.qd-head')).not.toBeNull();
     // Every section is a block the renderer may end a page after.
@@ -390,11 +398,82 @@ describe('AR03 with an inventory without screen/report data', () => {
   it('says 未解析 for 画面 / 帳票 / バッチ, never 0', () => {
     const { section } = draw(legacyCustomerReportFixture());
     for (const key of ['screens', 'reports', 'batches']) {
-      const card = section('scale').querySelector(`[data-kpi="${key}"]`);
+      const card = section('summary').querySelector(`[data-kpi="${key}"]`);
       expect(card?.textContent).toContain('未解析（再解析が必要）');
       expect(card?.textContent).not.toMatch(/\b0\b/);
     }
     expect(section('items').textContent).toContain('未解析（再解析が必要）');
     expect(section('scale').querySelector('[data-kind]')).toBeNull();
+  });
+});
+
+describe('AssessmentDocument in Vietnamese (report.language = vi)', () => {
+  const vi = () => {
+    const report = customerReportFixture();
+    report.language = 'vi';
+    return report;
+  };
+
+  it('writes the cover, sections and KPI in Vietnamese with the same numbers', () => {
+    const report = vi();
+    const { root, section, text } = draw(report);
+    const cover =
+      (section('cover').textContent ?? '') +
+      (section('cover-detail').textContent ?? '');
+    expect(cover).toContain('Báo cáo Assessment');
+    expect(cover).toContain('6/11/2026');
+    expect(cover).toContain('7/11/2026');
+    expect(section('scale').textContent).toContain('1. Quy mô');
+    const kpi = (name: string) =>
+      text(`[data-kpi="${name}"]`, section('summary'));
+    expect(kpi('reports')).toContain('Report theo quy ước Assessment');
+    expect(kpi('reports')).toContain(
+      String(report.scale.screenReport?.reports.counted),
+    );
+    expect(kpi('reports')).toContain(
+      'Crystal 3 · In bằng code 1 · Xuất CSV/Excel 1',
+    );
+    // No Japanese is left in the fixed text of the document.
+    const jp = /[\u3040-\u30ff\u4e00-\u9fff]/;
+    // The fixed text (headings, table heads, notes, KPI cards, chart labels,
+    // appendix) has no Japanese; only the data of the fixture may.
+    const fixed = Array.from(
+      root.querySelectorAll(
+        'h1, h2, h3, th, .qd-note, .ad-demo, .ad-toc-line, [data-kpi], svg text, [data-doc="appendix"] li',
+      ),
+    )
+      .map((element) => element.textContent ?? '')
+      .join(' | ');
+    expect(fixed).not.toMatch(jp);
+  });
+
+  it('has the counting basis in the appendix in Vietnamese and no internal id', () => {
+    const { section } = draw(vi());
+    const appendix = section('appendix').textContent ?? '';
+    expect(appendix).toContain('đơn vị quy đổi');
+    expect(appendix).toContain('không bảo đảm loại hết');
+    expect(appendix).not.toMatch(/-v1|-draft|customer-assessment-report/);
+  });
+
+  it('orders the list reports first in Vietnamese too', () => {
+    const report = vi();
+    const labels: Record<string, string> = {
+      画面: 'Màn hình',
+      帳票: 'Report',
+      バッチ: 'Batch',
+      出力機能: 'Ghi file dữ liệu',
+    };
+    report.items = report.items.map((item) => ({
+      ...item,
+      type: labels[item.type] ?? item.type,
+    }));
+    const { section } = draw(report);
+    const types = Array.from(
+      section('items').querySelectorAll('[data-item]'),
+    ).map((row) => row.getAttribute('data-item')?.split(':')[0]);
+    const firstBatch = types.indexOf('Batch');
+    const firstScreen = types.indexOf('Màn hình');
+    expect(types[0]).toBe('Report');
+    expect(firstBatch).toBeLessThan(firstScreen);
   });
 });

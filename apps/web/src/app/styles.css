@@ -6237,3 +6237,23 @@ fieldset.doc-card {
   padding-right: 4px;
   text-align: center;
 }
+/* Assessment PDF, page 1: the cover table, a one-line table of contents and
+   the summary (KPI cards and the program complexity) under it. */
+.assess-doc-root .ad-toc-line {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #55657a;
+}
+.assess-doc-root .ad-summary {
+  margin-top: 8px;
+}
+/* Vietnamese needs a font with the full set of tone marks (the Japanese
+   fonts of the document draw them apart from the letter). */
+.assess-doc-root.ad-lang-vi,
+.assess-doc-root.ad-lang-vi * {
+  font-family: 'Segoe UI', Arial, 'Helvetica Neue', 'Noto Sans', sans-serif;
+}
+.assess-doc-root .ad-split .qd-table th:last-child {
+  white-space: nowrap;
+}

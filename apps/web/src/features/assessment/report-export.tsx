@@ -28,7 +28,7 @@ export function ReportExportButton({
   slot?: HTMLElement | null;
   save?: SaveFile;
 }) {
-  const { messages } = useLocale();
+  const { messages, locale } = useLocale();
   const copy = messages.assessment.report;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<unknown>(null);
@@ -55,6 +55,7 @@ export function ReportExportButton({
         format,
         own.signal,
         'customer',
+        locale === 'vi' ? 'vi' : 'ja',
       );
       if (own.signal.aborted) return;
       save(file.fileName ?? 'assessment.' + format, file.blob);

@@ -30,6 +30,7 @@ describe('AR04 technical report: Screens and Reports', () => {
       ['REPORT', 'crystal', 'referenced', 40],
       ['REPORT', 'data-report', 'detected', 2],
       ['REPORT', 'excel', 'suspected', 60],
+      ['REPORT', 'file-output', 'suspected', 80],
     ]);
     const high = report.reports[0];
     expect(high).toMatchObject({
@@ -61,7 +62,7 @@ describe('AR04 technical report: Screens and Reports', () => {
       sharedScreens: 1,
       batches: 1,
       suspectedPrograms: 2,
-      reports: { rows: 8, counted: 4, suspected: 4 },
+      reports: { rows: 9, counted: 4, suspected: 5 },
     });
     const sheets = inventoryReportSheets(report);
     const names = sheets.map((s) => s.name);

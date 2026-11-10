@@ -47,7 +47,6 @@ export type ModuleRow = {
   programs: number;
   screens: number;
   reports: number;
-  suspectedReports: number;
   batches: number;
   files: number;
   codeLines: number;
@@ -107,28 +106,23 @@ export type CustomerReport = {
     // The table names rest on an assumed or unconfirmed schema mapping.
     tablesAssumed: boolean;
     // null: the inventory has no screen/report data (not zero).
-    // reports.counted / rows = report TEMPLATES, reports.suspected = print /
-    // export FUNCTIONS to confirm (see reportTemplates, outputFunctions).
+    // reports.counted / rows = the reports of the system (Crystal / DataReport
+    // templates, files that print in code, files that export CSV / Excel);
+    // reports.suspected is 0. The split is in `reportBreakdown`.
     screenReport: ScreenReportTotals | null;
-    // Report templates by design-file status; null when the inventory has no
-    // screen/report data.
-    reportTemplates: {
-      templates: number;
+    // The counting rule behind the number of reports; null when the inventory
+    // has no screen/report data (not zero).
+    reportBreakdown: {
+      total: number;
+      crystal: number;
       designFile: number;
       missingFile: number;
-    } | null;
-    // Print / Excel / CSV / file-output functions that need confirmation (log
-    // and temporary files left out and counted in `excluded`).
-    outputFunctions: {
-      functions: number;
-      programs: number;
+      print: number;
+      export: number;
+      // Other file output, listed and not counted; log / temporary files left
+      // out of both.
+      dataFiles: number;
       excluded: number;
-      // Excel / CSV export on one side, direct print and other output on the
-      // other; the two add up to `functions`.
-      groups: {
-        export: { functions: number; programs: number };
-        print: { functions: number; programs: number };
-      };
     } | null;
   };
   modules: ModuleRow[];
@@ -378,9 +372,9 @@ export function buildCustomerReport(
   // names and files and stays out of the customer JSON; the items of sheet 6
   // are built from it with redacted paths.
   const normalized = normalizeScreenReportTotals(inventory);
-  // Reports are counted by template, print/export signs by function (the
-  // rows of the technical report are signs: the same template named in two
-  // procedures is two rows there).
+  // Reports are counted once each: a template name, a form that prints, a
+  // form that exports (the rows of the technical report are signs: the same
+  // template named in two procedures is two rows there).
   const reportSummary = normalized ? deriveReportSummary(inventory) : undefined;
   const reportByKind = (): ScreenReportTotals['reports']['byKind'] => {
     const byKind = {
@@ -391,15 +385,10 @@ export function buildCustomerReport(
       'file-output': 0,
       unknown: 0,
     };
-    for (const template of reportSummary?.templates ?? [])
-      byKind[template.kind] += 1;
-    for (const entry of reportSummary?.functions ?? [])
-      if (!entry.excluded) {
-        // One function is counted once, under its first kind, so the kinds add
-        // up to the number of functions.
-        const kind = entry.kinds[0] ?? 'unknown';
-        byKind[kind === 'csv' ? 'file-output' : kind] += 1;
-      }
+    for (const report of reportSummary?.reports ?? [])
+      if (report.origin === 'crystal') byKind[report.kind ?? 'crystal'] += 1;
+      else if (report.origin === 'print') byKind.print += 1;
+      else byKind.excel += 1;
     return byKind;
   };
   const screenReport: ScreenReportTotals | null = normalized
@@ -409,16 +398,14 @@ export function buildCustomerReport(
         batches: normalized.batches,
         reports: reportSummary
           ? {
-              rows: reportSummary.counts.templates,
-              counted: reportSummary.counts.templates,
-              suspected: reportSummary.counts.functions,
+              rows: reportSummary.counts.total,
+              counted: reportSummary.counts.total,
+              suspected: 0,
               byKind: reportByKind(),
               byLevel: reportSummary.counts.byLevel,
             }
           : normalized.reports,
-        suspectedPrograms:
-          reportSummary?.counts.functionPrograms ??
-          normalized.suspectedPrograms,
+        suspectedPrograms: 0,
       }
     : null;
   const idOfPath = new Map(core.programs.map((p) => [p.projectPath, p.id]));
@@ -452,7 +439,6 @@ export function buildCustomerReport(
         programs: 0,
         screens: 0,
         reports: 0,
-        suspectedReports: 0,
         batches: 0,
         files: 0,
         codeLines: 0,
@@ -483,17 +469,15 @@ export function buildCustomerReport(
       (screen.shared ? sharedRow : row).screens += 1;
     }
   }
-  // A template or output function used by programs of one module belongs to
-  // that module; one used across modules goes on the shared row.
+  // A report used by programs of one module belongs to that module; one used
+  // across modules goes on the shared row.
   const rowOfPrograms = (paths: readonly string[]) => {
     const names = new Set(paths.map((path) => moduleOf(path)));
     const only = names.size === 1 ? [...names][0] : undefined;
     return only === undefined ? sharedRow : moduleRow(only, 'module');
   };
-  for (const template of reportSummary?.templates ?? [])
-    rowOfPrograms(template.programs).reports += 1;
-  for (const entry of reportSummary?.functions ?? [])
-    if (!entry.excluded) rowOfPrograms(entry.programs).suspectedReports += 1;
+  for (const report of reportSummary?.reports ?? [])
+    rowOfPrograms(report.programs).reports += 1;
   const rest = {
     files:
       inventory.totals.analyzedCodeFiles -
@@ -539,8 +523,8 @@ export function buildCustomerReport(
       codeLines: program.counters.codeLines,
       screens: program.screens ? program.screens.length : null,
       reports: reportSummary
-        ? reportSummary.templates.filter((t) =>
-            t.programs.includes(program.projectPath),
+        ? reportSummary.reports.filter((r) =>
+            r.programs.includes(program.projectPath),
           ).length
         : null,
     });
@@ -658,19 +642,16 @@ export function buildCustomerReport(
       tablesView: !crud.analyzed ? null : crud.mapped ? 'normalized' : 'raw',
       tablesAssumed: crud.analyzed && crud.assumed,
       screenReport,
-      reportTemplates: reportSummary
+      reportBreakdown: reportSummary
         ? {
-            templates: reportSummary.counts.templates,
+            total: reportSummary.counts.total,
+            crystal: reportSummary.counts.crystal,
             designFile: reportSummary.counts.designFile,
             missingFile: reportSummary.counts.missingFile,
-          }
-        : null,
-      outputFunctions: reportSummary
-        ? {
-            functions: reportSummary.counts.functions,
-            programs: reportSummary.counts.functionPrograms,
-            excluded: reportSummary.counts.excludedFunctions,
-            groups: reportSummary.counts.groups,
+            print: reportSummary.counts.print,
+            export: reportSummary.counts.export,
+            dataFiles: reportSummary.counts.dataFiles,
+            excluded: reportSummary.counts.excluded,
           }
         : null,
     },
@@ -735,27 +716,17 @@ export function buildCustomerReport(
             warning.code !== 'REPORT_FILE_MISSING' &&
             warning.code !== 'REPORT_SUSPECTED',
         ),
-        // One row per missing template and per output function to confirm
-        // (the technical report warns once per sign).
-        ...(reportSummary?.templates ?? [])
-          .filter((template) => template.status === 'missing-file')
-          .map((template) => ({
+        // One row per Crystal report whose design file is missing (the
+        // technical report warns once per sign).
+        ...(reportSummary?.reports ?? [])
+          .filter((report) => report.status === 'missing-file')
+          .map((report) => ({
             code: 'REPORT_FILE_MISSING',
             programId: null,
-            programIds: idsOf(template.programs),
-            relativePath: template.name,
+            programIds: idsOf(report.programs),
+            relativePath: report.name,
             line: null,
-            detail: template.name,
-          })),
-        ...(reportSummary?.functions ?? [])
-          .filter((entry) => !entry.excluded)
-          .map((entry) => ({
-            code: 'REPORT_SUSPECTED',
-            programId: null,
-            programIds: idsOf(entry.programs),
-            relativePath: entry.file,
-            line: entry.evidence[0]?.line ?? null,
-            detail: entry.kinds.join('/'),
+            detail: report.name,
           })),
         ...unsupportedWarnings(inventory),
         ...unlistedFileWarnings(inventory, usedByFile),
@@ -787,12 +758,9 @@ const TEMPLATE_STATUS_LABELS = {
   'design-file': '設計ファイルあり',
   'missing-file': '設計ファイルなし',
 } as const;
-const OUTPUT_KIND_LABELS: Record<string, string> = {
-  print: '印刷',
-  excel: 'Excel出力',
-  csv: 'CSV出力',
-  'file-output': 'ファイル出力',
-  unknown: '出力（不明）',
+const ORIGIN_LABELS: Record<string, string> = {
+  print: 'コード印刷',
+  export: 'CSV・Excel出力',
 };
 const WARNING_LABELS: Record<string, string> = {
   SCREEN_FILE_MISSING: '画面ファイルがソースにありません',
@@ -882,22 +850,31 @@ function buildItems(
     new Set(owners.map((o) => o.module)).size === 1
       ? (owners[0]?.module ?? '')
       : SHARED_MODULE;
-  // One row per report template (a template named in several places is one).
-  for (const template of summary.templates) {
-    const owners = ownersOf(template.programs);
-    const first = template.usages[0];
-    const complexity = template.complexity;
+  // One row per report: a template name, a form that prints, a form that
+  // exports.
+  for (const report of summary.reports) {
+    const owners = ownersOf(report.programs);
+    const first = report.usages[0];
+    const complexity = report.complexity;
     items.push({
       type: '帳票',
-      kindLabel: REPORT_KIND_LABELS[template.kind] ?? template.kind,
+      kindLabel:
+        report.origin === 'crystal'
+          ? (REPORT_KIND_LABELS[report.kind ?? 'crystal'] ?? 'Crystal Reports')
+          : (ORIGIN_LABELS[report.origin] ?? report.origin),
       programs: who(owners),
       module: moduleOfOwners(owners),
-      name: redactAbsolutePath(template.name),
-      file: redactAbsolutePath(template.designFile ?? first?.file ?? ''),
-      line: template.designFile === null ? (first?.line ?? null) : null,
+      name: redactAbsolutePath(report.name),
+      file: redactAbsolutePath(
+        report.designFile ?? report.file ?? first?.file ?? '',
+      ),
+      line: report.origin === 'crystal' ? null : (first?.line ?? null),
       shared: owners.length > 1,
-      confidence: template.status,
-      confidenceLabel: TEMPLATE_STATUS_LABELS[template.status],
+      confidence: report.status ?? 'detected',
+      confidenceLabel:
+        report.status === null
+          ? (ORIGIN_LABELS[report.origin] ?? '')
+          : TEMPLATE_STATUS_LABELS[report.status],
       level: complexity.level,
       levelLabel: LEVEL_LABELS[complexity.level] ?? complexity.level,
       score: complexity.score,
@@ -910,25 +887,22 @@ function buildItems(
         )
         .join('；'),
       note: [
-        `使用箇所 ${template.usages.length} か所`,
+        `使用箇所 ${report.usages.length} か所`,
         ...(complexity.reason
           ? [REASON_LABELS[complexity.reason] ?? complexity.reason]
           : []),
-        ...(template.status === 'missing-file'
+        ...(report.status === 'missing-file'
           ? [WARNING_LABELS['REPORT_FILE_MISSING'] ?? '']
           : []),
       ].join('；'),
     });
   }
-  // Print / export functions to confirm: apart from the templates, never
-  // added to their number.
-  for (const entry of summary.functions) {
+  // Other file output: listed, not counted as a report.
+  for (const entry of summary.dataFiles) {
     const owners = ownersOf(entry.programs);
     items.push({
       type: '出力機能',
-      kindLabel: entry.kinds
-        .map((kind) => OUTPUT_KIND_LABELS[kind] ?? kind)
-        .join('・'),
+      kindLabel: 'ファイル出力（帳票に含めない）',
       programs: who(owners),
       module: moduleOfOwners(owners),
       name: entry.procedure ?? '',
@@ -936,17 +910,13 @@ function buildItems(
       line: entry.evidence[0]?.line ?? null,
       shared: owners.length > 1,
       confidence: 'suspected',
-      confidenceLabel: entry.excluded
-        ? '対象外（ログ・一時ファイル）'
-        : '要確認',
+      confidenceLabel: '帳票に含めない',
       level: null,
       levelLabel: null,
       score: null,
       modelVersion: null,
       factors: '',
-      note: entry.excluded
-        ? `ログ・一時ファイルのため帳票機能の数に含めません（${entry.excludeReason ?? ''}）`
-        : '印刷・出力の可能性があります。帳票の数には含みません。',
+      note: '前提：CSV・Excel以外のファイル出力は、データ・連携用ファイルとして帳票に数えません。',
     });
   }
   return items.sort(

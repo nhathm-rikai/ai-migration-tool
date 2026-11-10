@@ -9,14 +9,19 @@ export const CUSTOMER_PROVIDED_COUNT = 'お客様提示数：未入力';
 export const NOT_ANALYZED = '未解析（再解析が必要）';
 export const NOT_APPLICABLE = '該当なし';
 export const UNRATED = '未評価';
-export const REFERENCE_VALUE = '参考値';
+// The rule behind the complexity levels, stated once as the assumption it is.
+export const COMPLEXITY_RULE =
+  '前提：複雑度は、処理の分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数を点数化し、低・中・高・非常に高の4段階に分類します。Crystal 帳票は定義ファイルの中身を解析しないため、最低でも「中」とします。';
+// How reports are counted, stated once as the assumptions they are.
+export const REPORT_COUNT_RULE =
+  '前提：Crystal／DataReport は帳票定義の名称ごとに1件、コード印刷と CSV・Excel出力は該当するフォーム（ファイル）1つを1件として数えます。CSV・Excel以外のファイル出力は帳票に含めません。';
 export const SHARED_MODULE = '共通';
 export const UNASSIGNED_MODULE = 'プログラム未所属';
 
 // R9: next steps are a fixed paragraph, not computed.
 export const RECOMMENDATIONS: readonly string[] = [
-  '本報告は静的解析（ソースコードの機械的な読み取り）による参考値です。画面数・帳票数はお客様の台帳と照合のうえ、ご確認ください。',
-  '「5_リスク・確認事項」の確認事項（特に重要度「高」）へのご回答をお願いします。ご回答により解析対象と数値を確定します。',
+  '本報告は静的解析（ソースコードの機械的な読み取り）の結果です。数え方の前提は各シートに記載しています。',
+  '「5_リスク・確認事項」の各項目（特に重要度「高」）について、必要に応じてソース等のご提供をお願いします。',
   '確認後の数値を基に、移行範囲・順序（移行単位）を協議し、見積りを確定します。',
 ];
 
@@ -34,11 +39,11 @@ export const SHEET_NOTES: Record<(typeof SHEET_NAMES)[number], string[]> = {
   '1_規模概要': [
     'このシートの見方：ソースコードの解析結果から求めた移行対象の規模です。数値は解析時点のものです。',
     '共通モジュールのファイルは「共通」の行に1回だけ集計し、合計はソース全体の実数に一致します。',
-    '「疑い」の帳票は出力の可能性がある箇所の数で、帳票数の合計には含みません。',
+    REPORT_COUNT_RULE,
   ],
   '2_複雑度': [
-    'このシートの見方：プログラムと帳票の複雑度の分布です。複雑度は参考分類で、工数や金額ではありません。',
-    '帳票の複雑度は、帳票を呼び出す処理の分岐・行数・アクセステーブル・動的SQL・呼び出し数から機械的に評価しています。',
+    'このシートの見方：プログラムと帳票の複雑度の分布です。工数や金額ではありません。',
+    COMPLEXITY_RULE,
   ],
   '3_依存関係': [
     'このシートの見方：複数のプログラムから参照される共通部品と、外部コンポーネント（COM/OCX）・Windows API の一覧です。',
@@ -53,18 +58,18 @@ export const SHEET_NOTES: Record<(typeof SHEET_NAMES)[number], string[]> = {
   ],
   '6_画面・帳票一覧': [
     'このシートの見方：画面・帳票・バッチを1行ずつ列挙した一覧です。お客様の台帳との照合にご利用ください。',
-    '帳票の信頼度：検出＝定義ファイルあり、参照＝コード上に名前のみ（定義ファイル不足）、疑い＝出力の可能性のみ。',
-    '複雑度は参考値です。定義ファイル未解析の帳票は最低でも「中」とし、評価できないものは「未評価」と表示します。',
+    '帳票の設計ファイル：あり＝ソース内に定義ファイルがある、なし＝コード上に名前のみ（設計ファイルなし）。',
+    'コード印刷・CSV・Excel出力の帳票は、該当するフォーム（ファイル）1つを1件としています。複雑度の前提は「2_複雑度」シートに記載しています。',
   ],
 };
 
 export const REPORT_KIND_LABELS: Record<string, string> = {
   'data-report': 'DataReport / ActiveReports',
   crystal: 'Crystal Reports',
-  excel: 'Excel出力（疑い）',
-  print: '印刷（疑い）',
-  'file-output': 'ファイル出力（疑い）',
-  unknown: '種別不明（疑い）',
+  excel: 'CSV・Excel出力',
+  print: 'コード印刷',
+  'file-output': 'ファイル出力（帳票に含めない）',
+  unknown: '帳票ライブラリのみ（帳票に含めない）',
 };
 
 export const LEVEL_LABELS: Record<string, string> = {
@@ -78,11 +83,11 @@ export const LEVEL_LABELS: Record<string, string> = {
 export const CONFIDENCE_LABELS: Record<string, string> = {
   detected: '検出',
   referenced: '参照（定義ファイル不足）',
-  suspected: '疑い（要確認）',
+  suspected: '帳票に含めない',
 };
 
 export const REASON_LABELS: Record<string, string> = {
-  SUSPECTED: '出力の可能性のみで、帳票様式の数は不明',
+  SUSPECTED: '帳票に含めない',
   NO_PROCEDURE: '帳票を呼び出す処理を特定できないため評価不可',
   DESIGN_NOT_ANALYZED_FLOOR: '定義ファイル未解析のため最低でも「中」',
 };

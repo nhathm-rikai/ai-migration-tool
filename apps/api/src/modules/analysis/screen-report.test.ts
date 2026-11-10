@@ -276,7 +276,9 @@ describe('AR04-AC04/AC11 totals', () => {
       Object.values(record ?? {}).reduce((a, b) => a + b, 0);
     expect(sum(reports?.byKind)).toBe(reports?.rows);
     expect(sum(reports?.byLevel)).toBe(reports?.rows);
-    expect(reports?.byLevel.unrated).toBeGreaterThanOrEqual(3);
+    // Prints and exports are scored too; only rows with no holding procedure
+    // (the DataReport design, file-level code) stay unrated.
+    expect(reports?.byLevel.unrated).toBeLessThan(reports?.rows ?? 0);
   });
 });
 
@@ -380,14 +382,40 @@ describe('AR04-AC09/AC10 report complexity', () => {
     expect(stricter.level).toBe('very-high');
   });
 
-  it('never rates missing data as low: suspected and no-procedure rows are unrated', () => {
+  it('scores a print or export on the procedure that holds it, without a design floor', () => {
+    const inventory = build(
+      vbp('a/A.vbp', 'Module=M; M.bas'),
+      at(
+        'a/M.bas',
+        bas(
+          'M',
+          'Sub Pr()',
+          '    If a Then',
+          '        Printer.Print "x"',
+          '    End If',
+          'End Sub',
+        ),
+      ),
+    );
+    const [row] = program(inventory, 'a/A.vbp').reports ?? [];
+    expect(row?.kind).toBe('print');
+    expect(row?.complexity.level).not.toBe('unrated');
+    expect(row?.complexity.score).not.toBeNull();
+    // No design file, so no design factor and no floor.
+    expect(row?.complexity.reason).toBeUndefined();
+    expect(
+      row?.complexity.factors.some((f) => f.factor === 'design-not-analyzed'),
+    ).toBe(false);
+  });
+
+  it('never rates missing data as low: no-procedure rows are unrated', () => {
     const inventory = build(
       vbp('a/A.vbp', 'Module=M; M.bas'),
       at('a/M.bas', bas('M', 'Printer.Print "top"')),
     );
     const [row] = program(inventory, 'a/A.vbp').reports ?? [];
     expect(row?.complexity).toMatchObject({ level: 'unrated', score: null });
-    expect(row?.complexity.reason).toBe('SUSPECTED');
+    expect(row?.complexity.reason).toBe('NO_PROCEDURE');
     const noProcedure = buildSourceInventory({
       profile,
       files: [

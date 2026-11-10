@@ -84,7 +84,7 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
   UNCLASSIFIED_LINES: {
     category: '解析の前提',
     severity: '中',
-    content: '分類できなかった行があり、行数に誤差が出る可能性があります。',
+    content: '分類できなかった行があり、行数に含まれていません。',
     confirmation: '該当ファイルの記述形式をご確認ください。',
   },
   REPORT_FILE_MISSING: {
@@ -93,14 +93,6 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     content:
       'コードから参照されている帳票定義ファイル（.rpt）がソース内にありません（設計ファイルなし）。',
     confirmation: '特にありません。',
-  },
-  REPORT_SUSPECTED: {
-    category: '帳票',
-    severity: '中',
-    content:
-      '印刷・Excel・CSV・ファイル出力を行う機能があります（帳票の種類には含みません）。',
-    confirmation:
-      '該当機能が帳票として運用されているかを、帳票一覧（台帳）とあわせてご確認ください。',
   },
   SCREEN_FILE_MISSING: {
     category: 'ソース不足',
@@ -144,14 +136,15 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
   COMPLEXITY_DRAFT: {
     category: '解析の前提',
     severity: '低',
-    content: '複雑度は暫定モデルによる参考値です。',
+    content:
+      '複雑度は、分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数の点数で算出しています。',
     confirmation: '特にありません。',
   },
   COMPLEXITY_REFERENCE_ONLY: {
     category: '解析の前提',
     severity: '低',
     content:
-      '複雑度は参考分類であり、工数・金額の根拠ではありません。ファイル処理・DB更新・トランザクションは別途確認します。',
+      '複雑度は移行の難しさの分類であり、工数・金額の算定根拠ではありません。ファイル処理・DB更新・トランザクションは点数に含まれません。',
     confirmation: '特にありません。',
   },
   PROCEDURE_LINES_MISSING: {

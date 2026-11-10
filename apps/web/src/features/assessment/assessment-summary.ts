@@ -56,7 +56,6 @@ export type ProgramRow = {
   screens: number | null;
   // detected + referenced; suspected outputs are counted apart.
   reports: number | null;
-  suspectedReports: number | null;
   members: Program['members'];
   sharedMembers: number;
   unresolvedMembers: number;
@@ -107,7 +106,7 @@ function complexityView(complexity: Complexity): ComplexityView {
   };
 }
 
-type ReportCounts = { templates: number; functions: number };
+type ReportCounts = { reports: number };
 
 function programRow(
   program: Program,
@@ -136,8 +135,7 @@ function programRow(
     screens: program.screens ? program.screens.length : null,
     // Report templates the program uses, and the print / export functions
     // in it that need confirmation (not added to the templates).
-    reports: reportCounts ? reportCounts.templates : null,
-    suspectedReports: reportCounts ? reportCounts.functions : null,
+    reports: reportCounts ? reportCounts.reports : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
     // A case-only difference still finds the file (Windows), so it is not
@@ -176,11 +174,8 @@ export function summarizeInventory(
       program,
       reportSummary
         ? {
-            templates: reportSummary.templates.filter((t) =>
-              t.programs.includes(program.projectPath),
-            ).length,
-            functions: reportSummary.functions.filter(
-              (f) => !f.excluded && f.programs.includes(program.projectPath),
+            reports: reportSummary.reports.filter((r) =>
+              r.programs.includes(program.projectPath),
             ).length,
           }
         : null,

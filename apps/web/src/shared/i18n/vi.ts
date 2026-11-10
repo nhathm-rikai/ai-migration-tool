@@ -340,28 +340,20 @@ export const viMessages = {
       kpis: {
         screens: 'Màn hình (画面)',
         screensSub: (shared: string) => `${shared} dùng chung, tính một lần`,
-        reports: 'Report (帳票) · số mẫu',
-        reportsSub: (design: string, missing: string) =>
-          `Có file thiết kế ${design} · Thiếu file ${missing}`,
-        exports: 'Xuất Excel/CSV',
-        functionsSub: (programs: string) =>
-          `${programs} program · cần xác nhận`,
-        prints: 'In / ghi file khác',
-        printsSub: (programs: string, excluded: string) =>
-          `${programs} program · cần xác nhận${excluded === '0' ? '' : ` · loại ${excluded} chỗ ghi log`}`,
+        reports: 'Report (帳票)',
+        reportsSub: (crystal: string, print: string, exports: string) =>
+          `Crystal ${crystal} · In bằng code ${print} · CSV/Excel ${exports}`,
+        reportsMissing: (missing: string) => `Thiếu file .rpt: ${missing}`,
         batches: 'Batch (バッチ)',
         batchesSub: 'Program không có form, khởi động bằng Sub Main',
         noData: 'Chưa có dữ liệu',
         noDataHelp:
           'Kết quả phân tích này được tạo trước khi có đếm màn hình, report và batch. Cần phân tích lại để có số liệu; Portal không hiện 0 thay cho dữ liệu chưa có.',
       },
-      reference: (version: string | null) =>
-        version === null ? 'Tham khảo' : `Tham khảo · mô hình ${version}`,
       distribution: {
-        title: 'Độ phức tạp của mẫu report',
-        help: 'Chỉ mang tính tham khảo, không phải effort.',
+        title: 'Độ phức tạp của report',
+        help: 'Chấm theo số nhánh, dòng thực thi, bảng truy cập, SQL động và lời gọi của procedure tạo report (lấy mức cao nhất nếu nhiều nơi).',
         byLevel: 'Theo mức phức tạp',
-        byKind: 'Theo loại',
         total: 'Tổng',
         level: {
           low: 'Thấp',
@@ -370,54 +362,37 @@ export const viMessages = {
           'very-high': 'Rất cao',
           unrated: 'Chưa đánh giá',
         },
-        kind: {
-          'data-report': 'DataReport / ActiveReports',
-          crystal: 'Crystal Reports',
-          excel: 'Xuất Excel (nghi)',
-          print: 'In (nghi)',
-          'file-output': 'Ghi file (nghi)',
-          unknown: 'Chưa xác định (nghi)',
-        },
       },
-      templates: {
-        title: 'Mẫu report',
-        help: 'Mỗi mẫu (file .rpt hoặc DataReport) tính một lần dù được gọi ở nhiều nơi.',
-        none: 'Không tìm thấy mẫu report nào.',
+      reports: {
+        title: 'Danh sách report',
+        help: 'Giả định: mỗi tên file .rpt là 1 report (cùng tên chỉ tính 1 mẫu, dù được gọi từ nhiều form hay program); in bằng code và xuất CSV/Excel tính 1 report cho mỗi form (file) có lệnh đó.',
+        none: 'Không tìm thấy report nào.',
+        originFilter: 'Tạo bằng',
         columns: {
-          name: 'Mẫu',
-          kind: 'Loại',
+          name: 'Report',
+          origin: 'Tạo bằng',
           status: 'File thiết kế',
-          uses: 'Nơi dùng',
           programs: 'Program',
+          uses: 'Nơi dùng',
           complexity: 'Phức tạp',
           details: 'Chi tiết nơi dùng',
         },
-        kind: {
+        origin: {
           crystal: 'Crystal Reports',
           'data-report': 'DataReport',
+          print: 'In bằng code',
+          export: 'Xuất CSV/Excel',
         },
         status: {
           'design-file': 'Có file',
           'missing-file': 'Thiếu file',
         },
       },
-      usage: {
-        program: 'Program',
-        file: 'File',
-        line: 'Dòng',
-        procedure: 'Procedure',
-      },
-      functions: {
-        title: 'Chức năng xuất/in cần xác nhận',
-        exportTitle: 'Xuất Excel/CSV (cần xác nhận)',
-        exportHelp:
-          'Code ghi dữ liệu ra file Excel hoặc CSV. Chưa chứng minh là một mẫu report.',
-        printTitle: 'In và ghi file khác (cần xác nhận)',
-        printHelp:
-          'Code in trực tiếp hoặc ghi file khác. Không cộng vào số mẫu report.',
+      dataFiles: {
+        title: 'Ghi file dữ liệu (không tính report)',
+        help: 'Giả định: ghi file không phải CSV/Excel là file dữ liệu hoặc trao đổi, không phải report; đường dẫn chứa log, tmp, temp, debug, err được coi là file log/tạm và bị loại.',
+        excluded: (count: string) => `Đã loại ${count} chỗ ghi log/file tạm.`,
         none: 'Không có.',
-        excluded: (count: string) =>
-          `Đã loại ${count} chỗ ghi log/file tạm (không tính).`,
         columns: {
           program: 'Program',
           kind: 'Loại',
@@ -425,12 +400,15 @@ export const viMessages = {
           procedure: 'Procedure',
         },
         kind: {
-          print: 'In',
-          excel: 'Xuất Excel',
-          csv: 'Xuất CSV',
           'file-output': 'Ghi file',
-          unknown: 'Thư viện report, chưa rõ mẫu',
+          unknown: 'Thư viện report, không kèm mẫu',
         },
+      },
+      usage: {
+        program: 'Program',
+        file: 'File',
+        line: 'Dòng',
+        procedure: 'Procedure',
       },
       list: {
         title: 'Danh sách report',
@@ -451,7 +429,7 @@ export const viMessages = {
           name: 'Tên',
           location: 'File:dòng',
           confidence: 'Tin cậy',
-          complexity: 'Phức tạp (tham khảo)',
+          complexity: 'Phức tạp',
         },
         sortBy: (label: string) => `Sắp xếp theo ${label}`,
         morePrograms: (count: string) => `và ${count} program khác`,
@@ -462,13 +440,7 @@ export const viMessages = {
         previous: 'Trang trước',
         next: 'Trang sau',
       },
-      confidence: {
-        detected: 'Phát hiện',
-        referenced: 'Tham chiếu',
-        suspected: 'Nghi có',
-      },
       reasons: {
-        SUSPECTED: 'Chỉ là dấu hiệu, chưa biết có bao nhiêu mẫu report',
         NO_PROCEDURE:
           'Không xác định được procedure chứa dòng report nên không chấm',
         DESIGN_NOT_ANALYZED_FLOOR:
@@ -505,12 +477,9 @@ export const viMessages = {
           name: 'Tên',
           location: 'File:dòng',
           confidence: 'Tin cậy',
-          complexity: 'Phức tạp (tham khảo)',
+          complexity: 'Phức tạp',
           notes: 'Ghi chú',
         },
-        suspectedNote:
-          'Dòng "Nghi có" chỉ là dấu hiệu program có thể xuất report; không cộng vào tổng report.',
-        functionsNote: 'Chức năng xuất/in không cộng vào số mẫu report.',
       },
     },
     dashboard: {
@@ -531,8 +500,7 @@ export const viMessages = {
           `Sau ánh xạ · giả định schema ${schema}`,
         tablesRaw: 'Tên như trong source',
         high: 'Program High + Very High',
-        highSub: (analyzed: string) =>
-          `trên ${analyzed} program đã phân tích · tham khảo`,
+        highSub: (analyzed: string) => `trên ${analyzed} program đã phân tích`,
       },
       analysedAt: (time: string) => `Phân tích xong lúc ${time}`,
       files: (count: string) => `${count} file`,
@@ -744,7 +712,7 @@ export const viMessages = {
         codeLines:
           'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
         complexity:
-          'Độ phức tạp tham khảo; báo giá nháp dùng mức này làm hệ số',
+          'Độ phức tạp của program; báo giá nháp dùng mức này làm hệ số',
       },
       state: {
         complete: 'Đầy đủ',
@@ -1224,7 +1192,7 @@ export const viMessages = {
       `Team ${devs} dev · ${months} tháng`,
     moduleTitle: 'Chi tiết theo module',
     shareNote:
-      'Bấm module để xem các program, bấm program (hoặc dòng đầu trong module) để xem effort theo hạng mục. Complexity chỉ để tham khảo, không làm hệ số',
+      'Bấm module để xem các program, bấm program (hoặc dòng đầu trong module) để xem effort theo hạng mục. Complexity không được dùng làm hệ số tính effort.',
     itemsTitle: 'Effort theo hạng mục',
     toggleRow: 'mở / đóng chi tiết',
     items: {

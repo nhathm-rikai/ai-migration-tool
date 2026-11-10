@@ -326,27 +326,21 @@ export const jaMessages = {
       kpis: {
         screens: '画面',
         screensSub: (shared: string) => `共通 ${shared} 件（1回のみ集計）`,
-        reports: '帳票（種類）',
-        reportsSub: (design: string, missing: string) =>
-          `設計ファイルあり ${design} · 未提供 ${missing}`,
-        exports: 'Excel/CSV出力',
-        functionsSub: (programs: string) => `${programs} プログラム · 要確認`,
-        prints: '印刷・その他出力',
-        printsSub: (programs: string, excluded: string) =>
-          `${programs} プログラム · 要確認${excluded === '0' ? '' : ` · ログ ${excluded} 件は除外`}`,
+        reports: '帳票',
+        reportsSub: (crystal: string, print: string, exports: string) =>
+          `Crystal ${crystal} · コード印刷 ${print} · CSV・Excel出力 ${exports}`,
+        reportsMissing: (missing: string) =>
+          `設計ファイルなし（.rpt）: ${missing}`,
         batches: 'バッチ',
         batchesSub: 'フォームがなく Sub Main で起動するプログラム',
         noData: 'データなし',
         noDataHelp:
           'この解析結果は画面・帳票・バッチの集計機能より前に作成されています。再解析が必要です。データがない項目を 0 とは表示しません。',
       },
-      reference: (version: string | null) =>
-        version === null ? '参考値' : `参考値 · モデル ${version}`,
       distribution: {
         title: '帳票の複雑度',
-        help: '参考値です（工数ではありません）。',
+        help: '分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数で点数化し、帳票を作成するプロシージャで評価します（複数箇所の場合は最も高い値）。',
         byLevel: '複雑度別',
-        byKind: '種類別',
         total: '合計',
         level: {
           low: '低',
@@ -355,54 +349,38 @@ export const jaMessages = {
           'very-high': '非常に高',
           unrated: '未評価',
         },
-        kind: {
-          'data-report': 'DataReport / ActiveReports',
-          crystal: 'Crystal Reports',
-          excel: 'Excel出力（疑い）',
-          print: '印刷（疑い）',
-          'file-output': 'ファイル出力（疑い）',
-          unknown: '不明（疑い）',
-        },
       },
-      templates: {
-        title: '帳票（種類）',
-        help: '.rpt や DataReport などの帳票定義を、複数箇所から使われても1種類として数えます。',
-        none: '帳票の種類は見つかりませんでした。',
+      reports: {
+        title: '帳票の一覧',
+        help: '前提：.rpt の名称ごとに1件（同じ名称は、複数のフォーム・プログラムから呼ばれても1件）、コード印刷と CSV・Excel出力は該当するフォーム（ファイル）1つを1件として数えます。',
+        none: '帳票は見つかりませんでした。',
+        originFilter: '作成方法',
         columns: {
           name: '帳票',
-          kind: '種類',
+          origin: '作成方法',
           status: '設計ファイル',
-          uses: '使用箇所',
           programs: 'プログラム',
+          uses: '使用箇所',
           complexity: '複雑度',
           details: '使用箇所の詳細',
         },
-        kind: {
+        origin: {
           crystal: 'Crystal Reports',
           'data-report': 'DataReport',
+          print: 'コード印刷',
+          export: 'CSV・Excel出力',
         },
         status: {
           'design-file': 'あり',
-          'missing-file': 'ファイルなし',
+          'missing-file': 'なし',
         },
       },
-      usage: {
-        program: 'プログラム',
-        file: 'ファイル',
-        line: '行',
-        procedure: 'プロシージャ',
-      },
-      functions: {
-        title: '出力機能（要確認）',
-        exportTitle: 'Excel/CSV出力（要確認）',
-        exportHelp:
-          'Excel や CSV ファイルへデータを出力するコードです。帳票であることの証明ではありません。',
-        printTitle: '印刷・その他出力（要確認）',
-        printHelp:
-          '直接印刷やその他のファイル出力を行うコードです。帳票の種類には含めません。',
-        none: 'ありません。',
+      dataFiles: {
+        title: 'データファイル出力（帳票に含めない）',
+        help: '前提：CSV・Excel以外のファイル出力はデータ・連携用とし、パスに log／tmp／temp／debug／err を含むものはログ・一時ファイルとして除外します。',
         excluded: (count: string) =>
-          `ログ・一時ファイルへの出力 ${count} 件は除外しました（集計外）。`,
+          `ログ・一時ファイルへの出力 ${count} 件は除外しました。`,
+        none: 'ありません。',
         columns: {
           program: 'プログラム',
           kind: '種類',
@@ -410,12 +388,15 @@ export const jaMessages = {
           procedure: 'プロシージャ',
         },
         kind: {
-          print: '印刷',
-          excel: 'Excel出力',
-          csv: 'CSV出力',
           'file-output': 'ファイル出力',
-          unknown: '帳票ライブラリあり（帳票は不明）',
+          unknown: '帳票ライブラリのみ（帳票なし）',
         },
+      },
+      usage: {
+        program: 'プログラム',
+        file: 'ファイル',
+        line: '行',
+        procedure: 'プロシージャ',
       },
       list: {
         title: '帳票一覧',
@@ -436,7 +417,7 @@ export const jaMessages = {
           name: '名前',
           location: 'ファイル:行',
           confidence: '信頼度',
-          complexity: '複雑度（参考）',
+          complexity: '複雑度',
         },
         sortBy: (label: string) => `${label} で並べ替え`,
         morePrograms: (count: string) => `ほか ${count} プログラム`,
@@ -448,13 +429,7 @@ export const jaMessages = {
         previous: '前のページ',
         next: '次のページ',
       },
-      confidence: {
-        detected: '検出',
-        referenced: '参照',
-        suspected: '疑い',
-      },
       reasons: {
-        SUSPECTED: '兆候のみで、帳票様式の数は不明です',
         NO_PROCEDURE:
           '帳票を呼び出すプロシージャを特定できないため評価していません',
         DESIGN_NOT_ANALYZED_FLOOR:
@@ -492,12 +467,9 @@ export const jaMessages = {
           name: '名前',
           location: 'ファイル:行',
           confidence: '信頼度',
-          complexity: '複雑度（参考）',
+          complexity: '複雑度',
           notes: '備考',
         },
-        functionsNote: '出力機能は帳票の種類には含めません。',
-        suspectedNote:
-          '「疑い」の行は帳票を出力している可能性を示すだけで、帳票の合計には含めません。',
       },
     },
     dashboard: {
@@ -518,7 +490,7 @@ export const jaMessages = {
           `マッピング後 · スキーマ ${schema} と仮定`,
         tablesRaw: 'ソース記載の名前',
         high: '高・非常に高のプログラム',
-        highSub: (analyzed: string) => `解析済み ${analyzed} 本中 · 参考`,
+        highSub: (analyzed: string) => `解析済み ${analyzed} 本中`,
       },
       analysedAt: (time: string) => `解析完了 ${time}`,
       files: (count: string) => `${count} ファイル`,
@@ -730,7 +702,8 @@ export const jaMessages = {
       columnHints: {
         codeLines:
           '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
-        complexity: '参考の複雑度。見積ドラフトではこのレベルを係数に使います',
+        complexity:
+          'プログラムの複雑度。見積ドラフトではこのレベルを係数に使います',
       },
       state: {
         complete: '完全',
@@ -1208,7 +1181,7 @@ export const jaMessages = {
       `チーム ${devs} 名 · ${months} か月`,
     moduleTitle: 'モジュール別明細',
     shareNote:
-      'モジュールをクリックするとプログラム、プログラム（またはモジュール先頭の行）をクリックすると項目別の工数を表示します。複雑度は参考表示で係数には使いません',
+      'モジュールをクリックするとプログラム、プログラム（またはモジュール先頭の行）をクリックすると項目別の工数を表示します。複雑度は工数の係数に使いません。',
     itemsTitle: '項目別工数',
     toggleRow: '詳細を開く / 閉じる',
     items: {

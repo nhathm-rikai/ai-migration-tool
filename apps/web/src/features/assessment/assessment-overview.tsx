@@ -245,7 +245,7 @@ function ArtifactView({
   );
   const counts: Record<Tab, number | null> = {
     programs: summary.programs.length,
-    reports: deriveReportSummary(artifact.payload)?.counts.templates ?? null,
+    reports: deriveReportSummary(artifact.payload)?.counts.total ?? null,
     graph: null,
     tables: tableCount,
   };
@@ -1025,13 +1025,6 @@ function ProgramList({
                         </td>
                         <td className="num" data-col="reports">
                           {metric(row.reports)}
-                          {row.suspectedReports !== null &&
-                            row.suspectedReports > 0 && (
-                              <span className="muted raw-count">
-                                {' '}
-                                {copy.outputShort(number(row.suspectedReports))}
-                              </span>
-                            )}
                         </td>
                         <td>
                           <span className="cx-cell">

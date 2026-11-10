@@ -88,30 +88,21 @@ export const CustomerReportSchema = Type.Object({
     // The table names rest on an assumed schema mapping (AR02 review 1).
     tablesAssumed: Type.Optional(Type.Boolean()),
     // null: the inventory has no screen/report data (not zero).
-    // reports.counted / rows = report templates; reports.suspected = print and
-    // export functions to confirm (10/11/2026, see reportTemplates).
+    // reports.counted / rows = the reports of the system (Crystal / DataReport
+    // templates, files that print in code, files that export CSV / Excel);
+    // reports.suspected is 0. The split is in reportBreakdown.
     screenReport: Nullable(ScreenReportTotals),
-    reportTemplates: Type.Optional(
+    reportBreakdown: Type.Optional(
       Nullable(
         Type.Object({
-          templates: Count,
+          total: Count,
+          crystal: Count,
           designFile: Count,
           missingFile: Count,
-        }),
-      ),
-    ),
-    outputFunctions: Type.Optional(
-      Nullable(
-        Type.Object({
-          functions: Count,
-          programs: Count,
+          print: Count,
+          export: Count,
+          dataFiles: Count,
           excluded: Count,
-          groups: Type.Optional(
-            Type.Object({
-              export: Type.Object({ functions: Count, programs: Count }),
-              print: Type.Object({ functions: Count, programs: Count }),
-            }),
-          ),
         }),
       ),
     ),
@@ -127,7 +118,6 @@ export const CustomerReportSchema = Type.Object({
       programs: Count,
       screens: Count,
       reports: Count,
-      suspectedReports: Count,
       batches: Count,
       files: Count,
       codeLines: Count,

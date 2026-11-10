@@ -1,9 +1,9 @@
 import {
   deriveReportSummary,
-  groupOfFunction,
-  type OutputFunction,
+  type DataFileOutput,
+  type ReportEntry,
+  type ReportOrigin,
   type ReportSummary,
-  type ReportTemplate,
   type SourceInventoryDocument,
 } from '@portal/contracts';
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
@@ -16,12 +16,12 @@ import {
   type ReportLevel,
 } from './screen-report-model';
 
-// Screens (画面), report templates (帳票) and batches (バッチ) of the
-// inventory. Reports are counted by TEMPLATE (a .rpt or DataReport design,
-// once however many places name it). Code that exports to Excel/CSV, prints
-// or writes files is listed apart as functions to confirm and never added to
-// the template count. An inventory without these fields shows "no data,
-// analyze again", not 0.
+// Screens (画面), reports (帳票) and batches (バッチ) of the inventory. A
+// report is counted once: a Crystal / DataReport template name, a form that
+// prints in code, a form that exports CSV or Excel; the counting rules are
+// stated as assumptions next to the list. Other file output is listed apart
+// and not counted. An inventory without these fields shows "no data, analyze
+// again", not 0.
 
 const PAGE_SIZE = 25;
 
@@ -53,27 +53,21 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
           {
             key: 'reports',
             label: copy.reports,
-            value: number(summary.counts.templates),
-            sub: copy.reportsSub(
-              number(summary.counts.designFile),
-              number(summary.counts.missingFile),
-            ),
-          },
-          {
-            key: 'exports',
-            label: copy.exports,
-            value: number(summary.counts.groups.export.functions),
-            sub: copy.functionsSub(
-              number(summary.counts.groups.export.programs),
-            ),
-          },
-          {
-            key: 'prints',
-            label: copy.prints,
-            value: number(summary.counts.groups.print.functions),
-            sub: copy.printsSub(
-              number(summary.counts.groups.print.programs),
-              number(summary.counts.excludedFunctions),
+            value: number(summary.counts.total),
+            sub: (
+              <>
+                {copy.reportsSub(
+                  number(summary.counts.crystal),
+                  number(summary.counts.print),
+                  number(summary.counts.export),
+                )}
+                {summary.counts.missingFile > 0 && (
+                  <>
+                    <br />
+                    {copy.reportsMissing(number(summary.counts.missingFile))}
+                  </>
+                )}
+              </>
             ),
           },
           {
@@ -86,8 +80,6 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
       : [
           { key: 'screens', label: copy.screens },
           { key: 'reports', label: copy.reports },
-          { key: 'exports', label: copy.exports },
-          { key: 'prints', label: copy.prints },
           { key: 'batches', label: copy.batches },
         ].map((card) => ({
           ...card,
@@ -97,8 +89,8 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
   return (
     <>
       <ul
-        className="kpi-grid kpi-grid-5"
-        aria-label={messages.assessment.screenReport.templates.title}
+        className="kpi-grid kpi-grid-3"
+        aria-label={messages.assessment.screenReport.reports.title}
       >
         {cards.map((card) => (
           <li
@@ -186,39 +178,61 @@ const Chevron = () => (
   </svg>
 );
 
-// Level distribution over the templates only, as a row of chips (a level with
-// no template is left out).
-function TemplateDistribution({ summary }: { summary: ReportSummary }) {
+// Complexity of the reports as columns, the same card as "Phân bổ complexity"
+// at the top of the step; a level without a report is a bar of no height.
+function ReportDistribution({ summary }: { summary: ReportSummary }) {
   const { messages } = useLocale();
   const copy = messages.assessment.screenReport;
   const number = useNumber();
-  const total = summary.counts.templates;
+  const levels = REPORT_LEVELS.filter(
+    (level) => level !== 'unrated' || summary.counts.byLevel[level] > 0,
+  );
+  const max = Math.max(
+    1,
+    ...levels.map((level) => summary.counts.byLevel[level]),
+  );
+  const total = summary.counts.total;
   const percent = (count: number) =>
     total === 0 ? '0%' : `${Math.round((count / total) * 100)}%`;
   return (
     <section
-      className="report-distribution"
+      className="panel chart-card histogram report-histogram"
       aria-label={copy.distribution.title}
     >
-      <h4>{copy.distribution.title}</h4>
-      <ul className="level-chips">
-        {REPORT_LEVELS.filter(
-          (level) => level !== 'unrated' || summary.counts.byLevel[level] > 0,
-        ).map((level) => (
-          <li key={level} data-level={level} className={`tag tag-${level}`}>
-            <span>{copy.distribution.level[level]}</span>
-            <strong>{number(summary.counts.byLevel[level])}</strong>
-            <span className="muted">
-              {percent(summary.counts.byLevel[level])}
-            </span>
+      <header className="chart-heading">
+        <h4>{copy.distribution.title}</h4>
+        <span className="muted">
+          {copy.distribution.total}{' '}
+          <strong className="mono" data-testid="report-rows-by-level">
+            {number(total)}
+          </strong>
+        </span>
+      </header>
+      <ol className="histogram-bars">
+        {levels.map((level) => (
+          <li key={level} data-level={level}>
+            <div className="histogram-bar">
+              <span className="mono histogram-count">
+                {number(summary.counts.byLevel[level])}
+              </span>
+              <i
+                className={`tone-${level}`}
+                style={{
+                  height: `${(summary.counts.byLevel[level] / max) * 100}%`,
+                }}
+                aria-hidden="true"
+              />
+              <span className="histogram-label">
+                {copy.distribution.level[level]}{' '}
+                <span className="muted">
+                  {percent(summary.counts.byLevel[level])}
+                </span>
+              </span>
+            </div>
           </li>
         ))}
-        <li className="level-chips-total">
-          <span>{copy.distribution.total}</span>
-          <strong data-testid="report-rows-by-level">{number(total)}</strong>
-        </li>
-      </ul>
-      <p className="muted" data-testid="report-reference">
+      </ol>
+      <p className="muted histogram-note" data-testid="report-reference">
         {copy.distribution.help}
       </p>
     </section>
@@ -261,13 +275,18 @@ function Pagination({
   );
 }
 
-// Template list: one row per template; the whole row opens the uses (program,
-// file, line, procedure) below it, like the program list.
-function TemplateTable({
-  templates,
+const originKey = (
+  report: ReportEntry,
+): 'crystal' | 'data-report' | 'print' | 'export' =>
+  report.origin === 'crystal' ? (report.kind ?? 'crystal') : report.origin;
+
+// One row per report; the whole row opens where it is made (program, file,
+// line, procedure) below it, like the program list.
+function ReportTable({
+  reports,
   testId,
 }: {
-  templates: readonly ReportTemplate[];
+  reports: readonly ReportEntry[];
   testId: string;
 }) {
   const { messages } = useLocale();
@@ -279,29 +298,29 @@ function TemplateTable({
       <table className="program-table report-table" data-testid={testId}>
         <thead>
           <tr>
-            <th scope="col">{copy.templates.columns.name}</th>
-            <th scope="col">{copy.templates.columns.kind}</th>
-            <th scope="col">{copy.templates.columns.status}</th>
-            <th scope="col">{copy.templates.columns.programs}</th>
+            <th scope="col">{copy.reports.columns.name}</th>
+            <th scope="col">{copy.reports.columns.origin}</th>
+            <th scope="col">{copy.reports.columns.status}</th>
+            <th scope="col">{copy.reports.columns.programs}</th>
             <th scope="col" className="num">
-              {copy.templates.columns.uses}
+              {copy.reports.columns.uses}
             </th>
-            <th scope="col">{copy.templates.columns.complexity}</th>
+            <th scope="col">{copy.reports.columns.complexity}</th>
             <th scope="col" className="chevron-col">
-              <span className="sr-only">{copy.templates.columns.details}</span>
+              <span className="sr-only">{copy.reports.columns.details}</span>
             </th>
           </tr>
         </thead>
         <tbody>
-          {templates.map((template) => {
-            const open = openId === template.id;
-            const detailId = `report-detail-${template.id}`;
+          {reports.map((report) => {
+            const open = openId === report.id;
+            const detailId = `report-detail-${report.id}`;
             return (
-              <Fragment key={template.id}>
+              <Fragment key={report.id}>
                 <tr
                   className={`program-row${open ? ' selected' : ''}`}
-                  data-kind={template.kind}
-                  onClick={() => setOpenId(open ? null : template.id)}
+                  data-origin={report.origin}
+                  onClick={() => setOpenId(open ? null : report.id)}
                 >
                   <th scope="row">
                     <button
@@ -309,33 +328,42 @@ function TemplateTable({
                       aria-expanded={open}
                       aria-controls={open ? detailId : undefined}
                     >
-                      {template.name}
+                      {report.name}
                     </button>
+                    {report.file !== null && (
+                      <span className="mono muted" title={report.file}>
+                        {report.file}
+                      </span>
+                    )}
                   </th>
-                  <td>{copy.templates.kind[template.kind]}</td>
+                  <td>{copy.reports.origin[originKey(report)]}</td>
                   <td>
-                    <span
-                      className={`tag tag-conf-${template.status === 'design-file' ? 'detected' : 'referenced'}`}
-                    >
-                      {copy.templates.status[template.status]}
-                    </span>
+                    {report.status === null ? (
+                      <span className="muted">—</span>
+                    ) : (
+                      <span
+                        className={`tag tag-conf-${report.status === 'design-file' ? 'detected' : 'referenced'}`}
+                      >
+                        {copy.reports.status[report.status]}
+                      </span>
+                    )}
                   </td>
                   <td>
                     {programsText(
-                      template.programs,
+                      report.programs,
                       copy.list.morePrograms,
                       number,
                     )}
                   </td>
-                  <td className="num">{number(template.usages.length)}</td>
+                  <td className="num">{number(report.usages.length)}</td>
                   <td>
                     <LevelTag
-                      level={template.complexity.level}
-                      score={template.complexity.score}
+                      level={report.complexity.level}
+                      score={report.complexity.score}
                       title={factorsText(
                         {
-                          factors: template.complexity.factors,
-                          reason: template.complexity.reason ?? null,
+                          factors: report.complexity.factors,
+                          reason: report.complexity.reason ?? null,
                         },
                         copy.factors,
                         copy.reasons,
@@ -363,7 +391,7 @@ function TemplateTable({
                             </tr>
                           </thead>
                           <tbody>
-                            {template.usages.map((usage) => (
+                            {report.usages.map((usage) => (
                               <tr
                                 key={`${usage.file}:${usage.line ?? ''}:${usage.procedure ?? ''}`}
                               >
@@ -398,11 +426,12 @@ function TemplateTable({
   );
 }
 
-function FunctionTable({
-  functions,
+// Other file output: not a report, listed for the evidence.
+function DataFileTable({
+  files,
   testId,
 }: {
-  functions: readonly OutputFunction[];
+  files: readonly DataFileOutput[];
   testId: string;
 }) {
   const { messages } = useLocale();
@@ -411,26 +440,26 @@ function FunctionTable({
   return (
     <div className="table-scroll">
       <table
-        className="program-table report-table report-function-table"
+        className="program-table report-table report-data-table"
         data-testid={testId}
       >
         <thead>
           <tr>
-            <th scope="col">{copy.functions.columns.program}</th>
-            <th scope="col">{copy.functions.columns.kind}</th>
-            <th scope="col">{copy.functions.columns.location}</th>
-            <th scope="col">{copy.functions.columns.procedure}</th>
+            <th scope="col">{copy.dataFiles.columns.program}</th>
+            <th scope="col">{copy.dataFiles.columns.kind}</th>
+            <th scope="col">{copy.dataFiles.columns.location}</th>
+            <th scope="col">{copy.dataFiles.columns.procedure}</th>
           </tr>
         </thead>
         <tbody>
-          {functions.map((entry) => (
-            <tr key={entry.id} data-kind={entry.kinds[0]}>
+          {files.map((entry) => (
+            <tr key={entry.id}>
               <th scope="row">
                 {programsText(entry.programs, copy.list.morePrograms, number)}
               </th>
               <td>
                 {entry.kinds
-                  .map((kind) => copy.functions.kind[kind])
+                  .map((kind) => copy.dataFiles.kind[kind])
                   .join(' · ')}
               </td>
               <td className="mono">
@@ -455,97 +484,51 @@ function FunctionTable({
   );
 }
 
-// One paginated list of functions (Excel/CSV, or print and the rest).
-function FunctionSection({
-  title,
-  help,
-  empty,
-  functions,
-  testId,
-  note,
-}: {
-  title: string;
-  help: string;
-  empty: string;
-  functions: readonly OutputFunction[];
-  testId: string;
-  note?: string | undefined;
-}) {
-  const [page, setPage] = useState(1);
-  const data = pageOf(functions, page, PAGE_SIZE);
-  return (
-    <section className="report-list" aria-label={title}>
-      <h4>{title}</h4>
-      <p className="muted">{help}</p>
-      {note && (
-        <p className="muted" data-testid="excluded-functions">
-          {note}
-        </p>
-      )}
-      {functions.length === 0 ? (
-        <p className="empty-state">{empty}</p>
-      ) : (
-        <>
-          <FunctionTable functions={data.items} testId={testId} />
-          <Pagination
-            title={title}
-            page={data.page}
-            pages={data.pages}
-            onPage={setPage}
-          />
-        </>
-      )}
-    </section>
-  );
-}
+type OriginFilter = 'all' | ReportOrigin;
 
-// "Report" tab: the templates (counted), then the Excel/CSV exports and the
-// print and other output functions to confirm (not counted as reports).
+// "Report" tab: the complexity of the reports, the list of reports (all three
+// ways of making one) and, folded away, the file output that is not a report.
 export function ReportsTab({ inventory }: { inventory: Inventory }) {
   const { messages } = useLocale();
   const copy = messages.assessment.screenReport;
   const number = useNumber();
   const summary = useMemo(() => deriveReportSummary(inventory), [inventory]);
-  const [templatePage, setTemplatePage] = useState(1);
+  const [page, setPage] = useState(1);
+  const [dataPage, setDataPage] = useState(1);
   const [query, setQuery] = useState('');
-  const templates = useMemo(() => {
+  const [origin, setOrigin] = useState<OriginFilter>('all');
+  const reports = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (summary?.templates ?? [])
+    return (summary?.reports ?? [])
       .filter(
-        (template) =>
-          needle === '' ||
-          template.name.toLowerCase().includes(needle) ||
-          template.programs.some((path) =>
-            programLabel(path).toLowerCase().includes(needle),
-          ),
+        (report) =>
+          (origin === 'all' || report.origin === origin) &&
+          (needle === '' ||
+            report.name.toLowerCase().includes(needle) ||
+            report.programs.some((path) =>
+              programLabel(path).toLowerCase().includes(needle),
+            )),
       )
       .sort(
         (a, b) =>
           (b.complexity.score ?? -1) - (a.complexity.score ?? -1) ||
           a.name.localeCompare(b.name),
       );
-  }, [summary, query]);
-  const counted = useMemo(
-    () => (summary?.functions ?? []).filter((entry) => !entry.excluded),
-    [summary],
-  );
+  }, [summary, query, origin]);
   if (!summary)
     return (
       <p className="empty-state" data-testid="reports-nodata">
         {copy.kpis.noDataHelp}
       </p>
     );
-  const templatePageData = pageOf(templates, templatePage, PAGE_SIZE);
-  const exports = counted.filter(
-    (entry) => groupOfFunction(entry) === 'export',
-  );
-  const prints = counted.filter((entry) => groupOfFunction(entry) === 'print');
+  const pageData = pageOf(reports, page, PAGE_SIZE);
+  const dataData = pageOf(summary.dataFiles, dataPage, PAGE_SIZE);
   return (
     <>
-      <TemplateDistribution summary={summary} />
-      <section className="report-list" aria-label={copy.templates.title}>
-        <h4>{copy.templates.title}</h4>
-        <p className="muted">{copy.templates.help}</p>
+      <ReportDistribution summary={summary} />
+      <section className="report-list" aria-label={copy.reports.title}>
+        <h4>{copy.reports.title}</h4>
+        <p className="muted">{copy.reports.help}</p>
         <div className="program-filters">
           <label>
             <span>{copy.list.search}</span>
@@ -554,64 +537,89 @@ export function ReportsTab({ inventory }: { inventory: Inventory }) {
               value={query}
               onChange={(event) => {
                 setQuery(event.currentTarget.value);
-                setTemplatePage(1);
+                setPage(1);
               }}
             />
+          </label>
+          <label>
+            <span>{copy.reports.originFilter}</span>
+            <select
+              value={origin}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setOrigin(
+                  value === 'crystal' || value === 'print' || value === 'export'
+                    ? value
+                    : 'all',
+                );
+                setPage(1);
+              }}
+            >
+              <option value="all">{copy.list.all}</option>
+              <option value="crystal">{copy.reports.origin.crystal}</option>
+              <option value="print">{copy.reports.origin.print}</option>
+              <option value="export">{copy.reports.origin.export}</option>
+            </select>
           </label>
         </div>
         <p className="muted" role="status">
           {copy.list.count(
-            number(templates.length),
-            number(summary.counts.templates),
+            number(reports.length),
+            number(summary.counts.total),
           )}
         </p>
-        {templates.length === 0 ? (
+        {reports.length === 0 ? (
           <p className="empty-state">
-            {summary.counts.templates > 0
-              ? copy.list.noMatch
-              : copy.templates.none}
+            {summary.counts.total > 0 ? copy.list.noMatch : copy.reports.none}
           </p>
         ) : (
           <>
-            <TemplateTable
-              templates={templatePageData.items}
+            <ReportTable
+              reports={pageData.items}
               testId="report-template-table"
             />
             <Pagination
-              title={copy.templates.title}
-              page={templatePageData.page}
-              pages={templatePageData.pages}
-              onPage={setTemplatePage}
+              title={copy.reports.title}
+              page={pageData.page}
+              pages={pageData.pages}
+              onPage={setPage}
             />
           </>
         )}
       </section>
-      <FunctionSection
-        title={copy.functions.exportTitle}
-        help={copy.functions.exportHelp}
-        empty={copy.functions.none}
-        functions={exports}
-        testId="export-function-table"
-      />
-      <FunctionSection
-        title={copy.functions.printTitle}
-        help={copy.functions.printHelp}
-        empty={copy.functions.none}
-        functions={prints}
-        testId="output-function-table"
-        note={
-          summary.counts.excludedFunctions > 0
-            ? copy.functions.excluded(number(summary.counts.excludedFunctions))
-            : undefined
-        }
-      />
+      <details className="report-list data-files">
+        <summary>
+          <h4>{copy.dataFiles.title}</h4>
+          <span className="muted mono" data-testid="data-file-count">
+            {number(summary.counts.dataFiles)}
+          </span>
+        </summary>
+        <p className="muted">{copy.dataFiles.help}</p>
+        {summary.counts.excluded > 0 && (
+          <p className="muted" data-testid="excluded-functions">
+            {copy.dataFiles.excluded(number(summary.counts.excluded))}
+          </p>
+        )}
+        {summary.dataFiles.length === 0 ? (
+          <p className="empty-state">{copy.dataFiles.none}</p>
+        ) : (
+          <>
+            <DataFileTable files={dataData.items} testId="data-file-table" />
+            <Pagination
+              title={copy.dataFiles.title}
+              page={dataData.page}
+              pages={dataData.pages}
+              onPage={setDataPage}
+            />
+          </>
+        )}
+      </details>
     </>
   );
 }
 
-// "Screens and reports" tab of one program: its screens, then the report
-// templates it uses and the Excel/CSV, print and other output functions in
-// it, with file:line.
+// "Screens and reports" tab of one program: its screens and the reports it
+// makes, with where (file:line) they are made.
 export function ProgramScreensReports({
   inventory,
   projectPath,
@@ -632,11 +640,8 @@ export function ProgramScreensReports({
         {copy.kpis.noDataHelp}
       </p>
     );
-  const templates = summary.templates.filter((template) =>
-    template.programs.includes(projectPath),
-  );
-  const functions = summary.functions.filter(
-    (entry) => !entry.excluded && entry.programs.includes(projectPath),
+  const reports = summary.reports.filter((report) =>
+    report.programs.includes(projectPath),
   );
   return (
     <>
@@ -675,19 +680,12 @@ export function ProgramScreensReports({
           </table>
         </div>
       )}
-      <h6>{copy.templates.title}</h6>
-      {templates.length === 0 ? (
+      <h6>{copy.detail.reportsTitle}</h6>
+      {reports.length === 0 ? (
         <p className="empty-state">{copy.detail.noReports}</p>
       ) : (
-        <TemplateTable templates={templates} testId="program-reports" />
+        <ReportTable reports={reports} testId="program-reports" />
       )}
-      <h6>{copy.functions.title}</h6>
-      {functions.length === 0 ? (
-        <p className="empty-state">{copy.functions.none}</p>
-      ) : (
-        <FunctionTable functions={functions} testId="program-functions" />
-      )}
-      <p className="muted">{copy.detail.functionsNote}</p>
     </>
   );
 }

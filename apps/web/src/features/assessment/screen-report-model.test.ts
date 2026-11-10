@@ -22,33 +22,35 @@ describe('AR04-AC06/AC11 screen and report model', () => {
     });
   });
 
-  it('counts report templates and print/export functions apart', () => {
+  it('counts one total over Crystal, code print and CSV/Excel export', () => {
     const summary = deriveReportSummary(inventory);
     expect(summary?.counts).toMatchObject({
-      templates: 3,
-      functions: 2,
-      functionPrograms: 2,
-      excludedFunctions: 0,
+      total: 5,
+      crystal: 3,
+      print: 1,
+      export: 1,
+      dataFiles: 0,
+      excluded: 0,
     });
-    // A shared template is one template, with every program that uses it.
-    const common = summary?.templates.find((t) => t.name === 'common.rpt');
+    // A shared template is one report, with every program that uses it.
+    const common = summary?.reports.find((r) => r.name === 'common.rpt');
     expect(common?.programs).toEqual([
       'programs/Invoice/Invoice.vbp',
       'programs/Order/Order.vbp',
     ]);
   });
 
-  it('keeps the level distribution over the templates only', () => {
+  it('keeps the level distribution over all reports', () => {
     const summary = deriveReportSummary(inventory);
     if (!summary) throw new Error('summary');
     const levels = Object.values(summary.counts.byLevel).reduce(
       (a, b) => a + b,
       0,
     );
-    expect(levels).toBe(summary.counts.templates);
+    expect(levels).toBe(summary.counts.total);
     for (const level of ['medium', 'high', 'very-high', 'unrated'] as const)
       expect(
-        summary.templates.filter((t) => t.complexity.level === level),
+        summary.reports.filter((r) => r.complexity.level === level),
       ).toHaveLength(summary.counts.byLevel[level]);
   });
 
@@ -58,19 +60,17 @@ describe('AR04-AC06/AC11 screen and report model', () => {
       summary.programs.map((row) => [
         row.screens,
         row.reports,
-        row.suspectedReports,
         row.programType,
       ]),
     ).toEqual([
-      [2, 2, 0, 'screen'],
-      [2, 2, 1, 'screen'],
-      [0, 0, 1, 'batch'],
+      [2, 2, 'screen'],
+      [2, 3, 'screen'],
+      [0, 1, 'batch'],
     ]);
     const old = summarizeInventory(mappedInventoryFixture);
     expect(old.programs[0]).toMatchObject({
       screens: null,
       reports: null,
-      suspectedReports: null,
       programType: null,
     });
   });

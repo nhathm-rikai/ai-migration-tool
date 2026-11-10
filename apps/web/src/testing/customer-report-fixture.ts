@@ -3,8 +3,8 @@ import type { CustomerReportDocument } from '@portal/contracts';
 type Item = CustomerReportDocument['items'][number];
 
 // Hand-written customer report JSON (numbers are set here, not computed):
-// the invented demo corpus. 3 programs, 3 screens (1 shared), 3 reports
-// found + 2 suspected, 1 batch.
+// the invented demo corpus. 3 programs, 3 screens (1 shared), 5 reports
+// (2 Crystal, 1 DataReport) + 1 code print + 1 CSV/Excel export, 1 batch.
 const item = (
   row: Partial<Item> & Pick<Item, 'type' | 'name' | 'file'>,
 ): Item => ({
@@ -61,12 +61,12 @@ export function customerReportFixture(): CustomerReportDocument {
         screens: 3,
         sharedScreens: 1,
         batches: 1,
-        // rows / counted = report TEMPLATES; suspected = print and export
-        // functions to confirm.
+        // rows = counted = all reports (Crystal / DataReport + code print +
+        // CSV/Excel export); nothing is left as a suspect.
         reports: {
-          rows: 3,
-          counted: 3,
-          suspected: 2,
+          rows: 5,
+          counted: 5,
+          suspected: 0,
           byKind: {
             'data-report': 1,
             crystal: 2,
@@ -75,19 +75,19 @@ export function customerReportFixture(): CustomerReportDocument {
             'file-output': 0,
             unknown: 0,
           },
-          byLevel: { low: 0, medium: 1, high: 1, 'very-high': 0, unrated: 1 },
+          byLevel: { low: 1, medium: 2, high: 1, 'very-high': 0, unrated: 1 },
         },
-        suspectedPrograms: 2,
+        suspectedPrograms: 0,
       },
-      reportTemplates: { templates: 3, designFile: 2, missingFile: 1 },
-      outputFunctions: {
-        functions: 2,
-        programs: 2,
+      reportBreakdown: {
+        total: 5,
+        crystal: 3,
+        designFile: 2,
+        missingFile: 1,
+        print: 1,
+        export: 1,
+        dataFiles: 1,
         excluded: 0,
-        groups: {
-          export: { functions: 1, programs: 1 },
-          print: { functions: 1, programs: 1 },
-        },
       },
     },
     modules: [
@@ -96,8 +96,7 @@ export function customerReportFixture(): CustomerReportDocument {
         kind: 'module',
         programs: 1,
         screens: 0,
-        reports: 0,
-        suspectedReports: 1,
+        reports: 1,
         batches: 1,
         files: 1,
         codeLines: 140,
@@ -108,7 +107,6 @@ export function customerReportFixture(): CustomerReportDocument {
         programs: 1,
         screens: 1,
         reports: 1,
-        suspectedReports: 0,
         batches: 0,
         files: 1,
         codeLines: 310,
@@ -118,8 +116,7 @@ export function customerReportFixture(): CustomerReportDocument {
         kind: 'module',
         programs: 1,
         screens: 1,
-        reports: 2,
-        suspectedReports: 1,
+        reports: 3,
         batches: 0,
         files: 1,
         codeLines: 85,
@@ -130,7 +127,6 @@ export function customerReportFixture(): CustomerReportDocument {
         programs: 0,
         screens: 1,
         reports: 0,
-        suspectedReports: 0,
         batches: 0,
         files: 1,
         codeLines: 120,
@@ -214,18 +210,6 @@ export function customerReportFixture(): CustomerReportDocument {
         confirmation: '帳票定義ファイル(.rpt)のご提供をお願いします。',
       },
       {
-        code: 'REPORT_SUSPECTED',
-        source: 'warning',
-        category: '帳票',
-        severity: '中',
-        count: 2,
-        content:
-          '印刷・Excel・ファイル出力を行う可能性のあるプログラムがあります。',
-        programs: ['CUSTOMER', 'REPORT'],
-        otherPrograms: 0,
-        confirmation: '帳票一覧（台帳）をご提供ください。',
-      },
-      {
         code: 'EXTERNAL_COMPONENT',
         source: 'data',
         category: '外部コンポーネント',
@@ -242,7 +226,8 @@ export function customerReportFixture(): CustomerReportDocument {
         category: '解析の前提',
         severity: '低',
         count: 1,
-        content: '複雑度は参考分類です。',
+        content:
+          '複雑度は移行の難しさの分類であり、工数・金額の算定根拠ではありません。',
         programs: [],
         otherPrograms: 0,
         confirmation: '特にありません。',
@@ -316,28 +301,34 @@ export function customerReportFixture(): CustomerReportDocument {
         note: '帳票を呼び出す処理を特定できないため評価不可',
       }),
       item({
-        type: '出力機能',
-        kindLabel: 'Excel出力',
-        name: 'PrintMonthly',
+        type: '帳票',
+        kindLabel: 'CSV・Excel出力',
+        name: 'REPORT.BAS',
         file: 'programs/REPORT/REPORT.BAS',
         line: 60,
         programs: 'REPORT',
         module: 'programs/REPORT',
-        confidence: 'suspected',
-        confidenceLabel: '要確認',
-        note: '印刷・出力の可能性があります。帳票の数には含みません。',
+        confidenceLabel: 'CSV・Excel出力',
+        level: 'low',
+        levelLabel: '低',
+        score: 1,
+        modelVersion: 'report-complexity-v1-draft',
+        note: '使用箇所 1 か所',
       }),
       item({
-        type: '出力機能',
-        kindLabel: '印刷',
-        name: 'SearchCustomer',
+        type: '帳票',
+        kindLabel: 'コード印刷',
+        name: 'CUSTOMER.BAS',
         file: 'programs/CUSTOMER/CUSTOMER.BAS',
         line: 70,
         programs: 'CUSTOMER',
         module: 'programs/CUSTOMER',
-        confidence: 'suspected',
-        confidenceLabel: '要確認',
-        note: '印刷・出力の可能性があります。帳票の数には含みません。',
+        confidenceLabel: 'コード印刷',
+        level: 'medium',
+        levelLabel: '中',
+        score: 2,
+        modelVersion: 'report-complexity-v1-draft',
+        note: '使用箇所 1 か所',
       }),
       item({
         type: 'バッチ',
@@ -349,7 +340,7 @@ export function customerReportFixture(): CustomerReportDocument {
       }),
     ],
     recommendations: [
-      '本報告は静的解析による参考値です。画面数・帳票数はお客様の台帳と照合のうえ、ご確認ください。',
+      '本報告のソース規模は、ご提供のソースコードを静的に解析した結果です。数え方の前提は付録に記載しています。',
       '確認事項（特に重要度「高」）へのご回答をお願いします。',
       '確認後の数値を基に、移行範囲・順序を協議し、見積りを確定します。',
     ],
@@ -368,7 +359,6 @@ export function legacyCustomerReportFixture(): CustomerReportDocument {
   for (const row of report.modules) {
     row.screens = 0;
     row.reports = 0;
-    row.suspectedReports = 0;
     row.batches = 0;
   }
   return report;

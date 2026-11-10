@@ -1,44 +1,46 @@
 import type { SourceInventoryDocument } from './source-inventory.schema.js';
 import { normalizeScreenReportTotals } from './screen-report-items.js';
 
-// Reports counted by TEMPLATE, not by sign in the code (10/11/2026).
+// The reports (帳票) of a project, counted once each (10/11/2026).
 //
-// What a customer asks is "how many report forms are there". The analyzer
-// writes one row per sign (a .rpt string in a procedure, a Printer.Print, an
-// Open For Output ...), so the same template named in two procedures is two
-// rows, and a print call is not a template at all. This module reads the
-// project-level rows (normalizeScreenReportTotals) and answers two separate
-// questions, never added together:
+// The analyzer writes one row per sign in the code (a .rpt string in a
+// procedure, a Printer.Print, an Open For Output ...). A customer asks how
+// many report forms there are, so this module turns the signs into reports
+// by three rules, each an explicit assumption:
 //
-//  1. Templates: Crystal Reports / DataReport designs, one per template
-//     identity across the whole project. A template with its design file in
-//     the source is `design-file`; one only named in the code is
-//     `missing-file` (the design file has to be requested from the customer).
-//  2. Output functions: places where code prints or exports data (print,
-//     Excel, CSV, other file output, report runtime without a template), one
-//     per (file, procedure). They need confirmation: a print call does not
-//     prove a report form, and a log or temporary file is not an output.
+//  1. Crystal / DataReport: every template name is one report (a .rpt name
+//     without folder, case-insensitive, or a .dsr file), however many places
+//     name it. It has its design file, or it is missing.
+//  2. Print in code (Printer.Print, PrintForm, EndDoc): every source file
+//     (form or module) that prints is one report.
+//  3. CSV / Excel export: every source file that exports is one report.
 //
-// Pure and derived on read, so an inventory stored before this existed gets
-// the same answer from its stored rows.
+// File output that is neither (plain data or exchange files) is listed apart
+// and not counted; paths with log, tmp, temp, debug, err words are log or
+// temporary files and are left out. A report runtime without a template (an
+// OCX alone) is listed apart and not counted.
+//
+// Pure and derived on read from the stored rows, so an inventory stored
+// before this existed gets the same answer.
 
 type Inventory = Pick<SourceInventoryDocument, 'programs'> & {
   totals: Pick<SourceInventoryDocument['totals'], 'screenReport'>;
 };
 type Level = 'low' | 'medium' | 'high' | 'very-high' | 'unrated';
 
-export const REPORT_TEMPLATE_KINDS = ['crystal', 'data-report'] as const;
-export type ReportTemplateKind = (typeof REPORT_TEMPLATE_KINDS)[number];
+export const REPORT_ORIGINS = ['crystal', 'print', 'export'] as const;
+export type ReportOrigin = (typeof REPORT_ORIGINS)[number];
+export type ReportTemplateKind = 'crystal' | 'data-report';
 export type ReportTemplateStatus = 'design-file' | 'missing-file';
 
-export type ReportTemplateUsage = {
+export type ReportUsage = {
   file: string;
   line: number | null;
   procedure: string | null;
   programs: string[];
 };
 
-export type TemplateComplexity = {
+export type ReportComplexity = {
   level: Level;
   score: number | null;
   version: string;
@@ -46,74 +48,49 @@ export type TemplateComplexity = {
   reason?: string | undefined;
 };
 
-export type ReportTemplate = {
+export type ReportEntry = {
   id: string;
-  kind: ReportTemplateKind;
+  origin: ReportOrigin;
+  // Template name (crystal) or the source file the report is made in.
   name: string;
-  // The design file as the source names it (relative path); null when only
-  // referenced by name.
+  // Crystal origin only.
+  kind: ReportTemplateKind | null;
   designFile: string | null;
-  status: ReportTemplateStatus;
-  // Highest score of any place that uses the template.
-  complexity: TemplateComplexity;
-  usages: ReportTemplateUsage[];
+  status: ReportTemplateStatus | null;
+  // Print / export origin: the file (form or module) that makes the report.
+  file: string | null;
+  complexity: ReportComplexity;
+  usages: ReportUsage[];
   programs: string[];
 };
 
-export const OUTPUT_FUNCTION_KINDS = [
-  'print',
-  'excel',
-  'csv',
-  'file-output',
-  'unknown',
-] as const;
-export type OutputFunctionKind = (typeof OUTPUT_FUNCTION_KINDS)[number];
-
-// Excel/CSV export on one side; direct print, other file output and a report
-// runtime without a template on the other.
-export const OUTPUT_FUNCTION_GROUPS = ['export', 'print'] as const;
-export type OutputFunctionGroup = (typeof OUTPUT_FUNCTION_GROUPS)[number];
-
-export const groupOfFunction = (entry: {
-  kinds: readonly OutputFunctionKind[];
-}): OutputFunctionGroup =>
-  entry.kinds.some((kind) => kind === 'excel' || kind === 'csv')
-    ? 'export'
-    : 'print';
-
-export type OutputFunction = {
+export type DataFileKind = 'file-output' | 'unknown';
+export type DataFileOutput = {
   id: string;
   file: string;
   procedure: string | null;
-  kinds: OutputFunctionKind[];
-  evidence: { file: string; line: number | null; kind: OutputFunctionKind }[];
+  kinds: DataFileKind[];
+  evidence: { file: string; line: number | null; kind: DataFileKind }[];
   programs: string[];
-  // A log or temporary file: listed, not counted.
-  excluded: boolean;
-  excludeReason: string | null;
 };
 
 export type ReportSummary = {
-  templates: ReportTemplate[];
-  functions: OutputFunction[];
+  // Every counted report, the three origins together.
+  reports: ReportEntry[];
+  // Not counted: other file output and report runtimes without a template.
+  dataFiles: DataFileOutput[];
   counts: {
-    templates: number;
+    total: number;
+    crystal: number;
+    // Of the Crystal / DataReport reports: design file present or missing.
     designFile: number;
     missingFile: number;
+    print: number;
+    export: number;
     byLevel: Record<Level, number>;
-    // Output functions that need confirmation (excluded ones left out).
-    functions: number;
-    // Distinct programs holding at least one of them.
-    functionPrograms: number;
-    // The same functions in two groups that add up to `functions`: Excel or CSV
-    // export (any evidence of it), and everything else (direct print, other
-    // file output, a report runtime without a template).
-    groups: Record<
-      OutputFunctionGroup,
-      { functions: number; programs: number }
-    >;
-    // Log / temporary file outputs left out of the count.
-    excludedFunctions: number;
+    dataFiles: number;
+    // Log and temporary file outputs left out, per (file, procedure).
+    excluded: number;
   };
 };
 
@@ -125,7 +102,15 @@ const LEVELS: readonly Level[] = [
   'unrated',
 ];
 
-const complexityOf = (item: {
+type Item = {
+  kind: string;
+  subkind?: string | undefined;
+  excludeReason?: string | undefined;
+  name: string;
+  file: string;
+  line: number | null;
+  confidence: string;
+  procedureId: string | null;
   complexity: {
     level: Level;
     score: number | null;
@@ -133,7 +118,10 @@ const complexityOf = (item: {
     factors: { factor: string; value: number; points: number }[];
     reason?: string | undefined;
   };
-}): TemplateComplexity => ({
+  programs: { program: string }[];
+};
+
+const complexityOf = (item: Item): ReportComplexity => ({
   level: item.complexity.level,
   score: item.complexity.score,
   version: item.complexity.version,
@@ -142,6 +130,7 @@ const complexityOf = (item: {
 });
 
 const baseName = (path: string) => path.split(/[\\/]/).at(-1) ?? path;
+const stemOf = (path: string) => baseName(path).replace(/\.[^.]*$/, '');
 const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 export function deriveReportSummary(
@@ -152,171 +141,203 @@ export function deriveReportSummary(
 
   type Draft = {
     id: string;
-    kind: ReportTemplateKind;
+    origin: ReportOrigin;
     name: string;
+    kind: ReportTemplateKind | null;
     designFile: string | null;
-    complexity: TemplateComplexity;
-    usages: Map<string, ReportTemplateUsage>;
+    file: string | null;
+    complexity: ReportComplexity;
+    usages: Map<string, ReportUsage>;
     programs: Set<string>;
   };
   const drafts = new Map<string, Draft>();
-  type FunctionDraft = {
+  type DataDraft = {
     file: string;
     procedure: string | null;
-    excluded: boolean;
-    excludeReason: string | null;
-    evidence: Map<string, OutputFunction['evidence'][number]>;
+    evidence: Map<string, DataFileOutput['evidence'][number]>;
     programs: Set<string>;
   };
-  const functionDrafts = new Map<string, FunctionDraft>();
+  const dataDrafts = new Map<string, DataDraft>();
+  const excludedKeys = new Set<string>();
 
-  for (const item of totals.reportItems) {
+  const add = (
+    key: string,
+    seed: Omit<Draft, 'usages' | 'programs' | 'complexity'>,
+    item: Item,
+  ) => {
+    let draft = drafts.get(key);
+    if (!draft) {
+      draft = {
+        ...seed,
+        complexity: complexityOf(item),
+        usages: new Map(),
+        programs: new Set(),
+      };
+      drafts.set(key, draft);
+    } else if ((item.complexity.score ?? -1) > (draft.complexity.score ?? -1))
+      draft.complexity = complexityOf(item);
+    if (item.confidence === 'detected' && draft.designFile === null)
+      draft.designFile =
+        draft.origin === 'crystal'
+          ? draft.kind === 'data-report'
+            ? item.file
+            : item.name
+          : null;
     const programs = item.programs.map((entry) => entry.program);
+    const usageKey = `${item.file}\u0000${item.line ?? ''}\u0000${item.procedureId ?? ''}`;
+    const usage = draft.usages.get(usageKey);
+    if (usage) {
+      for (const program of programs)
+        if (!usage.programs.includes(program)) usage.programs.push(program);
+    } else
+      draft.usages.set(usageKey, {
+        file: item.file,
+        line: item.line,
+        procedure: item.procedureId,
+        programs: [...programs],
+      });
+    for (const program of programs) draft.programs.add(program);
+  };
+
+  for (const item of totals.reportItems as Item[]) {
     if (item.confidence !== 'suspected') {
       const crystal = item.kind === 'crystal';
       if (!crystal && item.kind !== 'data-report') continue;
       const identity = crystal
         ? baseName(item.name).toLowerCase()
         : item.file.toLowerCase();
-      const key = `${item.kind}\u0000${identity}`;
-      let draft = drafts.get(key);
-      if (!draft) {
-        draft = {
+      add(
+        `crystal\u0000${item.kind}\u0000${identity}`,
+        {
           id: `RT-${item.kind}-${identity}`,
-          kind: crystal ? 'crystal' : 'data-report',
+          origin: 'crystal',
           name: crystal ? baseName(item.name) : item.name,
+          kind: crystal ? 'crystal' : 'data-report',
           designFile: null,
-          complexity: complexityOf(item),
-          usages: new Map(),
-          programs: new Set(),
-        };
-        drafts.set(key, draft);
-      } else if ((item.complexity.score ?? -1) > (draft.complexity.score ?? -1))
-        draft.complexity = complexityOf(item);
-      if (item.confidence === 'detected' && draft.designFile === null)
-        draft.designFile = crystal ? item.name : item.file;
-      const usageKey = `${item.file}\u0000${item.line ?? ''}\u0000${item.procedureId ?? ''}`;
-      const usage = draft.usages.get(usageKey);
-      if (usage) {
-        for (const program of programs)
-          if (!usage.programs.includes(program)) usage.programs.push(program);
-      } else
-        draft.usages.set(usageKey, {
-          file: item.file,
-          line: item.line,
-          procedure: item.procedureId,
-          programs: [...programs],
-        });
-      for (const program of programs) draft.programs.add(program);
+          file: null,
+        },
+        item,
+      );
       continue;
     }
-    // A suspected row is an output function (never a template).
-    const kind: OutputFunctionKind =
-      item.kind === 'file-output' && item.subkind === 'csv'
-        ? 'csv'
-        : item.kind === 'print' ||
-            item.kind === 'excel' ||
-            item.kind === 'file-output' ||
-            item.kind === 'unknown'
-          ? item.kind
-          : 'unknown';
-    const excluded = item.excludeReason !== undefined;
-    const key = `${item.file}\u0000${item.procedureId ?? ''}\u0000${excluded ? 'x' : 'o'}`;
-    let draft = functionDrafts.get(key);
-    if (!draft) {
-      draft = {
+    // A sign of print, export or other file output.
+    if (item.excludeReason !== undefined) {
+      excludedKeys.add(`${item.file}\u0000${item.procedureId ?? ''}`);
+      continue;
+    }
+    const origin: ReportOrigin | null =
+      item.kind === 'print'
+        ? 'print'
+        : item.kind === 'excel' ||
+            (item.kind === 'file-output' && item.subkind === 'csv')
+          ? 'export'
+          : null;
+    if (origin !== null) {
+      add(
+        `${origin}\u0000${item.file}`,
+        {
+          id: `RP-${origin}-${item.file}`,
+          origin,
+          name: stemOf(item.file),
+          kind: null,
+          designFile: null,
+          file: item.file,
+        },
+        item,
+      );
+      continue;
+    }
+    const dataKind: DataFileKind =
+      item.kind === 'file-output' ? 'file-output' : 'unknown';
+    const key = `${item.file}\u0000${item.procedureId ?? ''}`;
+    let data = dataDrafts.get(key);
+    if (!data) {
+      data = {
         file: item.file,
         procedure: item.procedureId,
-        excluded,
-        excludeReason: item.excludeReason ?? null,
         evidence: new Map(),
         programs: new Set(),
       };
-      functionDrafts.set(key, draft);
+      dataDrafts.set(key, data);
     }
-    draft.evidence.set(`${item.line ?? ''}\u0000${kind}`, {
+    data.evidence.set(`${item.line ?? ''}\u0000${dataKind}`, {
       file: item.file,
       line: item.line,
-      kind,
+      kind: dataKind,
     });
-    for (const program of programs) draft.programs.add(program);
+    for (const entry of item.programs) data.programs.add(entry.program);
   }
 
-  const templates: ReportTemplate[] = [...drafts.values()]
-    .map((draft): ReportTemplate => {
+  const reports: ReportEntry[] = [...drafts.values()]
+    .map((draft): ReportEntry => {
       const usages = [...draft.usages.values()].sort(
         (a, b) => byText(a.file, b.file) || (a.line ?? 0) - (b.line ?? 0),
       );
+      const status: ReportTemplateStatus | null =
+        draft.origin === 'crystal'
+          ? draft.designFile === null
+            ? 'missing-file'
+            : 'design-file'
+          : null;
       return {
         id: draft.id,
-        kind: draft.kind,
+        origin: draft.origin,
         name: draft.name,
+        kind: draft.kind,
         designFile: draft.designFile,
-        status: draft.designFile === null ? 'missing-file' : 'design-file',
+        status,
+        file: draft.file,
         complexity: draft.complexity,
         usages,
         programs: [...draft.programs].sort(byText),
       };
     })
-    .sort((a, b) => byText(a.name.toLowerCase(), b.name.toLowerCase()));
-
-  const functions: OutputFunction[] = [...functionDrafts.values()]
     .sort(
       (a, b) =>
-        byText(a.file, b.file) ||
-        byText(a.procedure ?? '', b.procedure ?? '') ||
-        Number(a.excluded) - Number(b.excluded),
+        REPORT_ORIGINS.indexOf(a.origin) - REPORT_ORIGINS.indexOf(b.origin) ||
+        byText(a.name.toLowerCase(), b.name.toLowerCase()) ||
+        byText(a.file ?? '', b.file ?? ''),
+    );
+
+  const dataFiles: DataFileOutput[] = [...dataDrafts.values()]
+    .sort(
+      (a, b) =>
+        byText(a.file, b.file) || byText(a.procedure ?? '', b.procedure ?? ''),
     )
-    .map((draft, index): OutputFunction => {
+    .map((draft, index): DataFileOutput => {
       const evidence = [...draft.evidence.values()].sort(
         (a, b) => (a.line ?? 0) - (b.line ?? 0),
       );
-      const kinds = OUTPUT_FUNCTION_KINDS.filter((kind) =>
-        evidence.some((row) => row.kind === kind),
-      );
       return {
-        id: `OF-${String(index + 1).padStart(4, '0')}`,
+        id: `DF-${String(index + 1).padStart(4, '0')}`,
         file: draft.file,
         procedure: draft.procedure,
-        kinds,
+        kinds: (['file-output', 'unknown'] as const).filter((kind) =>
+          evidence.some((row) => row.kind === kind),
+        ),
         evidence,
         programs: [...draft.programs].sort(byText),
-        excluded: draft.excluded,
-        excludeReason: draft.excludeReason,
       };
     });
 
   const byLevel = Object.fromEntries(
     LEVELS.map((level) => [level, 0]),
   ) as Record<Level, number>;
-  for (const template of templates) byLevel[template.complexity.level] += 1;
-  const counted = functions.filter((entry) => !entry.excluded);
+  for (const report of reports) byLevel[report.complexity.level] += 1;
+  const crystal = reports.filter((report) => report.origin === 'crystal');
   return {
-    templates,
-    functions,
+    reports,
+    dataFiles,
     counts: {
-      templates: templates.length,
-      designFile: templates.filter((t) => t.status === 'design-file').length,
-      missingFile: templates.filter((t) => t.status === 'missing-file').length,
+      total: reports.length,
+      crystal: crystal.length,
+      designFile: crystal.filter((r) => r.status === 'design-file').length,
+      missingFile: crystal.filter((r) => r.status === 'missing-file').length,
+      print: reports.filter((r) => r.origin === 'print').length,
+      export: reports.filter((r) => r.origin === 'export').length,
       byLevel,
-      functions: counted.length,
-      functionPrograms: new Set(counted.flatMap((entry) => entry.programs))
-        .size,
-      groups: Object.fromEntries(
-        OUTPUT_FUNCTION_GROUPS.map((group) => {
-          const inGroup = counted.filter(
-            (entry) => groupOfFunction(entry) === group,
-          );
-          return [
-            group,
-            {
-              functions: inGroup.length,
-              programs: new Set(inGroup.flatMap((entry) => entry.programs)).size,
-            },
-          ];
-        }),
-      ) as ReportSummary['counts']['groups'],
-      excludedFunctions: functions.length - counted.length,
+      dataFiles: dataFiles.length,
+      excluded: excludedKeys.size,
     },
   };
 }

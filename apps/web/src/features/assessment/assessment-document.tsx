@@ -16,8 +16,7 @@ import {
   LEVELS,
   NOT_ANALYZED,
   NOT_APPLICABLE,
-  TEMPLATE_KINDS,
-  OUTPUT_KINDS,
+  BREAKDOWN,
   SECTIONS,
   SECTION_NOTES,
   TABLE,
@@ -283,7 +282,6 @@ export function AssessmentDocument({
   const count = (value: number | undefined) =>
     sr && value !== undefined ? n(value) : NOT_ANALYZED;
 
-  const kinds = sr ? Object.entries(sr.reports.byKind) : [];
   const levels = sr ? Object.entries(sr.reports.byLevel) : [];
   const unrated = (level: string) => LEVELS[level] ?? level;
 
@@ -373,7 +371,7 @@ export function AssessmentDocument({
       <div className="ad-section" data-doc="scale" data-page-break>
         <Heading>{SECTIONS.scale}</Heading>
         <Note>{SECTION_NOTES.scale}</Note>
-        <div className="qd-kpis ad-kpis ad-kpis-5">
+        <div className="qd-kpis ad-kpis">
           <Kpi
             name="screens"
             label={KPI.screens}
@@ -386,44 +384,19 @@ export function AssessmentDocument({
             label={KPI.reports}
             value={count(sr?.reports.counted)}
             sub={
-              scale.reportTemplates
-                ? KPI.reportsSub(
-                    n(scale.reportTemplates.designFile),
-                    n(scale.reportTemplates.missingFile),
-                  )
-                : null
-            }
-          />
-          <Kpi
-            name="exports"
-            label={KPI.exports}
-            value={
-              scale.outputFunctions
-                ? n(scale.outputFunctions.groups?.export.functions ?? 0)
-                : NOT_ANALYZED
-            }
-            sub={
-              scale.outputFunctions?.groups
-                ? KPI.exportsSub(
-                    n(scale.outputFunctions.groups.export.programs),
-                  )
-                : null
-            }
-          />
-          <Kpi
-            name="prints"
-            label={KPI.prints}
-            value={
-              scale.outputFunctions
-                ? n(scale.outputFunctions.groups?.print.functions ?? 0)
-                : NOT_ANALYZED
-            }
-            sub={
-              scale.outputFunctions?.groups
-                ? KPI.printsSub(
-                    n(scale.outputFunctions.groups.print.programs),
-                    n(scale.outputFunctions.excluded),
-                  )
+              scale.reportBreakdown
+                ? [
+                    KPI.reportsSub(
+                      n(scale.reportBreakdown.crystal),
+                      n(scale.reportBreakdown.print),
+                      n(scale.reportBreakdown.export),
+                    ),
+                    scale.reportBreakdown.missingFile > 0
+                      ? KPI.reportsMissing(n(scale.reportBreakdown.missingFile))
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join('／')
                 : null
             }
           />
@@ -465,31 +438,52 @@ export function AssessmentDocument({
               <table className="qd-table qd-compact">
                 <thead>
                   <tr>
-                    <th>{TABLE.kind}</th>
+                    <th>{BREAKDOWN.title}</th>
                     <th>{TABLE.count}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kinds
-                    .filter(([kind]) => kind in TEMPLATE_KINDS)
-                    .map(([kind, value]) => (
-                      <tr key={kind} data-kind={kind}>
-                        <td>{TEMPLATE_KINDS[kind] ?? kind}</td>
-                        <td className="num">{n(value)}</td>
-                      </tr>
-                    ))}
+                  {scale.reportBreakdown
+                    ? (
+                        [
+                          ['crystal', BREAKDOWN.crystal],
+                          ['print', BREAKDOWN.print],
+                          ['export', BREAKDOWN.export],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <tr key={key} data-kind={key}>
+                          <td>{label}</td>
+                          <td className="num">
+                            {n(scale.reportBreakdown?.[key] ?? 0)}
+                          </td>
+                        </tr>
+                      ))
+                    : null}
                   <tr>
                     <td>{TABLE.total}</td>
                     <td className="num" data-total="kind">
                       {sr.reports.rows}
                     </td>
                   </tr>
+                  {scale.reportBreakdown ? (
+                    <tr data-kind="data-files">
+                      <td>
+                        {BREAKDOWN.dataFiles}
+                        {scale.reportBreakdown.excluded > 0
+                          ? ` · ${BREAKDOWN.excluded(n(scale.reportBreakdown.excluded))}`
+                          : ''}
+                      </td>
+                      <td className="num">
+                        {n(scale.reportBreakdown.dataFiles)}
+                      </td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
               <table className="qd-table qd-compact">
                 <thead>
                   <tr>
-                    <th>{TABLE.level}（参考値）</th>
+                    <th>{TABLE.level}</th>
                     <th>{TABLE.count}</th>
                   </tr>
                 </thead>
@@ -509,32 +503,6 @@ export function AssessmentDocument({
                 </tbody>
               </table>
             </div>
-            <div className="qd-block">
-              <table className="qd-table qd-compact">
-                <thead>
-                  <tr>
-                    <th>{KPI.outputsTitle}</th>
-                    <th>{TABLE.count}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kinds
-                    .filter(([kind]) => kind in OUTPUT_KINDS)
-                    .map(([kind, value]) => (
-                      <tr key={kind} data-function-kind={kind}>
-                        <td>{OUTPUT_KINDS[kind] ?? kind}</td>
-                        <td className="num">{n(value)}</td>
-                      </tr>
-                    ))}
-                  <tr>
-                    <td>{TABLE.total}</td>
-                    <td className="num" data-total="function-kind">
-                      {sr.reports.suspected}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
           </>
         ) : (
           <div className="qd-block">
@@ -547,12 +515,11 @@ export function AssessmentDocument({
             TABLE.programs,
             TABLE.screens,
             TABLE.reports,
-            TABLE.suspected,
             TABLE.batches,
             TABLE.files,
             TABLE.lines,
           ]}
-          numeric={[1, 2, 3, 4, 5, 6, 7]}
+          numeric={[1, 2, 3, 4, 5, 6]}
           rows={[
             ...report.modules.map((row) => ({
               key: `${row.kind}:${row.module}`,
@@ -562,7 +529,6 @@ export function AssessmentDocument({
                 n(row.programs),
                 count(row.screens),
                 count(row.reports),
-                count(row.suspectedReports),
                 count(row.batches),
                 n(row.files),
                 n(row.codeLines),
@@ -576,7 +542,6 @@ export function AssessmentDocument({
                 n(scale.programs),
                 count(sr?.screens),
                 count(sr?.reports.counted),
-                count(sr?.reports.suspected),
                 count(sr?.batches),
                 n(moduleTotal.files),
                 n(scale.codeLines),

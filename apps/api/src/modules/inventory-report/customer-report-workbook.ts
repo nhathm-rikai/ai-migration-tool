@@ -8,7 +8,6 @@ import {
   SHEET_NAMES,
   SHEET_NOTES,
   CUSTOMER_PROVIDED_COUNT,
-  REFERENCE_VALUE,
 } from './customer-report-constants.js';
 import type { CellValue, Sheet, SheetColumn } from './xlsx-writer.js';
 
@@ -101,7 +100,7 @@ function sheet1(report: CustomerReport): Sheet {
   }
   b.row('スナップショット', source.snapshotHash.slice(0, 12));
   b.row('報告書版', report.reportVersion);
-  b.row('複雑度モデル', source.versions.complexityVersion, REFERENCE_VALUE);
+  b.row('複雑度モデル', source.versions.complexityVersion);
 
   b.heading('規模');
   b.row(
@@ -125,33 +124,46 @@ function sheet1(report: CustomerReport): Sheet {
     sr ? sr.screens : NOT_ANALYZED,
     sr ? `うち共通 ${sr.sharedScreens}（1回のみ集計）` : null,
   );
-  const templates = scale.reportTemplates;
-  const functions = scale.outputFunctions;
+  const breakdown = scale.reportBreakdown;
   b.row(
-    '帳票（種類）',
+    '帳票（合計）',
     sr ? sr.reports.counted : NOT_ANALYZED,
-    templates
-      ? `設計ファイルあり ${templates.designFile}／なし ${templates.missingFile}`
+    breakdown
+      ? `Crystal ${breakdown.crystal}／コード印刷 ${breakdown.print}／CSV・Excel出力 ${breakdown.export}`
       : null,
   );
   b.row(
-    'Excel/CSV出力（要確認）',
-    functions ? functions.groups.export.functions : NOT_ANALYZED,
-    functions
-      ? `${functions.groups.export.programs} プログラム（帳票の種類には含みません）`
+    '　Crystal Reports / DataReport',
+    breakdown ? breakdown.crystal : NOT_ANALYZED,
+    breakdown
+      ? `前提：帳票定義の名称（.rpt／.dsr）ごとに1件。設計ファイルあり ${breakdown.designFile}／なし ${breakdown.missingFile}`
       : null,
   );
   b.row(
-    '印刷・その他出力（要確認）',
-    functions ? functions.groups.print.functions : NOT_ANALYZED,
-    functions
-      ? `${functions.groups.print.programs} プログラム（帳票の種類には含みません）${functions.excluded > 0 ? `／ログ・一時ファイル ${functions.excluded} 件は除外` : ''}`
+    '　コードによる印刷',
+    breakdown ? breakdown.print : NOT_ANALYZED,
+    breakdown
+      ? '前提：印刷コード（Printer.Print 等）を持つフォーム（ファイル）1つを1帳票とする'
+      : null,
+  );
+  b.row(
+    '　CSV・Excel出力',
+    breakdown ? breakdown.export : NOT_ANALYZED,
+    breakdown
+      ? '前提：CSV・Excel出力コードを持つフォーム（ファイル）1つを1帳票とする'
+      : null,
+  );
+  b.row(
+    'データファイル出力（帳票に含めない）',
+    breakdown ? breakdown.dataFiles : NOT_ANALYZED,
+    breakdown
+      ? `前提：CSV・Excel以外のファイル出力はデータ・連携用とする。パスに log／tmp／temp／debug／err を含むものはログ・一時ファイルとして除外（${breakdown.excluded} 件）`
       : null,
   );
   b.row('バッチ', sr ? sr.batches : NOT_ANALYZED);
   b.row('画面・帳票（お客様提示）', CUSTOMER_PROVIDED_COUNT);
 
-  b.heading('帳票の種類・出力機能の内訳（種別）');
+  b.heading('帳票の内訳（作成方法別）');
   b.subHeader(['種別', '件数']);
   b.table(
     sr
@@ -163,7 +175,7 @@ function sheet1(report: CustomerReport): Sheet {
         ])
       : [[NOT_ANALYZED]],
   );
-  b.heading(`帳票の内訳（複雑度・${REFERENCE_VALUE}）`);
+  b.heading('帳票の内訳（複雑度）');
   b.subHeader(['複雑度', '件数', 'モデル版']);
   b.table(
     sr
@@ -180,8 +192,7 @@ function sheet1(report: CustomerReport): Sheet {
     'モジュール',
     'プログラム数',
     '画面',
-    '帳票（種類）',
-    '印刷・出力機能',
+    '帳票',
     'バッチ',
     'ファイル',
     'コード行数',
@@ -193,7 +204,6 @@ function sheet1(report: CustomerReport): Sheet {
       m.programs,
       count(m.screens),
       count(m.reports),
-      count(m.suspectedReports),
       count(m.batches),
       m.files,
       m.codeLines,
@@ -205,7 +215,6 @@ function sheet1(report: CustomerReport): Sheet {
             report.modules.reduce((n, m) => n + m.programs, 0),
             sr ? sr.screens : NOT_ANALYZED,
             sr ? sr.reports.counted : NOT_ANALYZED,
-            sr ? sr.reports.suspected : NOT_ANALYZED,
             sr ? sr.batches : NOT_ANALYZED,
             report.modules.reduce((n, m) => n + m.files, 0),
             report.modules.reduce((n, m) => n + m.codeLines, 0),
@@ -238,7 +247,7 @@ function sheet2(report: CustomerReport): Sheet {
   const { complexity } = report;
   const total = report.scale.programs;
   const b = new SheetBuilder(7);
-  b.row('モデル', complexity.version, REFERENCE_VALUE);
+  b.row('モデル', complexity.version);
   const levelRows: CellValue[][] = LEVELS.map((level) => {
     const value = complexity.levels[level];
     return value === null
@@ -254,8 +263,8 @@ function sheet2(report: CustomerReport): Sheet {
   b.subHeader(['レベル', 'プログラム数', '割合(%)']);
   b.table(total === 0 ? [] : levelRows);
 
-  b.heading(`帳票の複雑度の分布（${REFERENCE_VALUE}）`);
-  b.subHeader(['レベル', '帳票（種類）数', 'モデル版']);
+  b.heading(`帳票の複雑度の分布`);
+  b.subHeader(['レベル', '帳票数', 'モデル版']);
   b.table(
     complexity.reportLevels
       ? [...LEVELS, 'unrated' as const].map((level) => [
@@ -438,7 +447,7 @@ function sheet6(report: CustomerReport): Sheet {
           item.modelVersion,
           item.factors,
           item.type === '帳票' && item.level !== 'unrated'
-            ? [item.note, REFERENCE_VALUE].filter(Boolean).join('；')
+            ? item.note
             : item.note,
         ]);
   if (rows.length === 0)

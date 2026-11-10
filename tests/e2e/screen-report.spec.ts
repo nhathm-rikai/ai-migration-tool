@@ -14,22 +14,18 @@ test(
     });
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
 
-    // 3 distinct forms (LOGIN is shared by ORDER and REPORT), 3 report
-    // TEMPLATES (order.rpt is named in two procedures and counts once; 2 with a
-    // design file, 1 missing), 3 print/export functions to confirm in 2
-    // programs (a log file is left out), 1 batch (CUSTOMER).
+    // 3 distinct forms (LOGIN is shared by ORDER and REPORT) and one total of
+    // 6 reports: 3 Crystal / DataReport (order.rpt is named in two procedures
+    // and counts once; 1 has no design file), 1 form that prints in code, 2
+    // that export CSV / Excel; a log file is left out; 1 batch (CUSTOMER).
     const kpi = (name: string) => assessment.locator(`[data-kpi="${name}"]`);
     await expect(kpi('screens')).toContainText('3');
     await expect(kpi('screens')).toContainText('1 dùng chung');
-    await expect(kpi('reports')).toContainText('3');
+    await expect(kpi('reports')).toContainText('6');
     await expect(kpi('reports')).toContainText(
-      'Có file thiết kế 2 · Thiếu file 1',
+      'Crystal 3 · In bằng code 1 · CSV/Excel 2',
     );
-    // Excel/CSV exports (a CSV and Excel) and print: separate cards.
-    await expect(kpi('exports')).toContainText('2');
-    await expect(kpi('exports')).toContainText('2 program');
-    await expect(kpi('prints')).toContainText('1');
-    await expect(kpi('prints')).toContainText('loại 1 chỗ ghi log');
+    await expect(kpi('reports')).toContainText('Thiếu file .rpt: 1');
     await expect(kpi('batches')).toContainText('1');
 
     // Columns of the program list.
@@ -42,17 +38,13 @@ test(
         .getByRole('button', { name, exact: true })
         .locator('xpath=ancestor::tr');
     await expect(row('ORDER').locator('[data-col="screens"]')).toHaveText('2');
-    // order.rpt is one template although two procedures name it.
+    // order.rpt is one report although two procedures name it.
     await expect(row('ORDER').locator('[data-col="reports"]')).toHaveText('1');
     await expect(row('CUSTOMER').locator('[data-col="screens"]')).toHaveText(
       '0',
     );
-    await expect(row('REPORT').locator('[data-col="reports"]')).toContainText(
-      '2',
-    );
 
-    // Detail tab of REPORT: its templates with their uses (file:line) and its
-    // output functions.
+    // Detail tab of REPORT: its reports with their uses (file:line).
     await assessment
       .getByRole('button', { name: 'REPORT', exact: true })
       .click();
@@ -61,36 +53,25 @@ test(
     await expect(reports).toContainText('summary.rpt');
     await expect(reports).toContainText('Có file');
     await expect(reports).toContainText('Thiếu file');
-    await expect(reports).not.toContainText('xin khách');
     // The uses open from the row.
     await reports.getByRole('button', { name: 'summary.rpt' }).click();
     await expect(reports).toContainText('programs/REPORT/REPORT.BAS');
-    await expect(assessment.getByTestId('program-functions')).toContainText(
-      'Xuất Excel',
-    );
     await programsTab.click();
 
-    // Project-wide tab: the levels add up to the templates, the template list
-    // has one row per template, the functions are listed apart.
+    // Project-wide tab: one histogram and one list with a row per report;
+    // file output that is not a report stays in a folded section.
     await assessment.getByRole('tab', { name: /^Report \(帳票\)/ }).click();
     await expect(assessment.getByTestId('report-rows-by-level')).toHaveText(
-      '3',
+      '6',
     );
-    await expect(
-      assessment.getByTestId('report-template-table').locator('tbody tr'),
-    ).toHaveCount(3);
-    await expect(
-      assessment.getByTestId('export-function-table').locator('tbody tr'),
-    ).toHaveCount(2);
-    await expect(
-      assessment.getByTestId('output-function-table').locator('tbody tr'),
-    ).toHaveCount(1);
+    const table = assessment.getByTestId('report-template-table');
+    await expect(table.locator('tbody tr.program-row')).toHaveCount(6);
+    await expect(assessment.getByTestId('excluded-functions')).toBeHidden();
+    await assessment.getByText('Ghi file dữ liệu (không tính report)').click();
     await expect(assessment.getByTestId('excluded-functions')).toContainText(
       '1 chỗ ghi log/file tạm',
     );
     await assessment.getByLabel('Tìm report').fill('order');
-    await expect(
-      assessment.getByTestId('report-template-table').locator('tbody tr'),
-    ).toHaveCount(1);
+    await expect(table.locator('tbody tr.program-row')).toHaveCount(1);
   },
 );

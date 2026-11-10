@@ -6002,23 +6002,32 @@ fieldset.doc-card {
   margin: 0 0 4px;
   font-size: 14px;
 }
-.level-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0;
-  padding: 0;
-  list-style: none;
+.report-histogram {
+  margin: 8px 0 16px;
 }
-.level-chips li {
-  display: inline-flex;
+.histogram .tone-unrated {
+  background: var(--fg-3, #8a94a6);
+}
+.report-list > p,
+.data-files > p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.report-histogram .histogram-bar {
+  cursor: default;
+}
+.data-files > summary {
+  display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 4px 12px;
-  border-radius: 999px;
+  cursor: pointer;
+  list-style: none;
 }
-.level-chips .level-chips-total {
-  color: var(--fg-2);
+.data-files > summary::-webkit-details-marker {
+  display: none;
+}
+.data-files > summary h4 {
+  display: inline;
 }
 .report-table {
   table-layout: fixed;
@@ -6035,36 +6044,64 @@ fieldset.doc-card {
   text-align: right;
 }
 .report-table > thead > tr > th:nth-child(1) {
-  width: 26%;
+  width: 24%;
 }
 .report-table > thead > tr > th:nth-child(2) {
   width: 13%;
 }
 .report-table > thead > tr > th:nth-child(3) {
-  width: 12%;
+  width: 11%;
 }
 .report-table > thead > tr > th:nth-child(4) {
-  width: 20%;
+  width: 19%;
 }
 .report-table > thead > tr > th:nth-child(5) {
   width: 8%;
 }
 .report-table > thead > tr > th:nth-child(6) {
-  width: 17%;
+  width: 21%;
 }
 .report-table > thead > tr > th:nth-child(7) {
   width: 4%;
 }
-.report-function-table > thead > tr > th:nth-child(1) {
+.report-table th,
+.report-table td {
+  vertical-align: middle;
+}
+.report-table tbody th .mono {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.report-table td.chevron-col,
+.report-table th.chevron-col {
+  text-align: center;
+}
+.report-table td.chevron-col svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.report-table tr.selected td.chevron-col svg {
+  transform: rotate(180deg);
+}
+.report-data-table > thead > tr > th:nth-child(1) {
   width: 22%;
 }
-.report-function-table > thead > tr > th:nth-child(2) {
+.report-data-table > thead > tr > th:nth-child(2) {
   width: 16%;
 }
-.report-function-table > thead > tr > th:nth-child(3) {
+.report-data-table > thead > tr > th:nth-child(3) {
   width: 38%;
 }
-.report-function-table > thead > tr > th:nth-child(4) {
+.report-data-table > thead > tr > th:nth-child(4) {
   width: 24%;
 }
 .report-table .block {

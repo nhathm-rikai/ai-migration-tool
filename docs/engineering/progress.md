@@ -1,5 +1,13 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — Một tổng 帳票 (Crystal/DataReport + in bằng code + CSV/Excel); bỏ mọi câu "tham khảo/cần xác nhận"
+
+- **Đếm:** `deriveReportSummary` trả `reports[]` (origin crystal/data-report/print/export) và `dataFiles[]`; `counts.total` = tổng 帳票. Crystal/DataReport theo tên mẫu, in và CSV/Excel mỗi form (file) một; ghi file khác chỉ liệt kê, log/tmp loại. Analyzer `screen-report-v3` chấm độ phức tạp cho cả in/CSV theo procedure; `subkind`, `excludeReason` lưu ở dòng dấu hiệu. Spec `source-inventory.md` §6.2a, `customer-assessment-report.md`, `AR04.md` đã cập nhật.
+- **Giao diện bước 2:** 3 thẻ KPI (Màn hình, Report, Batch); tab Report: card phân bố dạng cột như "Phân bố complexity", một bảng report (tìm + lọc Tạo bằng, mở rộng từng dòng với Program/File/Dòng/Procedure, chevron giống danh sách program), mục gập "Ghi file dữ liệu (không tính report)". Cột Report trong danh sách program = số report của program.
+- **Báo cáo khách (AR02 Excel/JSON, AR03 PDF):** "帳票（合計）N" + dòng Crystal/コード印刷/CSV・Excel出力, mỗi dòng một câu "前提"; `reportBreakdown` thay `reportTemplates`/`outputFunctions`; bỏ `suspectedReports` và rủi ro `REPORT_SUSPECTED`. Không còn 参考値/疑い/要確認 (quét vi/ja và danh mục báo cáo khách; test khẳng định).
+- **Pilot VB6 (chạy chỉ đọc, chỉ ghi tổng):** 284 program; 帳票 175 = Crystal 63 (thiếu file thiết kế 63) + in bằng code 104 + CSV/Excel 8; ghi file khác không tính 52; log/tmp loại 7. Phân bố mức: thấp 33, trung bình 85, cao 29, rất cao 28.
+- **Kiểm chứng (Windows x64, Node 24.16):** typecheck, lint, `verify-repository` pass; test với 2 workers: web 387, api và contracts pass (một test xóa project bị timeout khi chạy cùng lúc, pass khi chạy riêng); e2e 21 pass. Giới hạn: chưa push; luật "mỗi form một report" cho in/CSV là giả định, một file có thể chứa nhiều report.
+
 ## 10/11/2026 — Tách Excel/CSV khỏi chức năng in; sửa giao diện tab Report
 
 - **Pilot xuất Excel/CSV bằng cách nào (chỉ kỹ thuật + số, source ngoài repo, chỉ đọc):** không có tự động hóa Excel đang chạy: các dòng `Workbooks`, `Excel.`, `Shell … excel`, chuỗi `.xls`, nguồn ADO Excel đều nằm trong comment; không có export của lưới Spread/FlexGrid/TDBGrid. CSV được tạo bằng file văn bản thuần: `Open … For Output/Append` (101 dòng, 44 file) rồi `Write #` (7 dòng) hoặc `Print #` ngăn giá trị bằng chuỗi `","` (371 trong 542 dòng `Print #`, 8 file); chuỗi `.csv` chỉ 14 dòng (9 file, phần lớn là đọc hoặc comment). Vì vậy tên file không đủ để nhận ra CSV.

@@ -11,7 +11,7 @@ import type {
 // lexical evidence: a report row says where code can produce output, and a
 // `suspected` row is never added to the report total.
 
-export const SCREEN_REPORT_VERSION = 'screen-report-v2';
+export const SCREEN_REPORT_VERSION = 'screen-report-v3';
 export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v1-draft';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
@@ -270,19 +270,19 @@ export function buildCodeFileReportRows(input: {
         : found
           ? 'detected'
           : 'referenced';
-      const complexity: ReportComplexity =
-        confidence === 'suspected'
-          ? unratedComplexity('SUSPECTED', false)
-          : !procedure
-            ? unratedComplexity('NO_PROCEDURE', true)
-            : scoreReportComplexity(
-                {
-                  ...evidenceOf(procedure.id, analysis),
-                  calls: context.callsOf(procedure.id),
-                },
-                input.config,
-                { designNotAnalyzed: true },
-              );
+      // Every report is scored on the procedure that holds the line that
+      // makes it (a Crystal report, a print, an export); only a Crystal
+      // report has a design that is not analyzed.
+      const complexity: ReportComplexity = !procedure
+        ? unratedComplexity('NO_PROCEDURE', crystal)
+        : scoreReportComplexity(
+            {
+              ...evidenceOf(procedure.id, analysis),
+              calls: context.callsOf(procedure.id),
+            },
+            input.config,
+            { designNotAnalyzed: crystal },
+          );
       return {
         kind: signal.kind,
         name: signal.name,

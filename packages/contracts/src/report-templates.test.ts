@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { deriveReportSummary } from './report-templates.js';
 import type { SourceInventoryDocument } from './source-inventory.schema.js';
 
-// Report templates and output functions, derived from the stored report rows.
+// Reports counted once each: Crystal / DataReport templates, files that print
+// in code, files that export CSV or Excel; other file output is listed apart.
 // Hand-written rows; nothing here comes from customer source.
 
 type Row = NonNullable<
@@ -62,14 +63,24 @@ const crystal = (name: string, over: Partial<Row> = {}): Row =>
   row({
     kind: 'crystal',
     name,
-    file: 'a/Main.bas',
     confidence: 'referenced',
     warnings: ['REPORT_FILE_MISSING'],
     ...over,
   });
+const print = (line: number, procedureId: string, file = 'a/Form1.frm') =>
+  row({ kind: 'print', name: 'Printer', line, procedureId, file });
+const csv = (line: number, procedureId: string, file = 'a/Form1.frm') =>
+  row({
+    kind: 'file-output',
+    name: 'Open For Output',
+    subkind: 'csv',
+    line,
+    procedureId,
+    file,
+  });
 
-describe('report templates (counted by template)', () => {
-  it('counts one template when the same .rpt is named in two procedures and two programs', () => {
+describe('Crystal / DataReport reports (one per template name)', () => {
+  it('counts one report when the same .rpt is named in two procedures and two programs', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
@@ -87,14 +98,14 @@ describe('report templates (counted by template)', () => {
         ],
       }),
     );
-    expect(summary?.counts.templates).toBe(1);
-    const [template] = summary?.templates ?? [];
-    expect(template?.name).toBe('Invoice.rpt');
-    expect(template?.usages.length).toBe(3);
-    expect(template?.programs).toEqual(['p/A.vbp', 'p/B.vbp']);
+    expect(summary?.counts.crystal).toBe(1);
+    const [report] = summary?.reports ?? [];
+    expect(report?.name).toBe('Invoice.rpt');
+    expect(report?.usages.length).toBe(3);
+    expect(report?.programs).toEqual(['p/A.vbp', 'p/B.vbp']);
   });
 
-  it('is design-file when the design file was found, missing-file when only named', () => {
+  it('has the design file, or it is missing', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
@@ -110,12 +121,11 @@ describe('report templates (counted by template)', () => {
       }),
     );
     expect(summary?.counts).toMatchObject({
-      templates: 3,
+      crystal: 3,
       designFile: 2,
       missingFile: 1,
     });
-    const by = (name: string) =>
-      summary?.templates.find((t) => t.name === name);
+    const by = (name: string) => summary?.reports.find((r) => r.name === name);
     expect(by('Found.rpt')).toMatchObject({
       status: 'design-file',
       designFile: 'Found.rpt',
@@ -130,162 +140,123 @@ describe('report templates (counted by template)', () => {
     });
   });
 
-  it('a template found for one program and only named for another is design-file', () => {
+  it('a template found for one program and only named for another has its design file', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [crystal('X.rpt', { confidence: 'detected', warnings: [] })],
         'p/B.vbp': [crystal('X.rpt', { file: 'b/B.bas' })],
       }),
     );
-    expect(summary?.counts).toMatchObject({ templates: 1, designFile: 1 });
-  });
-
-  it('keeps the highest complexity of the places that use a template', () => {
-    const summary = deriveReportSummary(
-      inventory({
-        'p/A.vbp': [
-          crystal('X.rpt', { complexity: rated('low', 1), procedureId: 'a' }),
-          crystal('X.rpt', {
-            complexity: rated('high', 7),
-            procedureId: 'b',
-            line: 9,
-          }),
-        ],
-      }),
-    );
-    expect(summary?.templates[0]?.complexity).toMatchObject({
-      level: 'high',
-      score: 7,
-    });
-    expect(summary?.counts.byLevel.high).toBe(1);
-    // The distribution is over templates only.
-    expect(
-      Object.values(summary?.counts.byLevel ?? {}).reduce((n, v) => n + v, 0),
-    ).toBe(summary?.counts.templates);
+    expect(summary?.counts).toMatchObject({ crystal: 1, designFile: 1 });
   });
 });
 
-describe('output functions (need confirmation, never added to templates)', () => {
-  it('groups signs of one procedure into one function', () => {
+describe('reports made by print in code (one per form)', () => {
+  it('prn_ALL and prn_HEDA in the same form are one report', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.P', line: 3 }),
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.P', line: 4 }),
-          row({
-            kind: 'print',
-            name: 'PrintForm',
-            procedureId: 'M.P',
-            line: 5,
-          }),
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.Q', line: 30 }),
+          print(10, 'a/Form1.frm#Function:prn_ALL'),
+          print(11, 'a/Form1.frm#Function:prn_ALL'),
+          print(40, 'a/Form1.frm#Function:prn_HEDA'),
+          print(5, 'a/Other.frm#Sub:Go', 'a/Other.frm'),
         ],
       }),
     );
-    expect(summary?.counts.functions).toBe(2);
-    expect(summary?.counts.templates).toBe(0);
-    expect(summary?.functions[0]?.evidence.length).toBeGreaterThanOrEqual(2);
-    expect(summary?.counts.functionPrograms).toBe(1);
+    expect(summary?.counts.print).toBe(2);
+    const form = summary?.reports.find((r) => r.name === 'Form1');
+    expect(form).toMatchObject({ origin: 'print', file: 'a/Form1.frm' });
+    // Both procedures and their lines are the evidence.
+    expect(form?.usages.map((u) => u.line)).toEqual([10, 11, 40]);
   });
 
-  it('names csv and excel, and leaves log files out of the count', () => {
+  it('a form shared by two programs is one report, with both programs', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [print(10, 'x#Sub:P')],
+        'p/B.vbp': [print(10, 'x#Sub:P')],
+      }),
+    );
+    expect(summary?.counts.print).toBe(1);
+    expect(summary?.reports[0]?.programs).toEqual(['p/A.vbp', 'p/B.vbp']);
+  });
+});
+
+describe('reports made by CSV or Excel export (one per form)', () => {
+  it('CSV in two procedures of one form is one report; Excel in another form is another', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
-          row({
-            kind: 'file-output',
-            name: 'Open For Output',
-            subkind: 'csv',
-            procedureId: 'M.Csv',
-            line: 11,
-          }),
+          csv(10, 'a/Form1.frm#Sub:Save1'),
+          csv(30, 'a/Form1.frm#Sub:Save2'),
           row({
             kind: 'excel',
-            name: 'EXCEL.EXE',
-            procedureId: 'M.Xl',
-            line: 21,
-          }),
-          row({
-            kind: 'file-output',
-            name: 'Open For Append',
-            excludeReason: 'log',
-            procedureId: 'M.Log',
-            line: 31,
-          }),
-          row({
-            kind: 'file-output',
-            name: 'Open For Output',
-            procedureId: 'M.Other',
-            line: 41,
+            name: 'Excel.Application',
+            file: 'a/Form2.frm',
+            procedureId: 'a/Form2.frm#Sub:Xl',
+            line: 3,
           }),
         ],
       }),
     );
-    expect(summary?.counts.functions).toBe(3);
-    expect(summary?.counts.excludedFunctions).toBe(1);
-    const kinds = summary?.functions.flatMap((f) => f.kinds);
-    expect(kinds).toEqual(
-      expect.arrayContaining(['csv', 'excel', 'file-output']),
-    );
-    const excluded = summary?.functions.find((f) => f.excluded);
-    expect(excluded?.excludeReason).toBe('log');
-    expect(excluded?.procedure).toBe('M.Log');
+    expect(summary?.counts.export).toBe(2);
   });
 
-  it('splits the functions into Excel/CSV export and the rest (print, other file output, report runtime)', () => {
+  it('a form that both prints and exports is a print report and an export report', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [print(5, 'f#Sub:P'), csv(9, 'f#Sub:C')],
+      }),
+    );
+    expect(summary?.counts).toMatchObject({ print: 1, export: 1, total: 2 });
+  });
+});
+
+describe('what is not a report', () => {
+  it('other file output is listed apart and not counted', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
-          row({ kind: 'excel', name: 'Excel.Application', procedureId: 'M.A', line: 1 }),
           row({
             kind: 'file-output',
             name: 'Open For Output',
-            subkind: 'csv',
-            procedureId: 'M.B',
-            line: 2,
+            procedureId: 'f#Sub:Dump',
+            line: 7,
           }),
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.C', line: 3 }),
-        ],
-        'p/B.vbp': [
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.D', line: 4 }),
-          row({
-            kind: 'file-output',
-            name: 'Open For Output',
-            procedureId: 'M.E',
-            line: 5,
-          }),
-          row({ kind: 'unknown', name: 'crystl32.ocx', file: 'p/B.vbp', line: null }),
         ],
       }),
     );
-    expect(summary?.counts.groups).toEqual({
-      export: { functions: 2, programs: 1 },
-      print: { functions: 4, programs: 2 },
+    expect(summary?.counts.total).toBe(0);
+    expect(summary?.counts.dataFiles).toBe(1);
+    expect(summary?.dataFiles[0]).toMatchObject({
+      file: 'a/Main.bas',
+      procedure: 'f#Sub:Dump',
+      kinds: ['file-output'],
     });
-    // The groups add up to the functions.
-    expect(summary?.counts.functions).toBe(6);
   });
 
-  it('a log in the same procedure as a print does not remove the print function', () => {
+  it('a log file is left out and counted as excluded', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
-          row({ kind: 'print', name: 'Printer', procedureId: 'M.P' }),
           row({
             kind: 'file-output',
             name: 'Open For Append',
             excludeReason: 'log',
-            procedureId: 'M.P',
-            line: 8,
+            procedureId: 'f#Sub:Log',
           }),
+          print(3, 'f#Sub:P'),
         ],
       }),
     );
-    expect(summary?.counts.functions).toBe(1);
-    expect(summary?.counts.excludedFunctions).toBe(1);
+    expect(summary?.counts).toMatchObject({
+      total: 1,
+      dataFiles: 0,
+      excluded: 1,
+    });
   });
 
-  it('a report runtime without a template is one unknown function of its program', () => {
+  it('a report runtime without a template is listed apart, not counted', () => {
     const summary = deriveReportSummary(
       inventory({
         'p/A.vbp': [
@@ -298,16 +269,67 @@ describe('output functions (need confirmation, never added to templates)', () =>
         ],
       }),
     );
-    expect(summary?.functions).toHaveLength(1);
-    expect(summary?.functions[0]?.kinds).toEqual(['unknown']);
+    expect(summary?.counts.total).toBe(0);
+    expect(summary?.dataFiles[0]?.kinds).toEqual(['unknown']);
+  });
+});
+
+describe('totals', () => {
+  it('the total is the three kinds added up, and the levels add up to it', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [
+          crystal('A.rpt', { complexity: rated('high', 7) }),
+          row({
+            kind: 'print',
+            name: 'Printer',
+            procedureId: 'f#Sub:P',
+            file: 'a/F.frm',
+            complexity: rated('medium', 4),
+          }),
+          csv(9, 'g#Sub:C', 'a/G.frm'),
+        ],
+      }),
+    );
+    const c = summary?.counts;
+    expect(c?.total).toBe(
+      (c?.crystal ?? 0) + (c?.print ?? 0) + (c?.export ?? 0),
+    );
+    expect(c?.total).toBe(3);
+    expect(Object.values(c?.byLevel ?? {}).reduce((n, v) => n + v, 0)).toBe(3);
+    expect(c?.byLevel).toMatchObject({ high: 1, medium: 1, unrated: 1 });
+  });
+
+  it('keeps the highest complexity of the places that make a report', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [
+          row({
+            kind: 'print',
+            name: 'Printer',
+            procedureId: 'f#Sub:A',
+            line: 1,
+            complexity: rated('low', 1),
+          }),
+          row({
+            kind: 'print',
+            name: 'Printer',
+            procedureId: 'f#Sub:B',
+            line: 9,
+            complexity: rated('high', 7),
+          }),
+        ],
+      }),
+    );
+    expect(summary?.reports[0]?.complexity).toMatchObject({
+      level: 'high',
+      score: 7,
+    });
   });
 
   it('is undefined for an inventory without screen/report data', () => {
     expect(
-      deriveReportSummary({
-        programs: [] as never,
-        totals: {},
-      }),
+      deriveReportSummary({ programs: [] as never, totals: {} }),
     ).toBeUndefined();
   });
 });

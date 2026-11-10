@@ -5974,3 +5974,12 @@ fieldset.doc-card {
   font-weight: 600;
   white-space: nowrap;
 }
+/* Buttons placed in the step header (Assessment report export): spaced like
+   the actions of the quote step. */
+.page-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}

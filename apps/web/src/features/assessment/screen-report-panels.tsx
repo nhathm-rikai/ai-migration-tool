@@ -116,43 +116,72 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
   );
 }
 
-type Factored = {
-  factors: { factor: string; value: number; points: number }[];
-  reason: string | null;
-};
-
-function factorsText(
-  row: Factored,
-  factorNames: Record<string, string>,
-  reasons: Record<string, string>,
-  empty: string,
-): string {
-  const parts = row.factors.map((item) =>
-    item.factor === 'design-not-analyzed'
-      ? (factorNames[item.factor] ?? item.factor)
-      : `${factorNames[item.factor] ?? item.factor}: ${item.value} → +${item.points}`,
-  );
-  if (row.reason) parts.push(reasons[row.reason] ?? row.reason);
-  return parts.length > 0 ? parts.join('\n') : empty;
-}
-
-function LevelTag({
-  level,
-  score,
-  title,
-}: {
-  level: ReportLevel;
-  score: number | null;
-  title: string;
-}) {
+// The list shows the level only; the score and its factors are in the detail.
+function LevelTag({ level }: { level: ReportLevel }) {
   const { messages } = useLocale();
   const label = messages.assessment.screenReport.distribution.level[level];
+  return <span className={`tag tag-${level}`}>{label}</span>;
+}
+
+// How a report's level was reached: the score and each factor with what was
+// measured and the points it added. A level raised by a convention (the design
+// is not analyzed) is said so and its score is not shown as a real rating.
+function ComplexityDetail({
+  complexity,
+}: {
+  complexity: {
+    score: number | null;
+    factors: { factor: string; value: number; points: number }[];
+    reason?: string | null | undefined;
+  };
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport;
+  const measured = complexity.factors.filter(
+    (item) => item.factor !== 'design-not-analyzed',
+  );
+  const reason = complexity.reason ?? null;
+  const floored = reason === 'DESIGN_NOT_ANALYZED_FLOOR';
   return (
-    <span className={`tag tag-${level}`} title={title}>
-      {label}
-      {score !== null && ` · ${score}`}
-      <span className="sr-only">{`: ${title.replaceAll('\n', '; ')}`}</span>
-    </span>
+    <div className="complexity-detail" data-testid="report-complexity-detail">
+      <h4>{copy.complexityDetail.title}</h4>
+      {reason !== null && (
+        <p className="muted" data-testid="report-complexity-reason">
+          {copy.reasons[reason] ?? reason}
+        </p>
+      )}
+      {measured.length > 0 ? (
+        <table className="detail-table">
+          <thead>
+            <tr>
+              <th scope="col">{copy.complexityDetail.factor}</th>
+              <th scope="col" className="num">
+                {copy.complexityDetail.measured}
+              </th>
+              <th scope="col" className="num">
+                {copy.complexityDetail.points}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {measured.map((item) => (
+              <tr key={item.factor}>
+                <td>{copy.factors[item.factor] ?? item.factor}</td>
+                <td className="num mono">{item.value}</td>
+                <td className="num mono">+{item.points}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="muted">{copy.list.noFactors}</p>
+      )}
+      {complexity.score !== null && !floored && (
+        <p data-testid="report-complexity-score">
+          {copy.complexityDetail.score(String(complexity.score))}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -359,19 +388,7 @@ function ReportTable({
                   </td>
                   <td className="num">{number(report.usages.length)}</td>
                   <td>
-                    <LevelTag
-                      level={report.complexity.level}
-                      score={report.complexity.score}
-                      title={factorsText(
-                        {
-                          factors: report.complexity.factors,
-                          reason: report.complexity.reason ?? null,
-                        },
-                        copy.factors,
-                        copy.reasons,
-                        copy.list.noFactors,
-                      )}
-                    />
+                    <LevelTag level={report.complexity.level} />
                   </td>
                   <td className="chevron-col">
                     <Chevron />
@@ -381,6 +398,7 @@ function ReportTable({
                   <tr className="program-detail-row" id={detailId}>
                     <td colSpan={7}>
                       <div className="detail-card">
+                        <ComplexityDetail complexity={report.complexity} />
                         <table className="detail-table">
                           <thead>
                             <tr>

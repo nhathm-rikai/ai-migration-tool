@@ -480,7 +480,7 @@ function sheet5(report: CustomerReport, t: ReportText): Sheet {
 // the file output that is not a report as a second table under it.
 function sheet6(report: CustomerReport, t: ReportText): Sheet {
   const w = t.wb;
-  const widths = [24, 24, 24, 22, 40, 7, 12, 14, 8, 11, 36, 40];
+  const widths = [24, 24, 24, 22, 40, 7, 12, 14, 11, 44];
   const wraps = [
     true,
     true,
@@ -491,8 +491,6 @@ function sheet6(report: CustomerReport, t: ReportText): Sheet {
     false,
     false,
     false,
-    false,
-    true,
     true,
   ];
   const columns = w.itemColumns.map((header, index) =>
@@ -533,9 +531,7 @@ function sheet6(report: CustomerReport, t: ReportText): Sheet {
           item.line,
           design,
           item.levelLabel,
-          item.score,
           item.usages ?? null,
-          item.factors,
           item.note,
         ]),
       );

@@ -209,7 +209,8 @@ const JA: ReportText = {
   reasonLabels: {
     SUSPECTED: '帳票に含めない',
     NO_PROCEDURE: '帳票を呼び出す処理を特定できないため評価不可',
-    DESIGN_NOT_ANALYZED_FLOOR: '定義ファイル未解析のため最低でも「中」',
+    DESIGN_NOT_ANALYZED_FLOOR:
+      '帳票定義（.rpt）が未解析のため、最低レベルは「中」です',
   },
   factorLabels: {
     decisionPoints: '分岐数',
@@ -356,9 +357,7 @@ const JA: ReportText = {
       '行',
       '設計ファイル',
       '複雑度',
-      '点数',
       '使用箇所数',
-      '評価要因',
       '備考',
     ],
     designYes: 'あり',
@@ -439,7 +438,7 @@ const VI: ReportText = {
     NO_PROCEDURE:
       'Không xác định được procedure tạo report nên không đánh giá được',
     DESIGN_NOT_ANALYZED_FLOOR:
-      'File thiết kế chưa phân tích nên tối thiểu là "Trung bình"',
+      'Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình',
   },
   factorLabels: {
     decisionPoints: 'Số nhánh',
@@ -598,9 +597,7 @@ const VI: ReportText = {
       'Dòng',
       'File thiết kế',
       'Độ phức tạp',
-      'Điểm',
       'Số nơi dùng',
-      'Yếu tố đánh giá',
       'Ghi chú',
     ],
     designYes: 'Có',

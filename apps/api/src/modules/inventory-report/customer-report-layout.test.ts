@@ -112,7 +112,10 @@ for (const lang of ['ja', 'vi'] as const) {
     it('sheet 6: no confidence column, the number of uses and the design file in columns of their own', () => {
       const sheet = sheets[5];
       const headers = sheet?.columns.map((c) => c.header) ?? [];
-      expect(headers).toHaveLength(12);
+      expect(headers).toHaveLength(10);
+      // The level only: no score and no factor column.
+      for (const word of ['点数', 'Điểm', '評価要因', 'Yếu tố đánh giá'])
+        expect(headers).not.toContain(word);
       for (const word of ['信頼度', 'Độ tin cậy', 'Nhóm', '区分'])
         expect(headers).not.toContain(word);
       const usage = headers.findIndex(
@@ -149,7 +152,7 @@ for (const lang of ['ja', 'vi'] as const) {
       const text = xml(5);
       expect(text).toMatch(
         new RegExp(
-          `<autoFilter ref="A\\d+:L${3 + (sheet.notes?.length ?? 0) + (sheet.filterRows ?? 0)}"`,
+          `<autoFilter ref="A\\d+:J${3 + (sheet.notes?.length ?? 0) + (sheet.filterRows ?? 0)}"`,
         ),
       );
       expect(JSON.stringify(after)).toContain('WriteDump');

@@ -279,9 +279,14 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     const listed = report.items.filter((i) => i.confidence !== 'suspected');
     expect(sheet.filterRows).toBe(listed.length);
     expect(sheet.rows.length).toBeGreaterThanOrEqual(report.items.length);
-    expect(sheet.columns.map((c) => c.header)).toEqual(
-      expect.arrayContaining(['複雑度', '点数', '評価要因']),
-    );
+    // The level only: the score and the factors are not columns of the list.
+    const headers = sheet.columns.map((c) => c.header);
+    expect(headers).toContain('複雑度');
+    expect(headers).not.toContain('点数');
+    expect(headers).not.toContain('評価要因');
+    // The reason a level was raised stays in the note.
+    const notes = sheet.rows.map((r) => String(r[r.length - 1] ?? ''));
+    expect(notes.some((n) => n.includes('最低レベルは「中」'))).toBe(true);
     expect(sheet.notes?.join('')).toContain('算定基準');
   });
 

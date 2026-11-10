@@ -836,11 +836,7 @@ export function AssessmentDocument({
                   item.confidence === 'design-file'
                     ? T.table.designYes
                     : T.table.designNo,
-                  item.levelLabel === null
-                    ? ''
-                    : item.score === null
-                      ? item.levelLabel
-                      : `${item.levelLabel} · ${item.score}`,
+                  item.levelLabel ?? '',
                 ],
               }))}
             />

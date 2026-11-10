@@ -441,11 +441,18 @@ export const viMessages = {
         previous: 'Trang trước',
         next: 'Trang sau',
       },
+      complexityDetail: {
+        title: 'Cách xác định độ phức tạp',
+        factor: 'Yếu tố',
+        measured: 'Giá trị đo',
+        points: 'Điểm cộng',
+        score: (score: string) => `Tổng điểm: ${score}`,
+      },
       reasons: {
         NO_PROCEDURE:
           'Không xác định được procedure chứa dòng report nên không chấm',
         DESIGN_NOT_ANALYZED_FLOOR:
-          'Thiết kế report chưa được phân tích; chỉ chấm phần code gọi và không xếp mức thấp',
+          'Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình',
       } as Record<string, string>,
       factors: {
         decisionPoints: 'Điểm rẽ nhánh',

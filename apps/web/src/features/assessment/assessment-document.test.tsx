@@ -330,7 +330,8 @@ describe('AssessmentDocument sections 2 to 6', () => {
     const templates = Array.from(items.querySelectorAll('[data-item]'));
     expect(templates).toHaveLength(3);
     expect(templates[0]?.textContent).toContain('order.rpt');
-    expect(templates[0]?.textContent).toContain('高 · 6');
+    expect(templates[0]?.textContent).toContain('高');
+    expect(templates[0]?.textContent).not.toMatch(/高 · [0-9]/);
     expect(templates[0]?.textContent).toContain('あり');
     expect(templates[1]?.textContent).toContain('なし');
     expect(templates[2]?.textContent).toContain('未評価');

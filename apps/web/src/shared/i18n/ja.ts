@@ -433,7 +433,14 @@ export const jaMessages = {
         NO_PROCEDURE:
           '帳票を呼び出すプロシージャを特定できないため評価していません',
         DESIGN_NOT_ANALYZED_FLOOR:
-          '帳票デザインは未解析です。呼び出しコードのみ評価し、低レベルにはしません',
+          '帳票デザイン（.rpt）が未解析のため、最低レベルは「中」です',
+      },
+      complexityDetail: {
+        title: '複雑度の算出根拠',
+        factor: '要因',
+        measured: '計測値',
+        points: '加点',
+        score: (score: string) => `合計点: ${score}`,
       },
       factors: {
         decisionPoints: '分岐数',

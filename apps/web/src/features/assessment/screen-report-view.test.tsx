@@ -197,26 +197,46 @@ describe('AR04-AC11/AC12 one list of reports', () => {
     expect(rows()).toHaveLength(5);
   });
 
+  it('a level raised by the missing design says so and shows no score as a rating', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
+    fireEvent.click(within(table).getByRole('button', { name: 'bill.rpt' }));
+    const detail = within(table).getByTestId('report-complexity-detail');
+    expect(
+      within(detail).getByTestId('report-complexity-reason').textContent,
+    ).toBe('Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình');
+    expect(within(detail).queryByTestId('report-complexity-score')).toBeNull();
+    expect(within(detail).getByText('Bảng truy cập')).toBeTruthy();
+  });
+
   it('lists a shared template once with its design-file state, and opens its uses from the row', async () => {
     await openReports();
     const table = screen.getByTestId('report-template-table');
     expect(within(table).getAllByText('common.rpt')).toHaveLength(1);
     expect(within(table).getByText('Invoice, Order')).toBeTruthy();
     expect(within(table).getByText('Thiếu file')).toBeTruthy();
-    const high = within(table).getByText(/^Cao · 7/);
-    expect(high.getAttribute('title')).toContain('Điểm rẽ nhánh: 30 → +3');
-    expect(high.getAttribute('title')).toContain('Thiết kế chưa phân tích');
+    // The list shows the level only: no score, no factors.
+    const high = within(table).getByText('Cao');
+    expect(high.getAttribute('title')).toBeNull();
+    expect(table.textContent).not.toMatch(/(Cao|Trung bình|Thấp) · [0-9]/);
     expect(document.body.textContent).not.toContain('report-complexity-v1');
-    fireEvent.click(within(table).getByRole('button', { name: 'common.rpt' }));
+    const highRow = high.closest('tr');
+    if (!highRow) throw new Error('row');
+    const toggle = within(highRow).getByRole('button');
+    fireEvent.click(toggle);
+    // The score and each factor (measured value and points) are in the detail.
+    const detail = within(table).getByTestId('report-complexity-detail');
+    expect(within(detail).getByText('Điểm rẽ nhánh')).toBeTruthy();
+    expect(detail.textContent).toContain('30');
+    expect(detail.textContent).toContain('+3');
+    expect(
+      within(detail).getByTestId('report-complexity-score').textContent,
+    ).toBe('Tổng điểm: 7');
     expect(within(table).getAllByText(/.bas$/).length).toBeGreaterThan(0);
     expect(
       within(table).getByRole('columnheader', { name: 'Procedure' }),
     ).toBeTruthy();
-    expect(
-      within(table)
-        .getByRole('button', { name: 'common.rpt' })
-        .getAttribute('aria-expanded'),
-    ).toBe('true');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('has one "Cơ sở tính" block with the conventions, and no word of doubt', async () => {

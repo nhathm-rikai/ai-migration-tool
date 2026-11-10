@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 (đêm, 2) — Độ phức tạp report chỉ hiện mức
+
+- Bước 2 (danh sách report), Excel sheet 6 (10 cột, bỏ Điểm và Yếu tố đánh giá) và PDF mục 6: chỉ hiện mức, không "Cao · 7" / "Trung bình · 0". "Chưa đánh giá" giữ riêng.
+- Chi tiết Portal (mở dòng report): tổng điểm, bảng yếu tố (giá trị đo, điểm cộng); Crystal bị nâng lên Trung bình ghi "Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình" và không hiện tổng điểm.
+- Độ phức tạp program không đổi. Mô hình v2 (call graph 2 tầng, mật độ in/vẽ) chỉ có spec (AR06, ngoài repo), chưa code. Chưa push.
+
 ## 10/11/2026 (đêm) — PDF báo cáo cho khách: chữ đậm, rõ hơn
 
 - Chữ mờ do màu xám nhạt (#55657a), cỡ 9–9,5px (khoảng 7pt) và font Yu Gothic mặc định mảnh. Chỉ đổi trong PDF Assessment (CSS có phạm vi `.assess-doc-root`, PDF báo giá giữ nguyên): chữ chính #1a1a1a, chữ phụ/nhãn/ghi chú #3f4756 (tương phản trên nền trắng khoảng 9:1), viền bảng #c2ccd8, header bảng #00639a; mọi chữ tối thiểu 12px (9pt) kể cả ghi chú, nhãn thẻ KPI, bảng, chân trang; weight 500, tiêu đề/nhãn 700; font ja `Yu Gothic UI, Yu Gothic Medium, Meiryo, Hiragino Sans, Noto Sans JP`; biểu đồ cột chữ 12px. Chân trang vẽ cỡ 12px màu đậm.

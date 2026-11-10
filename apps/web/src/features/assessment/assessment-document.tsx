@@ -1,9 +1,13 @@
-import type { CustomerReportDocument } from '@portal/contracts';
+import {
+  tableSchemaState,
+  type CustomerReportDocument,
+} from '@portal/contracts';
 import type { ReactNode } from 'react';
 import { branding } from '../../app/branding';
 import {
   ALL_IN_EXCEL,
   APPENDIX,
+  appendixDefinitions,
   CHARTS,
   COVER,
   DEMO_NOTICE,
@@ -271,6 +275,7 @@ export function AssessmentDocument({
   issuedOn: string;
 }) {
   const { scale, source, complexity } = report;
+  const schemaState = tableSchemaState(scale);
   const origin = source.origin;
   const sr = scale.screenReport;
   const count = (value: number | undefined) =>
@@ -471,50 +476,49 @@ export function AssessmentDocument({
             <p className="qd-note">{NOT_ANALYZED}</p>
           </div>
         )}
-        <div className="qd-block">
-          <table className="qd-table qd-compact">
-            <thead>
-              <tr>
-                {[
-                  TABLE.module,
-                  TABLE.programs,
-                  TABLE.screens,
-                  TABLE.reports,
-                  TABLE.suspected,
-                  TABLE.batches,
-                  TABLE.files,
-                  TABLE.lines,
-                ].map((label) => (
-                  <th key={label}>{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.modules.map((row) => (
-                <tr key={`${row.kind}:${row.module}`} data-module-row>
-                  <td>{row.module}</td>
-                  <td className="num">{n(row.programs)}</td>
-                  <td className="num">{count(row.screens)}</td>
-                  <td className="num">{count(row.reports)}</td>
-                  <td className="num">{count(row.suspectedReports)}</td>
-                  <td className="num">{count(row.batches)}</td>
-                  <td className="num">{n(row.files)}</td>
-                  <td className="num">{n(row.codeLines)}</td>
-                </tr>
-              ))}
-              <tr data-module-total>
-                <td>{TABLE.total}</td>
-                <td className="num">{n(scale.programs)}</td>
-                <td className="num">{count(sr?.screens)}</td>
-                <td className="num">{count(sr?.reports.counted)}</td>
-                <td className="num">{count(sr?.reports.suspected)}</td>
-                <td className="num">{count(sr?.batches)}</td>
-                <td className="num">{n(moduleTotal.files)}</td>
-                <td className="num">{n(scale.codeLines)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <KeyedTable
+          head={[
+            TABLE.module,
+            TABLE.programs,
+            TABLE.screens,
+            TABLE.reports,
+            TABLE.suspected,
+            TABLE.batches,
+            TABLE.files,
+            TABLE.lines,
+          ]}
+          numeric={[1, 2, 3, 4, 5, 6, 7]}
+          rows={[
+            ...report.modules.map((row) => ({
+              key: `${row.kind}:${row.module}`,
+              attr: 'data-module-row',
+              cells: [
+                row.module,
+                n(row.programs),
+                count(row.screens),
+                count(row.reports),
+                count(row.suspectedReports),
+                count(row.batches),
+                n(row.files),
+                n(row.codeLines),
+              ],
+            })),
+            {
+              key: 'total',
+              attr: 'data-module-total',
+              cells: [
+                TABLE.total,
+                n(scale.programs),
+                count(sr?.screens),
+                count(sr?.reports.counted),
+                count(sr?.reports.suspected),
+                count(sr?.batches),
+                n(moduleTotal.files),
+                n(scale.codeLines),
+              ],
+            },
+          ]}
+        />
       </div>
 
       <div className="ad-section" data-doc="complexity">
@@ -632,7 +636,7 @@ export function AssessmentDocument({
 
       <div className="ad-section" data-doc="database">
         <Heading>{SECTIONS.database}</Heading>
-        <Note>{SECTION_NOTES.database(scale.tablesView)}</Note>
+        <Note>{SECTION_NOTES.database(schemaState)}</Note>
         <KeyedTable
           title={`${KPI.tables}（上位）`}
           head={[TABLE.dbTable, TABLE.refPrograms, TABLE.operations]}
@@ -753,7 +757,7 @@ export function AssessmentDocument({
         <div className="qd-block">
           <h3>{APPENDIX.definitionsTitle}</h3>
           <ul className="qd-notes">
-            {APPENDIX.definitions.map((line) => (
+            {appendixDefinitions(schemaState).map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>

@@ -677,7 +677,6 @@ export const viMessages = {
         tables: 'Số bảng',
         screens: 'Màn hình',
         reports: 'Report',
-        utPoints: 'Điểm test UT',
         complexity: 'Độ phức tạp',
       },
       columnHints: {
@@ -857,9 +856,9 @@ export const viMessages = {
       },
     },
     report: {
-      export: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
-      exportCustomer: 'Báo cáo cho khách (Excel)',
-      exportCustomerPdf: 'Báo cáo cho khách (PDF)',
+      groupTitle: 'Báo cáo Assessment',
+      exportCustomer: 'Xuất Excel',
+      exportCustomerPdf: 'Xuất PDF',
       pdfFailed: 'Không tạo được PDF. Thử lại sau; không có file nào được lưu.',
       exporting: 'Đang xuất…',
       tooLarge:
@@ -1092,7 +1091,7 @@ export const viMessages = {
         ? ` · ${skipped} program không phân tích được, chưa tính`
         : ''),
     exportPdf: 'Xuất PDF',
-    exportExcel: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+    exportExcel: 'Xuất Excel',
     send: 'Gửi khách hàng',
     sendLater: 'Chưa có trong bản này',
     totalCost: 'Tổng chi phí',

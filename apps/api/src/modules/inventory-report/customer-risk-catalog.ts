@@ -98,9 +98,9 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     category: '帳票',
     severity: '中',
     content:
-      '印刷・Excel・ファイル出力を行う可能性のあるプログラムがあります（帳票数には含みません）。',
+      '印刷・Excel・CSV・ファイル出力を行う機能があります（帳票の種類には含みません）。',
     confirmation:
-      '帳票一覧（台帳）をご提供のうえ、該当プログラムの出力内容をご確認ください。',
+      '該当機能が帳票として運用されているかを、帳票一覧（台帳）とあわせてご確認ください。',
   },
   SCREEN_FILE_MISSING: {
     category: 'ソース不足',

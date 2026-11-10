@@ -5983,3 +5983,15 @@ fieldset.doc-card {
   justify-content: flex-end;
   gap: 8px;
 }
+/* Four KPI cards in the screen / report row (screens, report templates,
+   print and export functions, batches). */
+.kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.usage-list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+}

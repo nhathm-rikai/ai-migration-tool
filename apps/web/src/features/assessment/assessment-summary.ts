@@ -1,4 +1,7 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  deriveReportSummary,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 
 // View model of one inventory artifact (F03). It only selects and counts
 // what the inventory already states: unique totals come from
@@ -104,7 +107,12 @@ function complexityView(complexity: Complexity): ComplexityView {
   };
 }
 
-function programRow(program: Program): ProgramRow {
+type ReportCounts = { templates: number; functions: number };
+
+function programRow(
+  program: Program,
+  reportCounts: ReportCounts | null,
+): ProgramRow {
   const analysis = program.analysis;
   const state: ProgramState =
     program.status === 'unsupported' || !analysis
@@ -126,12 +134,10 @@ function programRow(program: Program): ProgramRow {
     complexity: analysis ? complexityView(analysis.complexity) : null,
     programType: program.programType ?? null,
     screens: program.screens ? program.screens.length : null,
-    reports: program.reports
-      ? program.reports.filter((row) => row.confidence !== 'suspected').length
-      : null,
-    suspectedReports: program.reports
-      ? program.reports.filter((row) => row.confidence === 'suspected').length
-      : null,
+    // Report templates the program uses, and the print / export functions
+    // in it that need confirmation (not added to the templates).
+    reports: reportCounts ? reportCounts.templates : null,
+    suspectedReports: reportCounts ? reportCounts.functions : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
     // A case-only difference still finds the file (Windows), so it is not
@@ -164,7 +170,22 @@ function memberTarget(projectPath: string, declaredPath: string): string {
 export function summarizeInventory(
   inventory: SourceInventoryDocument,
 ): AssessmentSummary {
-  const programs = inventory.programs.map(programRow);
+  const reportSummary = deriveReportSummary(inventory);
+  const programs = inventory.programs.map((program) =>
+    programRow(
+      program,
+      reportSummary
+        ? {
+            templates: reportSummary.templates.filter((t) =>
+              t.programs.includes(program.projectPath),
+            ).length,
+            functions: reportSummary.functions.filter(
+              (f) => !f.excluded && f.programs.includes(program.projectPath),
+            ).length,
+          }
+        : null,
+    ),
+  );
   const sharedPaths = new Set<string>();
   for (const program of inventory.programs)
     for (const member of program.members)

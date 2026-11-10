@@ -404,6 +404,10 @@ const ProgramReportSchema = Type.Object(
     procedureId: Nullable(Type.String()),
     warnings: Type.Array(Type.String()),
     complexity: ReportComplexitySchema,
+    // screen-report-v2, file-output rows: a .csv path; a log or temporary
+    // file (the word that says so), which is not counted as a report output.
+    subkind: Type.Optional(Type.Literal('csv')),
+    excludeReason: Type.Optional(Type.String()),
   },
   Strict,
 );

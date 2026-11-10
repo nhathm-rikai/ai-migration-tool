@@ -48,8 +48,12 @@ describe('AssessmentDocument cover and scale', () => {
     expect(sr).not.toBeNull();
     expect(kpi('screens')).toContain(String(sr?.screens));
     expect(kpi('screens')).toContain(`共通 ${sr?.sharedScreens}`);
+    // Reports by template, with the design-file split; the print and export
+    // functions are their own card, not added to the template count.
     expect(kpi('reports')).toContain(String(sr?.reports.counted));
-    expect(kpi('reports')).toContain(`疑い ${sr?.reports.suspected} 件`);
+    expect(kpi('reports')).toContain('設計ファイルあり 2／未提供 1');
+    expect(kpi('outputs')).toContain(String(sr?.reports.suspected));
+    expect(kpi('outputs')).toContain('帳票の種類には含まない');
     expect(kpi('batches')).toContain(String(sr?.batches));
     expect(kpi('programs')).toContain(String(report.scale.programs));
     expect(kpi('lines')).toContain('655');
@@ -64,10 +68,17 @@ describe('AssessmentDocument cover and scale', () => {
     const scale = section('scale');
     const reports = report.scale.screenReport?.reports;
     if (!reports) throw new Error('fixture');
-    for (const [kind, count] of Object.entries(reports.byKind))
+    for (const kind of ['crystal', 'data-report'] as const)
       expect(
         scale.querySelector(`[data-kind="${kind}"] .num`)?.textContent,
-      ).toBe(String(count));
+      ).toBe(String(reports.byKind[kind]));
+    for (const kind of ['print', 'excel', 'file-output', 'unknown'] as const)
+      expect(
+        scale.querySelector(`[data-function-kind="${kind}"] .num`)?.textContent,
+      ).toBe(String(reports.byKind[kind]));
+    expect(
+      scale.querySelector('[data-total="function-kind"]')?.textContent,
+    ).toBe(String(reports.suspected));
     for (const [level, count] of Object.entries(reports.byLevel))
       expect(
         scale.querySelector(`[data-level="${level}"] .num`)?.textContent,
@@ -288,8 +299,8 @@ describe('AssessmentDocument sections 2 to 6', () => {
       '帳票',
       '帳票',
       '帳票',
-      '帳票',
-      '帳票',
+      '出力機能',
+      '出力機能',
       'バッチ',
       '画面',
       '画面',
@@ -297,9 +308,13 @@ describe('AssessmentDocument sections 2 to 6', () => {
     ]);
     const high = items.querySelector('[data-item="帳票:order.rpt"]');
     expect(high?.textContent).toContain('高 · 6');
-    const unrated = items.querySelector('[data-item="帳票:Printer"]');
+    const unrated = items.querySelector('[data-item="帳票:rptMonthly"]');
     expect(unrated?.textContent).toContain('未評価');
     expect(unrated?.textContent).not.toContain('低');
+    // A print or export function is listed apart, not as a report.
+    expect(
+      items.querySelector('[data-item="出力機能:SearchCustomer"]')?.textContent,
+    ).toContain('印刷');
     expect(items.textContent).toContain('全件は Excel 参照');
     expect(items.textContent).toContain(`全${report.items.length}件`);
   });
@@ -329,8 +344,8 @@ describe('AssessmentDocument sections 2 to 6', () => {
     for (const rule of [
       '画面：',
       'バッチ：',
-      '帳票（検出）：',
-      '帳票（疑い）：',
+      '帳票（種類）：',
+      '印刷・出力機能（要確認）：',
     ])
       expect(appendix).toContain(rule);
     expect(appendix).toContain('帳票の複雑度（参考値）');

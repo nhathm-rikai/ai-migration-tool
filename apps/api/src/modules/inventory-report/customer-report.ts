@@ -1,5 +1,6 @@
 import {
   crudTables,
+  deriveReportSummary,
   inventoryKpis,
   sqlUses,
   normalizeScreenReportTotals,
@@ -67,7 +68,8 @@ export type RiskRow = {
 };
 
 export type ItemRow = {
-  type: '画面' | '帳票' | 'バッチ';
+  // 帳票 = a report template; 出力機能 = a print/export function to confirm.
+  type: '画面' | '帳票' | 'バッチ' | '出力機能';
   kindLabel: string;
   programs: string;
   module: string;
@@ -105,7 +107,23 @@ export type CustomerReport = {
     // The table names rest on an assumed or unconfirmed schema mapping.
     tablesAssumed: boolean;
     // null: the inventory has no screen/report data (not zero).
+    // reports.counted / rows = report TEMPLATES, reports.suspected = print /
+    // export FUNCTIONS to confirm (see reportTemplates, outputFunctions).
     screenReport: ScreenReportTotals | null;
+    // Report templates by design-file status; null when the inventory has no
+    // screen/report data.
+    reportTemplates: {
+      templates: number;
+      designFile: number;
+      missingFile: number;
+    } | null;
+    // Print / Excel / CSV / file-output functions that need confirmation (log
+    // and temporary files left out and counted in `excluded`).
+    outputFunctions: {
+      functions: number;
+      programs: number;
+      excluded: number;
+    } | null;
   };
   modules: ModuleRow[];
   complexity: {
@@ -354,15 +372,55 @@ export function buildCustomerReport(
   // names and files and stays out of the customer JSON; the items of sheet 6
   // are built from it with redacted paths.
   const normalized = normalizeScreenReportTotals(inventory);
+  // Reports are counted by template, print/export signs by function (the
+  // rows of the technical report are signs: the same template named in two
+  // procedures is two rows there).
+  const reportSummary = normalized ? deriveReportSummary(inventory) : undefined;
+  const reportByKind = (): ScreenReportTotals['reports']['byKind'] => {
+    const byKind = {
+      'data-report': 0,
+      crystal: 0,
+      excel: 0,
+      print: 0,
+      'file-output': 0,
+      unknown: 0,
+    };
+    for (const template of reportSummary?.templates ?? [])
+      byKind[template.kind] += 1;
+    for (const entry of reportSummary?.functions ?? [])
+      if (!entry.excluded) {
+        // One function is counted once, under its first kind, so the kinds add
+        // up to the number of functions.
+        const kind = entry.kinds[0] ?? 'unknown';
+        byKind[kind === 'csv' ? 'file-output' : kind] += 1;
+      }
+    return byKind;
+  };
   const screenReport: ScreenReportTotals | null = normalized
     ? {
         screens: normalized.screens,
         sharedScreens: normalized.sharedScreens,
         batches: normalized.batches,
-        reports: normalized.reports,
-        suspectedPrograms: normalized.suspectedPrograms,
+        reports: reportSummary
+          ? {
+              rows: reportSummary.counts.templates,
+              counted: reportSummary.counts.templates,
+              suspected: reportSummary.counts.functions,
+              byKind: reportByKind(),
+              byLevel: reportSummary.counts.byLevel,
+            }
+          : normalized.reports,
+        suspectedPrograms:
+          reportSummary?.counts.functionPrograms ??
+          normalized.suspectedPrograms,
       }
     : null;
+  const idOfPath = new Map(core.programs.map((p) => [p.projectPath, p.id]));
+  const idsOf = (paths: readonly string[]) =>
+    paths.flatMap((path) => {
+      const id = idOfPath.get(path);
+      return id === undefined ? [] : [id];
+    });
   const pathOf = new Map(core.programs.map((p) => [p.id, p.projectPath]));
   const moduleOfProgram = (id: string) => moduleOf(pathOf.get(id) ?? '');
 
@@ -404,7 +462,6 @@ export function buildCustomerReport(
     0,
   );
   const seenScreens = new Set<string>();
-  const seenReports = new Set<string>();
   for (const program of inventory.programs) {
     const row = moduleRow(moduleOf(program.projectPath), 'module');
     row.programs += 1;
@@ -419,20 +476,18 @@ export function buildCustomerReport(
       seenScreens.add(key);
       (screen.shared ? sharedRow : row).screens += 1;
     }
-    for (const report of program.reports ?? []) {
-      const key = [
-        report.kind,
-        report.file,
-        report.line,
-        report.name.toLowerCase(),
-      ].join('\u0000');
-      if (seenReports.has(key)) continue;
-      seenReports.add(key);
-      const target = report.shared ? sharedRow : row;
-      if (report.confidence === 'suspected') target.suspectedReports += 1;
-      else target.reports += 1;
-    }
   }
+  // A template or output function used by programs of one module belongs to
+  // that module; one used across modules goes on the shared row.
+  const rowOfPrograms = (paths: readonly string[]) => {
+    const names = new Set(paths.map((path) => moduleOf(path)));
+    const only = names.size === 1 ? [...names][0] : undefined;
+    return only === undefined ? sharedRow : moduleRow(only, 'module');
+  };
+  for (const template of reportSummary?.templates ?? [])
+    rowOfPrograms(template.programs).reports += 1;
+  for (const entry of reportSummary?.functions ?? [])
+    if (!entry.excluded) rowOfPrograms(entry.programs).suspectedReports += 1;
   const rest = {
     files:
       inventory.totals.analyzedCodeFiles -
@@ -477,8 +532,10 @@ export function buildCustomerReport(
       score: complexity.score,
       codeLines: program.counters.codeLines,
       screens: program.screens ? program.screens.length : null,
-      reports: program.reports
-        ? program.reports.filter((r) => r.confidence !== 'suspected').length
+      reports: reportSummary
+        ? reportSummary.templates.filter((t) =>
+            t.programs.includes(program.projectPath),
+          ).length
         : null,
     });
   }
@@ -595,6 +652,20 @@ export function buildCustomerReport(
       tablesView: !crud.analyzed ? null : crud.mapped ? 'normalized' : 'raw',
       tablesAssumed: crud.analyzed && crud.assumed,
       screenReport,
+      reportTemplates: reportSummary
+        ? {
+            templates: reportSummary.counts.templates,
+            designFile: reportSummary.counts.designFile,
+            missingFile: reportSummary.counts.missingFile,
+          }
+        : null,
+      outputFunctions: reportSummary
+        ? {
+            functions: reportSummary.counts.functions,
+            programs: reportSummary.counts.functionPrograms,
+            excluded: reportSummary.counts.excludedFunctions,
+          }
+        : null,
     },
     modules: moduleList,
     complexity: {
@@ -602,7 +673,7 @@ export function buildCustomerReport(
       levels,
       notAnalyzed,
       reportModelVersion: inventory.reportComplexityVersion ?? null,
-      reportLevels: screenReport ? screenReport.reports.byLevel : null,
+      reportLevels: reportSummary ? reportSummary.counts.byLevel : null,
       top: ranked.slice(0, TOP_PROGRAMS),
     },
     dependencies: {
@@ -653,8 +724,32 @@ export function buildCustomerReport(
         ...core.warnings.filter(
           (warning) =>
             warning.code !== 'DYNAMIC_SQL' &&
-            warning.code !== 'FILE_UNSUPPORTED',
+            warning.code !== 'FILE_UNSUPPORTED' &&
+            warning.code !== 'REPORT_FILE_MISSING' &&
+            warning.code !== 'REPORT_SUSPECTED',
         ),
+        // One row per missing template and per output function to confirm
+        // (the technical report warns once per sign).
+        ...(reportSummary?.templates ?? [])
+          .filter((template) => template.status === 'missing-file')
+          .map((template) => ({
+            code: 'REPORT_FILE_MISSING',
+            programId: null,
+            programIds: idsOf(template.programs),
+            relativePath: template.name,
+            line: null,
+            detail: template.name,
+          })),
+        ...(reportSummary?.functions ?? [])
+          .filter((entry) => !entry.excluded)
+          .map((entry) => ({
+            code: 'REPORT_SUSPECTED',
+            programId: null,
+            programIds: idsOf(entry.programs),
+            relativePath: entry.file,
+            line: entry.evidence[0]?.line ?? null,
+            detail: entry.kinds.join('/'),
+          })),
         ...unsupportedWarnings(inventory),
         ...unlistedFileWarnings(inventory, usedByFile),
         ...dynamicRows.map((row) => ({
@@ -673,14 +768,25 @@ export function buildCustomerReport(
         programIds: concatenatedRows.flatMap((row) => row.usedBy),
       },
     ),
-    items: buildItems(inventory),
+    items: buildItems(inventory, reportSummary),
     recommendations: RECOMMENDATIONS,
   };
 }
 
 // ---- Screen and report list -----------------------------------------------
 
-const ITEM_TYPE_ORDER = ['画面', '帳票', 'バッチ'];
+const ITEM_TYPE_ORDER = ['画面', '帳票', 'バッチ', '出力機能'];
+const TEMPLATE_STATUS_LABELS = {
+  'design-file': '設計ファイルあり',
+  'missing-file': '設計ファイル未提供',
+} as const;
+const OUTPUT_KIND_LABELS: Record<string, string> = {
+  print: '印刷',
+  excel: 'Excel出力',
+  csv: 'CSV出力',
+  'file-output': 'ファイル出力',
+  unknown: '出力（不明）',
+};
 const WARNING_LABELS: Record<string, string> = {
   SCREEN_FILE_MISSING: '画面ファイルがソースにありません',
   SCREEN_FILE_NOT_ANALYZED:
@@ -688,21 +794,16 @@ const WARNING_LABELS: Record<string, string> = {
   REPORT_FILE_MISSING: '帳票定義ファイル(.rpt)がソースにありません',
 };
 
-function buildItems(inventory: Inventory): ItemRow[] {
-  const projectReports = normalizeScreenReportTotals(inventory);
-  if (!projectReports) return [];
+function buildItems(
+  inventory: Inventory,
+  summary: ReturnType<typeof deriveReportSummary>,
+): ItemRow[] {
+  if (!summary) return [];
   type Owner = { label: string; module: string };
   const screens = new Map<
     string,
     {
       row: NonNullable<Inventory['programs'][number]['screens']>[number];
-      owners: Owner[];
-    }
-  >();
-  const reports = new Map<
-    string,
-    {
-      row: NonNullable<Inventory['programs'][number]['reports']>[number];
       owners: Owner[];
     }
   >();
@@ -740,19 +841,6 @@ function buildItems(inventory: Inventory): ItemRow[] {
         note: '',
       });
   }
-  // Reports come from the project-level list the analyzer computed once (a
-  // shared report at its highest score), never from the program rows.
-  for (const item of projectReports.reportItems)
-    reports.set(
-      [item.kind, item.file, item.line, item.name.toLowerCase()].join('\u0000'),
-      {
-        row: item,
-        owners: item.programs.map((entry) => ({
-          label: programLabel(entry.program),
-          module: moduleOf(entry.program),
-        })),
-      },
-    );
   const who = (owners: Owner[]) => {
     const labels = [...new Set(owners.map((o) => o.label))];
     return labels.length <= 3
@@ -778,25 +866,31 @@ function buildItems(inventory: Inventory): ItemRow[] {
       factors: '',
       note: row.warnings.map((code) => WARNING_LABELS[code] ?? code).join('；'),
     });
-  for (const { row, owners } of reports.values()) {
-    const complexity = row.complexity;
-    const notes = [
-      ...(complexity.reason
-        ? [REASON_LABELS[complexity.reason] ?? complexity.reason]
-        : []),
-      ...row.warnings.map((code) => WARNING_LABELS[code] ?? code),
-    ];
+  const ownersOf = (paths: readonly string[]): Owner[] =>
+    paths.map((path) => ({
+      label: programLabel(path),
+      module: moduleOf(path),
+    }));
+  const moduleOfOwners = (owners: Owner[]) =>
+    new Set(owners.map((o) => o.module)).size === 1
+      ? (owners[0]?.module ?? '')
+      : SHARED_MODULE;
+  // One row per report template (a template named in several places is one).
+  for (const template of summary.templates) {
+    const owners = ownersOf(template.programs);
+    const first = template.usages[0];
+    const complexity = template.complexity;
     items.push({
       type: '帳票',
-      kindLabel: REPORT_KIND_LABELS[row.kind] ?? row.kind,
+      kindLabel: REPORT_KIND_LABELS[template.kind] ?? template.kind,
       programs: who(owners),
-      module: row.shared ? SHARED_MODULE : (owners[0]?.module ?? ''),
-      name: redactAbsolutePath(row.name),
-      file: redactAbsolutePath(row.file),
-      line: row.line,
-      shared: row.shared,
-      confidence: row.confidence,
-      confidenceLabel: CONFIDENCE_LABELS[row.confidence] ?? row.confidence,
+      module: moduleOfOwners(owners),
+      name: redactAbsolutePath(template.name),
+      file: redactAbsolutePath(template.designFile ?? first?.file ?? ''),
+      line: template.designFile === null ? (first?.line ?? null) : null,
+      shared: owners.length > 1,
+      confidence: template.status,
+      confidenceLabel: TEMPLATE_STATUS_LABELS[template.status],
       level: complexity.level,
       levelLabel: LEVEL_LABELS[complexity.level] ?? complexity.level,
       score: complexity.score,
@@ -808,7 +902,44 @@ function buildItems(inventory: Inventory): ItemRow[] {
             : `${FACTOR_LABELS[f.factor] ?? f.factor} ${f.value} (+${f.points})`,
         )
         .join('；'),
-      note: notes.join('；'),
+      note: [
+        `使用箇所 ${template.usages.length} か所`,
+        ...(complexity.reason
+          ? [REASON_LABELS[complexity.reason] ?? complexity.reason]
+          : []),
+        ...(template.status === 'missing-file'
+          ? [WARNING_LABELS['REPORT_FILE_MISSING'] ?? '']
+          : []),
+      ].join('；'),
+    });
+  }
+  // Print / export functions to confirm: apart from the templates, never
+  // added to their number.
+  for (const entry of summary.functions) {
+    const owners = ownersOf(entry.programs);
+    items.push({
+      type: '出力機能',
+      kindLabel: entry.kinds
+        .map((kind) => OUTPUT_KIND_LABELS[kind] ?? kind)
+        .join('・'),
+      programs: who(owners),
+      module: moduleOfOwners(owners),
+      name: entry.procedure ?? '',
+      file: redactAbsolutePath(entry.file),
+      line: entry.evidence[0]?.line ?? null,
+      shared: owners.length > 1,
+      confidence: 'suspected',
+      confidenceLabel: entry.excluded
+        ? '対象外（ログ・一時ファイル）'
+        : '要確認',
+      level: null,
+      levelLabel: null,
+      score: null,
+      modelVersion: null,
+      factors: '',
+      note: entry.excluded
+        ? `ログ・一時ファイルのため帳票機能の数に含めません（${entry.excludeReason ?? ''}）`
+        : '印刷・出力の可能性があります。帳票の数には含みません。',
     });
   }
   return items.sort(

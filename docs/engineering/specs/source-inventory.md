@@ -12,7 +12,7 @@
 | `sqlAccessVersion` | `sql-access-v5` | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
 | `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
 | `complexityVersion` | `complexity-v1` | Công thức điểm complexity (mục 5), chỉ là phân loại tham khảo. Inventory cũ ghi `complexity-v0` hoặc `complexity-v0-draft` (cùng công thức v0: SQL động chỉ đếm tên bảng runtime, ngưỡng 40/55, không có `very-high`). |
-| `screenReportVersion` | `screen-report-v1` | Luật đếm 画面・帳票・バッチ (mục 6). Optional: inventory cũ không có, và khi đó mọi nơi hiển thị "chưa có dữ liệu, cần phân tích lại", không hiện 0. |
+| `screenReportVersion` | `screen-report-v2` (v1: inventory cũ, vẫn đọc được) | Luật đếm 画面・帳票・バッチ (mục 6). Optional: inventory cũ không có, và khi đó mọi nơi hiển thị "chưa có dữ liệu, cần phân tích lại", không hiện 0. |
 | `reportComplexityVersion` | `report-complexity-v1-draft` | Phân loại tham khảo độ phức tạp từng report (mục 6.3), không phải effort. Optional như trên. |
 | `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
 
@@ -120,6 +120,15 @@ Tất cả là fact từ code/project file, không gọi AI. Trường mới đ�
 **Report dùng chung (quy tắc gộp duy nhất):** report trong file do nhiều program khai báo có thể được chấm khác nhau ở mỗi program (yếu tố `calls` lấy từ call graph của program đó). Dòng của từng program (`programs[].reports[]`) giữ điểm riêng; mục cấp dự án `totals.screenReport.reportItems[]` là một dòng cho mỗi report, mang **điểm cao nhất** của các program khai báo nó (bằng điểm: program đầu theo thứ tự inventory, không phụ thuộc gì khác), mức tính từ điểm đó, và ghi điểm/mức riêng từng program ở `programs[]` (`{program, level, score}`). Chỉ phân tích tính mục này một lần: tổng theo kind/mức (`byKind`, `byLevel`), danh sách report ở bước 2, sheet `Reports` (cột `projectComplexity*`), báo cáo khách (AR02) và PDF (AR03) đều đọc nó, không gộp lại. Tổng theo mức luôn bằng số dòng theo mức của danh sách. `reportItems` là optional trong schema: inventory lưu trước khi có trường này vẫn hợp lệ và được đọc qua `normalizeScreenReportTotals` (`packages/contracts`), cùng một hàm và cùng quy tắc với analyzer, tính lại cả `reports.rows/counted/suspected/byKind/byLevel` từ danh sách.
 
 Giới hạn: lexical. `file-output` gồm cả ghi log/work file; xuất Excel bằng `Shell` hoặc file CSV không phải `excel`; một `.rpt` được dựng động từ biến không thấy; số mẫu report thật không biết với `suspected`.
+
+### 6.2a. Đếm theo mẫu (10/11/2026, `screen-report-v2`)
+
+Các dòng ở 6.2 là **dấu hiệu** (một chuỗi `.rpt` trong một procedure, một `Printer.Print`, một `Open ... For Output`), không phải số mẫu report: cùng `Invoice.rpt` ở hai procedure là hai dòng. Cái khách hỏi là số mẫu, nên mọi chỗ hiển thị và xuất báo cáo dùng hai danh sách tách rời do `deriveReportSummary()` (contracts, `report-templates.ts`) suy ra từ các dòng đã lưu (nên inventory cũ cũng đọc được, không cần phân tích lại):
+
+1. **Mẫu report** (`templates`, cấp dự án): khử trùng toàn dự án theo khóa chuẩn hóa: Crystal = tên file `.rpt` bỏ thư mục, không phân biệt hoa thường; DataReport = file `.dsr` thật. Mỗi mẫu có `status`: `design-file` (có file thiết kế trong source) hoặc `missing-file` (chỉ có tên trong code, cần xin khách file); `usages[]` (file, dòng, procedure), `programs[]`, độ phức tạp = mức cao nhất của các nơi dùng. X = A (`design-file`) + B (`missing-file`). `REPORT_FILE_MISSING` là danh sách mẫu B, mỗi mẫu một lần. Tên report động (ghép chuỗi) không được analyzer nhận ra nên không thành mẫu; chỗ gọi runtime mà không có mẫu nào thành một chức năng `unknown`.
+2. **Chức năng in/xuất cần xác nhận** (`functions`): các dấu hiệu `print`, `excel` (`Excel.Application` hoặc `Shell "…EXCEL.EXE"`), `file-output` (`subkind: csv` khi đường dẫn có `.csv`) và `unknown`, gom theo (file, procedure) thành một chức năng, mỗi chức năng có bằng chứng file:dòng. **Không cộng vào X.** Ghi file vào log/file tạm bị loại: đường dẫn (biểu thức giữa `Open` và `For`) có từ `log`, `tmp`, `temp`, `debug`, `err`, `error`, `trace` (tách theo chữ hoa/thường và ký tự không phải chữ), hoặc một tên file kết thúc bằng `log`/`tmp`/`temp` (trừ `catalog`, `dialog`... ), được ghi `excludeReason` (`log` | `temp` | `debug` | `error`: loại, không phải tên khớp) và đếm riêng ở `excludedFunctions`. Giới hạn: tên biến/file không chứa các từ đó vẫn được tính là chức năng cần xác nhận.
+
+`programs[].reports[]` thêm `subkind` và `excludeReason` (optional). Dòng dấu hiệu cũ giữ nguyên làm bằng chứng và cho báo cáo kỹ thuật AR01; `totals.screenReport.reports` vẫn là số dấu hiệu (không dùng để hiển thị).
 
 ### 6.3. Độ phức tạp từng report (`report-complexity-v1-draft`)
 

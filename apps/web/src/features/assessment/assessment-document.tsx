@@ -16,7 +16,8 @@ import {
   LEVELS,
   NOT_ANALYZED,
   NOT_APPLICABLE,
-  REPORT_KINDS,
+  TEMPLATE_KINDS,
+  OUTPUT_KINDS,
   SECTIONS,
   SECTION_NOTES,
   TABLE,
@@ -262,8 +263,9 @@ function BarChart({
 
 const itemOrder: Record<Item['type'], number> = {
   帳票: 0,
-  バッチ: 1,
-  画面: 2,
+  出力機能: 1,
+  バッチ: 2,
+  画面: 3,
 };
 
 export function AssessmentDocument({
@@ -371,7 +373,7 @@ export function AssessmentDocument({
       <div className="ad-section" data-doc="scale" data-page-break>
         <Heading>{SECTIONS.scale}</Heading>
         <Note>{SECTION_NOTES.scale}</Note>
-        <div className="qd-kpis ad-kpis">
+        <div className="qd-kpis ad-kpis ad-kpis-4">
           <Kpi
             name="screens"
             label={KPI.screens}
@@ -384,10 +386,23 @@ export function AssessmentDocument({
             label={KPI.reports}
             value={count(sr?.reports.counted)}
             sub={
-              sr
+              scale.reportTemplates
                 ? KPI.reportsSub(
-                    n(sr.suspectedPrograms),
-                    n(sr.reports.suspected),
+                    n(scale.reportTemplates.designFile),
+                    n(scale.reportTemplates.missingFile),
+                  )
+                : null
+            }
+          />
+          <Kpi
+            name="outputs"
+            label={KPI.outputs}
+            value={count(sr?.reports.suspected)}
+            sub={
+              scale.outputFunctions
+                ? KPI.outputsSub(
+                    n(scale.outputFunctions.programs),
+                    n(scale.outputFunctions.excluded),
                   )
                 : null
             }
@@ -425,52 +440,82 @@ export function AssessmentDocument({
         </div>
         <Note>{KPI.customerCount}</Note>
         {sr ? (
-          <div className="qd-block ad-split">
-            <table className="qd-table qd-compact">
-              <thead>
-                <tr>
-                  <th>{TABLE.kind}</th>
-                  <th>{TABLE.count}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kinds.map(([kind, value]) => (
-                  <tr key={kind} data-kind={kind}>
-                    <td>{REPORT_KINDS[kind] ?? kind}</td>
-                    <td className="num">{n(value)}</td>
+          <>
+            <div className="qd-block ad-split">
+              <table className="qd-table qd-compact">
+                <thead>
+                  <tr>
+                    <th>{TABLE.kind}</th>
+                    <th>{TABLE.count}</th>
                   </tr>
-                ))}
-                <tr>
-                  <td>{TABLE.total}</td>
-                  <td className="num" data-total="kind">
-                    {sr.reports.rows}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <table className="qd-table qd-compact">
-              <thead>
-                <tr>
-                  <th>{TABLE.level}（参考値）</th>
-                  <th>{TABLE.count}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {levels.map(([level, value]) => (
-                  <tr key={level} data-level={level}>
-                    <td>{unrated(level)}</td>
-                    <td className="num">{n(value)}</td>
+                </thead>
+                <tbody>
+                  {kinds
+                    .filter(([kind]) => kind in TEMPLATE_KINDS)
+                    .map(([kind, value]) => (
+                      <tr key={kind} data-kind={kind}>
+                        <td>{TEMPLATE_KINDS[kind] ?? kind}</td>
+                        <td className="num">{n(value)}</td>
+                      </tr>
+                    ))}
+                  <tr>
+                    <td>{TABLE.total}</td>
+                    <td className="num" data-total="kind">
+                      {sr.reports.rows}
+                    </td>
                   </tr>
-                ))}
-                <tr>
-                  <td>{TABLE.total}</td>
-                  <td className="num" data-total="level">
-                    {sr.reports.rows}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+              <table className="qd-table qd-compact">
+                <thead>
+                  <tr>
+                    <th>{TABLE.level}（参考値）</th>
+                    <th>{TABLE.count}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {levels.map(([level, value]) => (
+                    <tr key={level} data-level={level}>
+                      <td>{unrated(level)}</td>
+                      <td className="num">{n(value)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td>{TABLE.total}</td>
+                    <td className="num" data-total="level">
+                      {sr.reports.rows}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="qd-block">
+              <table className="qd-table qd-compact">
+                <thead>
+                  <tr>
+                    <th>{KPI.outputs}</th>
+                    <th>{TABLE.count}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kinds
+                    .filter(([kind]) => kind in OUTPUT_KINDS)
+                    .map(([kind, value]) => (
+                      <tr key={kind} data-function-kind={kind}>
+                        <td>{OUTPUT_KINDS[kind] ?? kind}</td>
+                        <td className="num">{n(value)}</td>
+                      </tr>
+                    ))}
+                  <tr>
+                    <td>{TABLE.total}</td>
+                    <td className="num" data-total="function-kind">
+                      {sr.reports.suspected}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="qd-block">
             <p className="qd-note">{NOT_ANALYZED}</p>

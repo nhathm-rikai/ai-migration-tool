@@ -340,9 +340,12 @@ export const viMessages = {
       kpis: {
         screens: 'Màn hình (画面)',
         screensSub: (shared: string) => `${shared} dùng chung, tính một lần`,
-        reports: 'Report (帳票) phát hiện',
-        reportsSub: (programs: string, suspected: string) =>
-          `${programs} program nghi có xuất report (${suspected} dòng nghi, không cộng vào tổng)`,
+        reports: 'Report (帳票) · số mẫu',
+        reportsSub: (design: string, missing: string) =>
+          `Có file thiết kế ${design} · Thiếu file ${missing}`,
+        outputs: 'Chức năng in/xuất (cần xác nhận)',
+        outputsSub: (programs: string, excluded: string) =>
+          `${programs} program · không cộng vào số mẫu report${excluded === '0' ? '' : ` · đã loại ${excluded} chỗ ghi log/file tạm`}`,
         batches: 'Batch (バッチ)',
         batchesSub: 'Program không có form, khởi động bằng Sub Main',
         noData: 'Chưa có dữ liệu',
@@ -352,8 +355,8 @@ export const viMessages = {
       reference: (version: string | null) =>
         version === null ? 'Tham khảo' : `Tham khảo · mô hình ${version}`,
       distribution: {
-        title: 'Phân bố report',
-        help: 'Mức phức tạp của từng report chỉ là phân loại tham khảo, chấm trên procedure chứa dòng gọi report; không phải effort.',
+        title: 'Phân bố mẫu report',
+        help: 'Chỉ tính trên các mẫu report. Mức phức tạp là phân loại tham khảo, chấm trên procedure gọi mẫu (lấy mức cao nhất nếu mẫu được gọi ở nhiều nơi); không phải effort.',
         byLevel: 'Theo mức phức tạp',
         byKind: 'Theo loại',
         total: 'Tổng',
@@ -371,6 +374,48 @@ export const viMessages = {
           print: 'In (nghi)',
           'file-output': 'Ghi file (nghi)',
           unknown: 'Chưa xác định (nghi)',
+        },
+      },
+      templates: {
+        title: 'Mẫu report',
+        help: 'Mỗi mẫu (file .rpt hoặc DataReport) được tính một lần dù được gọi ở nhiều procedure hay nhiều program. Thiếu file thiết kế thì vẫn là một mẫu, cần xin khách cung cấp file.',
+        none: 'Không tìm thấy mẫu report nào.',
+        columns: {
+          name: 'Mẫu',
+          kind: 'Loại',
+          status: 'File thiết kế',
+          uses: 'Nơi dùng',
+          programs: 'Program',
+          complexity: 'Phức tạp (tham khảo)',
+        },
+        kind: {
+          crystal: 'Crystal Reports',
+          'data-report': 'DataReport / ActiveReports',
+        },
+        status: {
+          'design-file': 'Có file thiết kế',
+          'missing-file': 'Thiếu file (cần xin khách)',
+        },
+        usesCount: (count: string) => `${count} nơi`,
+      },
+      functions: {
+        title: 'Chức năng in/xuất cần xác nhận',
+        help: 'Chỗ trong code có in trực tiếp, xuất Excel, xuất CSV hoặc ghi file. Đây chỉ là dấu hiệu, chưa chứng minh là một mẫu report: cần khách xác nhận. Không cộng vào số mẫu report.',
+        none: 'Không có chức năng in/xuất nào.',
+        excluded: (count: string) =>
+          `Đã loại ${count} chỗ ghi log/file tạm (không tính).`,
+        columns: {
+          program: 'Program',
+          kind: 'Loại',
+          location: 'Bằng chứng (file:dòng)',
+          procedure: 'Procedure',
+        },
+        kind: {
+          print: 'In',
+          excel: 'Xuất Excel',
+          csv: 'Xuất CSV',
+          'file-output': 'Ghi file',
+          unknown: 'Có thư viện report, chưa rõ mẫu',
         },
       },
       list: {
@@ -451,6 +496,8 @@ export const viMessages = {
         },
         suspectedNote:
           'Dòng "Nghi có" chỉ là dấu hiệu program có thể xuất report; không cộng vào tổng report.',
+        functionsNote:
+          'Chức năng in/xuất chỉ là dấu hiệu, không cộng vào số mẫu report của program.',
       },
     },
     dashboard: {
@@ -659,6 +706,7 @@ export const viMessages = {
       none: 'Kiểm kê không có program nào.',
       notAnalyzed: 'Chưa phân tích',
       rawTables: (count: string) => `(gốc: ${count})`,
+      outputShort: (count: string) => `+${count} in/xuất`,
       draft: 'Nháp',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,

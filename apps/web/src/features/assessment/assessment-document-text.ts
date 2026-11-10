@@ -42,9 +42,12 @@ export const SECTIONS = {
 export const KPI = {
   screens: '画面',
   screensSub: (shared: string) => `うち共通 ${shared}`,
-  reports: '帳票（検出）',
-  reportsSub: (programs: string, suspected: string) =>
-    `疑い ${suspected} 件（${programs} プログラム）は合計に含まない`,
+  reports: '帳票（種類）',
+  reportsSub: (design: string, missing: string) =>
+    `設計ファイルあり ${design}／未提供 ${missing}`,
+  outputs: '印刷・出力機能（要確認）',
+  outputsSub: (programs: string, excluded: string) =>
+    `${programs} プログラム（帳票の種類には含まない）${excluded === '0' ? '' : `／ログ・一時ファイル ${excluded} 件は除外`}`,
   batches: 'バッチ',
   batchesSub: 'フォームなし・Sub Main 起動',
   programs: 'プログラム',
@@ -77,8 +80,8 @@ export const TABLE = {
   module: 'モジュール',
   programs: 'プログラム数',
   screens: '画面',
-  reports: '帳票（検出）',
-  suspected: '帳票（疑い）',
+  reports: '帳票（種類）',
+  suspected: '印刷・出力機能',
   batches: 'バッチ',
   files: 'ファイル',
   lines: 'コード行数',
@@ -128,7 +131,7 @@ export const CHARTS = {
 
 export const SECTION_NOTES = {
   scale:
-    '解析結果から求めた移行対象の規模です。「疑い」の帳票は出力の可能性がある箇所で、帳票数の合計には含みません。',
+    '解析結果から求めた移行対象の規模です。帳票は種類（帳票定義）で数え、印刷・出力機能は帳票の種類には含みません。',
   dependencies:
     '複数のプログラムから参照される共通部品と、外部コンポーネント・外部ライブラリの一覧です。',
   // The statement about the table names comes from the report's own state
@@ -154,8 +157,8 @@ export const APPENDIX = {
   counting: [
     '画面：プロジェクトが宣言するフォーム（ユーザードキュメント含む）のファイル数。複数のプログラムで使う画面は共通として1回のみ数えます。ファイルが不足・解析不可の画面も数え、備考に記載します。',
     'バッチ：フォームを持たず、起動オブジェクトが Sub Main のプログラム。フォームがあるプログラムは画面として数えます。',
-    '帳票（検出）：Crystal Reports の .rpt をコード上で指定している箇所（定義ファイルがあれば「検出」、名称のみなら「参照」）と、DataReport / ActiveReports の定義。「帳票（検出）」は検出と参照の合計です。',
-    '帳票（疑い）：Excel 出力、印刷、ファイル出力（Open … For Output/Append）を行う可能性のある箇所。様式の数が分からないため合計に含めず、別に表示します。',
+    '帳票（種類）：Crystal Reports の .rpt（コード上で指定されたファイル名）と DataReport / ActiveReports の定義を、種類ごとに1回だけ数えます。複数のプロシージャ・プログラムから使われても1種類です。定義ファイルがソースにあれば「設計ファイルあり」、名称のみなら「未提供」（お客様に提供を依頼します）。',
+    '印刷・出力機能（要確認）：コード上で印刷（Printer.Print 等）、Excel、CSV、ファイル出力を行う箇所を、プロシージャごとに1件として数えます。帳票であることの証明ではないため、帳票の種類には含めず、お客様の確認をお願いします。ログ・一時ファイルへの出力は除外します。',
     '数え方はソースコードの機械的な読み取り（字句解析）です。実行時に決まるファイル名や、コード以外で行う出力は検出できません。',
   ],
   complexityTitle: '帳票の複雑度（参考値）',
@@ -173,3 +176,14 @@ export const appendixDefinitions = (state: TableSchemaState): string[] => [
   ...APPENDIX.definitions,
   TABLE_SCHEMA_STATEMENT[state].definition,
 ];
+
+export const OUTPUT_KINDS: Record<string, string> = {
+  print: '印刷',
+  excel: 'Excel出力',
+  'file-output': 'ファイル出力（CSV含む）',
+  unknown: '出力（不明）',
+};
+export const TEMPLATE_KINDS: Record<string, string> = {
+  crystal: 'Crystal Reports',
+  'data-report': 'DataReport / ActiveReports',
+};

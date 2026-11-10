@@ -21,7 +21,12 @@ describe('AR04 technical report: Screens and Reports', () => {
       report.reports.map((r) => [r.programId, r.kind, r.confidence, r.line]),
     ).toEqual([
       ['ORDER', 'crystal', 'detected', 130],
+      // The same template in a second procedure: a second SIGN in the
+      // technical report (the customer report counts templates).
+      ['ORDER', 'crystal', 'detected', 160],
       ['CUSTOMER', 'print', 'suspected', 70],
+      ['CUSTOMER', 'file-output', 'suspected', 90],
+      ['CUSTOMER', 'file-output', 'suspected', 95],
       ['REPORT', 'crystal', 'referenced', 40],
       ['REPORT', 'data-report', 'detected', 2],
       ['REPORT', 'excel', 'suspected', 60],
@@ -40,22 +45,23 @@ describe('AR04 technical report: Screens and Reports', () => {
     expect(order).toMatchObject({
       programType: 'screen',
       screens: 2,
-      reports: 1,
+      reports: 2,
       suspectedReports: 0,
     });
     expect(report.programs.find((p) => p.id === 'CUSTOMER')).toMatchObject({
       programType: 'batch',
       screens: 0,
       reports: 0,
-      suspectedReports: 1,
+      suspectedReports: 3,
     });
-    // 3 distinct screens (LOGIN counted once); 3 reports counted, 2 suspected.
+    // 3 distinct screens (LOGIN counted once); 4 report signs counted, 4
+    // suspected (print, csv, log, excel).
     expect(report.totals.screenReport).toMatchObject({
       screens: 3,
       sharedScreens: 1,
       batches: 1,
       suspectedPrograms: 2,
-      reports: { rows: 5, counted: 3, suspected: 2 },
+      reports: { rows: 8, counted: 4, suspected: 4 },
     });
     const sheets = inventoryReportSheets(report);
     const names = sheets.map((s) => s.name);

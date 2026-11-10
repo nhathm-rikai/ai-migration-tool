@@ -13,6 +13,53 @@ const EXCEL_PROG_ID = /^excel\.application$/i;
 const DECLARATION =
   /^(?:(?:public|private|friend|static)\s+)*(?:sub|function)\b/i;
 
+// Words that make an output file a log or a temporary file, not a report.
+// Matched on whole words of the path expression (camelCase and non-letters
+// split it), so "catalog" and "template" are not excluded.
+const NOT_A_REPORT_WORDS = new Set([
+  'log',
+  'logs',
+  'logfile',
+  'tmp',
+  'temp',
+  'debug',
+  'err',
+  'error',
+  'trace',
+]);
+// Ordinary words that end with "log" and are not log files.
+const NOT_LOG_WORDS = new Set([
+  'catalog',
+  'dialog',
+  'analog',
+  'backlog',
+  'blog',
+  'prolog',
+  'epilog',
+  'monolog',
+  'travelog',
+]);
+function excludeReasonOf(pathExpression: string): string | undefined {
+  const words = pathExpression
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^A-Za-z0-9]+/)
+    .map((word) => word.toLowerCase())
+    .filter((word) => word !== '');
+  const word = words.find(
+    (word) =>
+      NOT_A_REPORT_WORDS.has(word) ||
+      // A file name that ends with the word: "syslog", "errlog", "worktmp".
+      (/(?:log|tmp|temp)$/.test(word) &&
+        ![...NOT_LOG_WORDS].some((plain) => word.endsWith(plain))),
+  );
+  if (word === undefined) return undefined;
+  // The reason is a category, never the matched name.
+  if (/log|trace/.test(word)) return 'log';
+  if (/tmp|temp/.test(word)) return 'temp';
+  if (/debug/.test(word)) return 'debug';
+  return 'error';
+}
+
 // Keeps the quotes but blanks string contents, so patterns only see code.
 const maskStrings = (code: string) =>
   code.replace(STRING_LITERAL, (text) => `"${' '.repeat(text.length - 2)}"`);
@@ -77,11 +124,25 @@ function signalsOf(statement: string): Omit<ReportSignal, 'line'>[] {
   const open = /^\s*Open\b.*?\bFor\s+(Output|Append)\b/i.exec(masked);
   if (open) {
     const mode = open[1] ?? 'Output';
+    // The path expression is what the statement writes between Open and For
+    // (read from the unmasked text: its strings carry the file name).
+    const expression =
+      /^\s*Open\s+(.+?)\s+For\s+(?:Output|Append)\b/i.exec(statement)?.[1] ??
+      '';
+    const excludeReason = excludeReasonOf(expression);
     found.push({
       kind: 'file-output',
       name: `Open For ${mode[0]?.toUpperCase()}${mode.slice(1).toLowerCase()}`,
+      ...(/\.csv\b/i.test(expression) ? { subkind: 'csv' as const } : {}),
+      ...(excludeReason ? { excludeReason } : {}),
     });
   }
+  // Excel started as a program: Shell "...EXCEL.EXE ...".
+  if (
+    /(?<![\w.])Shell\b/i.test(masked) &&
+    literals.some((text) => /excel\.exe/i.test(text))
+  )
+    found.push({ kind: 'excel', name: 'EXCEL.EXE' });
   return found;
 }
 

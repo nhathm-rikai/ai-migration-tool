@@ -89,16 +89,28 @@ describe('AR02-AC01 figures equal the assessment step and AR04', () => {
     expect(scale.tables).toBe(4);
     expect(scale.tablesView).toBe('normalized');
     expect(scale.screenReport).not.toHaveProperty('reportItems');
-    expect({ ...scale.screenReport, reportItems: undefined }).toEqual({
-      ...demoInventory.totals.screenReport,
-      reportItems: undefined,
-    });
+    // Reports are counted by template: order.rpt is named in two procedures
+    // (two signs in the stored rows) and is one template. Print and export
+    // functions are counted apart: print, CSV and Excel (the log file is left
+    // out).
     expect(scale.screenReport).toMatchObject({
       screens: 3,
       sharedScreens: 1,
       batches: 1,
-      reports: { counted: 3, suspected: 2 },
+      reports: { rows: 3, counted: 3, suspected: 3 },
+      suspectedPrograms: 2,
     });
+    expect(scale.reportTemplates).toEqual({
+      templates: 3,
+      designFile: 2,
+      missingFile: 1,
+    });
+    expect(scale.outputFunctions).toEqual({
+      functions: 3,
+      programs: 2,
+      excluded: 1,
+    });
+    expect(demoInventory.totals.screenReport?.reports.counted).toBe(4);
     // The core report of the same inventory agrees.
     const core = buildInventoryReport(demoInventory, ALL_PROGRAMS);
     expect(scale.codeLines).toBe(core.totals.unique.codeLines);
@@ -134,8 +146,17 @@ describe('AR02-AC03 risks', () => {
   it('puts every source warning in exactly one row; counts add up', () => {
     const core = buildInventoryReport(demoInventory, ALL_PROGRAMS);
     const fromWarnings = report.risks.filter((r) => r.source === 'warning');
+    // The technical report warns once per sign; the customer report once per
+    // missing template and per output function to confirm.
+    const perSign = core.warnings.filter(
+      (w) => w.code === 'REPORT_FILE_MISSING' || w.code === 'REPORT_SUSPECTED',
+    ).length;
+    expect(perSign).toBeGreaterThan(0);
     expect(fromWarnings.reduce((n, r) => n + r.count, 0)).toBe(
-      core.warnings.length,
+      core.warnings.length -
+        perSign +
+        (report.scale.reportTemplates?.missingFile ?? 0) +
+        (report.scale.outputFunctions?.functions ?? 0),
     );
     expect(new Set(fromWarnings.map((r) => r.code)).size).toBe(
       fromWarnings.length,
@@ -207,22 +228,26 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     const screens = report.items.filter((i) => i.type === '画面');
     const reports = report.items.filter((i) => i.type === '帳票');
     const batches = report.items.filter((i) => i.type === 'バッチ');
+    const functions = report.items.filter((i) => i.type === '出力機能');
     expect(screens).toHaveLength(totals?.screens ?? -1);
-    expect(reports).toHaveLength(totals?.reports.rows ?? -1);
+    // One row per report TEMPLATE; the output functions are listed apart.
+    expect(reports).toHaveLength(report.scale.reportTemplates?.templates ?? -1);
     expect(batches).toHaveLength(totals?.batches ?? -1);
-    expect(report.items.every((i) => i.file !== '')).toBe(true);
+    expect(functions).toHaveLength(4);
     expect(
-      reports.filter((i) => i.confidenceLabel.includes('疑い')),
-    ).toHaveLength(totals?.reports.suspected ?? -1);
+      functions.filter((i) => i.confidenceLabel === '要確認'),
+    ).toHaveLength(report.scale.outputFunctions?.functions ?? -1);
+    expect(report.items.every((i) => i.file !== '')).toBe(true);
+    const order = reports.find((r) => r.name === 'order.rpt');
+    expect(order?.note).toContain('使用箇所 2 か所');
   });
 
   it('rows of reports equal the total by kind and by level; unrated is 未評価 with a reason', () => {
     const reports = report.items.filter((i) => i.type === '帳票');
-    const byKind = totals?.reports.byKind ?? {};
-    const byLevel = totals?.reports.byLevel ?? {};
+    const byLevel = report.scale.screenReport?.reports.byLevel ?? {};
     const sum = (r: Record<string, number>) =>
       Object.values(r).reduce((a, b) => a + b, 0);
-    expect(reports.length).toBe(sum(byKind));
+    // The level distribution is over templates only.
     expect(reports.length).toBe(sum(byLevel));
     for (const row of reports.filter((r) => r.level === 'unrated')) {
       expect(row.levelLabel).toBe('未評価');
@@ -266,7 +291,7 @@ describe('AR02-AC05 inventory without AR04 data', () => {
     expect(old.items).toEqual([]);
     const sheet1 = sheetOf('1_規模概要', old);
     const lines = sheet1.rows.filter((row) =>
-      ['画面', '帳票（検出）', 'バッチ'].some((label) => row[0] === label),
+      ['画面', '帳票（種類）', 'バッチ'].some((label) => row[0] === label),
     );
     expect(lines).toHaveLength(3);
     for (const row of lines) expect(row[1]).toBe(NOT_ANALYZED);
@@ -385,9 +410,11 @@ describe('customer report keeps files that differ only in case apart (AR04 revie
     expect(
       built.items.filter((i) => i.type === '画面' && i.file.startsWith('x/')),
     ).toHaveLength(2);
-    expect(
-      built.items.filter((i) => i.type === '帳票' && i.file.startsWith('x/')),
-    ).toHaveLength(2);
+    // Reports are one row per template, whatever the case of the file that
+    // names them.
+    expect(built.items.filter((i) => i.type === '帳票')).toHaveLength(
+      built.scale.reportTemplates?.templates ?? -1,
+    );
   });
 });
 
@@ -927,5 +954,71 @@ describe('AR03 review 2 — sheet 4 note about the schema follows the report sta
     const text = noteOf(inventory);
     expect(text).toContain('解析データがない');
     expect(text).not.toContain('仮定');
+  });
+});
+
+// ---- Report templates and output functions in the customer report ---------
+
+describe('report template count (customer report)', () => {
+  it('lists a missing template once in the risks, and every function to confirm', () => {
+    const missing = report.risks.find((r) => r.code === 'REPORT_FILE_MISSING');
+    expect(missing).toMatchObject({ count: 1, source: 'warning' });
+    const confirm = report.risks.find((r) => r.code === 'REPORT_SUSPECTED');
+    // print, CSV, Excel; the log file is not a function to confirm.
+    expect(confirm?.count).toBe(3);
+    expect(confirm?.content).toContain('帳票の種類には含みません');
+  });
+
+  it('sheet 1 says how many templates, with and without the design file, and how many functions', () => {
+    const rows = sheetOf('1_規模概要').rows;
+    const templates = rows.find((r) => r[0] === '帳票（種類）');
+    expect(templates?.[1]).toBe(3);
+    expect(templates?.[2]).toBe('設計ファイルあり 2／未提供 1');
+    const functions = rows.find((r) => r[0] === '印刷・出力機能（要確認）');
+    expect(functions?.[1]).toBe(3);
+    expect(String(functions?.[2])).toContain('2 プログラム');
+    expect(String(functions?.[2])).toContain('ログ・一時ファイル 1 件は除外');
+    // Nothing is called a suspected report any more.
+    expect(JSON.stringify(sheetOf('1_規模概要').rows)).not.toContain(
+      '帳票（疑い）',
+    );
+  });
+
+  it('sheet 6: one row per template with its programs and uses, functions apart, log excluded', () => {
+    const items = report.items;
+    const order = items.find(
+      (i) => i.type === '帳票' && i.name === 'order.rpt',
+    );
+    expect(order).toMatchObject({
+      confidenceLabel: '設計ファイルあり',
+      level: 'high',
+    });
+    expect(order?.note).toContain('使用箇所 2 か所');
+    const summary = items.find((i) => i.name === 'summary.rpt');
+    expect(summary?.confidenceLabel).toBe('設計ファイル未提供');
+    const functions = items.filter((i) => i.type === '出力機能');
+    expect(functions.map((f) => f.kindLabel).sort()).toEqual(
+      ['CSV出力', 'Excel出力', 'ファイル出力', '印刷'].sort(),
+    );
+    const log = functions.find((f) => f.confidenceLabel.startsWith('対象外'));
+    expect(log?.note).toContain('ログ');
+  });
+
+  it('the level distribution and the module table count templates and functions', () => {
+    expect(report.complexity.reportLevels).toMatchObject({
+      high: 1,
+      medium: 1,
+      unrated: 1,
+    });
+    const sum = (pick: (m: CustomerReport['modules'][number]) => number) =>
+      report.modules.reduce((n, m) => n + pick(m), 0);
+    expect(sum((m) => m.reports)).toBe(3);
+    expect(sum((m) => m.suspectedReports)).toBe(3);
+  });
+
+  it('an inventory without screen/report data has no template numbers (not 0)', () => {
+    const old = buildCustomerReport(legacy(), origin);
+    expect(old.scale.reportTemplates).toBeNull();
+    expect(old.scale.outputFunctions).toBeNull();
   });
 });

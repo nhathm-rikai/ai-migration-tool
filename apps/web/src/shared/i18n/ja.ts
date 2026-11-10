@@ -326,9 +326,12 @@ export const jaMessages = {
       kpis: {
         screens: '画面',
         screensSub: (shared: string) => `共通 ${shared} 件（1回のみ集計）`,
-        reports: '帳票（検出分）',
-        reportsSub: (programs: string, suspected: string) =>
-          `帳票出力の疑いがあるプログラム ${programs} 件（疑い ${suspected} 件は合計に含めません）`,
+        reports: '帳票（種類）',
+        reportsSub: (design: string, missing: string) =>
+          `設計ファイルあり ${design} · 未提供 ${missing}`,
+        outputs: '印刷・出力機能（要確認）',
+        outputsSub: (programs: string, excluded: string) =>
+          `${programs} プログラム · 帳票の種類には含めません${excluded === '0' ? '' : ` · ログ・一時ファイル ${excluded} 件は除外`}`,
         batches: 'バッチ',
         batchesSub: 'フォームがなく Sub Main で起動するプログラム',
         noData: 'データなし',
@@ -338,8 +341,8 @@ export const jaMessages = {
       reference: (version: string | null) =>
         version === null ? '参考値' : `参考値 · モデル ${version}`,
       distribution: {
-        title: '帳票の分布',
-        help: '帳票ごとの複雑度は参考分類です。帳票を呼び出すプロシージャで評価しており、工数ではありません。',
+        title: '帳票（種類）の分布',
+        help: '帳票の種類のみが対象です。複雑度は参考分類で、帳票を呼び出すプロシージャで評価します（複数箇所から呼ばれる場合は最も高い値）。工数ではありません。',
         byLevel: '複雑度別',
         byKind: '種類別',
         total: '合計',
@@ -357,6 +360,48 @@ export const jaMessages = {
           print: '印刷（疑い）',
           'file-output': 'ファイル出力（疑い）',
           unknown: '不明（疑い）',
+        },
+      },
+      templates: {
+        title: '帳票（種類）',
+        help: '.rpt や DataReport などの帳票定義を1種類として数えます。複数のプロシージャ・プログラムから使われても1回です。設計ファイルがなくても1種類として数え、お客様に提供を依頼します。',
+        none: '帳票の種類は見つかりませんでした。',
+        columns: {
+          name: '帳票',
+          kind: '種類',
+          status: '設計ファイル',
+          uses: '使用箇所',
+          programs: 'プログラム',
+          complexity: '複雑度（参考）',
+        },
+        kind: {
+          crystal: 'Crystal Reports',
+          'data-report': 'DataReport / ActiveReports',
+        },
+        status: {
+          'design-file': '設計ファイルあり',
+          'missing-file': '未提供（依頼が必要）',
+        },
+        usesCount: (count: string) => `${count} か所`,
+      },
+      functions: {
+        title: '印刷・出力機能（要確認）',
+        help: 'コード上で印刷・Excel・CSV・ファイル出力を行う箇所です。帳票であることの証明ではないため、お客様の確認が必要です。帳票の種類には含めません。',
+        none: '印刷・出力機能は見つかりませんでした。',
+        excluded: (count: string) =>
+          `ログ・一時ファイルへの出力 ${count} 件は除外しました（集計外）。`,
+        columns: {
+          program: 'プログラム',
+          kind: '種類',
+          location: '根拠（ファイル:行）',
+          procedure: 'プロシージャ',
+        },
+        kind: {
+          print: '印刷',
+          excel: 'Excel出力',
+          csv: 'CSV出力',
+          'file-output': 'ファイル出力',
+          unknown: '帳票ライブラリあり（帳票は不明）',
         },
       },
       list: {
@@ -437,6 +482,8 @@ export const jaMessages = {
           complexity: '複雑度（参考）',
           notes: '備考',
         },
+        functionsNote:
+          '印刷・出力機能は目安であり、プログラムの帳票の種類には含めません。',
         suspectedNote:
           '「疑い」の行は帳票を出力している可能性を示すだけで、帳票の合計には含めません。',
       },
@@ -647,6 +694,7 @@ export const jaMessages = {
       none: 'インベントリにプログラムがありません。',
       notAnalyzed: '未解析',
       rawTables: (count: string) => `（元: ${count}）`,
+      outputShort: (count: string) => `＋${count} 出力`,
       draft: 'ドラフト',
       declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
       sortBy: (column: string) => `${column}で並べ替え`,

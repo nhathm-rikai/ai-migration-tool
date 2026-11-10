@@ -54,7 +54,7 @@ import {
   type RenderCustomerPdf,
 } from './customer-pdf-button';
 import { ReportsTab, ScreenReportKpis } from './screen-report-panels';
-import { reportListRows } from './screen-report-model';
+import { deriveReportSummary } from '@portal/contracts';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -245,7 +245,7 @@ function ArtifactView({
   );
   const counts: Record<Tab, number | null> = {
     programs: summary.programs.length,
-    reports: reportListRows(artifact.payload)?.length ?? null,
+    reports: deriveReportSummary(artifact.payload)?.counts.templates ?? null,
     graph: null,
     tables: tableCount,
   };
@@ -1029,7 +1029,7 @@ function ProgramList({
                             row.suspectedReports > 0 && (
                               <span className="muted raw-count">
                                 {' '}
-                                +{number(row.suspectedReports)}?
+                                {copy.outputShort(number(row.suspectedReports))}
                               </span>
                             )}
                         </td>

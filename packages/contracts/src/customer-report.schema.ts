@@ -88,7 +88,23 @@ export const CustomerReportSchema = Type.Object({
     // The table names rest on an assumed schema mapping (AR02 review 1).
     tablesAssumed: Type.Optional(Type.Boolean()),
     // null: the inventory has no screen/report data (not zero).
+    // reports.counted / rows = report templates; reports.suspected = print and
+    // export functions to confirm (10/11/2026, see reportTemplates).
     screenReport: Nullable(ScreenReportTotals),
+    reportTemplates: Type.Optional(
+      Nullable(
+        Type.Object({
+          templates: Count,
+          designFile: Count,
+          missingFile: Count,
+        }),
+      ),
+    ),
+    outputFunctions: Type.Optional(
+      Nullable(
+        Type.Object({ functions: Count, programs: Count, excluded: Count }),
+      ),
+    ),
   }),
   modules: Type.Array(
     Type.Object({
@@ -200,6 +216,7 @@ export const CustomerReportSchema = Type.Object({
       type: Type.Union([
         Type.Literal('画面'),
         Type.Literal('帳票'),
+        Type.Literal('出力機能'),
         Type.Literal('バッチ'),
       ]),
       kindLabel: Type.String(),

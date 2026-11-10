@@ -99,6 +99,11 @@ export type ReportSignal = {
   // against the source tree, so `name` is then the file name alone.
   path?: string;
   absolute?: boolean;
+  // file-output only: a .csv path.
+  subkind?: 'csv';
+  // file-output only: the word that says the file is a log or a temporary
+  // file, not a report output (the function is listed but not counted).
+  excludeReason?: string;
 };
 
 // What a project reference says about reports, by runtime component.

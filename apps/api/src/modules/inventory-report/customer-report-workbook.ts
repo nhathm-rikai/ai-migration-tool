@@ -125,22 +125,26 @@ function sheet1(report: CustomerReport): Sheet {
     sr ? sr.screens : NOT_ANALYZED,
     sr ? `うち共通 ${sr.sharedScreens}（1回のみ集計）` : null,
   );
+  const templates = scale.reportTemplates;
+  const functions = scale.outputFunctions;
   b.row(
-    '帳票（検出）',
+    '帳票（種類）',
     sr ? sr.reports.counted : NOT_ANALYZED,
-    sr ? '検出＋参照。「疑い」は含みません' : null,
+    templates
+      ? `設計ファイルあり ${templates.designFile}／未提供 ${templates.missingFile}`
+      : null,
   );
   b.row(
-    '帳票（疑い）',
+    '印刷・出力機能（要確認）',
     sr ? sr.reports.suspected : NOT_ANALYZED,
-    sr
-      ? `${sr.suspectedPrograms} プログラムに出力の可能性（合計に含まない）`
+    functions
+      ? `${functions.programs} プログラム（帳票の種類には含みません）${functions.excluded > 0 ? `／ログ・一時ファイル ${functions.excluded} 件は除外` : ''}`
       : null,
   );
   b.row('バッチ', sr ? sr.batches : NOT_ANALYZED);
   b.row('画面・帳票（お客様提示）', CUSTOMER_PROVIDED_COUNT);
 
-  b.heading('帳票の内訳（種別）');
+  b.heading('帳票の種類・出力機能の内訳（種別）');
   b.subHeader(['種別', '件数']);
   b.table(
     sr
@@ -169,8 +173,8 @@ function sheet1(report: CustomerReport): Sheet {
     'モジュール',
     'プログラム数',
     '画面',
-    '帳票（検出）',
-    '帳票（疑い）',
+    '帳票（種類）',
+    '印刷・出力機能',
     'バッチ',
     'ファイル',
     'コード行数',
@@ -244,7 +248,7 @@ function sheet2(report: CustomerReport): Sheet {
   b.table(total === 0 ? [] : levelRows);
 
   b.heading(`帳票の複雑度の分布（${REFERENCE_VALUE}）`);
-  b.subHeader(['レベル', '帳票数', 'モデル版']);
+  b.subHeader(['レベル', '帳票（種類）数', 'モデル版']);
   b.table(
     complexity.reportLevels
       ? [...LEVELS, 'unrated' as const].map((level) => [

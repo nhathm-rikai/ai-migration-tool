@@ -54,8 +54,6 @@ export type ProgramRow = {
   // detected + referenced; suspected outputs are counted apart.
   reports: number | null;
   suspectedReports: number | null;
-  // TC01: unit test checklist items; null = inventory predates it (not 0).
-  utPoints: number | null;
   members: Program['members'];
   sharedMembers: number;
   unresolvedMembers: number;
@@ -134,7 +132,6 @@ function programRow(program: Program): ProgramRow {
     suspectedReports: program.reports
       ? program.reports.filter((row) => row.confidence === 'suspected').length
       : null,
-    utPoints: program.utPoints ?? null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
     // A case-only difference still finds the file (Windows), so it is not
@@ -308,7 +305,6 @@ export type ProgramSortKey =
   | 'tables'
   | 'screens'
   | 'reports'
-  | 'utPoints'
   | 'complexity';
 export type ProgramSort = { key: ProgramSortKey; direction: 'asc' | 'desc' };
 

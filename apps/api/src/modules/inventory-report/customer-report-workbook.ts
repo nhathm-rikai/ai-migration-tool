@@ -1,3 +1,4 @@
+import { TABLE_SCHEMA_STATEMENT, tableSchemaState } from '@portal/contracts';
 import type { CustomerReport } from './customer-report.js';
 import {
   LEVEL_LABELS,
@@ -64,7 +65,6 @@ function sheetOf(
   return {
     name,
     title: name.replace(/^\d_/, '') + '（アセスメント報告書）',
-    notes: SHEET_NOTES[name],
     tabColor: 'FF1F3864',
     columns,
     rows: isBuilder ? built.rows : built,
@@ -75,6 +75,7 @@ function sheetOf(
       ? { subHeaderRows: built.subHeaderRows }
       : {}),
     ...extra,
+    notes: [...SHEET_NOTES[name], ...(extra.notes ?? [])],
   };
 }
 
@@ -328,12 +329,13 @@ function sheet3(report: CustomerReport): Sheet {
 
 function sheet4(report: CustomerReport): Sheet {
   const { database } = report;
+  const state = tableSchemaState(report.scale);
   const b = new SheetBuilder(3);
   b.heading(
     (report.scale.tablesView === 'raw'
       ? 'アクセスされるテーブル（ソース上の名称・上位30）'
       : 'アクセスされるテーブル（名称統一後・上位30）') +
-      (report.scale.tablesAssumed ? '※スキーマは仮定（DB管理者の確認前）' : ''),
+      (state === 'assumed' ? '※スキーマは仮定（DB管理者の確認前）' : ''),
   );
   b.subHeader([
     'テーブル',
@@ -360,7 +362,7 @@ function sheet4(report: CustomerReport): Sheet {
     SHEET_NAMES[3],
     [col('項目', 36), col('値', 30), col('補足', 44)],
     b,
-    { boldFirstColumn: true },
+    { boldFirstColumn: true, notes: [TABLE_SCHEMA_STATEMENT[state].note] },
   );
 }
 

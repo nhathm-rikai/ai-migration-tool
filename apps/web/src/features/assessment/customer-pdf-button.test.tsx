@@ -11,7 +11,10 @@ import { createArtifactsApi } from '../../shared/api/artifacts-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { json, requestUrl, testCredentials } from '../../testing/fixtures';
 import { customerReportFixture } from '../../testing/customer-report-fixture';
-import { customerPdfFileName } from './customer-pdf-button';
+import {
+  customerPdfAsciiFileName,
+  customerPdfFileName,
+} from './customer-pdf-button';
 
 // AR03-AC04 / AC05 (web): the PDF button of the analysis step.
 
@@ -67,8 +70,7 @@ function setup(
   return { calls, save, view, renderPdf: render_ };
 }
 
-const button = () =>
-  screen.findByRole('button', { name: 'Báo cáo cho khách (PDF)' });
+const button = () => screen.findByRole('button', { name: 'Xuất PDF' });
 
 describe('Customer PDF button (AR03)', () => {
   it('reads the customer JSON of the exact version and saves a .pdf', async () => {
@@ -85,6 +87,19 @@ describe('Customer PDF button (AR03)', () => {
     expect(
       (renderPdf.mock.calls[0]?.[0] as { reportVersion: string }).reportVersion,
     ).toBe('customer-assessment-report-v1');
+  });
+
+  it('saves under the ASCII name when the browser refuses the Japanese one (AR03 review 1)', async () => {
+    const { view, save } = setup(reportResponse);
+    save.mockImplementationOnce(() => {
+      throw new Error('invalid file name');
+    });
+    render(view());
+    fireEvent.click(await button());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[0]?.[0]).toMatch(/^アセスメント報告書_/);
+    expect(save.mock.calls[1]?.[0]).toMatch(/^[A-Za-z0-9._-]+.pdf$/);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('is disabled while it works and comes back afterwards', async () => {
@@ -171,6 +186,26 @@ describe('Customer PDF button (AR03)', () => {
     fireEvent.click(await button());
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('customerPdfAsciiFileName (fallback, AR03 review 1)', () => {
+  const day = new Date('2026-11-06T10:00:00Z');
+  it('keeps only ASCII letters, digits, dot and dash, and ends with .pdf', () => {
+    for (const name of [
+      '受注/管理 システム',
+      '..',
+      '',
+      'a:b*c?"<>|',
+      'Order System 1.0',
+    ]) {
+      const ascii = customerPdfAsciiFileName(name, day);
+      expect(ascii).toMatch(/^[A-Za-z0-9._-]+.pdf$/);
+      expect(ascii).toContain('20261106');
+    }
+    expect(customerPdfAsciiFileName('Order System 1.0', day)).toBe(
+      'assessment-report_Order_System_1.0_20261106.pdf',
+    );
   });
 });
 

@@ -33,10 +33,6 @@ test(
 
     const assessment = page.getByRole('region', { name: 'Đánh giá tổng quan' });
     await assessment.getByRole('tab', { name: /^Danh sách program/ }).click();
-    const row = assessment
-      .getByRole('button', { name: 'SAMPLE', exact: true })
-      .locator('xpath=ancestor::tr');
-    await expect(row.locator('[data-col="utPoints"]')).toHaveText(/^\d+$/);
     await assessment.getByRole('button', { name: 'SAMPLE' }).click();
     await page
       .getByRole('link', { name: /Tạo tài liệu cho program này/ })

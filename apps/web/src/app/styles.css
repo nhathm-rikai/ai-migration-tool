@@ -1688,7 +1688,7 @@ details.technical[open] > summary {
   width: 12%;
 }
 .program-list .program-table thead th:nth-child(3) {
-  width: 11%;
+  width: 12%;
 }
 .program-list .program-table thead th:nth-child(8) {
   width: 15%;
@@ -5899,4 +5899,78 @@ fieldset.doc-card {
 }
 .assess-doc-root .qd-table td {
   overflow-wrap: anywhere;
+}
+
+/* Step 2 program list (UI fix, 10/11/2026): 11 columns after the UT column
+   was removed. Fixed widths that add up to 100%, numbers right-aligned with
+   their headers, headers wrap instead of being cut, the complexity badge and
+   the table-count note keep their text. */
+.program-list .program-table thead th {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: bottom;
+}
+.program-list .sort-button {
+  white-space: normal;
+}
+.program-list .program-table thead th:nth-child(1) {
+  width: 14%;
+}
+.program-list .program-table thead th:nth-child(2) {
+  width: 14%;
+}
+.program-list .program-table thead th:nth-child(3) {
+  width: 11%;
+}
+.program-list .program-table thead th:nth-child(4),
+.program-list .program-table thead th:nth-child(5),
+.program-list .program-table thead th:nth-child(6) {
+  width: 8%;
+}
+.program-list .program-table thead th:nth-child(7) {
+  width: 8%;
+}
+.program-list .program-table thead th:nth-child(8) {
+  width: 6%;
+}
+.program-list .program-table thead th:nth-child(9) {
+  width: 7%;
+}
+.program-list .program-table thead th:nth-child(10) {
+  width: 13%;
+}
+.program-list .program-table thead th:nth-child(11) {
+  width: 3%;
+}
+.program-list .program-table td .kind-chip {
+  white-space: normal;
+}
+.program-list .program-table thead th:nth-child(n + 4):nth-child(-n + 9),
+.program-list .program-table td.num {
+  text-align: right;
+}
+.program-list
+  .program-table
+  thead
+  th:nth-child(n + 4):nth-child(-n + 9)
+  .sort-button {
+  justify-content: flex-end;
+  text-align: right;
+}
+.program-list .program-table td.num .raw-count {
+  display: block;
+  white-space: nowrap;
+}
+.program-list .program-table td .tag,
+.program-list .program-table td .badge {
+  white-space: nowrap;
+}
+.export-group-title {
+  align-self: center;
+  margin-right: 4px;
+  color: var(--fg-3);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }

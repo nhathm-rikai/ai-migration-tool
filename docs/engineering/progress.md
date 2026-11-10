@@ -1,10 +1,16 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (3) — Review vòng 2 tại b4351cc: xuất Excel qua mẫu
+
+- **P2:** `Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/`.Formula` không SaveAs bị sót. Thêm ca vào bộ mẫu chấp nhận trước (4 ca fail), rồi sửa: các lời gọi đó trên đối tượng Excel đã biết là ghi; đích gán phải KẾT THÚC bằng Cells/Range/Item/Offset(..)/.Value/.Formula nên chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không tính (đóng luôn mục N "định dạng bị tính").
+- **P3:** không sửa, ghi vào "Giới hạn đã biết" §6.2b (With Printer, ProgID có phiên bản, ActiveWorkbook.SaveAs không tiền tố, SELECT INTO/INSERT INTO [Excel 8.0;…], tham số As Sheets/Range, late-bound ADODB.Connection, ".rpt" trong phép so sánh, ErrorList.csv).
+- Chưa push.
+
 ## 11/11/2026 (2) — Nhận diện Excel/CSV: vòng 3 (4 lỗi P2 tại 07ed8cf) và bộ mẫu chấp nhận
 
 - **4 lỗi:** connection mở lại tới DB khác vẫn là Excel; chỉ in SQL + biến connection cùng câu bị tính; tham số không kiểu không che biến module; ghi qua tham số `As Excel.*` bị sót (không có tín hiệu). Câu "giới hạn chỉ gây sót" ở vòng trước là SAI (có giới hạn gây nhầm); spec §6.2b ghi từng giới hạn là sót (S) hay nhầm (N).
 - **Sửa:** loại connection/recordset theo lần cấu hình gần nhất (Open/ConnectionString/ActiveConnection/Set); chỉ tính khi có lời gọi ghi (Execute/Open INSERT-UPDATE-DELETE, CommandText, AddNew/Update/Delete/UpdateBatch trên recordset Excel); tham số/Dim không kiểu che biến module; ghi trên đối tượng Excel biết qua khai báo sinh tín hiệu tại dòng ghi.
-- **Bộ mẫu chấp nhận:** `vb6-report-signals.acceptance.test.ts` (58 ca, qua inventory → tổng report), mô tả ở spec §6.2b. 7 ca fail trên 07ed8cf, pass sau sửa.
+- **Bộ mẫu chấp nhận:** `vb6-report-signals.acceptance.test.ts` (58 ca ở vòng 3, nay 63 ca, qua inventory → tổng report), mô tả ở spec §6.2b. 7 ca fail trên 07ed8cf, pass sau sửa.
 - **Quy ước review nhận diện (từ nay):** ca biên NGOÀI bộ mẫu xếp P3 (ghi vào "Giới hạn đã biết") trừ khi đổi số pilot hoặc là pattern phổ biến; khi đó thêm vào bộ mẫu rồi mới sửa. Mỗi sửa kèm ca vào bộ mẫu thay vì vá điểm.
 - Chưa push.
 

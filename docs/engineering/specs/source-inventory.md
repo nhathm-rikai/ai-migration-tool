@@ -155,7 +155,7 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - **Ghi Excel** chỉ tính là một LỜI GỌI/phép gán ghi: `Workbooks.Add`; `.SaveAs/.Save` và gán ô/range/`.Value` trên đối tượng Excel (hoặc trong `With` trên nó); trên connection Excel: `Execute`/`Open` của INSERT/UPDATE/DELETE chạy trên connection đó hoặc recordset/command gắn với nó (command theo `CommandText`), và `AddNew/Update/Delete/UpdateBatch` của recordset mở trên connection Excel. In chuỗi SQL, hoặc biến connection cùng câu với SQL (`Debug.Print cn.State, sql`) không phải lời gọi. Ghi trên đối tượng Excel chỉ biết qua khai báo (tham số `As Excel.Workbook`) sinh một tín hiệu Excel ngay tại dòng ghi đầu tiên của file.
 - **CSV:** `Write #h` hoặc `Print #h` có chuỗi `","` ngăn giá trị vào đúng `Open … For Output/Append As #h` còn mở trong procedure (handle số hoặc biến `FreeFile`); `Close #h`, mở lại handle hoặc hết procedure thì quên; đường dẫn có `.csv` là CSV. File log/tmp/debug/error (theo từ trong đường dẫn) bị loại trừ và không thành CSV.
 
-**Bộ mẫu chấp nhận:** `apps/api/src/modules/analysis/vb6/vb6-report-signals.acceptance.test.ts` (58 ca, đi qua inventory → tổng report): Excel automation (CreateObject/GetObject/New, Workbooks.Add/Open, SaveAs/Save, gán Cells/Range/Value, With, tham số `As Excel.*`, biến module Set ở procedure khác, If một dòng), ADO Excel (chuỗi kết nối Excel kể cả hằng module, Execute INSERT/UPDATE, biến SQL, recordset AddNew/Update, command CommandText, đọc SELECT không tính, đổi connection/ConnectionString/ActiveConnection), CSV (Open For Output/Append + Print #/Write #, theo handle và FreeFile, If một dòng, `:`, log/tmp loại trừ, Open For Input), in bằng Printer/PrintForm, Crystal `.rpt` (một và nhiều mẫu, trong comment), và các ca âm (Recordset.Save, control.Value, check box Value, grid.Cells, Debug.Print, Picture1.Print, UPDATE DB thường, biến cùng tên ở procedure khác, tham số không kiểu che biến module). Ca mới được thêm vào đây khi gặp pattern phổ biến hoặc ca làm đổi số pilot.
+**Bộ mẫu chấp nhận:** `apps/api/src/modules/analysis/vb6/vb6-report-signals.acceptance.test.ts` (63 ca, đi qua inventory → tổng report): Excel automation (CreateObject/GetObject/New, Workbooks.Add/Open, SaveAs/Save, gán Cells/Range/Value, With, tham số `As Excel.*`, biến module Set ở procedure khác, If một dòng), ADO Excel (chuỗi kết nối Excel kể cả hằng module, Execute INSERT/UPDATE, biến SQL, recordset AddNew/Update, command CommandText, đọc SELECT không tính, đổi connection/ConnectionString/ActiveConnection), CSV (Open For Output/Append + Print #/Write #, theo handle và FreeFile, If một dòng, `:`, log/tmp loại trừ, Open For Input), in bằng Printer/PrintForm, Crystal `.rpt` (một và nhiều mẫu, trong comment), và các ca âm (Recordset.Save, control.Value, check box Value, grid.Cells, Debug.Print, Picture1.Print, UPDATE DB thường, biến cùng tên ở procedure khác, tham số không kiểu che biến module). Ca mới được thêm vào đây khi gặp pattern phổ biến hoặc ca làm đổi số pilot.
 
 **Giới hạn đã biết** (S = có thể SÓT, N = có thể NHẦM):
 - Đối tượng Excel truyền qua tham số không khai `As Excel.*` (Object/Variant): S.
@@ -168,6 +168,15 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - Code không chạy tới (nhánh chết, procedure không được gọi) vẫn được tính: N (phân tích tĩnh).
 - Biến không khai báo (không `Option Explicit`) trùng tên biến module ở procedure khác: có thể N.
 - `With` chứa nhiều cấp đối tượng lồng nhau: S.
+- Khối `With Printer ... End With` (lệnh bắt đầu bằng dấu chấm): S.
+- ProgID có số phiên bản (`Excel.Application.8`): S (chỉ nhận `Excel.Application`).
+- `ActiveWorkbook.SaveAs` không có tiền tố đối tượng Excel đã biết: S.
+- `SELECT … INTO` / `INSERT INTO [Excel 8.0;…]` chạy trên connection thường (đích Excel nằm trong câu SQL): S.
+- Tham số không có tiền tố `Excel.` như `As Sheets` / `As Range`: S (chỉ nhận `Workbook(s)`/`Worksheet(s)` không tiền tố).
+- `CreateObject("ADODB.Connection")` (late-bound) chưa được phân loại là connection: recordset mở trên nó vẫn giữ loại Excel đã gán trước đó: N.
+- Chuỗi `".rpt"` nằm trong phép so sánh (ví dụ `If Right(f, 4) = ".rpt"`) vẫn cho tín hiệu Crystal: N.
+- File tên `ErrorList.csv` bị loại trừ như log (từ `Error` trong tên): S (nhãn N trong ghi chú review là chưa đúng: file bị bỏ, không bị tính thêm).
+- Ghi Excel qua mẫu (`Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/gán `.Formula`/`.Value`) được tính; chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không được tính.
 
 ### 6.3. Độ phức tạp từng report (`report-complexity-v1-draft`)
 

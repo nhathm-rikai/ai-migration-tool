@@ -529,6 +529,43 @@ const cases: [string, string[], Expected][] = [
     sub('    \' rpt.ReportFileName = "a.rpt"'),
     { crystal: 0 },
   ],
+  // --- Excel export through a template: a workbook opened from a .xlt and
+  // filled, with no SaveAs; formatting alone is not a write.
+  [
+    'a template opened, a range filled from a recordset',
+    sub(
+      '    Set xl = CreateObject("Excel.Application")',
+      '    Set wb = xl.Workbooks.Open("t.xlt")',
+      '    Set ws = wb.Sheets(1)',
+      '    ws.Range("A2").CopyFromRecordset rs',
+    ),
+    { export: 1 },
+  ],
+  [
+    'a template opened, a Paste',
+    sub(...XL, '    wb.Sheets(1).Paste'),
+    { export: 1 },
+  ],
+  [
+    'a template opened, a PasteSpecial',
+    sub(...XL, '    wb.Sheets(1).Range("A1").PasteSpecial xlPasteValues'),
+    { export: 1 },
+  ],
+  [
+    'a template opened, a Formula assigned',
+    sub(...XL, '    wb.Sheets(1).Range("A1").Formula = "=SUM(B1:B9)"'),
+    { export: 1 },
+  ],
+  [
+    'a template opened, only formatting (colour, font, width)',
+    sub(
+      ...XL,
+      '    wb.Sheets(1).Range("A1").Interior.Color = vbRed',
+      '    wb.Sheets(1).Range("A1").Font.Bold = True',
+      '    wb.Sheets(1).Columns(1).ColumnWidth = 10',
+    ),
+    { export: 0 },
+  ],
 ];
 
 describe('report signals: the acceptance set, through the report total', () => {

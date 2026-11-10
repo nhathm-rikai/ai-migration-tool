@@ -205,7 +205,13 @@ const DECLARING =
 const PROCEDURE_START =
   /^(?:(?:public|private|friend|static)\s+)*(?:sub|function|property\s+(?:get|let|set))\b/i;
 const STATEMENT_ROOT = /^\s*(?:Call\s+)?(\.|[A-Za-z_]\w*)/i;
-const CELL_TARGET = /\.\s*(?:Cells|Range|Item|Value2?|Formula)\b/i;
+// What is assigned must BE a cell, a range or a value: the target ends with
+// Cells(..), Range(..), Item(..), Offset(..), .Value or .Formula, so a format
+// (.Interior.Color, .Font.Bold, .ColumnWidth) is not a write.
+const CELL_TARGET =
+  /(?:\.\s*(?:Cells|Range|Item|Offset)\s*\(.*\)|\.\s*(?:Value2?|Formula\w*))\s*$/i;
+// A call that puts data into Excel from an Excel object.
+const FILLS_EXCEL = /\.\s*(?:CopyFromRecordset|PasteSpecial|Paste)\b/i;
 const EXCEL_SOURCE =
   /\bExcel\s+\d+\.\d+|Extended\s+Properties\s*=\s*"?\s*Excel|\.xls[xmb]?\b/i;
 const SQL_WRITE = /^"\s*(?:insert\s+into|update\s+\S+\s+set|delete\s+from)\b/i;
@@ -457,6 +463,8 @@ class ExcelWrites {
       this.isExcel(masked)
     )
       wrote = true;
+    // Data pasted or copied in from a recordset (a template filled, no SaveAs).
+    if (FILLS_EXCEL.test(masked) && this.isExcel(masked)) wrote = true;
     // A cell, range or value assigned (the first "=" of the statement).
     const equals = masked.search(/(?<![<>=!])=(?!=)/);
     if (equals > 0) {

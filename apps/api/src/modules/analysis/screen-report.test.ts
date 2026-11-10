@@ -1,4 +1,8 @@
-import { SourceInventorySchema } from '@portal/contracts';
+import {
+  deriveReportSummary,
+  REPORT_COUNTING_BASIS,
+  SourceInventorySchema,
+} from '@portal/contracts';
 import { Check } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
 import {
@@ -239,7 +243,11 @@ describe('AR04-AC04/AC11 totals', () => {
         'M',
         ...sub('P1', '    Printer.Print "a"', '    Printer.EndDoc'),
         ...sub('P2', '    Printer.Print "b"'),
-        ...sub('X', '    Set x = CreateObject("Excel.Application")'),
+        ...sub(
+          'X',
+          '    Set x = CreateObject("Excel.Application")',
+          '    x.ActiveSheet.Cells(1, 1).Value = "x"',
+        ),
       ),
     ),
   );
@@ -481,5 +489,47 @@ describe('AR04-AC05 compatibility', () => {
       delete p['reports'];
     }
     expect(Check(SourceInventorySchema, legacy)).toBe(true);
+  });
+});
+
+// The counting basis says what the counting does: Crystal per template, code
+// print and CSV/Excel export at most one unit each per file.
+describe('counting basis: one file with 2 templates, a print and a CSV', () => {
+  const inventory = build(
+    vbp('a/A.vbp', 'Module=M; M.bas'),
+    at(
+      'a/M.bas',
+      bas(
+        'M',
+        ...sub(
+          'Go',
+          '    rpt.ReportFileName = "one.rpt"',
+          '    rpt.ReportFileName = "two.rpt"',
+          '    Printer.Print "a"',
+          '    Printer.Print "b"',
+          '    Open sOut For Output As #1',
+          '    Write #1, a, b',
+          '    Close #1',
+        ),
+      ),
+    ),
+  );
+
+  it('totals 2 Crystal + 1 print + 1 CSV = 4 (not at most 3)', () => {
+    const summary = deriveReportSummary(inventory);
+    expect(summary?.counts).toMatchObject({
+      total: 4,
+      crystal: 2,
+      print: 1,
+      export: 1,
+    });
+  });
+
+  it('the basis text states that rule in both languages', () => {
+    const overlap = REPORT_COUNTING_BASIS.find((item) => item.id === 'overlap');
+    expect(overlap?.vi.text).toContain('2 + 1 + 1 = 4');
+    expect(overlap?.ja.text).toContain('2 + 1 + 1 = 4');
+    for (const text of [overlap?.vi.text, overlap?.ja.text])
+      expect(text).not.toMatch(/tối đa 3 đơn vị|最大3件/);
   });
 });

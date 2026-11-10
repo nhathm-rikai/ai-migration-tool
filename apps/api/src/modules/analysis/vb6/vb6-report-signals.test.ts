@@ -22,15 +22,28 @@ describe('AR04-AC02 report signals in VB6 code', () => {
     ],
     [
       'excel',
-      ['    Set xl = CreateObject("Excel.Application")'],
+      [
+        '    Set xl = CreateObject("Excel.Application")',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      ],
       'Excel.Application',
     ],
     [
       'excel',
-      ['    Set xl = GetObject(, "Excel.Application")'],
+      [
+        '    Set xl = GetObject(, "Excel.Application")',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      ],
       'Excel.Application',
     ],
-    ['excel', ['    Dim xl As New Excel.Application'], 'Excel.Application'],
+    [
+      'excel',
+      [
+        '    Dim xl As New Excel.Application',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      ],
+      'Excel.Application',
+    ],
     ['print', ['    Printer.Print "hello"'], 'Printer'],
     ['print', ['    Printer.EndDoc'], 'Printer'],
     ['print', ['    Me.PrintForm'], 'PrintForm'],
@@ -157,7 +170,10 @@ describe('output signals for the output-function list', () => {
   });
   it('detects Shell of EXCEL.EXE as an excel output', () => {
     expect(
-      scan('    Shell "C:\\Program Files\\Office\\EXCEL.EXE " & f, 1'),
+      scan(
+        '    Shell "C:\\Program Files\\Office\\EXCEL.EXE " & f, 1',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      ),
     ).toEqual([{ kind: 'excel', name: 'EXCEL.EXE', line: 1 }]);
     expect(scan('    Shell "notepad.exe " & f')).toEqual([]);
   });
@@ -236,19 +252,191 @@ describe('CSV and Excel output signals', () => {
       kind: 'excel',
       name: 'Workbooks',
     });
-    expect(scan('    sFile = "report.xls"')[0]).toMatchObject({
+    expect(
+      scan(
+        '    sFile = "report.xls"',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      )[0],
+    ).toMatchObject({
       kind: 'excel',
       name: 'Excel file',
     });
     expect(
-      scan('    cs = "Extended Properties=Excel 8.0;HDR=Yes"')[0],
+      scan(
+        '    cs = "Extended Properties=Excel 8.0;HDR=Yes"',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      )[0],
     ).toMatchObject({ kind: 'excel', name: 'Excel (ADO)' });
-    expect(scan('    Shell "excel.exe " & f')[0]).toMatchObject({
+    expect(
+      scan(
+        '    Shell "excel.exe " & f',
+        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
+      )[0],
+    ).toMatchObject({
       kind: 'excel',
     });
   });
   it('ignores Excel and CSV words in comments and unrelated strings', () => {
     expect(scan('    \' Open f For Output: Workbooks.Add "a.xls"')).toEqual([]);
     expect(scan('    msg = "export to excel is not available"')).toEqual([]);
+  });
+});
+
+// Review 10/11 (independent review of ac79d57..10f56a7): reading Excel is not
+// output, and a CSV write belongs to the file handle it names.
+describe('Excel is output only when the code writes to it', () => {
+  const kinds = (...lines: string[]) => scan(...lines).map((s) => s.kind);
+
+  it('does not count reading a workbook, an Excel ADO source or a .xls name', () => {
+    expect(
+      kinds(
+        'Sub ImportPrices()',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Open("in/prices.xls")',
+        '    v = wb.Sheets(1).Cells(1, 1).Value',
+        '    If wb.Sheets(1).Cells(2, 1).Value = "x" Then n = n + 1',
+        '    wb.Close False',
+        '    xl.Quit',
+        'End Sub',
+      ),
+    ).toEqual([]);
+    expect(
+      kinds(
+        'Sub Load()',
+        '    cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=in.xls;Extended Properties=""Excel 8.0"""',
+        '    Set rs = cn.Execute("SELECT * FROM [Sheet1$]")',
+        'End Sub',
+      ),
+    ).toEqual([]);
+    expect(kinds('    Shell "EXCEL.EXE in.xls", 1')).toEqual([]);
+  });
+
+  it('counts Excel when the code adds a workbook, saves it or sets cells', () => {
+    expect(
+      kinds(
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Add',
+      ),
+    ).toContain('excel');
+    expect(
+      kinds(
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Open("t.xls")',
+        '    wb.SaveAs "out.xls"',
+      ),
+    ).toContain('excel');
+    expect(
+      kinds(
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Open("t.xls")',
+        '    wb.Sheets(1).Cells(1, 1).Value = "Title"',
+      ),
+    ).toContain('excel');
+    expect(
+      kinds(
+        '    Set xl = CreateObject("Excel.Application")',
+        '    With ws',
+        '        .Range("A1") = "Title"',
+        '    End With',
+      ),
+    ).toContain('excel');
+    expect(
+      kinds(
+        '    cn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=out.xls;Extended Properties=""Excel 8.0"""',
+        '    cn.Execute "INSERT INTO [Sheet1$] VALUES (1, 2)"',
+      ),
+    ).toContain('excel');
+  });
+});
+
+describe('a CSV write belongs to its own file handle', () => {
+  const csv = (...lines: string[]) =>
+    scan(...lines).map(
+      (s) => `${s.name}:${s.subkind ?? '-'}:${s.excludeReason ?? '-'}`,
+    );
+
+  it('puts the write on the file it names, not the last one opened', () => {
+    expect(
+      csv(
+        'Sub Export()',
+        '    Open "C:/data/config.dat" For Output As #1',
+        '    Open "C:/data/sales.dat" For Output As #2',
+        '    Write #1, a, b',
+        '    Close #1',
+        '    Close #2',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:csv:-', 'Open For Output:-:-']);
+  });
+
+  it('keeps a log and a CSV apart, in either order', () => {
+    expect(
+      csv(
+        'Sub A()',
+        '    Open "out.dat" For Output As #1',
+        '    Open "run.log" For Append As #2',
+        '    Write #1, a, b',
+        '    Print #2, "done"',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:csv:-', 'Open For Append:-:log']);
+    expect(
+      csv(
+        'Sub B()',
+        '    Open "run.log" For Append As #2',
+        '    Open "out.dat" For Output As #1',
+        '    Write #1, a, b',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Append:-:log', 'Open For Output:csv:-']);
+  });
+
+  it('follows a handle held in a variable (FreeFile)', () => {
+    expect(
+      csv(
+        'Sub C()',
+        '    fh1 = FreeFile',
+        '    Open "a.dat" For Output As #fh1',
+        '    fh2 = FreeFile',
+        '    Open "b.dat" For Output As #fh2',
+        '    Write #fh2, x, y',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:-:-', 'Open For Output:csv:-']);
+  });
+
+  it('forgets a handle once it is closed or reopened for input, and at the end of the procedure', () => {
+    expect(
+      csv(
+        'Sub D()',
+        '    Open "a.dat" For Output As #1',
+        '    Close #1',
+        '    Open "in.txt" For Input As #1',
+        '    Write #1, x',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:-:-']);
+    expect(
+      csv(
+        'Sub E()',
+        '    Open "a.dat" For Output As #1',
+        'End Sub',
+        'Sub F()',
+        '    Write #1, x',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:-:-']);
+  });
+
+  it('writes with a comma separated Print # to the handle it names', () => {
+    expect(
+      csv(
+        'Sub G()',
+        '    Open "x.dat" For Output As #1',
+        '    Open "y.dat" For Output As #2',
+        '    Print #2, a; ","; b',
+        'End Sub',
+      ),
+    ).toEqual(['Open For Output:-:-', 'Open For Output:csv:-']);
   });
 });

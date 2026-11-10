@@ -54,11 +54,11 @@ export const REPORT_COUNTING_BASIS: readonly ReportCountingBasisItem[] = [
     id: 'overlap',
     vi: {
       label: 'Trùng giữa các cách',
-      text: 'Mỗi cách tạo đầu ra được tính riêng: một file vừa gọi Crystal, vừa in bằng code, vừa xuất CSV/Excel được tính tối đa 3 đơn vị (Crystal theo mẫu, in và xuất theo file). Tổng là số đơn vị đầu ra theo quy ước này, không phải số báo cáo nghiệp vụ.',
+      text: 'Mỗi cách tạo đầu ra được tính riêng. Crystal/DataReport tính theo từng mẫu (một mẫu chỉ tính một lần trong dự án, dù nhiều file gọi); in bằng code và xuất CSV/Excel mỗi loại tối đa 1 đơn vị cho mỗi file. Ví dụ: một file gọi 2 mẫu Crystal, có lệnh in và có lệnh xuất CSV được 2 + 1 + 1 = 4 đơn vị (nếu 2 mẫu chưa được tính ở file khác). Tổng là số đơn vị đầu ra theo quy ước này, không phải số báo cáo nghiệp vụ.',
     },
     ja: {
       label: '作成方法の重複',
-      text: '作成方法ごとに別々に数えます。1つのファイルが Crystal の呼び出し・コード印刷・CSV出力をすべて行う場合は最大3件です（Crystal は帳票定義ごと、印刷と出力はファイルごと）。合計はこの基準による出力単位の数であり、業務上の帳票数ではありません。',
+      text: '作成方法ごとに別々に数えます。Crystal／DataReport は帳票定義ごと（複数のファイルから呼ばれても、プロジェクトで1件）、コード印刷と CSV・Excel出力は、それぞれ1ファイルにつき最大1件です。例：1つのファイルが Crystal の帳票定義2つを呼び、コード印刷と CSV出力も行う場合は 2 + 1 + 1 = 4件です（2つの帳票定義が他のファイルで数えられていない場合）。合計はこの基準による出力単位の数であり、業務上の帳票数ではありません。',
     },
   },
   {

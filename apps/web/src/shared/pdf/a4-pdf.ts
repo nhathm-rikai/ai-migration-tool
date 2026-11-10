@@ -171,7 +171,7 @@ const MIN_SPLIT_ROWS = 2;
 // Room kept free on a page while laying it out, tried in turn until the pages
 // drawn as images fit (see renderA4Pdf); the image is drawn this much taller
 // than the room so an overrun can be seen.
-const PAGINATE_SLACKS = [0, 24, 48, 80, 120, 180];
+const PAGINATE_SLACKS = [0, 24, 48, 80, 120, 180, 260];
 const OVERRUN = 300;
 
 // Places the items of the document on pages of `room` pixels, in the frame's
@@ -536,6 +536,11 @@ export async function renderA4Pdf(
           for (const entry of placed) entry.element.remove();
       }
       if (!laid) throw new Error('The report could not be laid out.');
+      // Never save a PDF with a page that still runs past its room (a row
+      // taller than a page, or a browser that keeps wrapping differently): fail
+      // so the button shows an error and no file is downloaded.
+      if (!placed.every((entry) => entry.bottom <= room - 2))
+        throw new Error('The report could not be laid out without overflow.');
       const rendered: { jpeg: Uint8Array; width: number; height: number }[] =
         [];
       const info: PaginationInfo = {

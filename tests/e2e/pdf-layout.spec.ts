@@ -151,3 +151,36 @@ for (const lang of ['vi', 'ja'] as const)
         expect(entry.fill).toBeGreaterThanOrEqual(0.75);
     },
   );
+
+// A row taller than a page cannot be split: the PDF must not be saved with a
+// page that overflows; the button shows an error instead (AR03-AC04).
+test(
+  'a PDF whose pagination still overflows is not saved and shows an error',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await page.route(/customer-report[?]format=json/, async (route) => {
+      const response = await route.fetch();
+      const json = (await response.json()) as CustomerReportDocument;
+      const risk = json.risks[0];
+      if (!risk) throw new Error('fixture has no risk');
+      json.risks = [
+        { ...risk, content: Array(600).fill(risk.content).join(' ') },
+      ];
+      await route.fulfill({ response, json });
+    });
+    await openNewDemoProject(page, `Overflow ${Date.now()}`);
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
+    const pdf = page.getByRole('button', { name: 'Xuất PDF' });
+    await expect(pdf).toBeEnabled({ timeout: 20_000 });
+    let downloaded = false;
+    page.on('download', () => {
+      downloaded = true;
+    });
+    await pdf.click();
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 120_000 });
+    expect(downloaded).toBe(false);
+  },
+);

@@ -6,6 +6,15 @@
 - Phân trang kiểm lại với e2e `pdf-layout` (vi và ja): không dòng nào chạm biên dưới, lần thử đầu đã vừa; PDF dài 11 và 10 trang, PDF demo 4 trang.
 - Chưa push.
 
+## 10/11/2026 (đêm) — Sửa 4 lỗi review độc lập (3 P2 + 1 P3) trên feat/report-template-count
+
+- **P2 Excel:** đọc Excel không còn bị tính là xuất. Excel chỉ tính khi file có bằng chứng ghi (`Workbooks.Add`, `.SaveAs/.Save`, gán giá trị ô/range, `INSERT/UPDATE` qua ADO Excel); `Workbooks.Open`, chuỗi `.xls`, ADO `SELECT`, `Shell EXCEL.EXE` đơn lẻ không tính.
+- **P2 CSV theo handle:** `Write/Print #h` gắn vào đúng `Open … As #h` còn mở trong procedure (handle số hoặc biến FreeFile), không gắn vào lệnh Open gần nhất; `Close`, mở lại handle, hết procedure thì quên.
+- **P2 PDF tràn trang:** thêm lần thử chừa 260px; sau mọi lần thử nếu còn trang chạm biên dưới thì `renderA4Pdf` throw, nút hiện lỗi, không tải file. E2E mới (một dòng cao hơn trang): có alert, không có download; chạy lại với code cũ thì fail.
+- **P3 Cơ sở tính:** câu "tối đa 3 đơn vị" sai (Crystal tính theo mẫu, không giới hạn theo file). Viết lại vi+ja: Crystal theo mẫu, in và CSV/Excel mỗi loại tối đa 1 đơn vị mỗi file; ví dụ 2 mẫu + in + CSV = 4. Test hành vi (fixture → tổng 4) và test text.
+- **Pilot `source_vb6` (chỉ số tổng):** 帳票 175 → 175 (Crystal 63, in 104, CSV/Excel 8), file dữ liệu 52 → 51, loại trừ 7 → 7.
+- Spec `source-inventory.md` §6.2a cập nhật. Chưa push.
+
 ## 10/11/2026 (tối) — Báo cáo cho khách: PDF mục 6 gọn, OCX gộp theo tên file, phân trang chống cắt dòng, độ rộng cột Excel
 
 - **PDF:** mục 6 thành tổng hợp (cách tạo × độ phức tạp + top 15 mẫu Crystal/DataReport + trỏ tới Excel); thành phần ngoài không còn GUID, gộp theo tên file không phân biệt hoa thường, top 15; API và SQL theo module top 15.

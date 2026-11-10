@@ -948,8 +948,16 @@ function ProgramList({
                     copy.columns.codeLines,
                     copy.columnHints.codeLines,
                   )}
-                  {header('procedures', copy.columns.procedures)}
-                  {header('tables', copy.columns.tables)}
+                  {header(
+                    'procedures',
+                    copy.columns.procedures,
+                    copy.columnHints.procedures,
+                  )}
+                  {header(
+                    'tables',
+                    copy.columns.tables,
+                    copy.columnHints.tables,
+                  )}
                   {header('screens', copy.columns.screens)}
                   {header('reports', copy.columns.reports)}
                   {header(
@@ -1015,7 +1023,6 @@ function ProgramList({
                           {row.rawTables !== null &&
                             row.rawTables !== row.tables && (
                               <span className="muted raw-count">
-                                {' '}
                                 {copy.rawTables(number(row.rawTables))}
                               </span>
                             )}

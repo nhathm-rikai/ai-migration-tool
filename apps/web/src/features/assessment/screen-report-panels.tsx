@@ -493,7 +493,10 @@ function CountingBasis() {
   const lang = locale === 'ja' ? 'ja' : 'vi';
   return (
     <details className="report-basis" data-testid="report-basis">
-      <summary>{REPORT_COUNTING_BASIS_TITLE[lang]}</summary>
+      <summary>
+        <span>{REPORT_COUNTING_BASIS_TITLE[lang]}</span>
+        <Chevron />
+      </summary>
       <dl>
         {REPORT_COUNTING_BASIS.map((item) => (
           <div key={item.id} data-basis={item.id}>
@@ -616,6 +619,7 @@ export function ReportsTab({ inventory }: { inventory: Inventory }) {
           <span className="muted mono" data-testid="data-file-count">
             {number(summary.counts.dataFiles)}
           </span>
+          <Chevron />
         </summary>
         <p className="muted">{copy.dataFiles.help}</p>
         {summary.counts.excluded > 0 && (

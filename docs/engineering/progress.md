@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — Bước 2: header bảng program một dòng; "Cơ sở tính" dùng chevron của Portal
+
+- **Header danh sách program:** mọi header một dòng (`white-space: nowrap`), dấu sắp xếp cùng dòng ngay sau chữ. Nhãn rút gọn, nhãn đầy đủ nằm trong `title`: vi LoC riêng / LoC + chung / Procedure / Bảng / Màn hình / Report / Độ phức tạp; ja 固有LoC / 共通込LoC / 固有Proc / テーブル / 画面 / 帳票 / 複雑度. Độ rộng cột tính lại theo chữ header cộng dấu sắp xếp, padding ngang 7px; "(gốc: N)" / "（元: N）" cùng dòng sau số, chữ nhỏ màu nhạt; chip loại một dòng, cắt bằng dấu … (đầy đủ trong tooltip). Đo ở 1280 và 1600 px, vi và ja: không header nào xuống dòng, không tràn ngang (bảng và trang).
+- **"Cơ sở tính":** bỏ tam giác mặc định của `<details>`, dùng chevron của Portal (xoay khi mở) trong một card có viền; nội dung là danh sách, tiêu đề đậm mỗi mục, đường kẻ giữa các mục. Mục "Ghi file dữ liệu" dùng cùng chevron.
+- Chưa push.
+
 ## 10/11/2026 — Quy ước đếm report: khóa Crystal theo đường dẫn, đơn vị theo file, mục "Cơ sở tính" dùng chung
 
 Sửa theo review về quy ước đếm (4 điểm):

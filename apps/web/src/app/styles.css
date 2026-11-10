@@ -5909,13 +5909,20 @@ fieldset.doc-card {
    their headers, headers wrap instead of being cut, the complexity badge and
    the table-count note keep their text. */
 .program-list .program-table thead th {
-  white-space: normal;
+  white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
   vertical-align: bottom;
 }
 .program-list .sort-button {
-  white-space: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.program-list .sort-button .sort-mark {
+  flex: none;
+  margin-left: 0;
 }
 .program-list .program-table thead th:nth-child(1) {
   width: 14%;
@@ -5947,7 +5954,17 @@ fieldset.doc-card {
   width: 3%;
 }
 .program-list .program-table td .kind-chip {
-  white-space: normal;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.program-list .program-table td .kind-chip i {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
 }
 .program-list .program-table thead th:nth-child(n + 4):nth-child(-n + 9),
 .program-list .program-table td.num {
@@ -5962,8 +5979,11 @@ fieldset.doc-card {
   text-align: right;
 }
 .program-list .program-table td.num .raw-count {
-  display: block;
+  display: inline;
+  margin-left: 4px;
   white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-3);
 }
 .program-list .program-table td .tag,
 .program-list .program-table td .badge {
@@ -6015,16 +6035,6 @@ fieldset.doc-card {
 }
 .report-histogram .histogram-bar {
   cursor: default;
-}
-.data-files > summary {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  cursor: pointer;
-  list-style: none;
-}
-.data-files > summary::-webkit-details-marker {
-  display: none;
 }
 .data-files > summary h4 {
   display: inline;
@@ -6115,26 +6125,115 @@ fieldset.doc-card {
 .report-basis {
   margin: 0 0 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: var(--bg-2, transparent);
+  border-radius: 12px;
+  background: #fff;
+}
+.report-basis > summary,
+.data-files > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
 }
 .report-basis > summary {
-  cursor: pointer;
+  justify-content: space-between;
+  padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
+}
+.report-basis > summary::-webkit-details-marker,
+.data-files > summary::-webkit-details-marker {
+  display: none;
+}
+.report-basis > summary svg,
+.data-files > summary svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.data-files > summary svg {
+  margin-left: auto;
+}
+.report-basis[open] > summary svg,
+.data-files[open] > summary svg {
+  transform: rotate(180deg);
+}
+.report-basis[open] > summary {
+  border-bottom: 1px solid var(--line);
 }
 .report-basis dl {
-  margin: 8px 0 0;
-  display: grid;
-  gap: 8px;
+  margin: 0;
+  padding: 4px 14px 8px;
+  display: block;
+}
+.report-basis dl > div {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.report-basis dl > div:first-child {
+  border-top: 0;
 }
 .report-basis dt {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
 }
 .report-basis dd {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: 13px;
+  line-height: 1.55;
   color: var(--fg-2);
+}
+/* Step 2 program list at 1280px: headers on one line, tighter cell padding,
+   widths sized to the header text plus the sort mark. */
+.program-list .program-table thead th,
+.program-list .program-table tbody td,
+.program-list .program-table tbody th {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+.program-list .program-table thead th:nth-child(1) {
+  width: 8.8%;
+}
+.program-list .program-table thead th:nth-child(2) {
+  width: 10.6%;
+}
+.program-list .program-table thead th:nth-child(3) {
+  width: 10.9%;
+}
+.program-list .program-table thead th:nth-child(4) {
+  width: 9.2%;
+}
+.program-list .program-table thead th:nth-child(5) {
+  width: 11%;
+}
+.program-list .program-table thead th:nth-child(6) {
+  width: 9.5%;
+}
+.program-list .program-table thead th:nth-child(7) {
+  width: 9.5%;
+}
+.program-list .program-table thead th:nth-child(8) {
+  width: 8.5%;
+}
+.program-list .program-table thead th:nth-child(9) {
+  width: 7.5%;
+}
+.program-list .program-table thead th:nth-child(10) {
+  width: 11.8%;
+}
+.program-list .program-table thead th:nth-child(11) {
+  width: 2.8%;
+}
+.program-list .program-table .chevron-col {
+  padding-left: 0;
+  padding-right: 4px;
+  text-align: center;
 }

@@ -692,16 +692,18 @@ export const jaMessages = {
         kind: '種類',
         state: '状態',
         ownCodeLines: '固有LoC',
-        codeLines: 'LoC（共通込み）',
-        procedures: '固有プロシージャ',
-        tables: 'テーブル数',
+        codeLines: '共通込LoC',
+        procedures: '固有Proc',
+        tables: 'テーブル',
         screens: '画面',
         reports: '帳票',
         complexity: '複雑度',
       },
       columnHints: {
         codeLines:
-          '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
+          'LoC（共通込み）：共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
+        procedures: '固有プロシージャ',
+        tables: 'テーブル数',
         complexity:
           'プログラムの複雑度。見積ドラフトではこのレベルを係数に使います',
       },

@@ -702,16 +702,18 @@ export const viMessages = {
         kind: 'Loại',
         state: 'Trạng thái',
         ownCodeLines: 'LoC riêng',
-        codeLines: 'LoC + dùng chung',
-        procedures: 'Procedure riêng',
-        tables: 'Số bảng',
+        codeLines: 'LoC + chung',
+        procedures: 'Procedure',
+        tables: 'Bảng',
         screens: 'Màn hình',
         reports: 'Report',
         complexity: 'Độ phức tạp',
       },
       columnHints: {
         codeLines:
-          'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+          'LoC + dùng chung: LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+        procedures: 'Procedure riêng',
+        tables: 'Số bảng',
         complexity:
           'Độ phức tạp của program; báo giá nháp dùng mức này làm hệ số',
       },

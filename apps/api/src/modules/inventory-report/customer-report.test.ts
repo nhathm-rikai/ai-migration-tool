@@ -109,6 +109,11 @@ describe('AR02-AC01 figures equal the assessment step and AR04', () => {
       functions: 3,
       programs: 2,
       excluded: 1,
+      // Excel/CSV export (CSV and Excel) and the rest (print).
+      groups: {
+        export: { functions: 2, programs: 2 },
+        print: { functions: 1, programs: 1 },
+      },
     });
     expect(demoInventory.totals.screenReport?.reports.counted).toBe(4);
     // The core report of the same inventory agrees.
@@ -196,10 +201,12 @@ describe('AR02-AC03 risks', () => {
     expect(risks.reduce((n, r) => n + r.count, 0)).toBe(3);
   });
 
-  it('rates missing .rpt as 高 with the request, suspected output as 中, sorted high first', () => {
+  it('rates missing .rpt as 高 without asking the customer for the file, suspected output as 中, sorted high first', () => {
     const missing = report.risks.find((r) => r.code === 'REPORT_FILE_MISSING');
     expect(missing).toMatchObject({ severity: '高' });
-    expect(missing?.confirmation).toContain('帳票定義ファイル(.rpt)のご提供');
+    // The file is reported as missing; the report does not ask for it.
+    expect(missing?.content).toContain('設計ファイルなし');
+    expect(missing?.confirmation).not.toContain('ご提供');
     const suspected = report.risks.find((r) => r.code === 'REPORT_SUSPECTED');
     expect(suspected).toMatchObject({ severity: '中' });
     const order = report.risks.map((r) =>
@@ -973,11 +980,13 @@ describe('report template count (customer report)', () => {
     const rows = sheetOf('1_規模概要').rows;
     const templates = rows.find((r) => r[0] === '帳票（種類）');
     expect(templates?.[1]).toBe(3);
-    expect(templates?.[2]).toBe('設計ファイルあり 2／未提供 1');
-    const functions = rows.find((r) => r[0] === '印刷・出力機能（要確認）');
-    expect(functions?.[1]).toBe(3);
-    expect(String(functions?.[2])).toContain('2 プログラム');
-    expect(String(functions?.[2])).toContain('ログ・一時ファイル 1 件は除外');
+    expect(templates?.[2]).toBe('設計ファイルあり 2／なし 1');
+    const exports = rows.find((r) => r[0] === 'Excel/CSV出力（要確認）');
+    expect(exports?.[1]).toBe(2);
+    expect(String(exports?.[2])).toContain('2 プログラム');
+    const prints = rows.find((r) => r[0] === '印刷・その他出力（要確認）');
+    expect(prints?.[1]).toBe(1);
+    expect(String(prints?.[2])).toContain('ログ・一時ファイル 1 件は除外');
     // Nothing is called a suspected report any more.
     expect(JSON.stringify(sheetOf('1_規模概要').rows)).not.toContain(
       '帳票（疑い）',
@@ -995,7 +1004,7 @@ describe('report template count (customer report)', () => {
     });
     expect(order?.note).toContain('使用箇所 2 か所');
     const summary = items.find((i) => i.name === 'summary.rpt');
-    expect(summary?.confidenceLabel).toBe('設計ファイル未提供');
+    expect(summary?.confidenceLabel).toBe('設計ファイルなし');
     const functions = items.filter((i) => i.type === '出力機能');
     expect(functions.map((f) => f.kindLabel).sort()).toEqual(
       ['CSV出力', 'Excel出力', 'ファイル出力', '印刷'].sort(),

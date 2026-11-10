@@ -174,3 +174,81 @@ describe('exclusion reason is a category, not the matched name', () => {
     expect(scan(text)[0]?.excludeReason).toBe(reason);
   });
 });
+
+// CSV written with Write # or comma separated Print #, and the other ways
+// code produces an Excel file (10/11: found by reading a real corpus).
+describe('CSV and Excel output signals', () => {
+  it('an Open For Output followed by Write # is a CSV file', () => {
+    const [signal] = scan(
+      '    Open sOut For Output As #1',
+      '    Write #1, a, b, c',
+      '    Close #1',
+    );
+    expect(signal).toMatchObject({
+      kind: 'file-output',
+      subkind: 'csv',
+      line: 1,
+    });
+  });
+  it('Print # with a "," between the values is CSV too', () => {
+    const [signal] = scan(
+      '    Open sOut For Output As #1',
+      '    Print #1, a & "," & b',
+      '    Close #1',
+    );
+    expect(signal?.subkind).toBe('csv');
+  });
+  it('plain Print # text, or a write after Close, is not CSV', () => {
+    expect(
+      scan(
+        '    Open sOut For Output As #1',
+        '    Print #1, "header line"',
+        '    Close #1',
+      )[0]?.subkind,
+    ).toBeUndefined();
+    expect(
+      scan(
+        '    Open sOut For Output As #1',
+        '    Close #1',
+        '    Write #2, a, b',
+      )[0]?.subkind,
+    ).toBeUndefined();
+    // A new procedure ends the file of the previous one.
+    expect(
+      scan(
+        '    Open sOut For Output As #1',
+        'End Sub',
+        'Sub Other()',
+        '    Write #1, a',
+      )[0]?.subkind,
+    ).toBeUndefined();
+  });
+  it('a log file written with commas stays excluded, not CSV', () => {
+    const [signal] = scan(
+      '    Open sLogFile For Append As #1',
+      '    Write #1, Now, msg',
+    );
+    expect(signal?.excludeReason).toBe('log');
+    expect(signal?.subkind).toBeUndefined();
+  });
+  it('detects an Excel workbook object, file and ADO source', () => {
+    expect(scan('    Set wb = xl.Workbooks.Add')[0]).toMatchObject({
+      kind: 'excel',
+      name: 'Workbooks',
+    });
+    expect(scan('    sFile = "report.xls"')[0]).toMatchObject({
+      kind: 'excel',
+      name: 'Excel file',
+    });
+    expect(
+      scan('    cs = "Extended Properties=Excel 8.0;HDR=Yes"')[0],
+    ).toMatchObject({ kind: 'excel', name: 'Excel (ADO)' });
+    expect(scan('    Shell "excel.exe " & f')[0]).toMatchObject({
+      kind: 'excel',
+    });
+  });
+  it('ignores Excel and CSV words in comments and unrelated strings', () => {
+    expect(scan('    \' Open f For Output: Workbooks.Add "a.xls"')).toEqual([]);
+    expect(scan('    msg = "export to excel is not available"')).toEqual([]);
+  });
+});

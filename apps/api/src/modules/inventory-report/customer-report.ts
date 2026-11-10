@@ -123,6 +123,12 @@ export type CustomerReport = {
       functions: number;
       programs: number;
       excluded: number;
+      // Excel / CSV export on one side, direct print and other output on the
+      // other; the two add up to `functions`.
+      groups: {
+        export: { functions: number; programs: number };
+        print: { functions: number; programs: number };
+      };
     } | null;
   };
   modules: ModuleRow[];
@@ -664,6 +670,7 @@ export function buildCustomerReport(
             functions: reportSummary.counts.functions,
             programs: reportSummary.counts.functionPrograms,
             excluded: reportSummary.counts.excludedFunctions,
+            groups: reportSummary.counts.groups,
           }
         : null,
     },
@@ -778,7 +785,7 @@ export function buildCustomerReport(
 const ITEM_TYPE_ORDER = ['画面', '帳票', 'バッチ', '出力機能'];
 const TEMPLATE_STATUS_LABELS = {
   'design-file': '設計ファイルあり',
-  'missing-file': '設計ファイル未提供',
+  'missing-file': '設計ファイルなし',
 } as const;
 const OUTPUT_KIND_LABELS: Record<string, string> = {
   print: '印刷',

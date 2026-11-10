@@ -373,7 +373,7 @@ export function AssessmentDocument({
       <div className="ad-section" data-doc="scale" data-page-break>
         <Heading>{SECTIONS.scale}</Heading>
         <Note>{SECTION_NOTES.scale}</Note>
-        <div className="qd-kpis ad-kpis ad-kpis-4">
+        <div className="qd-kpis ad-kpis ad-kpis-5">
           <Kpi
             name="screens"
             label={KPI.screens}
@@ -395,13 +395,33 @@ export function AssessmentDocument({
             }
           />
           <Kpi
-            name="outputs"
-            label={KPI.outputs}
-            value={count(sr?.reports.suspected)}
-            sub={
+            name="exports"
+            label={KPI.exports}
+            value={
               scale.outputFunctions
-                ? KPI.outputsSub(
-                    n(scale.outputFunctions.programs),
+                ? n(scale.outputFunctions.groups?.export.functions ?? 0)
+                : NOT_ANALYZED
+            }
+            sub={
+              scale.outputFunctions?.groups
+                ? KPI.exportsSub(
+                    n(scale.outputFunctions.groups.export.programs),
+                  )
+                : null
+            }
+          />
+          <Kpi
+            name="prints"
+            label={KPI.prints}
+            value={
+              scale.outputFunctions
+                ? n(scale.outputFunctions.groups?.print.functions ?? 0)
+                : NOT_ANALYZED
+            }
+            sub={
+              scale.outputFunctions?.groups
+                ? KPI.printsSub(
+                    n(scale.outputFunctions.groups.print.programs),
                     n(scale.outputFunctions.excluded),
                   )
                 : null
@@ -493,7 +513,7 @@ export function AssessmentDocument({
               <table className="qd-table qd-compact">
                 <thead>
                   <tr>
-                    <th>{KPI.outputs}</th>
+                    <th>{KPI.outputsTitle}</th>
                     <th>{TABLE.count}</th>
                   </tr>
                 </thead>

@@ -91,8 +91,8 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     category: '帳票',
     severity: '高',
     content:
-      'コードから参照されている帳票定義ファイル（.rpt）がソース内にありません。',
-    confirmation: '帳票定義ファイル(.rpt)のご提供をお願いします。',
+      'コードから参照されている帳票定義ファイル（.rpt）がソース内にありません（設計ファイルなし）。',
+    confirmation: '特にありません。',
   },
   REPORT_SUSPECTED: {
     category: '帳票',

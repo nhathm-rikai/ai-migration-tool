@@ -44,10 +44,14 @@ export const KPI = {
   screensSub: (shared: string) => `うち共通 ${shared}`,
   reports: '帳票（種類）',
   reportsSub: (design: string, missing: string) =>
-    `設計ファイルあり ${design}／未提供 ${missing}`,
-  outputs: '印刷・出力機能（要確認）',
-  outputsSub: (programs: string, excluded: string) =>
+    `設計ファイルあり ${design}／なし ${missing}`,
+  exports: 'Excel/CSV出力（要確認）',
+  exportsSub: (programs: string) =>
+    `${programs} プログラム（帳票の種類には含まない）`,
+  prints: '印刷・その他出力（要確認）',
+  printsSub: (programs: string, excluded: string) =>
     `${programs} プログラム（帳票の種類には含まない）${excluded === '0' ? '' : `／ログ・一時ファイル ${excluded} 件は除外`}`,
+  outputsTitle: '印刷・出力機能（要確認）',
   batches: 'バッチ',
   batchesSub: 'フォームなし・Sub Main 起動',
   programs: 'プログラム',
@@ -157,8 +161,8 @@ export const APPENDIX = {
   counting: [
     '画面：プロジェクトが宣言するフォーム（ユーザードキュメント含む）のファイル数。複数のプログラムで使う画面は共通として1回のみ数えます。ファイルが不足・解析不可の画面も数え、備考に記載します。',
     'バッチ：フォームを持たず、起動オブジェクトが Sub Main のプログラム。フォームがあるプログラムは画面として数えます。',
-    '帳票（種類）：Crystal Reports の .rpt（コード上で指定されたファイル名）と DataReport / ActiveReports の定義を、種類ごとに1回だけ数えます。複数のプロシージャ・プログラムから使われても1種類です。定義ファイルがソースにあれば「設計ファイルあり」、名称のみなら「未提供」（お客様に提供を依頼します）。',
-    '印刷・出力機能（要確認）：コード上で印刷（Printer.Print 等）、Excel、CSV、ファイル出力を行う箇所を、プロシージャごとに1件として数えます。帳票であることの証明ではないため、帳票の種類には含めず、お客様の確認をお願いします。ログ・一時ファイルへの出力は除外します。',
+    '帳票（種類）：Crystal Reports の .rpt（コード上で指定されたファイル名）と DataReport / ActiveReports の定義を、種類ごとに1回だけ数えます。複数のプロシージャ・プログラムから使われても1種類です。定義ファイルがソースにあれば「設計ファイルあり」、名称のみなら「設計ファイルなし」とします。',
+    'Excel/CSV出力（要確認）：コード上で Excel や CSV ファイルへ出力する箇所を、プロシージャごとに1件として数えます。印刷・その他出力（要確認）：直接印刷（Printer.Print 等）やその他のファイル出力を同様に数えます。いずれも帳票であることの証明ではないため帳票の種類には含めず、ログ・一時ファイルへの出力は除外します。',
     '数え方はソースコードの機械的な読み取り（字句解析）です。実行時に決まるファイル名や、コード以外で行う出力は検出できません。',
   ],
   complexityTitle: '帳票の複雑度（参考値）',

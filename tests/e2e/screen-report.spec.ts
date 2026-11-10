@@ -25,11 +25,11 @@ test(
     await expect(kpi('reports')).toContainText(
       'Có file thiết kế 2 · Thiếu file 1',
     );
-    await expect(kpi('outputs')).toContainText('3');
-    await expect(kpi('outputs')).toContainText('2 program');
-    await expect(kpi('outputs')).toContainText(
-      'đã loại 1 chỗ ghi log/file tạm',
-    );
+    // Excel/CSV exports (a CSV and Excel) and print: separate cards.
+    await expect(kpi('exports')).toContainText('2');
+    await expect(kpi('exports')).toContainText('2 program');
+    await expect(kpi('prints')).toContainText('1');
+    await expect(kpi('prints')).toContainText('loại 1 chỗ ghi log');
     await expect(kpi('batches')).toContainText('1');
 
     // Columns of the program list.
@@ -59,9 +59,12 @@ test(
     await assessment.getByRole('tab', { name: /^Màn hình và report/ }).click();
     const reports = assessment.getByTestId('program-reports');
     await expect(reports).toContainText('summary.rpt');
-    await expect(reports).toContainText('programs/REPORT/REPORT.BAS:40');
-    await expect(reports).toContainText('Có file thiết kế');
-    await expect(reports).toContainText('Thiếu file (cần xin khách)');
+    await expect(reports).toContainText('Có file');
+    await expect(reports).toContainText('Thiếu file');
+    await expect(reports).not.toContainText('xin khách');
+    // The uses open from the row.
+    await reports.getByRole('button', { name: 'summary.rpt' }).click();
+    await expect(reports).toContainText('programs/REPORT/REPORT.BAS');
     await expect(assessment.getByTestId('program-functions')).toContainText(
       'Xuất Excel',
     );
@@ -77,8 +80,11 @@ test(
       assessment.getByTestId('report-template-table').locator('tbody tr'),
     ).toHaveCount(3);
     await expect(
+      assessment.getByTestId('export-function-table').locator('tbody tr'),
+    ).toHaveCount(2);
+    await expect(
       assessment.getByTestId('output-function-table').locator('tbody tr'),
-    ).toHaveCount(3);
+    ).toHaveCount(1);
     await expect(assessment.getByTestId('excluded-functions')).toContainText(
       '1 chỗ ghi log/file tạm',
     );

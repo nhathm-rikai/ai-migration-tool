@@ -5863,6 +5863,9 @@ fieldset.doc-card {
 .assess-doc-root .ad-kpis-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.assess-doc-root .ad-kpis-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
 .ad-heading {
   margin-top: 16px;
 }
@@ -5985,13 +5988,90 @@ fieldset.doc-card {
 }
 /* Four KPI cards in the screen / report row (screens, report templates,
    print and export functions, batches). */
-.kpi-grid-4 {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+.kpi-grid-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
-.usage-list {
-  margin: 4px 0 0;
-  padding-left: 16px;
-  font-size: 11px;
+/* Report tab: the level chips and the template and function tables share the
+   program list's table style; columns are fixed so numbers line up under
+   their headers. */
+.report-list {
+  margin-top: 16px;
+}
+.report-list h4,
+.report-distribution h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.level-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.level-chips li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.level-chips .level-chips-total {
+  color: var(--fg-2);
+}
+.report-table {
+  table-layout: fixed;
+}
+.report-table th,
+.report-table td {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.report-table > thead > tr > th {
+  vertical-align: bottom;
+}
+.report-table .num {
+  text-align: right;
+}
+.report-table > thead > tr > th:nth-child(1) {
+  width: 26%;
+}
+.report-table > thead > tr > th:nth-child(2) {
+  width: 13%;
+}
+.report-table > thead > tr > th:nth-child(3) {
+  width: 12%;
+}
+.report-table > thead > tr > th:nth-child(4) {
+  width: 20%;
+}
+.report-table > thead > tr > th:nth-child(5) {
+  width: 8%;
+}
+.report-table > thead > tr > th:nth-child(6) {
+  width: 17%;
+}
+.report-table > thead > tr > th:nth-child(7) {
+  width: 4%;
+}
+.report-function-table > thead > tr > th:nth-child(1) {
+  width: 22%;
+}
+.report-function-table > thead > tr > th:nth-child(2) {
+  width: 16%;
+}
+.report-function-table > thead > tr > th:nth-child(3) {
+  width: 38%;
+}
+.report-function-table > thead > tr > th:nth-child(4) {
+  width: 24%;
+}
+.report-table .block {
+  display: block;
+}
+.report-table .program-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

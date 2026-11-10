@@ -343,9 +343,12 @@ export const viMessages = {
         reports: 'Report (帳票) · số mẫu',
         reportsSub: (design: string, missing: string) =>
           `Có file thiết kế ${design} · Thiếu file ${missing}`,
-        outputs: 'Chức năng in/xuất (cần xác nhận)',
-        outputsSub: (programs: string, excluded: string) =>
-          `${programs} program · không cộng vào số mẫu report${excluded === '0' ? '' : ` · đã loại ${excluded} chỗ ghi log/file tạm`}`,
+        exports: 'Xuất Excel/CSV',
+        functionsSub: (programs: string) =>
+          `${programs} program · cần xác nhận`,
+        prints: 'In / ghi file khác',
+        printsSub: (programs: string, excluded: string) =>
+          `${programs} program · cần xác nhận${excluded === '0' ? '' : ` · loại ${excluded} chỗ ghi log`}`,
         batches: 'Batch (バッチ)',
         batchesSub: 'Program không có form, khởi động bằng Sub Main',
         noData: 'Chưa có dữ liệu',
@@ -355,8 +358,8 @@ export const viMessages = {
       reference: (version: string | null) =>
         version === null ? 'Tham khảo' : `Tham khảo · mô hình ${version}`,
       distribution: {
-        title: 'Phân bố mẫu report',
-        help: 'Chỉ tính trên các mẫu report. Mức phức tạp là phân loại tham khảo, chấm trên procedure gọi mẫu (lấy mức cao nhất nếu mẫu được gọi ở nhiều nơi); không phải effort.',
+        title: 'Độ phức tạp của mẫu report',
+        help: 'Chỉ mang tính tham khảo, không phải effort.',
         byLevel: 'Theo mức phức tạp',
         byKind: 'Theo loại',
         total: 'Tổng',
@@ -378,7 +381,7 @@ export const viMessages = {
       },
       templates: {
         title: 'Mẫu report',
-        help: 'Mỗi mẫu (file .rpt hoặc DataReport) được tính một lần dù được gọi ở nhiều procedure hay nhiều program. Thiếu file thiết kế thì vẫn là một mẫu, cần xin khách cung cấp file.',
+        help: 'Mỗi mẫu (file .rpt hoặc DataReport) tính một lần dù được gọi ở nhiều nơi.',
         none: 'Không tìm thấy mẫu report nào.',
         columns: {
           name: 'Mẫu',
@@ -386,22 +389,33 @@ export const viMessages = {
           status: 'File thiết kế',
           uses: 'Nơi dùng',
           programs: 'Program',
-          complexity: 'Phức tạp (tham khảo)',
+          complexity: 'Phức tạp',
+          details: 'Chi tiết nơi dùng',
         },
         kind: {
           crystal: 'Crystal Reports',
-          'data-report': 'DataReport / ActiveReports',
+          'data-report': 'DataReport',
         },
         status: {
-          'design-file': 'Có file thiết kế',
-          'missing-file': 'Thiếu file (cần xin khách)',
+          'design-file': 'Có file',
+          'missing-file': 'Thiếu file',
         },
-        usesCount: (count: string) => `${count} nơi`,
+      },
+      usage: {
+        program: 'Program',
+        file: 'File',
+        line: 'Dòng',
+        procedure: 'Procedure',
       },
       functions: {
-        title: 'Chức năng in/xuất cần xác nhận',
-        help: 'Chỗ trong code có in trực tiếp, xuất Excel, xuất CSV hoặc ghi file. Đây chỉ là dấu hiệu, chưa chứng minh là một mẫu report: cần khách xác nhận. Không cộng vào số mẫu report.',
-        none: 'Không có chức năng in/xuất nào.',
+        title: 'Chức năng xuất/in cần xác nhận',
+        exportTitle: 'Xuất Excel/CSV (cần xác nhận)',
+        exportHelp:
+          'Code ghi dữ liệu ra file Excel hoặc CSV. Chưa chứng minh là một mẫu report.',
+        printTitle: 'In và ghi file khác (cần xác nhận)',
+        printHelp:
+          'Code in trực tiếp hoặc ghi file khác. Không cộng vào số mẫu report.',
+        none: 'Không có.',
         excluded: (count: string) =>
           `Đã loại ${count} chỗ ghi log/file tạm (không tính).`,
         columns: {
@@ -415,7 +429,7 @@ export const viMessages = {
           excel: 'Xuất Excel',
           csv: 'Xuất CSV',
           'file-output': 'Ghi file',
-          unknown: 'Có thư viện report, chưa rõ mẫu',
+          unknown: 'Thư viện report, chưa rõ mẫu',
         },
       },
       list: {
@@ -496,8 +510,7 @@ export const viMessages = {
         },
         suspectedNote:
           'Dòng "Nghi có" chỉ là dấu hiệu program có thể xuất report; không cộng vào tổng report.',
-        functionsNote:
-          'Chức năng in/xuất chỉ là dấu hiệu, không cộng vào số mẫu report của program.',
+        functionsNote: 'Chức năng xuất/in không cộng vào số mẫu report.',
       },
     },
     dashboard: {

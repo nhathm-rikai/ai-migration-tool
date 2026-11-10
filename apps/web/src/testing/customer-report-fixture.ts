@@ -80,7 +80,15 @@ export function customerReportFixture(): CustomerReportDocument {
         suspectedPrograms: 2,
       },
       reportTemplates: { templates: 3, designFile: 2, missingFile: 1 },
-      outputFunctions: { functions: 2, programs: 2, excluded: 0 },
+      outputFunctions: {
+        functions: 2,
+        programs: 2,
+        excluded: 0,
+        groups: {
+          export: { functions: 1, programs: 1 },
+          print: { functions: 1, programs: 1 },
+        },
+      },
     },
     modules: [
       {

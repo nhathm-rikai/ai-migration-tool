@@ -140,17 +140,39 @@ function signalsOf(statement: string): Omit<ReportSignal, 'line'>[] {
   // Excel started as a program: Shell "...EXCEL.EXE ...".
   if (
     /(?<![\w.])Shell\b/i.test(masked) &&
-    literals.some((text) => /excel\.exe/i.test(text))
+    literals.some((text) => /excel/i.test(text))
   )
     found.push({ kind: 'excel', name: 'EXCEL.EXE' });
+  // Excel through its object model, a workbook file, or an ADO Excel source.
+  if (/(?<!\w)Workbooks\s*\.\s*(?:Add|Open)\b/i.test(masked))
+    found.push({ kind: 'excel', name: 'Workbooks' });
+  if (literals.some((text) => /\.xls[xmb]?\s*"$/i.test(text)))
+    found.push({ kind: 'excel', name: 'Excel file' });
+  if (literals.some((text) => /\bExcel\s+\d+\.\d+/i.test(text)))
+    found.push({ kind: 'excel', name: 'Excel (ADO)' });
   return found;
 }
+
+// A write that makes the file comma separated: Write # (the statement
+// separates the fields with commas) or Print # with a "," between values.
+function writesCsv(statement: string): boolean {
+  const masked = maskStrings(statement);
+  if (/^\s*Write\s+#/i.test(masked)) return true;
+  if (!/^\s*Print\s+#/i.test(masked)) return false;
+  return [...statement.matchAll(STRING_LITERAL)].some(
+    (match) => match[0].slice(1, -1).trim() === ',',
+  );
+}
+const ENDS_OPEN_FILE = /^\s*(?:Close\b|End\s+(?:Sub|Function|Property)\b)/i;
 
 export function findVb6ReportSignals(
   lines: string[],
   options: { module: Vb6ModuleKind },
 ): ReportSignal[] {
   const signals: ReportSignal[] = [];
+  // The last Open For Output/Append of the procedure being read: a Write # or
+  // a comma separated Print # after it makes that file CSV.
+  let openFile: ReportSignal | null = null;
   let incoming: Vb6Continuation = 'none';
   let buffer: { text: string; line: number } | null = null;
   for (
@@ -169,9 +191,18 @@ export function findVb6ReportSignals(
     if (buffer && line.continuation !== 'code') {
       // A statement may hold several ':'-separated statements; only the
       // whole text is matched, which is enough for the signals above.
-      for (const part of buffer.text.split(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/))
-        for (const signal of signalsOf(part))
-          signals.push({ ...signal, line: buffer.line });
+      for (const part of buffer.text.split(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/)) {
+        const masked = maskStrings(part);
+        if (ENDS_OPEN_FILE.test(masked) || DECLARATION.test(masked.trim()))
+          openFile = null;
+        else if (openFile && !openFile.excludeReason && writesCsv(part))
+          openFile.subkind = 'csv';
+        for (const signal of signalsOf(part)) {
+          const found: ReportSignal = { ...signal, line: buffer.line };
+          signals.push(found);
+          if (found.kind === 'file-output') openFile = found;
+        }
+      }
       buffer = null;
     }
   }

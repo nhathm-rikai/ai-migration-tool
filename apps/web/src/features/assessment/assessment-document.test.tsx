@@ -51,9 +51,15 @@ describe('AssessmentDocument cover and scale', () => {
     // Reports by template, with the design-file split; the print and export
     // functions are their own card, not added to the template count.
     expect(kpi('reports')).toContain(String(sr?.reports.counted));
-    expect(kpi('reports')).toContain('設計ファイルあり 2／未提供 1');
-    expect(kpi('outputs')).toContain(String(sr?.reports.suspected));
-    expect(kpi('outputs')).toContain('帳票の種類には含まない');
+    expect(kpi('reports')).toContain('設計ファイルあり 2／なし 1');
+    expect(kpi('exports')).toContain('Excel/CSV出力（要確認）');
+    expect(kpi('exports')).toContain('帳票の種類には含まない');
+    expect(kpi('prints')).toContain('印刷・その他出力（要確認）');
+    // The two function cards add up to the functions (suspected).
+    expect(
+      (report.scale.outputFunctions?.groups?.export.functions ?? 0) +
+        (report.scale.outputFunctions?.groups?.print.functions ?? 0),
+    ).toBe(sr?.reports.suspected);
     expect(kpi('batches')).toContain(String(sr?.batches));
     expect(kpi('programs')).toContain(String(report.scale.programs));
     expect(kpi('lines')).toContain('655');
@@ -345,7 +351,7 @@ describe('AssessmentDocument sections 2 to 6', () => {
       '画面：',
       'バッチ：',
       '帳票（種類）：',
-      '印刷・出力機能（要確認）：',
+      'Excel/CSV出力（要確認）：',
     ])
       expect(appendix).toContain(rule);
     expect(appendix).toContain('帳票の複雑度（参考値）');

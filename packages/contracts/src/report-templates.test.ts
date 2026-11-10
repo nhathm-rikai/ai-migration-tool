@@ -232,6 +232,40 @@ describe('output functions (need confirmation, never added to templates)', () =>
     expect(excluded?.procedure).toBe('M.Log');
   });
 
+  it('splits the functions into Excel/CSV export and the rest (print, other file output, report runtime)', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [
+          row({ kind: 'excel', name: 'Excel.Application', procedureId: 'M.A', line: 1 }),
+          row({
+            kind: 'file-output',
+            name: 'Open For Output',
+            subkind: 'csv',
+            procedureId: 'M.B',
+            line: 2,
+          }),
+          row({ kind: 'print', name: 'Printer', procedureId: 'M.C', line: 3 }),
+        ],
+        'p/B.vbp': [
+          row({ kind: 'print', name: 'Printer', procedureId: 'M.D', line: 4 }),
+          row({
+            kind: 'file-output',
+            name: 'Open For Output',
+            procedureId: 'M.E',
+            line: 5,
+          }),
+          row({ kind: 'unknown', name: 'crystl32.ocx', file: 'p/B.vbp', line: null }),
+        ],
+      }),
+    );
+    expect(summary?.counts.groups).toEqual({
+      export: { functions: 2, programs: 1 },
+      print: { functions: 4, programs: 2 },
+    });
+    // The groups add up to the functions.
+    expect(summary?.counts.functions).toBe(6);
+  });
+
   it('a log in the same procedure as a print does not remove the print function', () => {
     const summary = deriveReportSummary(
       inventory({

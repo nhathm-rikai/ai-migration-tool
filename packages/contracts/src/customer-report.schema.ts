@@ -102,7 +102,17 @@ export const CustomerReportSchema = Type.Object({
     ),
     outputFunctions: Type.Optional(
       Nullable(
-        Type.Object({ functions: Count, programs: Count, excluded: Count }),
+        Type.Object({
+          functions: Count,
+          programs: Count,
+          excluded: Count,
+          groups: Type.Optional(
+            Type.Object({
+              export: Type.Object({ functions: Count, programs: Count }),
+              print: Type.Object({ functions: Count, programs: Count }),
+            }),
+          ),
+        }),
       ),
     ),
   }),

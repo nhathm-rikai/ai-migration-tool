@@ -4,17 +4,17 @@
 
 ## 1. Version
 
-| Trường | Giá trị hiện tại | Ý nghĩa |
-|---|---|---|
-| `schemaVersion` | `source-inventory-v1` | Hình dạng JSON. Thêm trường optional giữ version; đổi tên, bỏ hoặc đổi nghĩa trường phải tăng version. |
-| `metricVersion` | `vb6-physical-code-v1` | Cách đếm dòng, theo [source-analysis](source-analysis.md) §4. |
-| `procedureLinesVersion` | `vb6-procedure-lines-v1` | Breakdown Physical/Code/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có. |
-| `sqlAccessVersion` | `sql-access-v5` | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
-| `callGraphVersion` | `call-graph-v2` | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`. |
-| `complexityVersion` | `complexity-v1` | Công thức điểm complexity (mục 5), chỉ là phân loại tham khảo. Inventory cũ ghi `complexity-v0` hoặc `complexity-v0-draft` (cùng công thức v0: SQL động chỉ đếm tên bảng runtime, ngưỡng 40/55, không có `very-high`). |
-| `screenReportVersion` | `screen-report-v2` (v1: inventory cũ, vẫn đọc được) | Luật đếm 画面・帳票・バッチ (mục 6). Optional: inventory cũ không có, và khi đó mọi nơi hiển thị "chưa có dữ liệu, cần phân tích lại", không hiện 0. |
-| `reportComplexityVersion` | `report-complexity-v1-draft` | Phân loại tham khảo độ phức tạp từng report (mục 6.3), không phải effort. Optional như trên. |
-| `tableNames.version` | `table-name-v1` | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1). |
+| Trường                    | Giá trị hiện tại                                    | Ý nghĩa                                                                                                                                                                                                                                                       |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`           | `source-inventory-v1`                               | Hình dạng JSON. Thêm trường optional giữ version; đổi tên, bỏ hoặc đổi nghĩa trường phải tăng version.                                                                                                                                                        |
+| `metricVersion`           | `vb6-physical-code-v1`                              | Cách đếm dòng, theo [source-analysis](source-analysis.md) §4.                                                                                                                                                                                                 |
+| `procedureLinesVersion`   | `vb6-procedure-lines-v1`                            | Breakdown Physical/Code/Executable/Comment/Blank/SQL theo procedure, [source-analysis](source-analysis.md) §4.1. Optional: inventory cũ không có.                                                                                                             |
+| `sqlAccessVersion`        | `sql-access-v5`                                     | Cách dựng chuỗi SQL (theo biến, nhánh, property), trích bảng/CRUD và đếm SQL ghép giá trị runtime/bind parameter. v5 thêm `concatenatedSql`/`parameterizedSql` và đọc `vbCrLf`, `vbNewLine`, `vbCr`, `vbLf`, `vbTab` là khoảng trắng thay vì giá trị runtime. |
+| `callGraphVersion`        | `call-graph-v2`                                     | Cách nối lời gọi procedure, có đệ quy và hậu tố `$`.                                                                                                                                                                                                          |
+| `complexityVersion`       | `complexity-v1`                                     | Công thức điểm complexity (mục 5), chỉ là phân loại tham khảo. Inventory cũ ghi `complexity-v0` hoặc `complexity-v0-draft` (cùng công thức v0: SQL động chỉ đếm tên bảng runtime, ngưỡng 40/55, không có `very-high`).                                        |
+| `screenReportVersion`     | `screen-report-v2` (v1: inventory cũ, vẫn đọc được) | Luật đếm 画面・帳票・バッチ (mục 6). Optional: inventory cũ không có, và khi đó mọi nơi hiển thị "chưa có dữ liệu, cần phân tích lại", không hiện 0.                                                                                                          |
+| `reportComplexityVersion` | `report-complexity-v1-draft`                        | Phân loại tham khảo độ phức tạp từng report (mục 6.3), không phải effort. Optional như trên.                                                                                                                                                                  |
+| `tableNames.version`      | `table-name-v1`                                     | Cách gộp tên bảng cho góc nhìn sau mapping (mục 4.1).                                                                                                                                                                                                         |
 
 Số liệu khác version không được trộn trong cùng report.
 
@@ -73,14 +73,14 @@ Một program là một file project (`.vbp`). `members[]` ghi path đã khai b�
 
 Điểm 0–100, tổng 6 phần, mỗi phần theo thang log và có trần:
 
-| Phần | Input | Trần | Đạt trần khi |
-|---|---|---|---|
-| size | `ownCodeLines` | 30 | 10.000 dòng |
-| decisions | `decisionPoints` | 20 | 2.000 |
-| tables | số bảng trong `crud` | 15 | 30 |
-| dynamicSql | 3 × `metrics.dynamicSql` (tên bảng runtime) + `metrics.concatenatedSql` (SQL ghép giá trị runtime) | 15 | 100 |
-| components | số OCX | 10 | 8 |
-| externalApis | số API native gọi tới | 10 | 10 |
+| Phần         | Input                                                                                              | Trần | Đạt trần khi |
+| ------------ | -------------------------------------------------------------------------------------------------- | ---- | ------------ |
+| size         | `ownCodeLines`                                                                                     | 30   | 10.000 dòng  |
+| decisions    | `decisionPoints`                                                                                   | 20   | 2.000        |
+| tables       | số bảng trong `crud`                                                                               | 15   | 30           |
+| dynamicSql   | 3 × `metrics.dynamicSql` (tên bảng runtime) + `metrics.concatenatedSql` (SQL ghép giá trị runtime) | 15   | 100          |
+| components   | số OCX                                                                                             | 10   | 8            |
+| externalApis | số API native gọi tới                                                                              | 10   | 10           |
 
 SQL ghép giá trị cũng là SQL dựng lúc chạy, nhưng nhẹ hơn tên bảng runtime: phần lớn là đổi sang bind parameter và test lại (SQL injection, format ngày/số), còn tên bảng runtime làm CRUD không biết trước. Vì vậy một tên bảng runtime tính bằng 3 câu ghép. `parameterizedSql` (bind `:name`) không vào điểm. Tên phần `dynamicSql` giữ như v0 để inventory cũ vẫn hợp schema.
 
@@ -106,14 +106,14 @@ Tất cả là fact từ code/project file, không gọi AI. Trường mới đ�
 
 `programs[].reports[]`: `kind`, `name`, `file`, `line` (null với bằng chứng cấp project), `confidence`, `shared`, `procedureId`, `warnings`, `complexity`. Một dòng cho mỗi (kind, tên, procedure); code ở file dùng chung gắn vào mọi program khai báo file, tổng dự án tính một lần.
 
-| `kind` | Nhận diện | `confidence` |
-|---|---|---|
-| `data-report` | member `designer` có header `Begin {guid} DataReport/ActiveReport… <tên>` trong file (đọc header, chưa parse thiết kế) | `detected` |
-| `crystal` | chuỗi `"….rpt"` trong code (không tính comment, đoạn trong chuỗi khác) | `detected` nếu có file cùng tên (không phân biệt thư mục/hoa thường) trong source, ngược lại `referenced` + `REPORT_FILE_MISSING` |
-| `excel` | `CreateObject("Excel.Application")`, `GetObject(, "Excel.Application")`, `New Excel.Application` | `suspected` |
-| `print` | `Printer.Print` / `Printer.EndDoc` / `PrintForm` | `suspected` |
-| `file-output` | `Open … For Output/Append` | `suspected` |
-| `unknown` | program có reference/OCX báo cáo (Crystal `crystl32`, `craxdrt`, `crviewer`; DataReport `msdbrptr`/`msdatrep`) mà không có dòng cùng loại | `suspected` |
+| `kind`        | Nhận diện                                                                                                                                 | `confidence`                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `data-report` | member `designer` có header `Begin {guid} DataReport/ActiveReport… <tên>` trong file (đọc header, chưa parse thiết kế)                    | `detected`                                                                                                                        |
+| `crystal`     | chuỗi `"….rpt"` trong code (không tính comment, đoạn trong chuỗi khác)                                                                    | `detected` nếu có file cùng tên (không phân biệt thư mục/hoa thường) trong source, ngược lại `referenced` + `REPORT_FILE_MISSING` |
+| `excel`       | `CreateObject("Excel.Application")`, `GetObject(, "Excel.Application")`, `New Excel.Application`                                          | `suspected`                                                                                                                       |
+| `print`       | `Printer.Print` / `Printer.EndDoc` / `PrintForm`                                                                                          | `suspected`                                                                                                                       |
+| `file-output` | `Open … For Output/Append`                                                                                                                | `suspected`                                                                                                                       |
+| `unknown`     | program có reference/OCX báo cáo (Crystal `crystl32`, `craxdrt`, `crviewer`; DataReport `msdbrptr`/`msdatrep`) mà không có dòng cùng loại | `suspected`                                                                                                                       |
 
 `totals.screenReport.reports`: `rows` (số dòng duy nhất, bằng tổng `byKind` và tổng `byLevel`), `counted` (detected + referenced, "báo cáo phát hiện được"), `suspected` (hiển thị riêng, không cộng vào `counted`); `suspectedPrograms` = số program có ít nhất một dòng suspected; `batches` = số program `batch`.
 
@@ -126,7 +126,7 @@ Giới hạn: lexical. `file-output` gồm cả ghi log/work file; xuất Excel 
 Các dòng ở 6.2 là **dấu hiệu** (một chuỗi `.rpt` trong một procedure, một `Printer.Print`, một `Open ... For Output`), không phải số mẫu report: cùng `Invoice.rpt` ở hai procedure là hai dòng. Cái khách hỏi là số mẫu, nên mọi chỗ hiển thị và xuất báo cáo dùng hai danh sách tách rời do `deriveReportSummary()` (contracts, `report-templates.ts`) suy ra từ các dòng đã lưu (nên inventory cũ cũng đọc được, không cần phân tích lại):
 
 1. **Mẫu report** (`templates`, cấp dự án): khử trùng toàn dự án theo khóa chuẩn hóa: Crystal = tên file `.rpt` bỏ thư mục, không phân biệt hoa thường; DataReport = file `.dsr` thật. Mỗi mẫu có `status`: `design-file` (có file thiết kế trong source) hoặc `missing-file` (chỉ có tên trong code, cần xin khách file); `usages[]` (file, dòng, procedure), `programs[]`, độ phức tạp = mức cao nhất của các nơi dùng. X = A (`design-file`) + B (`missing-file`). `REPORT_FILE_MISSING` là danh sách mẫu B, mỗi mẫu một lần. Tên report động (ghép chuỗi) không được analyzer nhận ra nên không thành mẫu; chỗ gọi runtime mà không có mẫu nào thành một chức năng `unknown`.
-2. **Chức năng in/xuất cần xác nhận** (`functions`): các dấu hiệu `print`, `excel` (`Excel.Application` hoặc `Shell "…EXCEL.EXE"`), `file-output` (`subkind: csv` khi đường dẫn có `.csv`) và `unknown`, gom theo (file, procedure) thành một chức năng, mỗi chức năng có bằng chứng file:dòng. **Không cộng vào X.** Ghi file vào log/file tạm bị loại: đường dẫn (biểu thức giữa `Open` và `For`) có từ `log`, `tmp`, `temp`, `debug`, `err`, `error`, `trace` (tách theo chữ hoa/thường và ký tự không phải chữ), hoặc một tên file kết thúc bằng `log`/`tmp`/`temp` (trừ `catalog`, `dialog`... ), được ghi `excludeReason` (`log` | `temp` | `debug` | `error`: loại, không phải tên khớp) và đếm riêng ở `excludedFunctions`. Giới hạn: tên biến/file không chứa các từ đó vẫn được tính là chức năng cần xác nhận.
+2. **Chức năng xuất/in cần xác nhận** (`functions`): các dấu hiệu `print`, `excel` (`Excel.Application`, `Workbooks.Add/Open`, `Shell` chạy Excel, chuỗi file `.xls/.xlsx/.xlsm`, nguồn ADO `Excel 8.0`), `file-output` (`subkind: csv` khi đường dẫn có `.csv`, hoặc khi sau `Open … For Output/Append` trong cùng procedure có `Write #` hoặc `Print #` ngăn giá trị bằng chuỗi `","`) và `unknown`, gom theo (file, procedure) thành một chức năng, mỗi chức năng có bằng chứng file:dòng. **Không cộng vào X.** Ghi file vào log/file tạm bị loại: đường dẫn (biểu thức giữa `Open` và `For`) có từ `log`, `tmp`, `temp`, `debug`, `err`, `error`, `trace` (tách theo chữ hoa/thường và ký tự không phải chữ), hoặc một tên file kết thúc bằng `log`/`tmp`/`temp` (trừ `catalog`, `dialog`... ), được ghi `excludeReason` (`log` | `temp` | `debug` | `error`: loại, không phải tên khớp) và đếm riêng ở `excludedFunctions`. Hai nhóm hiển thị: **Excel/CSV** (có bằng chứng `excel` hoặc `csv`) và **in và ghi file khác** (còn lại: in trực tiếp, ghi file không phải CSV, thư viện report không có mẫu); hai nhóm cộng lại bằng tổng chức năng (`counts.groups`). Giới hạn: tên biến/file không chứa các từ log/tmp vẫn được tính là chức năng cần xác nhận; ghi CSV bằng cách ghép chuỗi mà không dùng `Write #`/`Print #` với `","` chưa nhận ra.
 
 `programs[].reports[]` thêm `subkind` và `excludeReason` (optional). Dòng dấu hiệu cũ giữ nguyên làm bằng chứng và cho báo cáo kỹ thuật AR01; `totals.screenReport.reports` vẫn là số dấu hiệu (không dùng để hiển thị).
 

@@ -131,14 +131,21 @@ function sheet1(report: CustomerReport): Sheet {
     '帳票（種類）',
     sr ? sr.reports.counted : NOT_ANALYZED,
     templates
-      ? `設計ファイルあり ${templates.designFile}／未提供 ${templates.missingFile}`
+      ? `設計ファイルあり ${templates.designFile}／なし ${templates.missingFile}`
       : null,
   );
   b.row(
-    '印刷・出力機能（要確認）',
-    sr ? sr.reports.suspected : NOT_ANALYZED,
+    'Excel/CSV出力（要確認）',
+    functions ? functions.groups.export.functions : NOT_ANALYZED,
     functions
-      ? `${functions.programs} プログラム（帳票の種類には含みません）${functions.excluded > 0 ? `／ログ・一時ファイル ${functions.excluded} 件は除外` : ''}`
+      ? `${functions.groups.export.programs} プログラム（帳票の種類には含みません）`
+      : null,
+  );
+  b.row(
+    '印刷・その他出力（要確認）',
+    functions ? functions.groups.print.functions : NOT_ANALYZED,
+    functions
+      ? `${functions.groups.print.programs} プログラム（帳票の種類には含みません）${functions.excluded > 0 ? `／ログ・一時ファイル ${functions.excluded} 件は除外` : ''}`
       : null,
   );
   b.row('バッチ', sr ? sr.batches : NOT_ANALYZED);

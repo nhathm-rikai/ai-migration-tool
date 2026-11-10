@@ -89,11 +89,11 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     expect(kpi('reports').textContent).toContain(
       `Có file thiết kế ${counts?.designFile} · Thiếu file ${counts?.missingFile}`,
     );
-    expect(within(kpi('outputs')).getByText('2')).toBeTruthy();
-    expect(kpi('outputs').textContent).toContain('2 program');
-    expect(kpi('outputs').textContent).toContain(
-      'không cộng vào số mẫu report',
-    );
+    // Excel/CSV (Invoice) and print (Batch) are a card each.
+    expect(within(kpi('exports')).getByText('1')).toBeTruthy();
+    expect(kpi('exports').textContent).toContain('1 program');
+    expect(within(kpi('prints')).getByText('1')).toBeTruthy();
+    expect(kpi('prints').textContent).toContain('cần xác nhận');
     expect(within(kpi('batches')).getByText('1')).toBeTruthy();
   });
 
@@ -136,10 +136,17 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     const reports = screen.getByTestId('program-reports');
     expect(within(reports).getByText('common.rpt')).toBeTruthy();
     expect(within(reports).getByText('bill.rpt')).toBeTruthy();
+    // The uses open from the row: file and line in their own columns.
+    fireEvent.click(within(reports).getByRole('button', { name: 'bill.rpt' }));
     expect(
-      within(reports).getByText('programs/Invoice/Invoice.bas:20'),
-    ).toBeTruthy();
-    expect(within(reports).getByText(/Thiếu file/)).toBeTruthy();
+      within(reports).getAllByText('programs/Invoice/Invoice.bas').length,
+    ).toBeGreaterThan(0);
+    expect(within(reports).getAllByText('20').length).toBeGreaterThan(0);
+    expect(within(reports).getAllByText('Thiếu file').length).toBeGreaterThan(
+      0,
+    );
+    // The wording stays short: no request to the customer in the UI.
+    expect(reports.textContent).not.toContain('xin khách');
     const functions = screen.getByTestId('program-functions');
     expect(within(functions).getByText('Xuất Excel')).toBeTruthy();
   });
@@ -150,12 +157,15 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     await waitFor(() => expect(kpi('screens').textContent).toContain('画面'));
     expect(kpi('screens').textContent).toContain('共通 1 件');
     expect(kpi('reports').textContent).toContain('帳票（種類）');
-    expect(kpi('outputs').textContent).toContain('印刷・出力機能（要確認）');
+    expect(kpi('exports').textContent).toContain('Excel/CSV出力');
+    expect(kpi('prints').textContent).toContain('印刷・その他出力');
     expect(kpi('batches').textContent).toContain('バッチ');
     fireEvent.click(screen.getByRole('button', { name: 'Invoice' }));
     fireEvent.click(screen.getByRole('tab', { name: /^画面と帳票/ }));
     const reports = screen.getByTestId('program-reports');
-    expect(within(reports).getByText(/未提供/)).toBeTruthy();
+    expect(within(reports).getAllByText('ファイルなし').length).toBeGreaterThan(
+      0,
+    );
     const functions = screen.getByTestId('program-functions');
     expect(within(functions).getByText('Excel出力')).toBeTruthy();
   });
@@ -167,7 +177,7 @@ describe('AR04-AC05 inventory without screen/report data', () => {
     expect(screen.getByTestId('screen-report-nodata').textContent).toContain(
       'Chưa có dữ liệu',
     );
-    for (const key of ['screens', 'reports', 'outputs', 'batches']) {
+    for (const key of ['screens', 'reports', 'exports', 'prints', 'batches']) {
       expect(kpi(key).textContent).toContain('—');
       expect(within(kpi(key)).queryByText('0')).toBeNull();
     }
@@ -190,46 +200,68 @@ describe('AR04-AC11/AC12 report templates and output functions', () => {
     fireEvent.click(screen.getByRole('tab', { name: /^Report \(帳票\)/ }));
   };
 
-  it('counts templates in the level table and the list, and lists the functions apart', async () => {
+  it('counts templates in the level chips and the list; the two function lists are apart', async () => {
     await openReports();
     expect(screen.getByTestId('report-rows-by-level').textContent).toBe('3');
     expect(
       screen.getByTestId('report-template-table').querySelectorAll('tbody tr'),
     ).toHaveLength(3);
     expect(
+      screen.getByTestId('export-function-table').querySelectorAll('tbody tr'),
+    ).toHaveLength(1);
+    expect(
       screen.getByTestId('output-function-table').querySelectorAll('tbody tr'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
+    // A level without a template shows no empty chip for "not rated".
     const unrated = document.querySelector('[data-level="unrated"]');
-    expect(unrated?.textContent).toContain('Chưa đánh giá');
+    expect(unrated === null || /[1-9]/.test(unrated.textContent ?? '')).toBe(
+      true,
+    );
   });
 
-  it('lists each template once with its design-file state, uses and complexity', async () => {
+  it('lists each template once with its design-file state, and opens its uses from the row', async () => {
     await openReports();
     const table = screen.getByTestId('report-template-table');
     // A shared template appears once, for both programs.
     expect(within(table).getAllByText('common.rpt')).toHaveLength(1);
     expect(within(table).getByText('Invoice, Order')).toBeTruthy();
-    expect(within(table).getByText('Thiếu file (cần xin khách)')).toBeTruthy();
+    expect(within(table).getByText('Thiếu file')).toBeTruthy();
     const high = within(table).getByText(/^Cao · 7/);
     expect(high.getAttribute('title')).toContain('Điểm rẽ nhánh: 30 → +3');
     expect(high.getAttribute('title')).toContain('Thiết kế chưa phân tích');
-    expect(screen.getByTestId('report-reference').textContent).toContain(
-      'Tham khảo · mô hình report-complexity-v1-draft',
-    );
-    // The uses are evidence, listed under each template.
-    expect(within(table).getByText('programs/Order/Order.bas:12')).toBeTruthy();
+    // No request to the customer and no model version in the UI.
+    expect(document.body.textContent).not.toContain('xin khách');
+    expect(document.body.textContent).not.toContain('report-complexity-v1');
+    // The number of uses is a plain number; the row opens a small table.
+    expect(within(table).queryByText(/nơi$/)).toBeNull();
+    fireEvent.click(within(table).getByRole('button', { name: 'common.rpt' }));
+    expect(within(table).getAllByText(/.bas$/).length).toBeGreaterThan(0);
+    expect(
+      within(table).getByRole('columnheader', { name: 'Procedure' }),
+    ).toBeTruthy();
+    expect(
+      within(table)
+        .getByRole('button', { name: 'common.rpt' })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
   });
 
-  it('says what an output function is and that it is not counted as a report', async () => {
+  it('says what each function list is and that it is not counted as a report', async () => {
     await openReports();
     expect(
-      screen.getByText(
-        /Đây chỉ là dấu hiệu, chưa chứng minh là một mẫu report/,
+      screen.getByRole('heading', { name: /^Xuất Excel\/CSV/ }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: /^In và ghi file khác/ }),
+    ).toBeTruthy();
+    expect(
+      within(screen.getByTestId('export-function-table')).getByText(
+        'Xuất Excel',
       ),
     ).toBeTruthy();
-    const table = screen.getByTestId('output-function-table');
-    expect(within(table).getByText('Xuất Excel')).toBeTruthy();
-    expect(within(table).getByText('In')).toBeTruthy();
+    expect(
+      within(screen.getByTestId('output-function-table')).getByText('In'),
+    ).toBeTruthy();
   });
 
   it('finds a template by name', async () => {
@@ -246,15 +278,15 @@ describe('AR04-AC11/AC12 report templates and output functions', () => {
     await openReports();
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     await waitFor(() =>
-      expect(screen.getByTestId('report-reference').textContent).toContain(
-        '参考値 · モデル report-complexity-v1-draft',
-      ),
+      expect(
+        screen.getByRole('heading', { name: 'Excel/CSV出力（要確認）' }),
+      ).toBeTruthy(),
     );
     expect(
-      screen.getByRole('heading', { name: '印刷・出力機能（要確認）' }),
+      screen.getByRole('heading', { name: '印刷・その他出力（要確認）' }),
     ).toBeTruthy();
     expect(
-      within(screen.getByTestId('output-function-table')).getByText(
+      within(screen.getByTestId('export-function-table')).getByText(
         'Excel出力',
       ),
     ).toBeTruthy();

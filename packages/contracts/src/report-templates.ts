@@ -69,6 +69,18 @@ export const OUTPUT_FUNCTION_KINDS = [
 ] as const;
 export type OutputFunctionKind = (typeof OUTPUT_FUNCTION_KINDS)[number];
 
+// Excel/CSV export on one side; direct print, other file output and a report
+// runtime without a template on the other.
+export const OUTPUT_FUNCTION_GROUPS = ['export', 'print'] as const;
+export type OutputFunctionGroup = (typeof OUTPUT_FUNCTION_GROUPS)[number];
+
+export const groupOfFunction = (entry: {
+  kinds: readonly OutputFunctionKind[];
+}): OutputFunctionGroup =>
+  entry.kinds.some((kind) => kind === 'excel' || kind === 'csv')
+    ? 'export'
+    : 'print';
+
 export type OutputFunction = {
   id: string;
   file: string;
@@ -93,6 +105,13 @@ export type ReportSummary = {
     functions: number;
     // Distinct programs holding at least one of them.
     functionPrograms: number;
+    // The same functions in two groups that add up to `functions`: Excel or CSV
+    // export (any evidence of it), and everything else (direct print, other
+    // file output, a report runtime without a template).
+    groups: Record<
+      OutputFunctionGroup,
+      { functions: number; programs: number }
+    >;
     // Log / temporary file outputs left out of the count.
     excludedFunctions: number;
   };
@@ -283,6 +302,20 @@ export function deriveReportSummary(
       functions: counted.length,
       functionPrograms: new Set(counted.flatMap((entry) => entry.programs))
         .size,
+      groups: Object.fromEntries(
+        OUTPUT_FUNCTION_GROUPS.map((group) => {
+          const inGroup = counted.filter(
+            (entry) => groupOfFunction(entry) === group,
+          );
+          return [
+            group,
+            {
+              functions: inGroup.length,
+              programs: new Set(inGroup.flatMap((entry) => entry.programs)).size,
+            },
+          ];
+        }),
+      ) as ReportSummary['counts']['groups'],
       excludedFunctions: functions.length - counted.length,
     },
   };

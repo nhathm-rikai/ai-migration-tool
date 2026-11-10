@@ -35,6 +35,27 @@
 - **Version:** bộ template `spec-design-templates-0.11.0-draft` → `0.12.0-draft` trên README pack + 10 file mang chuỗi version (`specPack` của mỗi run đọc từ README pack, `spec-workspace.ts#packVersion`); `specs/ut-test-spec.md` cập nhật theo. `SPEC_TASK_VERSION` giữ `spec-design-task-v7` vì task text trong `spec-context.ts` không đổi.
 - **Kiểm chứng (Windows x64, Node 24.16.0):** `format:check` pass. Chạy `parseUtSpec`/`validateUtSpec` thật trên template: lấy đúng 2 hàng ví dụ (bỏ qua bảng hướng dẫn), `対象外` nhận đúng, evidence dải dòng `frmOrder.frm:120-126` hợp lệ, kết quả `ok`. Ba bộ chuỗi ghim vi/ja/en đều pass; `ID mục tiêu` + `Ngoài phạm vi` (biến thể validator cũng nhận) pass; `ID đối tượng` cho `TABLE_MISSING`; `区分` = "Không áp dụng" cho `ok` nhưng thành case thật — đúng như mô tả trong template. `test -w @portal/api src/modules/documents src/modules/analysis/ut-checklist.test.ts`: 5 file, 46 pass.
 - **Chưa kiểm chứng:** chưa chạy agent thật (AC06 vẫn chưa làm), nên chưa biết agent có tuân thủ mục 1.1 hay không — đây là thứ AC06 cần quan sát đầu tiên. `ut-spec.test.ts` hiện **chưa có test đường đa ngôn ngữ** (header vi/en, `区分` vi/en); đề nghị thêm cùng TC02 hoặc task nhỏ riêng để tập chuỗi đóng không bị sửa lệch với template. `node scripts/verify-repository.mjs` đang fail sẵn vì `README.md` (sửa chưa commit từ trước) trỏ tới `docs/run-on-user-machine.md` không tồn tại trên nhánh này; không liên quan thay đổi này, đã kiểm riêng 88 link trong các file docs đã sửa: 0 broken.
+## 10/11/2026 — Bước 2: sửa giao diện theo góp ý (bảng lệch, bỏ cột UT, bỏ nút kỹ thuật, đổi nhãn nút)
+
+- **Bảng "Danh sách program":** AR04 thêm cột Màn hình/Report nhưng CSS vẫn đặt độ rộng theo bố cục cũ (cột thứ 8 = 15%) và header bị cắt bằng `nowrap` + ellipsis. Sửa: 11 cột, độ rộng cộng 100% (14/14/12/7/8/8/8/6/7/13/3), header xuống dòng thay vì bị cắt, cột số căn phải cùng header, badge trạng thái/độ phức tạp không bị cắt, ghi chú "(gốc: N)" xuống dòng dưới số bảng. Ảnh dự án demo (1280 và 1600 px, scale 2) ở `test-results/step2-ui/`, không commit.
+- **Bỏ cột "Điểm test UT"** khỏi UI bước 2 (cột, khóa sắp xếp, i18n, test). Giữ `programs[].utPoints` và checklist TC01 ở BE cho agent bước 3. Spec `ut-test-spec.md`, TC01.md, TC02.md cập nhật; TC02 không thêm cột IT.
+- **Bỏ nút "Dữ liệu kỹ thuật (Excel, nội bộ)" (AR01)** khỏi UI. Route `/report` và builder giữ nguyên; e2e AR01 giờ gọi thẳng route và kiểm UI không còn nút; test web của nút chuyển sang nút báo cáo Assessment (cùng component). Spec `inventory-report.md` ghi rõ UI không còn nút.
+- **Nhãn:** nhóm "Báo cáo Assessment" (ja アセスメント報告書) với "Xuất Excel" / "Xuất PDF" (ja Excel出力 / PDF出力); bỏ chữ "cho khách"/"Dữ liệu kỹ thuật". Tên file tải xuống không đổi. Nhãn nút xuất Excel ở bước Báo giá cũng bị đổi nhầm thành "Dữ liệu kỹ thuật (Excel, nội bộ)" ở vi ở vòng AR01 (ja vẫn "Excel 出力"): đã trả về "Xuất Excel".
+
+## 10/11/2026 — AR03: sửa review lần hai tại `712efd1` (2 P2: chú thích schema)
+
+- (1) **Đúng.** Với báo cáo không có bảng nào mà mapping đã xác nhận (`tablesAssumed = false`, `tables = 0`) PDF mục 4 vẫn ghi "確認済みの既定スキーマ…"; khi chưa có dữ liệu phân tích (`tablesView = null`) lại rơi vào câu "giả định". (2) **Đúng.** Phụ lục luôn ghi "既定スキーマは未確認のため仮定を含みます", mâu thuẫn khi đã xác nhận.
+- **Excel AR02 cũng bị:** ghi chú thứ hai của sheet `4_データベース` là câu cố định "仮定したスキーマ…確認が必要です" cho mọi trường hợp. Đã sửa ở nguồn chung.
+- Sửa: `tableSchemaState()` và `TABLE_SCHEMA_STATEMENT` trong `packages/contracts/src/table-schema-statement.ts` (5 trạng thái: `unanalyzed` / `none` / `raw` / `assumed` / `confirmed`; chỉ nói về schema khi có bảng; JSON cũ không có `tablesAssumed` đọc là giả định). Mục 4 PDF, dòng DBテーブル数 của phụ lục (`appendixDefinitions`) và ghi chú sheet 4 của Excel dùng cùng trạng thái và cùng câu; tiêu đề bảng của Excel chỉ thêm "※スキーマは仮定" ở trạng thái `assumed`.
+- Test fail trước (6): `assessment-document.test.tsx` mục "table name statement (AR03 review 2)" và `customer-report.test.ts` mục "AR03 review 2".
+
+## 09/11/2026 — AR03: sửa review độc lập tại `f8794eb` (2 P2, 1 P3)
+
+- (1) **P2 đúng.** Mục 4 của PDF luôn viết "既定スキーマを仮定して…データベース管理者による確認が必要です" cho view `normalized`, kể cả khi mapping đã được xác nhận; JSON đã có `scale.tablesAssumed`. Sửa: chú thích đọc `tablesAssumed`: `true` hoặc thiếu (JSON cũ) giữ câu "giả định"; `false` ghi "確認済みの既定スキーマで名称を統一", không còn yêu cầu xác nhận. Excel AR02 đã dùng cùng trường.
+- (2) **P2 đúng.** Bảng module là `<table>` đơn, không chia khối, nên bảng dài tràn trang thiếu header (AC03 cho phép "lặp header hoặc ghi rõ chưa làm", progress cũ không ghi chưa làm). Sửa: bảng module (kèm dòng 合計) dùng `KeyedTable` như các bảng dài khác, mỗi khối lặp header. Renderer `a4-pdf.ts` không đổi, nên PDF báo giá không đổi (test AC02 vẫn pass).
+- (3) **P3 đúng một phần.** Spec ghi "có fallback ASCII". Khác Excel, PDF được lưu phía client qua thẻ `<a download>`, không có header `Content-Disposition` để mang hai tên. Sửa: `customerPdfAsciiFileName` (cùng quy tắc ASCII của server: chữ, số, `.`, `-`; ví dụ `assessment-report_<project>_<YYYYMMDD>.pdf`); nếu lưu bằng tên tiếng Nhật ném lỗi thì lưu lại bằng tên ASCII. Tên tiếng Nhật vẫn là tên mặc định.
+- Test fail trước (4): `assessment-document.test.tsx` (header module nhiều khối, chú thích schema), `customer-pdf-button.test.tsx` (tên ASCII, lưu lại khi lỗi).
+
 
 ## 06/11/2026 — TC01: test case UT (単体テスト仕様書)
 

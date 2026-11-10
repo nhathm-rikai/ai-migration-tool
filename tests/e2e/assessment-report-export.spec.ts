@@ -2,10 +2,10 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { openNewDemoProject } from './demo-project.js';
 
-// AR01-AC07: the analysis step downloads the assessment workbook of the
-// demo project.
+// AR01-AC07: the technical workbook has no button in the UI any more (the
+// step shows only the Assessment report buttons) but its route still serves it.
 test(
-  'analysis step exports the assessment report as xlsx',
+  'technical report route still serves the workbook, without a UI button',
   { tag: '@smoke' },
   async ({ page }) => {
     await openNewDemoProject(page, `AR01 export ${Date.now()}`);
@@ -13,34 +13,48 @@ test(
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
-
-    const exportButton = page.getByRole('button', {
-      name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+    await expect(page.getByRole('button', { name: 'Xuất Excel' })).toBeEnabled({
+      timeout: 20_000,
     });
-    await expect(exportButton).toBeEnabled({ timeout: 20_000 });
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      exportButton.click(),
-    ]);
-    expect(download.suggestedFilename()).toMatch(
-      /^assessment-AR01 export \d+-\d{8}\.xlsx$/,
+    await expect(page.getByRole('button', { name: /kỹ thuật/i })).toHaveCount(
+      0,
     );
-    const path = await download.path();
-    const bytes = await readFile(path);
-    expect(bytes.byteLength).toBeGreaterThan(0);
-    // ZIP signature, and the part names are stored in clear text in the
-    // local and central headers.
-    expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
-    expect(bytes.includes(Buffer.from('xl/workbook.xml'))).toBe(true);
-    await expect(
-      page.getByRole('button', { name: 'Dữ liệu kỹ thuật (Excel, nội bộ)' }),
-    ).toBeEnabled();
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    const ids = /\/projects\/([^/]+)\/analysis\/([^/]+)$/.exec(page.url());
+    if (!ids) throw new Error('step URL');
+    const served = await page.evaluate(
+      async ([projectId, runId]) => {
+        const session = await fetch('/api/v1/session', { method: 'POST' });
+        const { token } = (await session.json()) as { token: string };
+        const headers = { authorization: `Bearer ${token}` };
+        const listed = (await (
+          await fetch(`/api/v1/projects/${projectId}/runs/${runId}/artifacts`, {
+            headers,
+          })
+        ).json()) as { items: { id: string; version: number }[] };
+        const artifact = listed.items[0];
+        if (!artifact) throw new Error('no artifact');
+        const response = await fetch(
+          `/api/v1/projects/${projectId}/artifacts/${artifact.id}/versions/${artifact.version}/report?format=xlsx`,
+          { headers },
+        );
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return {
+          status: response.status,
+          disposition: response.headers.get('content-disposition') ?? '',
+          signature: String.fromCharCode(bytes[0] ?? 0, bytes[1] ?? 0),
+          size: bytes.length,
+        };
+      },
+      [ids[1], ids[2]] as [string | undefined, string | undefined],
+    );
+    expect(served.status).toBe(200);
+    expect(served.signature).toBe('PK');
+    expect(served.size).toBeGreaterThan(0);
+    expect(served.disposition).toContain('assessment-');
   },
 );
 
-// AR02-AC07: the customer report is its own button and its own file with six
-// worksheets; the technical file stays a separate download.
+// AR02-AC07: the Assessment report Excel is its own file with six worksheets.
 test(
   'analysis step exports the six-sheet customer report as a separate file',
   { tag: '@smoke' },
@@ -50,14 +64,8 @@ test(
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
-    const customer = page.getByRole('button', {
-      name: 'Báo cáo cho khách (Excel)',
-    });
-    const technical = page.getByRole('button', {
-      name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
-    });
+    const customer = page.getByRole('button', { name: 'Xuất Excel' });
     await expect(customer).toBeEnabled({ timeout: 20_000 });
-    await expect(technical).toBeEnabled();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       customer.click(),
@@ -73,11 +81,6 @@ test(
       ).toBe(true);
     expect(bytes.includes(Buffer.from('xl/worksheets/sheet7.xml'))).toBe(false);
 
-    const [technicalDownload] = await Promise.all([
-      page.waitForEvent('download'),
-      technical.click(),
-    ]);
-    expect(technicalDownload.suggestedFilename()).toMatch(/^assessment-/);
     await expect(page.getByRole('alert')).toHaveCount(0);
   },
 );
@@ -93,7 +96,7 @@ test(
     await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
       timeout: 20_000,
     });
-    const pdf = page.getByRole('button', { name: 'Báo cáo cho khách (PDF)' });
+    const pdf = page.getByRole('button', { name: 'Xuất PDF' });
     await expect(pdf).toBeEnabled({ timeout: 20_000 });
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60_000 }),

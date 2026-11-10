@@ -875,3 +875,57 @@ describe('AR02 review 3 — finding 3: unknown concatenated SQL is not 0', () =>
     expect(text).toContain('連結 ' + NOT_ANALYZED);
   });
 });
+
+// ---- AR03 review 2: the statement about table names (sheet 4 note) ---------
+
+describe('AR03 review 2 — sheet 4 note about the schema follows the report state', () => {
+  const noteOf = (inventory: SourceInventoryDocument) => {
+    const built = buildCustomerReport(inventory, origin);
+    return (sheetOf('4_データベース', built).notes ?? []).join('\n');
+  };
+  it('assumed: asks the database administrator to confirm', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'assumed',
+    };
+    expect(noteOf(inventory)).toContain('仮定');
+  });
+  it('confirmed with tables: says confirmed, not assumed', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'confirmed',
+    };
+    const text = noteOf(inventory);
+    expect(text).toContain('確認済み');
+    expect(text).not.toContain('仮定');
+  });
+  it('no table found: claims neither', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'confirmed',
+    };
+    for (const program of inventory.programs)
+      if (program.analysis) {
+        program.analysis.crud = [];
+        program.analysis.normalizedCrud = [];
+      }
+    const text = noteOf(inventory);
+    expect(text).toContain('検出されませんでした');
+    expect(text).not.toContain('確認済み');
+    expect(text).not.toContain('仮定');
+  });
+  it('not analyzed: says there is no data', () => {
+    const inventory = clone();
+    for (const program of inventory.programs)
+      (program as { analysis?: unknown }).analysis = undefined;
+    const text = noteOf(inventory);
+    expect(text).toContain('解析データがない');
+    expect(text).not.toContain('仮定');
+  });
+});

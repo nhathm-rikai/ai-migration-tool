@@ -133,6 +133,109 @@ describe('AssessmentDocument sections 2 to 6', () => {
     );
   });
 
+  it('repeats the header of the module table on every block of a long list (AR03 review 1)', () => {
+    const report = customerReportFixture();
+    const base = report.modules[0];
+    if (!base) throw new Error('fixture');
+    report.modules = Array.from({ length: 40 }, (_, index) => ({
+      ...base,
+      module: `mod/${index}`,
+    }));
+    const { section } = draw(report);
+    const scale = section('scale');
+    const moduleTables = Array.from(scale.querySelectorAll('table')).filter(
+      (table) => table.querySelector('[data-module-row]'),
+    );
+    expect(moduleTables.length).toBeGreaterThan(1);
+    for (const table of moduleTables)
+      expect(table.querySelector('thead th')?.textContent).toBe('モジュール');
+    expect(scale.querySelectorAll('[data-module-row]')).toHaveLength(40);
+    expect(scale.querySelectorAll('[data-module-total]')).toHaveLength(1);
+  });
+
+  // AR03 review 2: one statement about the table names in section 4 and in
+  // the appendix, from the report's own state: assumed / confirmed / none /
+  // not analyzed.
+  describe('table name statement (AR03 review 2)', () => {
+    const state = (
+      patch: (r: ReturnType<typeof customerReportFixture>) => void,
+    ) => {
+      const report = customerReportFixture();
+      patch(report);
+      const { section } = draw(report);
+      return {
+        note: section('database').querySelector('.ad-note')?.textContent ?? '',
+        appendix: section('appendix').textContent ?? '',
+      };
+    };
+    it('assumed: says the schema is assumed in both places', () => {
+      const s = state((r) => {
+        r.scale.tablesView = 'normalized';
+        r.scale.tablesAssumed = true;
+        r.scale.tables = 3;
+      });
+      expect(s.note).toContain('仮定');
+      expect(s.appendix).toContain('仮定');
+    });
+    it('confirmed with tables: says confirmed, never assumed', () => {
+      const s = state((r) => {
+        r.scale.tablesView = 'normalized';
+        r.scale.tablesAssumed = false;
+        r.scale.tables = 3;
+      });
+      expect(s.note).toContain('確認済み');
+      expect(s.note).not.toContain('仮定');
+      expect(s.appendix).toContain('確認済み');
+      expect(s.appendix).not.toContain('仮定');
+    });
+    it('no table found: claims neither assumed nor confirmed', () => {
+      const s = state((r) => {
+        r.scale.tablesView = 'normalized';
+        r.scale.tablesAssumed = false;
+        r.scale.tables = 0;
+        r.database.tables = [];
+      });
+      expect(s.note).toContain('検出されませんでした');
+      for (const text of [s.note, s.appendix]) {
+        expect(text).not.toContain('確認済み');
+        expect(text).not.toContain('仮定');
+      }
+    });
+    it('not analyzed: says there is no data', () => {
+      const s = state((r) => {
+        r.scale.tablesView = null;
+        r.scale.tables = 0;
+        r.database.tables = [];
+      });
+      expect(s.note).toContain('解析データがない');
+      for (const text of [s.note, s.appendix]) {
+        expect(text).not.toContain('確認済み');
+        expect(text).not.toContain('仮定');
+      }
+    });
+    it('raw names: says so and nothing about a schema', () => {
+      const s = state((r) => {
+        r.scale.tablesView = 'raw';
+        r.scale.tables = 3;
+      });
+      expect(s.note).toContain('ソース上の名称');
+      expect(s.note).not.toContain('仮定');
+    });
+  });
+
+  it('says the schema is assumed only when the report says so (AR03 review 1)', () => {
+    const assumed = customerReportFixture();
+    assumed.scale.tablesView = 'normalized';
+    assumed.scale.tablesAssumed = true;
+    expect(draw(assumed).section('database').textContent).toContain('仮定');
+    const confirmed = customerReportFixture();
+    confirmed.scale.tablesView = 'normalized';
+    confirmed.scale.tablesAssumed = false;
+    const text = draw(confirmed).section('database').textContent ?? '';
+    expect(text).not.toContain('仮定');
+    expect(text).not.toContain('確認が必要');
+  });
+
   it('writes 未解析 for concatenated SQL when the inventory has no such data (AR02 review 3)', () => {
     const report = customerReportFixture();
     report.database.concatenatedSql = null;

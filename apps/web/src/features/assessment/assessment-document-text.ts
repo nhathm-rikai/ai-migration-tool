@@ -1,3 +1,7 @@
+import {
+  TABLE_SCHEMA_STATEMENT,
+  type TableSchemaState,
+} from '@portal/contracts';
 // Fixed Japanese wording of the customer PDF (R2): the document goes to the
 // customer, so it does not follow the screen language. Counting rules in the
 // appendix mirror docs/engineering/specs/source-inventory.md section 6.
@@ -127,10 +131,10 @@ export const SECTION_NOTES = {
     '解析結果から求めた移行対象の規模です。「疑い」の帳票は出力の可能性がある箇所で、帳票数の合計には含みません。',
   dependencies:
     '複数のプログラムから参照される共通部品と、外部コンポーネント・外部ライブラリの一覧です。',
-  database: (view: 'normalized' | 'raw' | null) =>
-    view === 'raw'
-      ? 'アクセスされるテーブル（ソース上の名称）と、動的SQL・文字列連結SQLの箇所数です。'
-      : 'アクセスされるテーブル（既定スキーマを仮定して名称を統一）と、動的SQL・文字列連結SQLの箇所数です。データベース管理者による確認が必要です。',
+  // The statement about the table names comes from the report's own state
+  // (tableSchemaState), the same one the appendix and the Excel note use.
+  database: (state: TableSchemaState) =>
+    `アクセスされるテーブルと、動的SQL・文字列連結SQLの箇所数です。${TABLE_SCHEMA_STATEMENT[state].note}`,
   risks:
     '解析で判断できなかった点・注意が必要な点を重要度別にまとめています。ご回答をお願いする内容を右端に記載しています。',
   items: (shown: string, total: string) =>
@@ -138,12 +142,13 @@ export const SECTION_NOTES = {
 };
 
 export const APPENDIX = {
+  // The last definition (DB table count) depends on the report: see
+  // appendixDefinitions().
   definitionsTitle: '指標の定義',
   definitions: [
     'コード行数：コメント・空白・フォームデザイン定義を除いた行数。複数のプログラムが共通で使うファイルは1回のみ集計します。',
     '物理行数：ファイルの全行数。プロシージャ：Sub・Function・Property の数。',
     'モジュール：プロジェクトファイルのあるフォルダ。複数のプログラムが共有するファイルは「共通」に集計します。',
-    'DBテーブル数：SQL からアクセスされるテーブル名の種類数。同義語・既定スキーマは未確認のため仮定を含みます。',
   ],
   countingTitle: '画面・帳票・バッチの数え方',
   counting: [
@@ -161,3 +166,10 @@ export const APPENDIX = {
   ],
   modelsTitle: '解析モデルの版',
 };
+
+// The definitions of the appendix; the table-count line follows the same
+// state as section 4.
+export const appendixDefinitions = (state: TableSchemaState): string[] => [
+  ...APPENDIX.definitions,
+  TABLE_SCHEMA_STATEMENT[state].definition,
+];

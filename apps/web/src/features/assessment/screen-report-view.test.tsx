@@ -99,8 +99,6 @@ describe('AR04-AC06 KPI cards and program columns', () => {
       rowOf(name).querySelector(`[data-col="${col}"]`)?.textContent ?? '';
     expect(cell('Order', 'screens')).toBe('2');
     expect(cell('Order', 'reports')).toBe('2');
-    // TC01: the corpus has no checklist count (older inventory).
-    expect(cell('Order', 'utPoints')).toBe('Chưa phân tích');
     expect(cell('Invoice', 'reports')).toContain('2');
     expect(cell('Invoice', 'reports')).toContain('+1?');
     expect(cell('Batch', 'screens')).toBe('0');
@@ -164,10 +162,6 @@ describe('AR04-AC05 inventory without screen/report data', () => {
     }
     const row = screen.getByRole('button', { name: 'Order' }).closest('tr');
     expect(row?.querySelector('[data-col="screens"]')?.textContent).toBe(
-      'Chưa phân tích',
-    );
-    // TC01: an inventory without the checklist count says so, not 0.
-    expect(row?.querySelector('[data-col="utPoints"]')?.textContent).toBe(
       'Chưa phân tích',
     );
     // The detail tab explains instead of listing nothing.

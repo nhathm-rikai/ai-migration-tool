@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { ArtifactEnvelope } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
@@ -114,11 +115,17 @@ export function AssessmentOverview({
       {state.status === 'empty' && <p className="empty-state">{copy.empty}</p>}
       {state.status === 'ready' && (
         <>
+          {headerSlot &&
+            createPortal(
+              <span className="export-group-title">
+                {copy.report.groupTitle}
+              </span>,
+              headerSlot,
+            )}
           <ReportExportButton
             api={api}
             artifact={state.artifact}
             slot={headerSlot}
-            kind="customer"
             {...(saveFile ? { save: saveFile } : {})}
           />
           <CustomerPdfButton
@@ -127,13 +134,6 @@ export function AssessmentOverview({
             slot={headerSlot}
             {...(saveFile ? { save: saveFile } : {})}
             {...(renderCustomerPdf ? { render: renderCustomerPdf } : {})}
-          />
-          <ReportExportButton
-            api={api}
-            artifact={state.artifact}
-            slot={headerSlot}
-            kind="technical"
-            {...(saveFile ? { save: saveFile } : {})}
           />
           <ArtifactView artifact={state.artifact} projectId={projectId} />
         </>
@@ -775,7 +775,7 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 12;
+const COLUMNS = 11;
 
 // List row: the table count shown first is the mapped one when there is a
 // mapped view (configured or inferred); the count as written stays beside it.
@@ -952,7 +952,6 @@ function ProgramList({
                   {header('tables', copy.columns.tables)}
                   {header('screens', copy.columns.screens)}
                   {header('reports', copy.columns.reports)}
-                  {header('utPoints', copy.columns.utPoints)}
                   {header(
                     'complexity',
                     copy.columns.complexity,
@@ -1033,9 +1032,6 @@ function ProgramList({
                                 +{number(row.suspectedReports)}?
                               </span>
                             )}
-                        </td>
-                        <td className="num" data-col="utPoints">
-                          {metric(row.utPoints)}
                         </td>
                         <td>
                           <span className="cx-cell">

@@ -665,7 +665,6 @@ export const jaMessages = {
         tables: 'テーブル数',
         screens: '画面',
         reports: '帳票',
-        utPoints: 'UTテスト観点数',
         complexity: '複雑度',
       },
       columnHints: {
@@ -838,9 +837,9 @@ export const jaMessages = {
       },
     },
     report: {
-      export: '技術データ（Excel・社内用）',
-      exportCustomer: 'お客様向け報告書（Excel）',
-      exportCustomerPdf: 'お客様向け報告書（PDF）',
+      groupTitle: 'アセスメント報告書',
+      exportCustomer: 'Excel出力',
+      exportCustomerPdf: 'PDF出力',
       pdfFailed:
         'PDF を作成できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
       exporting: '出力中…',

@@ -18,6 +18,8 @@ const MAX_PIXELS = 15000;
 const SHARP_SCALE = 3;
 const FONT =
   '"Yu Gothic", "Meiryo", "Hiragino Sans", "Noto Sans JP", sans-serif';
+const FOOTER_FONT =
+  '"Yu Gothic UI", "Segoe UI", "Meiryo", "Hiragino Sans", "Noto Sans JP", sans-serif';
 
 const ns = 'http://www.w3.org/1999/xhtml';
 
@@ -575,8 +577,9 @@ export async function renderA4Pdf(
           (PAGE_W - SIDE * 2) * SCALE,
           SCALE,
         );
-        context.fillStyle = '#55657a';
-        context.font = `${10 * SCALE}px ${FONT}`;
+        // A footer as legible as the text: dark, 12px (9pt), medium weight.
+        context.fillStyle = '#3f4756';
+        context.font = `500 ${12 * SCALE}px ${FOOTER_FONT}`;
         context.textBaseline = 'middle';
         context.textAlign = 'left';
         context.fillText(footerLabel, SIDE * SCALE, footerY);

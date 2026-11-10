@@ -235,12 +235,12 @@ function BarChart({
   n: (value: number) => string;
 }) {
   const max = Math.max(1, ...bars.map((bar) => bar.value ?? 0));
-  const row = 22;
+  const row = 26;
   return (
     <svg
-      width="330"
+      width="360"
       height={bars.length * row + 4}
-      viewBox={`0 0 330 ${bars.length * row + 4}`}
+      viewBox={`0 0 360 ${bars.length * row + 4}`}
       role="img"
     >
       {bars.map((bar, index) => {
@@ -248,20 +248,32 @@ function BarChart({
         const width = bar.value === null ? 0 : (bar.value / max) * 170;
         return (
           <g key={bar.key}>
-            <text x="0" y={y + 13} fontSize="10" fill="#0f2236">
+            <text
+              x="0"
+              y={y + 15}
+              fontSize="12"
+              fontWeight="500"
+              fill="#1a1a1a"
+            >
               {bar.label}
             </text>
             <rect
-              x="78"
-              y={y + 2}
+              x="104"
+              y={y + 3}
               width={Math.max(width, bar.value ? 2 : 0)}
-              height="13"
+              height="15"
               rx="2"
               fill={LEVEL_COLORS[bar.key] ?? '#0077be'}
               data-bar={`${prefix}-${bar.key}`}
               data-count={bar.value === null ? 'na' : String(bar.value)}
             />
-            <text x={78 + width + 6} y={y + 13} fontSize="10" fill="#55657a">
+            <text
+              x={104 + width + 6}
+              y={y + 15}
+              fontSize="12"
+              fontWeight="500"
+              fill="#3f4756"
+            >
               {bar.value === null ? notApplicable : n(bar.value)}
             </text>
           </g>

@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 (đêm) — PDF báo cáo cho khách: chữ đậm, rõ hơn
+
+- Chữ mờ do màu xám nhạt (#55657a), cỡ 9–9,5px (khoảng 7pt) và font Yu Gothic mặc định mảnh. Chỉ đổi trong PDF Assessment (CSS có phạm vi `.assess-doc-root`, PDF báo giá giữ nguyên): chữ chính #1a1a1a, chữ phụ/nhãn/ghi chú #3f4756 (tương phản trên nền trắng khoảng 9:1), viền bảng #c2ccd8, header bảng #00639a; mọi chữ tối thiểu 12px (9pt) kể cả ghi chú, nhãn thẻ KPI, bảng, chân trang; weight 500, tiêu đề/nhãn 700; font ja `Yu Gothic UI, Yu Gothic Medium, Meiryo, Hiragino Sans, Noto Sans JP`; biểu đồ cột chữ 12px. Chân trang vẽ cỡ 12px màu đậm.
+- Phân trang kiểm lại với e2e `pdf-layout` (vi và ja): không dòng nào chạm biên dưới, lần thử đầu đã vừa; PDF dài 11 và 10 trang, PDF demo 4 trang.
+- Chưa push.
+
 ## 10/11/2026 (tối) — Báo cáo cho khách: PDF mục 6 gọn, OCX gộp theo tên file, phân trang chống cắt dòng, độ rộng cột Excel
 
 - **PDF:** mục 6 thành tổng hợp (cách tạo × độ phức tạp + top 15 mẫu Crystal/DataReport + trỏ tới Excel); thành phần ngoài không còn GUID, gộp theo tên file không phân biệt hoa thường, top 15; API và SQL theo module top 15.

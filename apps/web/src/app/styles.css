@@ -6257,3 +6257,66 @@ fieldset.doc-card {
 .assess-doc-root .ad-split .qd-table th:last-child {
   white-space: nowrap;
 }
+/* Assessment PDF only (the quote shares the qd-* rules and keeps them):
+   darker text, sturdier fonts, nothing under 12px (9pt on the A4 page). */
+.assess-doc-root.qd-export {
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.assess-doc-root.ad-lang-ja,
+.assess-doc-root.ad-lang-ja * {
+  font-family:
+    'Yu Gothic UI', 'Yu Gothic Medium', 'Meiryo', 'Hiragino Sans',
+    'Noto Sans JP', sans-serif;
+}
+.assess-doc-root .qd-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-head p,
+.assess-doc-root .qd-note,
+.assess-doc-root .ad-note,
+.assess-doc-root .ad-toc-line,
+.assess-doc-root .qd-kpi span,
+.assess-doc-root .qd-kpi small {
+  color: #3f4756;
+  font-size: 12px;
+}
+.assess-doc-root .ad-toc-line b {
+  color: #1a1a1a;
+}
+.assess-doc-root .qd-block h3 {
+  color: #1f2733;
+  font-size: 13px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-kpi b {
+  color: #1a1a1a;
+  font-size: 19px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-kpi.main b {
+  color: #004d7a;
+  font-size: 23px;
+}
+.assess-doc-root .qd-table th,
+.assess-doc-root .qd-table td,
+.assess-doc-root .qd-compact th,
+.assess-doc-root .qd-compact td {
+  border-color: #c2ccd8;
+  font-size: 12px;
+}
+.assess-doc-root .qd-table thead th {
+  background: #00639a;
+  border-color: #00639a;
+  font-weight: 700;
+}
+.assess-doc-root .qd-notes li {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.assess-doc-root .ad-demo {
+  font-size: 12px;
+}

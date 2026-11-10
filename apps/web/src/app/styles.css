@@ -710,6 +710,7 @@ input[aria-invalid='true'] {
   font-size: 12px;
   color: var(--fg-3);
   margin-top: 6px;
+  text-align: center;
 }
 .create-panel > .field-help {
   border-top: 1px solid var(--line);
@@ -1687,7 +1688,7 @@ details.technical[open] > summary {
   width: 12%;
 }
 .program-list .program-table thead th:nth-child(3) {
-  width: 11%;
+  width: 12%;
 }
 .program-list .program-table thead th:nth-child(8) {
   width: 15%;
@@ -3681,7 +3682,7 @@ fieldset.doc-card {
 .review-doc > span:first-child {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 3px;
   min-width: 0;
 }
@@ -4959,6 +4960,7 @@ fieldset.doc-card {
 }
 .folder-chooser .error {
   margin: 8px 0 0;
+  text-align: center;
 }
 .project-info h2 {
   font-size: 16px;
@@ -5861,6 +5863,9 @@ fieldset.doc-card {
 .assess-doc-root .ad-kpis-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
+.assess-doc-root .ad-kpis-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
 .ad-heading {
   margin-top: 16px;
 }
@@ -5897,4 +5902,421 @@ fieldset.doc-card {
 }
 .assess-doc-root .qd-table td {
   overflow-wrap: anywhere;
+}
+
+/* Step 2 program list (UI fix, 10/11/2026): 11 columns after the UT column
+   was removed. Fixed widths that add up to 100%, numbers right-aligned with
+   their headers, headers wrap instead of being cut, the complexity badge and
+   the table-count note keep their text. */
+.program-list .program-table thead th {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: bottom;
+}
+.program-list .sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.program-list .sort-button .sort-mark {
+  flex: none;
+  margin-left: 0;
+}
+.program-list .program-table thead th:nth-child(1) {
+  width: 14%;
+}
+.program-list .program-table thead th:nth-child(2) {
+  width: 14%;
+}
+.program-list .program-table thead th:nth-child(3) {
+  width: 11%;
+}
+.program-list .program-table thead th:nth-child(4),
+.program-list .program-table thead th:nth-child(5),
+.program-list .program-table thead th:nth-child(6) {
+  width: 8%;
+}
+.program-list .program-table thead th:nth-child(7) {
+  width: 8%;
+}
+.program-list .program-table thead th:nth-child(8) {
+  width: 6%;
+}
+.program-list .program-table thead th:nth-child(9) {
+  width: 7%;
+}
+.program-list .program-table thead th:nth-child(10) {
+  width: 13%;
+}
+.program-list .program-table thead th:nth-child(11) {
+  width: 3%;
+}
+.program-list .program-table td .kind-chip {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.program-list .program-table td .kind-chip i {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.program-list .program-table thead th:nth-child(n + 4):nth-child(-n + 9),
+.program-list .program-table td.num {
+  text-align: right;
+}
+.program-list
+  .program-table
+  thead
+  th:nth-child(n + 4):nth-child(-n + 9)
+  .sort-button {
+  justify-content: flex-end;
+  text-align: right;
+}
+.program-list .program-table td.num .raw-count {
+  display: inline;
+  margin-left: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+.program-list .program-table td .tag,
+.program-list .program-table td .badge {
+  white-space: nowrap;
+}
+.export-group-title {
+  align-self: center;
+  margin-right: 4px;
+  color: var(--fg-3);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Buttons placed in the step header (Assessment report export): spaced like
+   the actions of the quote step. */
+.page-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* Four KPI cards in the screen / report row (screens, report templates,
+   print and export functions, batches). */
+.kpi-grid-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+/* Report tab: the level chips and the template and function tables share the
+   program list's table style; columns are fixed so numbers line up under
+   their headers. */
+.report-list {
+  margin-top: 16px;
+}
+.report-list h4,
+.report-distribution h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.report-histogram {
+  margin: 8px 0 16px;
+}
+.histogram .tone-unrated {
+  background: var(--fg-3, #8a94a6);
+}
+.report-list > p,
+.data-files > p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.report-histogram .histogram-bar {
+  cursor: default;
+}
+.data-files > summary h4 {
+  display: inline;
+}
+.report-table {
+  table-layout: fixed;
+}
+.report-table th,
+.report-table td {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.report-table > thead > tr > th {
+  vertical-align: bottom;
+}
+.report-table .num {
+  text-align: right;
+}
+.report-table > thead > tr > th:nth-child(1) {
+  width: 24%;
+}
+.report-table > thead > tr > th:nth-child(2) {
+  width: 13%;
+}
+.report-table > thead > tr > th:nth-child(3) {
+  width: 11%;
+}
+.report-table > thead > tr > th:nth-child(4) {
+  width: 19%;
+}
+.report-table > thead > tr > th:nth-child(5) {
+  width: 8%;
+}
+.report-table > thead > tr > th:nth-child(6) {
+  width: 21%;
+}
+.report-table > thead > tr > th:nth-child(7) {
+  width: 4%;
+}
+.report-table th,
+.report-table td {
+  vertical-align: middle;
+}
+.report-table tbody th .mono {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.report-table td.chevron-col,
+.report-table th.chevron-col {
+  text-align: center;
+}
+.report-table td.chevron-col svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.report-table tr.selected td.chevron-col svg {
+  transform: rotate(180deg);
+}
+.report-data-table > thead > tr > th:nth-child(1) {
+  width: 22%;
+}
+.report-data-table > thead > tr > th:nth-child(2) {
+  width: 16%;
+}
+.report-data-table > thead > tr > th:nth-child(3) {
+  width: 38%;
+}
+.report-data-table > thead > tr > th:nth-child(4) {
+  width: 24%;
+}
+.report-table .block {
+  display: block;
+}
+.report-table .program-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.report-basis {
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.report-basis > summary,
+.data-files > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.report-basis > summary {
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.report-basis > summary::-webkit-details-marker,
+.data-files > summary::-webkit-details-marker {
+  display: none;
+}
+.report-basis > summary svg,
+.data-files > summary svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms var(--ease-out);
+}
+.data-files > summary svg {
+  margin-left: auto;
+}
+.report-basis[open] > summary svg,
+.data-files[open] > summary svg {
+  transform: rotate(180deg);
+}
+.report-basis[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+.report-basis dl {
+  margin: 0;
+  padding: 4px 14px 8px;
+  display: block;
+}
+.report-basis dl > div {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.report-basis dl > div:first-child {
+  border-top: 0;
+}
+.report-basis dt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.report-basis dd {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-2);
+}
+/* Step 2 program list at 1280px: headers on one line, tighter cell padding,
+   widths sized to the header text plus the sort mark. */
+.program-list .program-table thead th,
+.program-list .program-table tbody td,
+.program-list .program-table tbody th {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+.program-list .program-table thead th:nth-child(1) {
+  width: 8.8%;
+}
+.program-list .program-table thead th:nth-child(2) {
+  width: 10.6%;
+}
+.program-list .program-table thead th:nth-child(3) {
+  width: 10.9%;
+}
+.program-list .program-table thead th:nth-child(4) {
+  width: 9.2%;
+}
+.program-list .program-table thead th:nth-child(5) {
+  width: 11%;
+}
+.program-list .program-table thead th:nth-child(6) {
+  width: 9.5%;
+}
+.program-list .program-table thead th:nth-child(7) {
+  width: 9.5%;
+}
+.program-list .program-table thead th:nth-child(8) {
+  width: 8.5%;
+}
+.program-list .program-table thead th:nth-child(9) {
+  width: 7.5%;
+}
+.program-list .program-table thead th:nth-child(10) {
+  width: 11.8%;
+}
+.program-list .program-table thead th:nth-child(11) {
+  width: 2.8%;
+}
+.program-list .program-table .chevron-col {
+  padding-left: 0;
+  padding-right: 4px;
+  text-align: center;
+}
+/* Assessment PDF, page 1: the cover table, a one-line table of contents and
+   the summary (KPI cards and the program complexity) under it. */
+.assess-doc-root .ad-toc-line {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #55657a;
+}
+.assess-doc-root .ad-summary {
+  margin-top: 8px;
+}
+/* Vietnamese needs a font with the full set of tone marks (the Japanese
+   fonts of the document draw them apart from the letter). */
+.assess-doc-root.ad-lang-vi,
+.assess-doc-root.ad-lang-vi * {
+  font-family: 'Segoe UI', Arial, 'Helvetica Neue', 'Noto Sans', sans-serif;
+}
+.assess-doc-root .ad-split .qd-table th:last-child {
+  white-space: nowrap;
+}
+/* Assessment PDF only (the quote shares the qd-* rules and keeps them):
+   darker text, sturdier fonts, nothing under 12px (9pt on the A4 page). */
+.assess-doc-root.qd-export {
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.assess-doc-root.ad-lang-ja,
+.assess-doc-root.ad-lang-ja * {
+  font-family:
+    'Yu Gothic UI', 'Yu Gothic Medium', 'Meiryo', 'Hiragino Sans',
+    'Noto Sans JP', sans-serif;
+}
+.assess-doc-root .qd-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-head p,
+.assess-doc-root .qd-note,
+.assess-doc-root .ad-note,
+.assess-doc-root .ad-toc-line,
+.assess-doc-root .qd-kpi span,
+.assess-doc-root .qd-kpi small {
+  color: #3f4756;
+  font-size: 12px;
+}
+.assess-doc-root .ad-toc-line b {
+  color: #1a1a1a;
+}
+.assess-doc-root .qd-block h3 {
+  color: #1f2733;
+  font-size: 13px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-kpi b {
+  color: #1a1a1a;
+  font-size: 19px;
+  font-weight: 700;
+}
+.assess-doc-root .qd-kpi.main b {
+  color: #004d7a;
+  font-size: 23px;
+}
+.assess-doc-root .qd-table th,
+.assess-doc-root .qd-table td,
+.assess-doc-root .qd-compact th,
+.assess-doc-root .qd-compact td {
+  border-color: #c2ccd8;
+  font-size: 12px;
+}
+.assess-doc-root .qd-table thead th {
+  background: #00639a;
+  border-color: #00639a;
+  font-weight: 700;
+}
+.assess-doc-root .qd-notes li {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.assess-doc-root .ad-demo {
+  font-size: 12px;
 }

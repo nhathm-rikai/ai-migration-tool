@@ -75,6 +75,20 @@ export const InventoryReportQuerySchema = Type.Object(
   { format: InventoryReportFormatSchema },
   Strict,
 );
+// Customer report language (default ja): the wording of the Excel file and of
+// the JSON the PDF is drawn from.
+export const CustomerReportLangSchema = Type.Union([
+  Type.Literal('ja'),
+  Type.Literal('vi'),
+]);
+export type CustomerReportLang = Static<typeof CustomerReportLangSchema>;
+export const CustomerReportQuerySchema = Type.Object(
+  {
+    format: InventoryReportFormatSchema,
+    lang: Type.Optional(CustomerReportLangSchema),
+  },
+  Strict,
+);
 export const INVENTORY_REPORT_CONTENT_TYPES = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   json: 'application/json; charset=utf-8',

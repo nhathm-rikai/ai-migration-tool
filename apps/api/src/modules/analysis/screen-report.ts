@@ -11,7 +11,7 @@ import type {
 // lexical evidence: a report row says where code can produce output, and a
 // `suspected` row is never added to the report total.
 
-export const SCREEN_REPORT_VERSION = 'screen-report-v1';
+export { SCREEN_REPORT_VERSION } from '@portal/contracts';
 export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v1-draft';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
@@ -177,6 +177,10 @@ export type ReportRow = {
   procedureId: string | null;
   warnings: string[];
   complexity: ReportComplexity;
+  // file-output: a .csv path (screen-report-v2).
+  subkind?: 'csv';
+  // file-output: a log or temporary file, not a report output (v2).
+  excludeReason?: string;
 };
 
 export type ProgramReport = ReportRow & { shared: boolean };
@@ -251,7 +255,7 @@ export function buildCodeFileReportRows(input: {
     );
     // A Crystal report is told apart by the path written in the code, so
     // two reports with the same file name in different folders stay two.
-    const key = `${signal.kind}\u0000${(signal.path ?? signal.name).toLowerCase()}\u0000${procedure?.id ?? ''}`;
+    const key = `${signal.kind}\u0000${(signal.path ?? signal.name).toLowerCase()}\u0000${procedure?.id ?? ''}\u0000${signal.subkind ?? ''}\u0000${signal.excludeReason ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const crystal = signal.kind === 'crystal';
@@ -266,19 +270,19 @@ export function buildCodeFileReportRows(input: {
         : found
           ? 'detected'
           : 'referenced';
-      const complexity: ReportComplexity =
-        confidence === 'suspected'
-          ? unratedComplexity('SUSPECTED', false)
-          : !procedure
-            ? unratedComplexity('NO_PROCEDURE', true)
-            : scoreReportComplexity(
-                {
-                  ...evidenceOf(procedure.id, analysis),
-                  calls: context.callsOf(procedure.id),
-                },
-                input.config,
-                { designNotAnalyzed: true },
-              );
+      // Every report is scored on the procedure that holds the line that
+      // makes it (a Crystal report, a print, an export); only a Crystal
+      // report has a design that is not analyzed.
+      const complexity: ReportComplexity = !procedure
+        ? unratedComplexity('NO_PROCEDURE', crystal)
+        : scoreReportComplexity(
+            {
+              ...evidenceOf(procedure.id, analysis),
+              calls: context.callsOf(procedure.id),
+            },
+            input.config,
+            { designNotAnalyzed: crystal },
+          );
       return {
         kind: signal.kind,
         name: signal.name,
@@ -288,6 +292,10 @@ export function buildCodeFileReportRows(input: {
         procedureId: procedure?.id ?? null,
         warnings: confidence === 'referenced' ? ['REPORT_FILE_MISSING'] : [],
         complexity,
+        ...(signal.subkind ? { subkind: signal.subkind } : {}),
+        ...(signal.excludeReason
+          ? { excludeReason: signal.excludeReason }
+          : {}),
       };
     });
   }

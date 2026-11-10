@@ -84,23 +84,15 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
   UNCLASSIFIED_LINES: {
     category: '解析の前提',
     severity: '中',
-    content: '分類できなかった行があり、行数に誤差が出る可能性があります。',
+    content: '分類できなかった行があり、行数に含まれていません。',
     confirmation: '該当ファイルの記述形式をご確認ください。',
   },
   REPORT_FILE_MISSING: {
     category: '帳票',
     severity: '高',
     content:
-      'コードから参照されている帳票定義ファイル（.rpt）がソース内にありません。',
-    confirmation: '帳票定義ファイル(.rpt)のご提供をお願いします。',
-  },
-  REPORT_SUSPECTED: {
-    category: '帳票',
-    severity: '中',
-    content:
-      '印刷・Excel・ファイル出力を行う可能性のあるプログラムがあります（帳票数には含みません）。',
-    confirmation:
-      '帳票一覧（台帳）をご提供のうえ、該当プログラムの出力内容をご確認ください。',
+      'コードから参照されている帳票定義ファイル（.rpt）がソース内にありません（設計ファイルなし）。',
+    confirmation: '特にありません。',
   },
   SCREEN_FILE_MISSING: {
     category: 'ソース不足',
@@ -144,15 +136,23 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
   COMPLEXITY_DRAFT: {
     category: '解析の前提',
     severity: '低',
-    content: '複雑度は暫定モデルによる参考値です。',
+    content:
+      '複雑度は、分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数の点数で算出しています。',
     confirmation: '特にありません。',
   },
   COMPLEXITY_REFERENCE_ONLY: {
     category: '解析の前提',
     severity: '低',
     content:
-      '複雑度は参考分類であり、工数・金額の根拠ではありません。ファイル処理・DB更新・トランザクションは別途確認します。',
+      '複雑度は移行の難しさの分類であり、工数・金額の算定根拠ではありません。ファイル処理・DB更新・トランザクションは点数に含まれません。',
     confirmation: '特にありません。',
+  },
+  SCREEN_REPORT_OUTDATED: {
+    category: '解析の前提',
+    severity: '中',
+    content:
+      '帳票の検出ルールが古い版の解析結果です。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。',
+    confirmation: 'ソースの再解析を実施します（ご対応は不要です）。',
   },
   PROCEDURE_LINES_MISSING: {
     category: '解析の前提',
@@ -190,3 +190,182 @@ export const RISK_CATALOG: Record<string, RiskEntry> = {
     confirmation: '詳細は担当者よりご連絡します。',
   },
 };
+
+// The same catalog in Vietnamese (customer report with lang=vi): same codes,
+// same severities; only the wording differs. A test compares the keys.
+type RiskWording = Pick<RiskEntry, 'category' | 'content' | 'confirmation'>;
+
+const SRC = 'Thiếu mã nguồn';
+const PREMISE = 'Cơ sở phân tích';
+const UNSUPPORTED = 'Thành phần chưa hỗ trợ';
+const DATABASE = 'Cơ sở dữ liệu';
+const EXTERNAL = 'Thành phần ngoài';
+const NONE = 'Không có.';
+const REANALYZE =
+  'Chúng tôi sẽ phân tích lại mã nguồn (khách hàng không cần xử lý).';
+
+export const RISK_CATALOG_VI: Record<string, RiskWording> = {
+  PROGRAM_UNSUPPORTED: {
+    category: 'Ngoài phạm vi phân tích',
+    content:
+      'Có program không phân tích được file project nên không nằm trong quy mô.',
+    confirmation:
+      'Vui lòng kiểm tra định dạng của project đó (không phải VB6, bị hỏng, v.v.).',
+  },
+  PROGRAM_INCOMPLETE: {
+    category: SRC,
+    content:
+      'Có program thiếu file, có định dạng chưa hỗ trợ hoặc có dòng chưa phân loại nên số liệu chỉ là một phần.',
+    confirmation:
+      'Vui lòng cung cấp các file còn thiếu, hoặc cho biết các file đó nằm ngoài phạm vi.',
+  },
+  MEMBER_MISSING: {
+    category: SRC,
+    content: 'Không tìm thấy trong mã nguồn các file mà project khai báo.',
+    confirmation: 'Vui lòng cung cấp các file tương ứng.',
+  },
+  MEMBER_ABSOLUTE_PATH: {
+    category: SRC,
+    content: 'Không xác định được file được khai báo bằng đường dẫn tuyệt đối.',
+    confirmation: 'Vui lòng cho biết vị trí và cung cấp các file tương ứng.',
+  },
+  MEMBER_OUTSIDE_ROOT: {
+    category: SRC,
+    content: 'Có file được khai báo nằm ngoài phạm vi mã nguồn đã cung cấp.',
+    confirmation: 'Vui lòng cung cấp các file tương ứng.',
+  },
+  MEMBER_AMBIGUOUS: {
+    category: SRC,
+    content:
+      'Có nhiều file trùng tên chỉ khác chữ hoa/thường nên không xác định được file nào.',
+    confirmation: 'Vui lòng chỉ định file đúng.',
+  },
+  MEMBER_CASE_MISMATCH: {
+    category: PREMISE,
+    content:
+      'Chữ hoa/thường của khai báo và file thật khác nhau (không ảnh hưởng đến phân tích).',
+    confirmation: NONE,
+  },
+  FILE_ERROR: {
+    category: SRC,
+    content: 'Có file không đọc được do bảng mã ký tự hoặc lý do tương tự.',
+    confirmation: 'Vui lòng kiểm tra bảng mã ký tự của file.',
+  },
+  FILE_UNSUPPORTED: {
+    category: UNSUPPORTED,
+    content:
+      'Có loại file mà phân tích hiện tại chưa hỗ trợ, như user control.',
+    confirmation:
+      'Vui lòng cho biết phạm vi sử dụng và mức độ quan trọng của các thành phần đó.',
+  },
+  FILES_SKIPPED: {
+    category: SRC,
+    content:
+      'Có file không được đọc do vượt dung lượng, là liên kết (link) hoặc lý do tương tự.',
+    confirmation: 'Vui lòng cho biết có cần các file không được đọc hay không.',
+  },
+  UNCLASSIFIED_LINES: {
+    category: PREMISE,
+    content: 'Có dòng không phân loại được nên không nằm trong số dòng.',
+    confirmation: 'Vui lòng kiểm tra cách viết của các file tương ứng.',
+  },
+  REPORT_FILE_MISSING: {
+    category: 'Report',
+    content:
+      'File định nghĩa report (.rpt) được code tham chiếu không có trong mã nguồn (thiếu file thiết kế).',
+    confirmation: NONE,
+  },
+  SCREEN_FILE_MISSING: {
+    category: SRC,
+    content: 'Không có trong mã nguồn các file màn hình (form).',
+    confirmation: 'Vui lòng cung cấp file của các màn hình tương ứng.',
+  },
+  SCREEN_FILE_NOT_ANALYZED: {
+    category: UNSUPPORTED,
+    content: 'Không phân tích được file màn hình (vẫn tính vào số màn hình).',
+    confirmation: 'Vui lòng cho biết nội dung của các màn hình tương ứng.',
+  },
+  SCREEN_REPORT_MISSING: {
+    category: PREMISE,
+    content:
+      'Số màn hình, report và batch không có trong kết quả phân tích này.',
+    confirmation: REANALYZE,
+  },
+  DYNAMIC_SQL: {
+    category: DATABASE,
+    content:
+      'Có SQL mà tên bảng được quyết định lúc chạy nên không xác định cơ học được bảng được truy cập.',
+    confirmation:
+      'Vui lòng cho biết danh sách và mục đích của các bảng được chỉ định động.',
+  },
+  TABLE_NAMES_NOT_CONFIRMED: {
+    category: DATABASE,
+    content: 'Tên bảng được thống kê theo schema giả định.',
+    confirmation:
+      'Vui lòng nhờ quản trị viên cơ sở dữ liệu kiểm tra schema mặc định và từ đồng nghĩa.',
+  },
+  CALL_AMBIGUOUS: {
+    category: PREMISE,
+    content:
+      'Có nhiều xử lý trùng tên nên có chỗ không xác định được duy nhất nơi được gọi.',
+    confirmation: 'Không có (sẽ kiểm tra khi thiết kế migrate).',
+  },
+  COMPLEXITY_DRAFT: {
+    category: PREMISE,
+    content:
+      'Độ phức tạp được tính theo điểm của số nhánh, số dòng thực thi, số bảng truy cập, SQL động và số lời gọi.',
+    confirmation: NONE,
+  },
+  COMPLEXITY_REFERENCE_ONLY: {
+    category: PREMISE,
+    content:
+      'Độ phức tạp là phân loại mức khó migrate, không phải cơ sở tính effort hay chi phí. Xử lý file, cập nhật DB và transaction không nằm trong điểm.',
+    confirmation: NONE,
+  },
+  SCREEN_REPORT_OUTDATED: {
+    category: PREMISE,
+    content:
+      'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code. Cần phân tích lại mã nguồn.',
+    confirmation: REANALYZE,
+  },
+  PROCEDURE_LINES_MISSING: {
+    category: PREMISE,
+    content:
+      'Kết quả phân tích này không có chi tiết số dòng theo từng procedure.',
+    confirmation: REANALYZE,
+  },
+  EXTERNAL_COMPONENT: {
+    category: EXTERNAL,
+    content:
+      'Đang dùng thành phần ngoài như COM / OCX. Có thể cần thay thế khi migrate.',
+    confirmation:
+      'Vui lòng cho biết giấy phép, cách có được và khả năng thay thế của các thành phần ngoài đang dùng.',
+  },
+  CONCATENATED_SQL: {
+    category: DATABASE,
+    content:
+      'Có SQL được ghép từ chuỗi. Không xác định cơ học được nội dung lúc chạy và đây là đối tượng phải viết lại khi migrate.',
+    confirmation:
+      'Vui lòng cho biết mục đích của các SQL đó và cách xử lý giá trị nhập (phòng chống SQL injection).',
+  },
+  EXTERNAL_API: {
+    category: EXTERNAL,
+    content: 'Có gọi hàm của thư viện ngoài như Windows API.',
+    confirmation: 'Không có (sẽ kiểm tra khi thiết kế migrate).',
+  },
+  [OTHER_RISK_CODE]: {
+    category: 'Khác',
+    content: 'Có những lưu ý ngoài các mục trên.',
+    confirmation: 'Người phụ trách sẽ liên hệ để trao đổi chi tiết.',
+  },
+};
+
+export const riskCatalog = (lang: 'ja' | 'vi'): Record<string, RiskEntry> =>
+  lang === 'ja'
+    ? RISK_CATALOG
+    : Object.fromEntries(
+        Object.entries(RISK_CATALOG).map(([code, entry]) => [
+          code,
+          { ...entry, ...(RISK_CATALOG_VI[code] ?? {}) },
+        ]),
+      );

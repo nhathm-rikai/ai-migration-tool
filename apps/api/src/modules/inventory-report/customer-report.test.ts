@@ -1,5 +1,6 @@
 import {
   CustomerReportSchema,
+  REPORT_COUNTING_BASIS,
   inventoryKpis,
   type SourceInventoryDocument,
 } from '@portal/contracts';
@@ -15,11 +16,11 @@ import {
   buildRisks,
   type CustomerReport,
 } from './customer-report.js';
-import {
-  CUSTOMER_REPORT_VERSION,
-  NOT_ANALYZED,
-  SHEET_NAMES,
-} from './customer-report-constants.js';
+import { CUSTOMER_REPORT_VERSION } from './customer-report-constants.js';
+import { reportText } from './customer-report-text.js';
+
+const NOT_ANALYZED = reportText('ja').notAnalyzed;
+const SHEET_NAMES = reportText('ja').sheetNames;
 import { customerReportSheets } from './customer-report-workbook.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
 import { unzip } from '../../testing/zip-reader.js';
@@ -89,16 +90,28 @@ describe('AR02-AC01 figures equal the assessment step and AR04', () => {
     expect(scale.tables).toBe(4);
     expect(scale.tablesView).toBe('normalized');
     expect(scale.screenReport).not.toHaveProperty('reportItems');
-    expect({ ...scale.screenReport, reportItems: undefined }).toEqual({
-      ...demoInventory.totals.screenReport,
-      reportItems: undefined,
-    });
+    // Reports are counted once each: order.rpt is named in two procedures
+    // (two signs in the stored rows) and is one report; CUSTOMER.BAS prints
+    // (one report) and exports CSV, REPORT.BAS exports to Excel (two export
+    // reports). Plain file output is listed apart and the log file is left
+    // out.
     expect(scale.screenReport).toMatchObject({
       screens: 3,
       sharedScreens: 1,
       batches: 1,
-      reports: { counted: 3, suspected: 2 },
+      reports: { rows: 6, counted: 6, suspected: 0 },
     });
+    expect(scale.reportBreakdown).toEqual({
+      total: 6,
+      crystal: 3,
+      designFile: 2,
+      missingFile: 1,
+      print: 1,
+      export: 2,
+      dataFiles: 1,
+      excluded: 1,
+    });
+    expect(demoInventory.totals.screenReport?.reports.counted).toBe(4);
     // The core report of the same inventory agrees.
     const core = buildInventoryReport(demoInventory, ALL_PROGRAMS);
     expect(scale.codeLines).toBe(core.totals.unique.codeLines);
@@ -114,9 +127,6 @@ describe('AR02-AC02 module table', () => {
     expect(sum((m) => m.screens)).toBe(report.scale.screenReport?.screens);
     expect(sum((m) => m.reports)).toBe(
       report.scale.screenReport?.reports.counted,
-    );
-    expect(sum((m) => m.suspectedReports)).toBe(
-      report.scale.screenReport?.reports.suspected,
     );
     expect(sum((m) => m.batches)).toBe(report.scale.screenReport?.batches);
     expect(sum((m) => m.programs)).toBe(report.scale.programs);
@@ -134,8 +144,26 @@ describe('AR02-AC03 risks', () => {
   it('puts every source warning in exactly one row; counts add up', () => {
     const core = buildInventoryReport(demoInventory, ALL_PROGRAMS);
     const fromWarnings = report.risks.filter((r) => r.source === 'warning');
+    // The technical report warns once per sign; the customer report once per
+    // missing Crystal report.
+    const perSign = core.warnings.filter(
+      (w) => w.code === 'REPORT_FILE_MISSING' || w.code === 'REPORT_SUSPECTED',
+    ).length;
+    expect(perSign).toBeGreaterThan(0);
+    // The definitions of the complexity are in the counting basis, not risks.
+    const definitions = core.warnings.filter(
+      (w) =>
+        w.code === 'COMPLEXITY_REFERENCE_ONLY' || w.code === 'COMPLEXITY_DRAFT',
+    ).length;
+    expect(definitions).toBeGreaterThan(0);
+    expect(fromWarnings.some((r) => r.code.startsWith('COMPLEXITY_'))).toBe(
+      false,
+    );
     expect(fromWarnings.reduce((n, r) => n + r.count, 0)).toBe(
-      core.warnings.length,
+      core.warnings.length -
+        perSign -
+        definitions +
+        (report.scale.reportBreakdown?.missingFile ?? 0),
     );
     expect(new Set(fromWarnings.map((r) => r.code)).size).toBe(
       fromWarnings.length,
@@ -175,12 +203,14 @@ describe('AR02-AC03 risks', () => {
     expect(risks.reduce((n, r) => n + r.count, 0)).toBe(3);
   });
 
-  it('rates missing .rpt as 高 with the request, suspected output as 中, sorted high first', () => {
+  it('rates missing .rpt as 高 without asking the customer for the file, sorted high first', () => {
     const missing = report.risks.find((r) => r.code === 'REPORT_FILE_MISSING');
     expect(missing).toMatchObject({ severity: '高' });
-    expect(missing?.confirmation).toContain('帳票定義ファイル(.rpt)のご提供');
-    const suspected = report.risks.find((r) => r.code === 'REPORT_SUSPECTED');
-    expect(suspected).toMatchObject({ severity: '中' });
+    // The file is reported as missing; the report does not ask for it.
+    expect(missing?.content).toContain('設計ファイルなし');
+    expect(missing?.confirmation).not.toContain('ご提供');
+    // Nothing is a "suspected report" any more: no such risk row.
+    expect(report.risks.some((r) => r.code === 'REPORT_SUSPECTED')).toBe(false);
     const order = report.risks.map((r) =>
       ['高', '中', '低'].indexOf(r.severity),
     );
@@ -207,22 +237,30 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     const screens = report.items.filter((i) => i.type === '画面');
     const reports = report.items.filter((i) => i.type === '帳票');
     const batches = report.items.filter((i) => i.type === 'バッチ');
+    const functions = report.items.filter((i) => i.type === '出力機能');
     expect(screens).toHaveLength(totals?.screens ?? -1);
-    expect(reports).toHaveLength(totals?.reports.rows ?? -1);
+    // One row per report; plain file output is listed apart.
+    expect(reports).toHaveLength(report.scale.reportBreakdown?.total ?? -1);
     expect(batches).toHaveLength(totals?.batches ?? -1);
+    expect(functions).toHaveLength(
+      report.scale.reportBreakdown?.dataFiles ?? -1,
+    );
+    expect(functions.every((i) => i.confidenceLabel === '帳票に含めない')).toBe(
+      true,
+    );
     expect(report.items.every((i) => i.file !== '')).toBe(true);
-    expect(
-      reports.filter((i) => i.confidenceLabel.includes('疑い')),
-    ).toHaveLength(totals?.reports.suspected ?? -1);
+    const order = reports.find((r) => r.name === 'order.rpt');
+    // The number of uses is a number of its own, not text in the note.
+    expect(order?.usages).toBe(2);
+    expect(order?.note).not.toContain('使用箇所');
   });
 
   it('rows of reports equal the total by kind and by level; unrated is 未評価 with a reason', () => {
     const reports = report.items.filter((i) => i.type === '帳票');
-    const byKind = totals?.reports.byKind ?? {};
-    const byLevel = totals?.reports.byLevel ?? {};
+    const byLevel = report.scale.screenReport?.reports.byLevel ?? {};
     const sum = (r: Record<string, number>) =>
       Object.values(r).reduce((a, b) => a + b, 0);
-    expect(reports.length).toBe(sum(byKind));
+    // The level distribution is over templates only.
     expect(reports.length).toBe(sum(byLevel));
     for (const row of reports.filter((r) => r.level === 'unrated')) {
       expect(row.levelLabel).toBe('未評価');
@@ -235,13 +273,21 @@ describe('AR02-AC04/AC09 screen and report list', () => {
       modelVersion: 'report-complexity-v1-draft',
     });
     expect(crystal?.factors).toContain('定義ファイル未解析');
-    // Sheet 6 shows the same rows plus the reference note.
+    // Sheet 6: the list (screens, batches, reports) with the file output that
+    // is not a report as a second table under it.
     const sheet = sheetOf('6_画面・帳票一覧');
-    expect(sheet.rows).toHaveLength(report.items.length);
-    expect(sheet.columns.map((c) => c.header)).toEqual(
-      expect.arrayContaining(['複雑度', '点数', 'モデル版', '評価要因']),
-    );
-    expect(sheet.notes?.join('')).toContain('参考値');
+    const listed = report.items.filter((i) => i.confidence !== 'suspected');
+    expect(sheet.filterRows).toBe(listed.length);
+    expect(sheet.rows.length).toBeGreaterThanOrEqual(report.items.length);
+    // The level only: the score and the factors are not columns of the list.
+    const headers = sheet.columns.map((c) => c.header);
+    expect(headers).toContain('複雑度');
+    expect(headers).not.toContain('点数');
+    expect(headers).not.toContain('評価要因');
+    // The reason a level was raised stays in the note.
+    const notes = sheet.rows.map((r) => String(r[r.length - 1] ?? ''));
+    expect(notes.some((n) => n.includes('最低レベルは「中」'))).toBe(true);
+    expect(sheet.notes?.join('')).toContain('算定基準');
   });
 
   it('shows the report counts by kind and level on sheet 1 and the level split on sheet 2', () => {
@@ -254,7 +300,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
       expect(sheet1).toContain(label);
     const sheet2 = cells(sheetOf('2_複雑度'));
     expect(sheet2).toContain('未評価');
-    expect(sheet2).toContain('report-complexity-v1-draft');
+    expect(sheet2).not.toContain('report-complexity-v1-draft');
   });
 });
 
@@ -266,7 +312,9 @@ describe('AR02-AC05 inventory without AR04 data', () => {
     expect(old.items).toEqual([]);
     const sheet1 = sheetOf('1_規模概要', old);
     const lines = sheet1.rows.filter((row) =>
-      ['画面', '帳票（検出）', 'バッチ'].some((label) => row[0] === label),
+      ['画面', '帳票数（算定基準による）', 'バッチ'].some(
+        (label) => row[0] === label,
+      ),
     );
     expect(lines).toHaveLength(3);
     for (const row of lines) expect(row[1]).toBe(NOT_ANALYZED);
@@ -285,9 +333,9 @@ describe('AR02-AC05 inventory without AR04 data', () => {
 describe('AR02-AC06 workbook', () => {
   const sheets = customerReportSheets(report);
 
-  it('has exactly the six sheets in order', () => {
+  it('has exactly the seven sheets in order (the last one is the counting basis)', () => {
     expect(sheets.map((s) => s.name)).toEqual([...SHEET_NAMES]);
-    expect(SHEET_NAMES).toHaveLength(6);
+    expect(SHEET_NAMES).toHaveLength(7);
   });
 
   it('writes a valid xlsx and puts 該当なし in an empty table', () => {
@@ -329,9 +377,11 @@ describe('AR02-AC06 workbook', () => {
   it('carries provenance and the DEMO label on sheet 1', () => {
     const text = cells(sheetOf('1_規模概要')).join('\n');
     expect(text).toContain('DEMO');
-    expect(text).toContain('a1');
-    expect(text).toContain(report.source.snapshotHash.slice(0, 12));
-    expect(text).toContain('お客様提示数：未入力');
+    expect(text).toContain('解析 #1');
+    expect(text).not.toContain(report.source.snapshotHash.slice(0, 12));
+    expect(text).not.toContain('artifact');
+    // The customer's own count is not collected: no line for it.
+    expect(text).not.toContain('お客様提示');
   });
 
   it('keeps absolute paths out and formula text as text', () => {
@@ -385,9 +435,11 @@ describe('customer report keeps files that differ only in case apart (AR04 revie
     expect(
       built.items.filter((i) => i.type === '画面' && i.file.startsWith('x/')),
     ).toHaveLength(2);
-    expect(
-      built.items.filter((i) => i.type === '帳票' && i.file.startsWith('x/')),
-    ).toHaveLength(2);
+    // Reports are one row per template, whatever the case of the file that
+    // names them.
+    expect(built.items.filter((i) => i.type === '帳票')).toHaveLength(
+      built.scale.reportBreakdown?.total ?? -1,
+    );
   });
 });
 
@@ -873,5 +925,154 @@ describe('AR02 review 3 — finding 3: unknown concatenated SQL is not 0', () =>
     const text = JSON.stringify(sheet.rows);
     expect(text).toContain(NOT_ANALYZED);
     expect(text).toContain('連結 ' + NOT_ANALYZED);
+  });
+});
+
+// ---- AR03 review 2: the statement about table names (sheet 4 note) ---------
+
+describe('AR03 review 2 — sheet 4 note about the schema follows the report state', () => {
+  const noteOf = (inventory: SourceInventoryDocument) => {
+    const built = buildCustomerReport(inventory, origin);
+    return (sheetOf('4_データベース', built).notes ?? []).join('\n');
+  };
+  it('assumed: asks the database administrator to confirm', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'assumed',
+    };
+    expect(noteOf(inventory)).toContain('仮定');
+  });
+  it('confirmed with tables: says confirmed, not assumed', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'confirmed',
+    };
+    const text = noteOf(inventory);
+    expect(text).toContain('確認済み');
+    expect(text).not.toContain('仮定');
+  });
+  it('no table found: claims neither', () => {
+    const inventory = clone();
+    inventory.tableNames = {
+      version: 'table-name-v1',
+      defaultSchema: 'APP',
+      status: 'confirmed',
+    };
+    for (const program of inventory.programs)
+      if (program.analysis) {
+        program.analysis.crud = [];
+        program.analysis.normalizedCrud = [];
+      }
+    const text = noteOf(inventory);
+    expect(text).toContain('検出されませんでした');
+    expect(text).not.toContain('確認済み');
+    expect(text).not.toContain('仮定');
+  });
+  it('not analyzed: says there is no data', () => {
+    const inventory = clone();
+    for (const program of inventory.programs)
+      (program as { analysis?: unknown }).analysis = undefined;
+    const text = noteOf(inventory);
+    expect(text).toContain('解析データがない');
+    expect(text).not.toContain('仮定');
+  });
+});
+
+// ---- Reports counted once each, by how they are made -----------------------
+
+describe('report count (customer report)', () => {
+  it('lists a missing Crystal report once in the risks', () => {
+    const missing = report.risks.find((r) => r.code === 'REPORT_FILE_MISSING');
+    expect(missing).toMatchObject({ count: 1, source: 'warning' });
+  });
+
+  it('sheet 1: one total, the three kinds, each with its assumption, and the file output left out', () => {
+    const rows = sheetOf('1_規模概要').rows;
+    const total = rows.find((r) => r[0] === '帳票数（算定基準による）');
+    expect(total?.[1]).toBe(6);
+    expect(total?.[2]).toBe('Crystal 3／コード印刷 1／CSV・Excel出力 2');
+    const crystal = rows.find((r) => r[0] === '　Crystal Reports / DataReport');
+    expect(crystal?.[1]).toBe(3);
+    expect(String(crystal?.[2])).toContain('設計ファイルあり 2／なし 1');
+    const print = rows.find((r) => r[0] === '　コードによる印刷');
+    expect(print?.[1]).toBe(1);
+    expect(print?.[2] ?? null).toBeNull();
+    const exports = rows.find((r) => r[0] === '　CSV・Excel出力');
+    expect(exports?.[1]).toBe(2);
+    expect(exports?.[2] ?? null).toBeNull();
+    const data = rows.find(
+      (r) => r[0] === 'データファイル出力（帳票に含めない）',
+    );
+    expect(data?.[1]).toBe(1);
+    expect(String(data?.[2])).toContain('ログ・一時ファイルとして除外 1 件');
+    // No uncertain wording is left.
+    const text = JSON.stringify(sheetOf('1_規模概要').rows);
+    for (const word of ['疑い', '要確認', '参考値'])
+      expect(text).not.toContain(word);
+  });
+
+  it('sheet 6: one row per report with its programs and uses; file output apart', () => {
+    const items = report.items;
+    const order = items.find(
+      (i) => i.type === '帳票' && i.name === 'order.rpt',
+    );
+    expect(order).toMatchObject({
+      confidenceLabel: '設計ファイルあり',
+      level: 'high',
+    });
+    expect(order?.usages).toBe(2);
+    const summary = items.find((i) => i.name === 'summary.rpt');
+    expect(summary?.confidenceLabel).toBe('設計ファイルなし');
+    const print = items.find((i) => i.kindLabel === 'コード印刷');
+    expect(print).toMatchObject({ type: '帳票', name: 'CUSTOMER' });
+    expect(print?.level).not.toBe('unrated');
+    const exports = items.filter((i) => i.kindLabel === 'CSV・Excel出力');
+    expect(exports.map((i) => i.name).sort()).toEqual(['CUSTOMER', 'REPORT']);
+    const data = items.filter((i) => i.type === '出力機能');
+    expect(data).toHaveLength(1);
+    expect(data[0]?.kindLabel).toContain('帳票に含めない');
+  });
+
+  it('the level distribution and the module table count the reports', () => {
+    const levels = report.complexity.reportLevels;
+    expect(levels).toMatchObject({ high: 1, medium: 2, low: 2, unrated: 1 });
+    expect(Object.values(levels ?? {}).reduce((n, v) => n + v, 0)).toBe(6);
+    const sum = (pick: (m: CustomerReport['modules'][number]) => number) =>
+      report.modules.reduce((n, m) => n + pick(m), 0);
+    expect(sum((m) => m.reports)).toBe(6);
+  });
+
+  it('an inventory without screen/report data has no report numbers (not 0)', () => {
+    const old = buildCustomerReport(legacy(), origin);
+    expect(old.scale.reportBreakdown).toBeNull();
+  });
+
+  it('sheet 7 is the counting basis, the same text as step 2 and the PDF', () => {
+    const sheet = sheetOf('7_算定基準');
+    expect(sheet.columns.map((c) => c.header)).toEqual(['項目', '内容']);
+    expect(sheet.columns[1]?.wrap).toBe(true);
+    expect(sheet.rows).toEqual(
+      REPORT_COUNTING_BASIS.map((item) => [item.ja.label, item.ja.text]),
+    );
+    const text = sheet.rows.map((r) => String(r[1])).join('');
+    expect(text).toContain('換算単位');
+    expect(text).toContain('レイアウトの設計内容は含みません');
+    expect(text).toContain('すべてを除外できるとは限りません');
+    expect(text).toContain('業務上の帳票数ではありません');
+    // Sheet 1 only points at it (in its notes) and carries no basis text.
+    const one = sheetOf('1_規模概要');
+    expect(one.notes?.join('')).toContain('7_算定基準');
+    expect(cells(one).join('')).not.toContain('換算単位');
+  });
+
+  it('says no uncertain thing in the fixed texts: assumptions only', () => {
+    const sheets = customerReportSheets(report);
+    const text = JSON.stringify(sheets.flatMap((s) => [s.notes ?? [], s.rows]));
+    for (const word of ['参考値', '疑い', '要確認（', '暫定'])
+      expect(text).not.toContain(word);
   });
 });

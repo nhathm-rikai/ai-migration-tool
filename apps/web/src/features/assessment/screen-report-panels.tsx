@@ -1,29 +1,29 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
-import { useMemo, useState, type ReactNode } from 'react';
-import { useLocale } from '../../shared/i18n/locale-context';
-import { pageOf } from './assessment-summary';
 import {
-  EMPTY_REPORT_FILTER,
-  REPORT_KINDS,
+  REPORT_COUNTING_BASIS,
+  REPORT_COUNTING_BASIS_TITLE,
+  deriveReportSummary,
+  type DataFileOutput,
+  type ReportEntry,
+  type ReportOrigin,
+  type ReportSummary,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { useLocale } from '../../shared/i18n/locale-context';
+import { pageOf, programLabel } from './assessment-summary';
+import {
   REPORT_LEVELS,
-  filterReports,
   programScreenReport,
-  reportListRows,
   screenReportView,
-  sortReports,
-  type ReportConfidence,
-  type ReportKind,
   type ReportLevel,
-  type ReportListFilter,
-  type ReportListRow,
-  type ReportSort,
-  type ReportSortKey,
 } from './screen-report-model';
 
-// Screens (画面), reports (帳票) and batches (バッチ) of the inventory (AR04).
-// Reports come with a reference complexity per report; "suspected" rows are
-// shown apart and never added to the report total. An inventory without
-// these fields shows "no data, analyze again", not 0.
+// Screens (画面), reports (帳票) and batches (バッチ) of the inventory. A
+// report is counted once: a Crystal / DataReport template name, a form that
+// prints in code, a form that exports CSV or Excel; the counting rules are
+// stated as assumptions next to the list. Other file output is listed apart
+// and not counted. An inventory without these fields shows "no data, analyze
+// again", not 0.
 
 const PAGE_SIZE = 25;
 
@@ -42,8 +42,9 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
   const copy = messages.assessment.screenReport.kpis;
   const number = useNumber();
   const view = screenReportView(inventory);
+  const summary = useMemo(() => deriveReportSummary(inventory), [inventory]);
   const cards: { key: string; label: string; value: string; sub: ReactNode }[] =
-    view.available
+    view.available && summary
       ? [
           {
             key: 'screens',
@@ -54,10 +55,21 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
           {
             key: 'reports',
             label: copy.reports,
-            value: number(view.counted),
-            sub: copy.reportsSub(
-              number(view.suspectedPrograms),
-              number(view.suspected),
+            value: number(summary.counts.total),
+            sub: (
+              <>
+                {copy.reportsSub(
+                  number(summary.counts.crystal),
+                  number(summary.counts.print),
+                  number(summary.counts.export),
+                )}
+                {summary.counts.missingFile > 0 && (
+                  <>
+                    <br />
+                    {copy.reportsMissing(number(summary.counts.missingFile))}
+                  </>
+                )}
+              </>
             ),
           },
           {
@@ -80,7 +92,7 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
     <>
       <ul
         className="kpi-grid kpi-grid-3"
-        aria-label={messages.assessment.screenReport.list.title}
+        aria-label={messages.assessment.screenReport.reports.title}
       >
         {cards.map((card) => (
           <li
@@ -104,364 +116,555 @@ export function ScreenReportKpis({ inventory }: { inventory: Inventory }) {
   );
 }
 
-function factorsText(
-  row: Pick<ReportListRow, 'factors' | 'reason'>,
-  factorNames: Record<string, string>,
-  reasons: Record<string, string>,
-  empty: string,
-): string {
-  const parts = row.factors.map((item) =>
-    item.factor === 'design-not-analyzed'
-      ? (factorNames[item.factor] ?? item.factor)
-      : `${factorNames[item.factor] ?? item.factor}: ${item.value} → +${item.points}`,
-  );
-  if (row.reason) parts.push(reasons[row.reason] ?? row.reason);
-  return parts.length > 0 ? parts.join('\n') : empty;
-}
-
-function LevelTag({
-  level,
-  score,
-  title,
-}: {
-  level: ReportLevel;
-  score: number | null;
-  title: string;
-}) {
+// The list shows the level only; the score and its factors are in the detail.
+function LevelTag({ level }: { level: ReportLevel }) {
   const { messages } = useLocale();
   const label = messages.assessment.screenReport.distribution.level[level];
-  return (
-    <span className={`tag tag-${level}`} title={title}>
-      {label}
-      {score !== null && ` · ${score}`}
-      <span className="sr-only">{`: ${title.replaceAll('\n', '; ')}`}</span>
-    </span>
-  );
+  return <span className={`tag tag-${level}`}>{label}</span>;
 }
 
-function ConfidenceTag({ value }: { value: ReportConfidence }) {
-  const { messages } = useLocale();
-  return (
-    <span className={`tag tag-conf-${value}`}>
-      {messages.assessment.screenReport.confidence[value]}
-    </span>
-  );
-}
-
-export function ReportDistribution({ inventory }: { inventory: Inventory }) {
+// How a report's level was reached: the score and each factor with what was
+// measured and the points it added. A level raised by a convention (the design
+// is not analyzed) is said so and its score is not shown as a real rating.
+function ComplexityDetail({
+  complexity,
+}: {
+  complexity: {
+    score: number | null;
+    factors: { factor: string; value: number; points: number }[];
+    reason?: string | null | undefined;
+  };
+}) {
   const { messages } = useLocale();
   const copy = messages.assessment.screenReport;
-  const number = useNumber();
-  const view = screenReportView(inventory);
-  if (!view.available) return null;
-  const percent = (count: number) =>
-    view.rows === 0 ? '0%' : `${Math.round((count / view.rows) * 100)}%`;
-  return (
-    <section
-      className="report-distribution"
-      aria-label={copy.distribution.title}
-    >
-      <p className="muted" data-testid="report-reference">
-        {copy.reference(view.complexityVersion)}. {copy.distribution.help}
-      </p>
-      <div className="report-distribution-grid">
-        <table aria-label={copy.distribution.byLevel}>
-          <caption>{copy.distribution.byLevel}</caption>
-          <tbody>
-            {REPORT_LEVELS.map((level) => (
-              <tr key={level} data-level={level}>
-                <th scope="row">{copy.distribution.level[level]}</th>
-                <td className="num">{number(view.byLevel[level])}</td>
-                <td className="num muted">{percent(view.byLevel[level])}</td>
-              </tr>
-            ))}
-            <tr className="total-row">
-              <th scope="row">{copy.distribution.total}</th>
-              <td className="num" data-testid="report-rows-by-level">
-                {number(view.rows)}
-              </td>
-              <td />
-            </tr>
-          </tbody>
-        </table>
-        <table aria-label={copy.distribution.byKind}>
-          <caption>{copy.distribution.byKind}</caption>
-          <tbody>
-            {REPORT_KINDS.map((kind) => (
-              <tr key={kind} data-kind={kind}>
-                <th scope="row">{copy.distribution.kind[kind]}</th>
-                <td className="num">{number(view.byKind[kind])}</td>
-                <td className="num muted">{percent(view.byKind[kind])}</td>
-              </tr>
-            ))}
-            <tr className="total-row">
-              <th scope="row">{copy.distribution.total}</th>
-              <td className="num" data-testid="report-rows-by-kind">
-                {number(view.rows)}
-              </td>
-              <td />
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+  const measured = complexity.factors.filter(
+    (item) => item.factor !== 'design-not-analyzed',
   );
-}
-
-const DEFAULT_REPORT_SORT: ReportSort = {
-  key: 'complexity',
-  direction: 'desc',
-};
-
-export function ReportList({ inventory }: { inventory: Inventory }) {
-  const { messages } = useLocale();
-  const copy = messages.assessment.screenReport;
-  const number = useNumber();
-  const rows = useMemo(() => reportListRows(inventory), [inventory]);
-  const [filter, setFilter] = useState<ReportListFilter>(EMPTY_REPORT_FILTER);
-  const [sort, setSort] = useState<ReportSort>(DEFAULT_REPORT_SORT);
-  const [page, setPage] = useState(1);
-  const visible = useMemo(
-    () => sortReports(filterReports(rows ?? [], filter), sort),
-    [rows, filter, sort],
-  );
-  if (rows === null) return null;
-  const current = pageOf(visible, page, PAGE_SIZE);
-  const change = (next: Partial<ReportListFilter>) => {
-    setFilter({ ...filter, ...next });
-    setPage(1);
-  };
-  const header = (key: ReportSortKey, label: string) => {
-    const active = sort.key === key;
-    return (
-      <th
-        scope="col"
-        aria-sort={
-          active
-            ? sort.direction === 'asc'
-              ? 'ascending'
-              : 'descending'
-            : undefined
-        }
-      >
-        <button
-          className="sort-button"
-          aria-label={copy.list.sortBy(label)}
-          onClick={() => {
-            setSort(
-              active
-                ? { key, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
-                : {
-                    key,
-                    direction: key === 'complexity' ? 'desc' : 'asc',
-                  },
-            );
-            setPage(1);
-          }}
-        >
-          {label}
-          <span aria-hidden="true" className="sort-mark">
-            {active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕'}
-          </span>
-        </button>
-      </th>
-    );
-  };
+  const reason = complexity.reason ?? null;
+  const floored = reason === 'DESIGN_NOT_ANALYZED_FLOOR';
   return (
-    <section className="program-list report-list" aria-label={copy.list.title}>
-      <div className="program-filters">
-        <label>
-          <span>{copy.list.search}</span>
-          <input
-            type="search"
-            value={filter.query}
-            onChange={(event) => change({ query: event.currentTarget.value })}
-          />
-        </label>
-        <label>
-          <span>{copy.list.levelFilter}</span>
-          <select
-            value={filter.level}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === 'all') change({ level: 'all' });
-              else {
-                const level = REPORT_LEVELS.find((item) => item === value);
-                if (level) change({ level });
-              }
-            }}
-          >
-            <option value="all">{copy.list.all}</option>
-            {REPORT_LEVELS.map((level) => (
-              <option key={level} value={level}>
-                {copy.distribution.level[level]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>{copy.list.kindFilter}</span>
-          <select
-            value={filter.kind}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === 'all') change({ kind: 'all' });
-              else {
-                const kind = REPORT_KINDS.find((item) => item === value);
-                if (kind) change({ kind });
-              }
-            }}
-          >
-            <option value="all">{copy.list.all}</option>
-            {REPORT_KINDS.map((kind: ReportKind) => (
-              <option key={kind} value={kind}>
-                {copy.distribution.kind[kind]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>{copy.list.confidenceFilter}</span>
-          <select
-            value={filter.confidence}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (
-                value === 'all' ||
-                value === 'counted' ||
-                value === 'suspected'
-              )
-                change({ confidence: value });
-            }}
-          >
-            <option value="all">{copy.list.all}</option>
-            <option value="counted">{copy.list.confidenceCounted}</option>
-            <option value="suspected">{copy.confidence.suspected}</option>
-          </select>
-        </label>
-      </div>
-      <p className="muted" role="status">
-        {copy.list.count(number(visible.length), number(rows.length))}
-      </p>
-      {visible.length === 0 ? (
-        <p className="empty-state">
-          {rows.length > 0 ? copy.list.noMatch : copy.list.none}
+    <div className="complexity-detail" data-testid="report-complexity-detail">
+      <h4>{copy.complexityDetail.title}</h4>
+      {reason !== null && (
+        <p className="muted" data-testid="report-complexity-reason">
+          {copy.reasons[reason] ?? reason}
         </p>
-      ) : (
-        <>
-          <div className="table-scroll">
-            <table className="program-table" data-testid="report-table">
-              <thead>
-                <tr>
-                  {header('program', copy.list.columns.program)}
-                  {header('module', copy.list.columns.module)}
-                  {header('kind', copy.list.columns.kind)}
-                  {header('name', copy.list.columns.name)}
-                  {header('file', copy.list.columns.location)}
-                  {header('confidence', copy.list.columns.confidence)}
-                  {header('complexity', copy.list.columns.complexity)}
-                </tr>
-              </thead>
-              <tbody>
-                {current.items.map((row) => (
-                  <tr key={row.key} data-kind={row.kind}>
-                    <th scope="row">
-                      {row.programs
-                        .slice(0, 2)
-                        .map((program) => program.label)
-                        .join(', ')}
-                      {row.programs.length > 2 && (
-                        <span className="muted">
-                          {' '}
-                          {copy.list.morePrograms(
-                            number(row.programs.length - 2),
-                          )}
-                        </span>
-                      )}
-                      {row.shared && (
-                        <span className="badge">{copy.list.sharedFile}</span>
-                      )}
-                    </th>
-                    <td className="mono">{row.module}</td>
-                    <td>{copy.distribution.kind[row.kind]}</td>
-                    <td>{row.name}</td>
-                    <td className="mono">
-                      {row.file}
-                      {row.line !== null && `:${row.line}`}
-                      {row.warnings.map((code) => (
-                        <span key={code} className="error-text">
-                          <br />
-                          {copy.warnings[code] ?? code}
-                        </span>
-                      ))}
-                    </td>
-                    <td>
-                      <ConfidenceTag value={row.confidence} />
-                    </td>
-                    <td>
-                      <LevelTag
-                        level={row.level}
-                        score={row.score}
-                        title={factorsText(
-                          row,
-                          copy.factors,
-                          copy.reasons,
-                          copy.list.noFactors,
-                        )}
-                      />
-                      <span className="badge">
-                        {copy.reference(row.version)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <nav className="pagination" aria-label={copy.list.title}>
-            <button
-              className="button small"
-              disabled={current.page <= 1}
-              onClick={() => setPage(current.page - 1)}
-            >
-              {copy.list.previous}
-            </button>
-            <span>
-              {copy.list.page(number(current.page), number(current.pages))}
-            </span>
-            <button
-              className="button small"
-              disabled={current.page >= current.pages}
-              onClick={() => setPage(current.page + 1)}
-            >
-              {copy.list.next}
-            </button>
-          </nav>
-        </>
       )}
-    </section>
+      {measured.length > 0 ? (
+        <table className="detail-table">
+          <thead>
+            <tr>
+              <th scope="col">{copy.complexityDetail.factor}</th>
+              <th scope="col" className="num">
+                {copy.complexityDetail.measured}
+              </th>
+              <th scope="col" className="num">
+                {copy.complexityDetail.points}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {measured.map((item) => (
+              <tr key={item.factor}>
+                <td>{copy.factors[item.factor] ?? item.factor}</td>
+                <td className="num mono">{item.value}</td>
+                <td className="num mono">+{item.points}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="muted">{copy.list.noFactors}</p>
+      )}
+      {complexity.score !== null && !floored && (
+        <p data-testid="report-complexity-score">
+          {copy.complexityDetail.score(String(complexity.score))}
+        </p>
+      )}
+    </div>
   );
 }
 
-export function ReportsTab({ inventory }: { inventory: Inventory }) {
-  const { messages } = useLocale();
-  const view = screenReportView(inventory);
-  if (!view.available)
-    return (
-      <p className="empty-state" data-testid="reports-nodata">
-        {messages.assessment.screenReport.kpis.noDataHelp}
-      </p>
-    );
+function programsText(
+  programs: readonly string[],
+  more: (count: string) => string,
+  number: (value: number) => string,
+): ReactNode {
   return (
     <>
-      <ReportDistribution inventory={inventory} />
-      <ReportList inventory={inventory} />
+      {programs
+        .slice(0, 2)
+        .map((path) => programLabel(path))
+        .join(', ')}
+      {programs.length > 2 && (
+        <span className="muted"> {more(number(programs.length - 2))}</span>
+      )}
     </>
   );
 }
 
-// "Screens and reports" tab of one program: file:line and the confidence of
-// each row, with the same warnings as the project list.
+const Chevron = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 9l6 6 6-6" />
+  </svg>
+);
+
+// Complexity of the reports as columns, the same card as "Phân bổ complexity"
+// at the top of the step; a level without a report is a bar of no height.
+function ReportDistribution({ summary }: { summary: ReportSummary }) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport;
+  const number = useNumber();
+  const levels = REPORT_LEVELS.filter(
+    (level) => level !== 'unrated' || summary.counts.byLevel[level] > 0,
+  );
+  const max = Math.max(
+    1,
+    ...levels.map((level) => summary.counts.byLevel[level]),
+  );
+  const total = summary.counts.total;
+  const percent = (count: number) =>
+    total === 0 ? '0%' : `${Math.round((count / total) * 100)}%`;
+  return (
+    <section
+      className="panel chart-card histogram report-histogram"
+      aria-label={copy.distribution.title}
+    >
+      <header className="chart-heading">
+        <h4>{copy.distribution.title}</h4>
+        <span className="muted">
+          {copy.distribution.total}{' '}
+          <strong className="mono" data-testid="report-rows-by-level">
+            {number(total)}
+          </strong>
+        </span>
+      </header>
+      <ol className="histogram-bars">
+        {levels.map((level) => (
+          <li key={level} data-level={level}>
+            <div className="histogram-bar">
+              <span className="mono histogram-count">
+                {number(summary.counts.byLevel[level])}
+              </span>
+              <i
+                className={`tone-${level}`}
+                style={{
+                  height: `${(summary.counts.byLevel[level] / max) * 100}%`,
+                }}
+                aria-hidden="true"
+              />
+              <span className="histogram-label">
+                {copy.distribution.level[level]}{' '}
+                <span className="muted">
+                  {percent(summary.counts.byLevel[level])}
+                </span>
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="muted histogram-note" data-testid="report-reference">
+        {copy.distribution.help}
+      </p>
+    </section>
+  );
+}
+
+function Pagination({
+  title,
+  page,
+  pages,
+  onPage,
+}: {
+  title: string;
+  page: number;
+  pages: number;
+  onPage: (page: number) => void;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport.list;
+  const number = useNumber();
+  if (pages <= 1) return null;
+  return (
+    <nav className="pagination" aria-label={title}>
+      <button
+        className="button small"
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        {copy.previous}
+      </button>
+      <span>{copy.page(number(page), number(pages))}</span>
+      <button
+        className="button small"
+        disabled={page >= pages}
+        onClick={() => onPage(page + 1)}
+      >
+        {copy.next}
+      </button>
+    </nav>
+  );
+}
+
+const originKey = (
+  report: ReportEntry,
+): 'crystal' | 'data-report' | 'print' | 'export' =>
+  report.origin === 'crystal' ? (report.kind ?? 'crystal') : report.origin;
+
+// One row per report; the whole row opens where it is made (program, file,
+// line, procedure) below it, like the program list.
+function ReportTable({
+  reports,
+  testId,
+}: {
+  reports: readonly ReportEntry[];
+  testId: string;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport;
+  const number = useNumber();
+  const [openId, setOpenId] = useState<string | null>(null);
+  return (
+    <div className="table-scroll">
+      <table className="program-table report-table" data-testid={testId}>
+        <thead>
+          <tr>
+            <th scope="col">{copy.reports.columns.name}</th>
+            <th scope="col">{copy.reports.columns.origin}</th>
+            <th scope="col">{copy.reports.columns.status}</th>
+            <th scope="col">{copy.reports.columns.programs}</th>
+            <th scope="col" className="num">
+              {copy.reports.columns.uses}
+            </th>
+            <th scope="col">{copy.reports.columns.complexity}</th>
+            <th scope="col" className="chevron-col">
+              <span className="sr-only">{copy.reports.columns.details}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {reports.map((report) => {
+            const open = openId === report.id;
+            const detailId = `report-detail-${report.id}`;
+            return (
+              <Fragment key={report.id}>
+                <tr
+                  className={`program-row${open ? ' selected' : ''}`}
+                  data-origin={report.origin}
+                  onClick={() => setOpenId(open ? null : report.id)}
+                >
+                  <th scope="row">
+                    <button
+                      className="link-button program-toggle"
+                      aria-expanded={open}
+                      aria-controls={open ? detailId : undefined}
+                    >
+                      {report.name}
+                    </button>
+                    {report.file !== null && (
+                      <span className="mono muted" title={report.file}>
+                        {report.file}
+                      </span>
+                    )}
+                  </th>
+                  <td>{copy.reports.origin[originKey(report)]}</td>
+                  <td>
+                    {report.status === null ? (
+                      <span className="muted">—</span>
+                    ) : (
+                      <span
+                        className={`tag tag-conf-${report.status === 'design-file' ? 'detected' : 'referenced'}`}
+                      >
+                        {copy.reports.status[report.status]}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {programsText(
+                      report.programs,
+                      copy.list.morePrograms,
+                      number,
+                    )}
+                  </td>
+                  <td className="num">{number(report.usages.length)}</td>
+                  <td>
+                    <LevelTag level={report.complexity.level} />
+                  </td>
+                  <td className="chevron-col">
+                    <Chevron />
+                  </td>
+                </tr>
+                {open && (
+                  <tr className="program-detail-row" id={detailId}>
+                    <td colSpan={7}>
+                      <div className="detail-card">
+                        <ComplexityDetail complexity={report.complexity} />
+                        <table className="detail-table">
+                          <thead>
+                            <tr>
+                              <th scope="col">{copy.usage.program}</th>
+                              <th scope="col">{copy.usage.file}</th>
+                              <th scope="col" className="num">
+                                {copy.usage.line}
+                              </th>
+                              <th scope="col">{copy.usage.procedure}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {report.usages.map((usage) => (
+                              <tr
+                                key={`${usage.file}:${usage.line ?? ''}:${usage.procedure ?? ''}`}
+                              >
+                                <td>
+                                  {programsText(
+                                    usage.programs,
+                                    copy.list.morePrograms,
+                                    number,
+                                  )}
+                                </td>
+                                <td className="mono">{usage.file}</td>
+                                <td className="num mono">
+                                  {usage.line ?? '—'}
+                                </td>
+                                <td className="mono">
+                                  {usage.procedure?.split('#').at(-1) ?? '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Other file output: not a report, listed for the evidence.
+function DataFileTable({
+  files,
+  testId,
+}: {
+  files: readonly DataFileOutput[];
+  testId: string;
+}) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport;
+  const number = useNumber();
+  return (
+    <div className="table-scroll">
+      <table
+        className="program-table report-table report-data-table"
+        data-testid={testId}
+      >
+        <thead>
+          <tr>
+            <th scope="col">{copy.dataFiles.columns.program}</th>
+            <th scope="col">{copy.dataFiles.columns.kind}</th>
+            <th scope="col">{copy.dataFiles.columns.location}</th>
+            <th scope="col">{copy.dataFiles.columns.procedure}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {files.map((entry) => (
+            <tr key={entry.id}>
+              <th scope="row">
+                {programsText(entry.programs, copy.list.morePrograms, number)}
+              </th>
+              <td>
+                {entry.kinds
+                  .map((kind) => copy.dataFiles.kind[kind])
+                  .join(' · ')}
+              </td>
+              <td className="mono">
+                {entry.evidence.map((item) => (
+                  <span
+                    key={`${item.line ?? ''}:${item.kind}`}
+                    className="block"
+                  >
+                    {entry.file}
+                    {item.line !== null && `:${item.line}`}
+                  </span>
+                ))}
+              </td>
+              <td className="mono">
+                {entry.procedure?.split('#').at(-1) ?? '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// "Cơ sở tính": the conventions behind the total, the same text as the Excel
+// report and the PDF (contracts REPORT_COUNTING_BASIS).
+function CountingBasis() {
+  const { locale } = useLocale();
+  const lang = locale === 'ja' ? 'ja' : 'vi';
+  return (
+    <details className="report-basis" data-testid="report-basis">
+      <summary>
+        <span>{REPORT_COUNTING_BASIS_TITLE[lang]}</span>
+        <Chevron />
+      </summary>
+      <dl>
+        {REPORT_COUNTING_BASIS.map((item) => (
+          <div key={item.id} data-basis={item.id}>
+            <dt>{item[lang].label}</dt>
+            <dd>{item[lang].text}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
+type OriginFilter = 'all' | ReportOrigin;
+
+// "Report" tab: the complexity of the reports, the list of reports (all three
+// ways of making one) and, folded away, the file output that is not a report.
+export function ReportsTab({ inventory }: { inventory: Inventory }) {
+  const { messages } = useLocale();
+  const copy = messages.assessment.screenReport;
+  const number = useNumber();
+  const summary = useMemo(() => deriveReportSummary(inventory), [inventory]);
+  const [page, setPage] = useState(1);
+  const [dataPage, setDataPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [origin, setOrigin] = useState<OriginFilter>('all');
+  const reports = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return (summary?.reports ?? [])
+      .filter(
+        (report) =>
+          (origin === 'all' || report.origin === origin) &&
+          (needle === '' ||
+            report.name.toLowerCase().includes(needle) ||
+            report.programs.some((path) =>
+              programLabel(path).toLowerCase().includes(needle),
+            )),
+      )
+      .sort(
+        (a, b) =>
+          (b.complexity.score ?? -1) - (a.complexity.score ?? -1) ||
+          a.name.localeCompare(b.name),
+      );
+  }, [summary, query, origin]);
+  if (!summary)
+    return (
+      <p className="empty-state" data-testid="reports-nodata">
+        {copy.kpis.noDataHelp}
+      </p>
+    );
+  const pageData = pageOf(reports, page, PAGE_SIZE);
+  const dataData = pageOf(summary.dataFiles, dataPage, PAGE_SIZE);
+  return (
+    <>
+      <ReportDistribution summary={summary} />
+      <section className="report-list" aria-label={copy.reports.title}>
+        <h4>{copy.reports.title}</h4>
+        <p className="muted">{copy.reports.help}</p>
+        <CountingBasis />
+        <div className="program-filters">
+          <label>
+            <span>{copy.list.search}</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.currentTarget.value);
+                setPage(1);
+              }}
+            />
+          </label>
+          <label>
+            <span>{copy.reports.originFilter}</span>
+            <select
+              value={origin}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                setOrigin(
+                  value === 'crystal' || value === 'print' || value === 'export'
+                    ? value
+                    : 'all',
+                );
+                setPage(1);
+              }}
+            >
+              <option value="all">{copy.list.all}</option>
+              <option value="crystal">{copy.reports.origin.crystal}</option>
+              <option value="print">{copy.reports.origin.print}</option>
+              <option value="export">{copy.reports.origin.export}</option>
+            </select>
+          </label>
+        </div>
+        <p className="muted" role="status">
+          {copy.list.count(
+            number(reports.length),
+            number(summary.counts.total),
+          )}
+        </p>
+        {reports.length === 0 ? (
+          <p className="empty-state">
+            {summary.counts.total > 0 ? copy.list.noMatch : copy.reports.none}
+          </p>
+        ) : (
+          <>
+            <ReportTable
+              reports={pageData.items}
+              testId="report-template-table"
+            />
+            <Pagination
+              title={copy.reports.title}
+              page={pageData.page}
+              pages={pageData.pages}
+              onPage={setPage}
+            />
+          </>
+        )}
+      </section>
+      <details className="report-list data-files">
+        <summary>
+          <h4>{copy.dataFiles.title}</h4>
+          <span className="muted mono" data-testid="data-file-count">
+            {number(summary.counts.dataFiles)}
+          </span>
+          <Chevron />
+        </summary>
+        <p className="muted">{copy.dataFiles.help}</p>
+        {summary.counts.excluded > 0 && (
+          <p className="muted" data-testid="excluded-functions">
+            {copy.dataFiles.excluded(number(summary.counts.excluded))}
+          </p>
+        )}
+        {summary.dataFiles.length === 0 ? (
+          <p className="empty-state">{copy.dataFiles.none}</p>
+        ) : (
+          <>
+            <DataFileTable files={dataData.items} testId="data-file-table" />
+            <Pagination
+              title={copy.dataFiles.title}
+              page={dataData.page}
+              pages={dataData.pages}
+              onPage={setDataPage}
+            />
+          </>
+        )}
+      </details>
+    </>
+  );
+}
+
+// "Screens and reports" tab of one program: its screens and the reports it
+// makes, with where (file:line) they are made.
 export function ProgramScreensReports({
   inventory,
   projectPath,
@@ -475,18 +678,19 @@ export function ProgramScreensReports({
     (candidate) => candidate.projectPath === projectPath,
   );
   const data = program ? programScreenReport(program) : null;
-  if (!data || !data.available)
+  const summary = useMemo(() => deriveReportSummary(inventory), [inventory]);
+  if (!data || !data.available || !summary)
     return (
       <p className="empty-state" data-testid="program-screen-nodata">
         {copy.kpis.noDataHelp}
       </p>
     );
-  const suspected = data.reports.some((row) => row.confidence === 'suspected');
+  const reports = summary.reports.filter((report) =>
+    report.programs.includes(projectPath),
+  );
   return (
     <>
-      <p className="muted">
-        {copy.programTypes[data.programType]} · {copy.reference(null)}
-      </p>
+      <p className="muted">{copy.programTypes[data.programType]}</p>
       <h6>{copy.detail.screensTitle}</h6>
       {data.screens.length === 0 ? (
         <p className="empty-state">{copy.detail.noScreens}</p>
@@ -522,60 +726,11 @@ export function ProgramScreensReports({
         </div>
       )}
       <h6>{copy.detail.reportsTitle}</h6>
-      {data.reports.length === 0 ? (
+      {reports.length === 0 ? (
         <p className="empty-state">{copy.detail.noReports}</p>
       ) : (
-        <div className="table-scroll">
-          <table className="detail-table" data-testid="program-reports">
-            <thead>
-              <tr>
-                <th scope="col">{copy.detail.columns.name}</th>
-                <th scope="col">{copy.detail.columns.kind}</th>
-                <th scope="col">{copy.detail.columns.location}</th>
-                <th scope="col">{copy.detail.columns.confidence}</th>
-                <th scope="col">{copy.detail.columns.complexity}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.reports.map((row) => (
-                <tr key={`${row.kind}:${row.file}:${row.line}:${row.name}`}>
-                  <th scope="row">{row.name}</th>
-                  <td>{copy.distribution.kind[row.kind]}</td>
-                  <td className="mono">
-                    {row.file}
-                    {row.line !== null && `:${row.line}`}
-                    {row.warnings.map((code) => (
-                      <span key={code} className="error-text">
-                        <br />
-                        {copy.warnings[code] ?? code}
-                      </span>
-                    ))}
-                  </td>
-                  <td>
-                    <ConfidenceTag value={row.confidence} />
-                  </td>
-                  <td>
-                    <LevelTag
-                      level={row.complexity.level}
-                      score={row.complexity.score}
-                      title={factorsText(
-                        {
-                          factors: row.complexity.factors,
-                          reason: row.complexity.reason ?? null,
-                        },
-                        copy.factors,
-                        copy.reasons,
-                        copy.list.noFactors,
-                      )}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ReportTable reports={reports} testId="program-reports" />
       )}
-      {suspected && <p className="muted">{copy.detail.suspectedNote}</p>}
     </>
   );
 }

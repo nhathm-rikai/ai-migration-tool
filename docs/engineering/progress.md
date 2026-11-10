@@ -1,5 +1,145 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (4) — Review vòng 2 đạt; 3 P3 nhỏ và đổi version
+
+- Dấu "=" gán nay tìm ở độ sâu ngoặc 0 (`Cells(IIf(a = 1, 2, 3), 1).Value = x` không còn bị cắt); thêm ca vào bộ mẫu (64 ca).
+- `SCREEN_REPORT_VERSION` = `screen-report-v4` vì luật nhận diện đổi trên nhánh này: inventory đã lưu hiện cảnh báo "cần phân tích lại". Cập nhật test/fixture và spec.
+- Bỏ version cũ trong hai comment. Chưa push.
+
+## 11/11/2026 (3) — Review vòng 2 tại b4351cc: xuất Excel qua mẫu
+
+- **P2:** `Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/`.Formula` không SaveAs bị sót. Thêm ca vào bộ mẫu chấp nhận trước (4 ca fail), rồi sửa: các lời gọi đó trên đối tượng Excel đã biết là ghi; đích gán phải KẾT THÚC bằng Cells/Range/Item/Offset(..)/.Value/.Formula nên chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không tính (đóng luôn mục N "định dạng bị tính").
+- **P3:** không sửa, ghi vào "Giới hạn đã biết" §6.2b (With Printer, ProgID có phiên bản, ActiveWorkbook.SaveAs không tiền tố, SELECT INTO/INSERT INTO [Excel 8.0;…], tham số As Sheets/Range, late-bound ADODB.Connection, ".rpt" trong phép so sánh, ErrorList.csv).
+- Chưa push.
+
+## 11/11/2026 (2) — Nhận diện Excel/CSV: vòng 3 (4 lỗi P2 tại 07ed8cf) và bộ mẫu chấp nhận
+
+- **4 lỗi:** connection mở lại tới DB khác vẫn là Excel; chỉ in SQL + biến connection cùng câu bị tính; tham số không kiểu không che biến module; ghi qua tham số `As Excel.*` bị sót (không có tín hiệu). Câu "giới hạn chỉ gây sót" ở vòng trước là SAI (có giới hạn gây nhầm); spec §6.2b ghi từng giới hạn là sót (S) hay nhầm (N).
+- **Sửa:** loại connection/recordset theo lần cấu hình gần nhất (Open/ConnectionString/ActiveConnection/Set); chỉ tính khi có lời gọi ghi (Execute/Open INSERT-UPDATE-DELETE, CommandText, AddNew/Update/Delete/UpdateBatch trên recordset Excel); tham số/Dim không kiểu che biến module; ghi trên đối tượng Excel biết qua khai báo sinh tín hiệu tại dòng ghi.
+- **Bộ mẫu chấp nhận:** `vb6-report-signals.acceptance.test.ts` (58 ca ở vòng 3, nay 63 ca, qua inventory → tổng report), mô tả ở spec §6.2b. 7 ca fail trên 07ed8cf, pass sau sửa.
+- **Quy ước review nhận diện (từ nay):** ca biên NGOÀI bộ mẫu xếp P3 (ghi vào "Giới hạn đã biết") trừ khi đổi số pilot hoặc là pattern phổ biến; khi đó thêm vào bộ mẫu rồi mới sửa. Mỗi sửa kèm ca vào bộ mẫu thay vì vá điểm.
+- Chưa push.
+
+## 11/11/2026 — Nhận diện Excel/CSV: một lượt quét theo procedure (review tại 902023b, 3 lỗi P2)
+
+- **Cấu trúc:** mọi tín hiệu (Crystal, in, Open/Write/Print #, Excel, ADO) sinh từ lệnh đã tách (If một dòng = điều kiện + lệnh sau Then/Else), không quét dòng gốc. Bảng ký hiệu theo procedure (biến khai báo che biến module, quên ở End Sub, gán lại đổi loại, Set ... = Nothing). Theo dõi connection ADO (cn.Open/ConnectionString, rs.Open ... cn, ActiveConnection) và recordset/command trên connection Excel.
+- Ba lỗi: wb cùng tên ở hai procedure khác kiểu; đọc Excel + UPDATE DB khác; Open CSV sau Then. Test tái hiện fail trên 902023b (6 test), pass sau sửa.
+- Quy tắc và giới hạn còn lại: spec source-inventory.md §6.2a. Chưa push.
+
+## 10/11/2026 (đêm, 3) — Sửa 2 lỗi P2 nhận diện ghi Excel (review tại 4dd4d79)
+
+- **Ghi Excel phải gắn với đối tượng Excel:** theo dõi biến Excel (khai báo `As Excel.*`, gán từ CreateObject/GetObject/New Excel.Application/Workbooks.Add/Open, Set từ đối tượng Excel, khối With); `rs.Save`, `Text1.Value =`, `grid.Cells(...) =`, UPDATE/INSERT DB thường không còn mở khóa tính Excel. INSERT/UPDATE chỉ tính khi file có nguồn ADO Excel (mức file; giới hạn đã biết).
+- **If một dòng:** phần sau Then/Else được quét như lệnh riêng (ghi Excel và Write # CSV).
+- Pilot `source_vb6` (số tổng): 帳票 175 → 175 (Crystal 63, in 104, CSV/Excel 8), file dữ liệu 51 → 51, loại trừ 7 → 7. Chưa push.
+
+## 10/11/2026 (đêm, 2) — Độ phức tạp report chỉ hiện mức
+
+- Bước 2 (danh sách report), Excel sheet 6 (10 cột, bỏ Điểm và Yếu tố đánh giá) và PDF mục 6: chỉ hiện mức, không "Cao · 7" / "Trung bình · 0". "Chưa đánh giá" giữ riêng.
+- Chi tiết Portal (mở dòng report): tổng điểm, bảng yếu tố (giá trị đo, điểm cộng); Crystal bị nâng lên Trung bình ghi "Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình" và không hiện tổng điểm.
+- Độ phức tạp program không đổi. Mô hình v2 (call graph 2 tầng, mật độ in/vẽ) chỉ có spec (AR06, ngoài repo), chưa code. Chưa push.
+
+## 10/11/2026 (đêm) — PDF báo cáo cho khách: chữ đậm, rõ hơn
+
+- Chữ mờ do màu xám nhạt (#55657a), cỡ 9–9,5px (khoảng 7pt) và font Yu Gothic mặc định mảnh. Chỉ đổi trong PDF Assessment (CSS có phạm vi `.assess-doc-root`, PDF báo giá giữ nguyên): chữ chính #1a1a1a, chữ phụ/nhãn/ghi chú #3f4756 (tương phản trên nền trắng khoảng 9:1), viền bảng #c2ccd8, header bảng #00639a; mọi chữ tối thiểu 12px (9pt) kể cả ghi chú, nhãn thẻ KPI, bảng, chân trang; weight 500, tiêu đề/nhãn 700; font ja `Yu Gothic UI, Yu Gothic Medium, Meiryo, Hiragino Sans, Noto Sans JP`; biểu đồ cột chữ 12px. Chân trang vẽ cỡ 12px màu đậm.
+- Phân trang kiểm lại với e2e `pdf-layout` (vi và ja): không dòng nào chạm biên dưới, lần thử đầu đã vừa; PDF dài 11 và 10 trang, PDF demo 4 trang.
+- Chưa push.
+
+## 10/11/2026 (đêm) — Sửa 4 lỗi review độc lập (3 P2 + 1 P3) trên feat/report-template-count
+
+- **P2 Excel:** đọc Excel không còn bị tính là xuất. Excel chỉ tính khi file có bằng chứng ghi (`Workbooks.Add`, `.SaveAs/.Save`, gán giá trị ô/range, `INSERT/UPDATE` qua ADO Excel); `Workbooks.Open`, chuỗi `.xls`, ADO `SELECT`, `Shell EXCEL.EXE` đơn lẻ không tính.
+- **P2 CSV theo handle:** `Write/Print #h` gắn vào đúng `Open … As #h` còn mở trong procedure (handle số hoặc biến FreeFile), không gắn vào lệnh Open gần nhất; `Close`, mở lại handle, hết procedure thì quên.
+- **P2 PDF tràn trang:** thêm lần thử chừa 260px; sau mọi lần thử nếu còn trang chạm biên dưới thì `renderA4Pdf` throw, nút hiện lỗi, không tải file. E2E mới (một dòng cao hơn trang): có alert, không có download; chạy lại với code cũ thì fail.
+- **P3 Cơ sở tính:** câu "tối đa 3 đơn vị" sai (Crystal tính theo mẫu, không giới hạn theo file). Viết lại vi+ja: Crystal theo mẫu, in và CSV/Excel mỗi loại tối đa 1 đơn vị mỗi file; ví dụ 2 mẫu + in + CSV = 4. Test hành vi (fixture → tổng 4) và test text.
+- **Pilot `source_vb6` (chỉ số tổng):** 帳票 175 → 175 (Crystal 63, in 104, CSV/Excel 8), file dữ liệu 52 → 51, loại trừ 7 → 7.
+- Spec `source-inventory.md` §6.2a cập nhật. Chưa push.
+
+## 10/11/2026 (tối) — Báo cáo cho khách: PDF mục 6 gọn, OCX gộp theo tên file, phân trang chống cắt dòng, độ rộng cột Excel
+
+- **PDF:** mục 6 thành tổng hợp (cách tạo × độ phức tạp + top 15 mẫu Crystal/DataReport + trỏ tới Excel); thành phần ngoài không còn GUID, gộp theo tên file không phân biệt hoa thường, top 15; API và SQL theo module top 15.
+- **Phân trang:** phát hiện lệch giữa chiều cao đo trong khung và ảnh vẽ thật (dòng cuối bị cắt nửa). Mỗi trang được vẽ thử và quét dòng thấp nhất; nếu chạm biên dưới thì xếp lại với chừa thêm chỗ, tới khi mọi trang vừa (trên e2e dữ liệu dài, lần thử đầu bị lệch, lần hai vừa).
+- **Rủi ro:** bỏ COMPLEXITY_REFERENCE_ONLY và COMPLEXITY_DRAFT (định nghĩa).
+- **Excel:** độ rộng cột theo nội dung (full-width tính 2), không ô nào bị cắt chữ; thành phần ngoài gộp theo tên file (distinct program).
+- Chưa push.
+
+## 10/11/2026 (chiều) — Báo cáo cho khách: bố cục lại 7 sheet, bỏ nội dung đòi khách, PDF xếp trang trong DOM
+
+Theo review của người dùng trên dự án thật (10 điểm):
+- **Excel:** mỗi bảng một khối riêng (tiêu đề đậm không nền, header riêng, đúng số cột của bảng; writer `rowSpans`/`sectionRows`/`noHeader`/`filterRows`); thời điểm phân tích dạng ngày giờ dễ đọc; bỏ dòng số khách cung cấp, "Bước tiếp theo", cột đề nghị khách hàng, GUID, độ tin cậy; cơ sở tính chuyển sang sheet 7 (rộng 100, wrap); sheet 3 đặt lại tên cột (File dùng chung, Tên/Loại/Mô tả/Số program dùng); sheet 6: Loại, Tên, …, File thiết kế (Có/Thiếu file), Số nơi dùng (số), ghi chú wrap, ghi file dữ liệu thành bảng riêng bên dưới.
+- **Inventory cũ:** `SCREEN_REPORT_VERSION` chuyển vào contracts; inventory có `screenReportVersion` khác bản hiện tại → cảnh báo `SCREEN_REPORT_OUTDATED` ở bước 2 và rủi ro cùng mã trong báo cáo khách (cần phân tích lại; CSV/Excel, log và độ phức tạp report in không suy ra được từ dữ liệu cũ). Report in bằng code của inventory mới có độ phức tạp theo procedure in (không có "Chưa đánh giá" hàng loạt).
+- **PDF:** `a4-pdf.ts` có tùy chọn `paginate`: xếp trang trong DOM (đo, không cắt dòng/thẻ/đoạn, bảng dài tách giữa dòng và lặp header, tiêu đề không đứng cuối trang một mình), rồi vẽ từng trang ở scale 3; bảng không còn bị chia khối cứng 14 dòng; rủi ro ≤5 tên program. Kiểm bằng e2e `pdf-layout.spec.ts` với báo cáo dài (10 trang, 276 dòng đủ, không tràn, trang giữa đầy ≥86%).
+- Chưa push.
+
+## 10/11/2026 — Báo cáo cho khách: tiếng Việt (lang=vi), bỏ version nội bộ, PDF nét hơn, trang 1 gọn
+
+- **Bỏ version nội bộ khỏi Excel và PDF:** bảng 解析モデルの版 (phụ lục PDF), dòng データの出所 và 解析モデル ở bìa, dòng 報告書版 / 複雑度モデル / スナップショット / 解析ラン / 解析結果 ở sheet 1, cột モデル版 ở sheet 1, 2, 6, và "モデル vN" trong chú thích. Giữ dự án, thời điểm phân tích, "解析 #N". JSON (`format=json`) giữ nguyên. Test: Excel/PDF không chứa `-v1`, `-draft`, `customer-assessment-report`, id, hash.
+- **Tiếng Việt:** route `customer-report?lang=ja|vi` (mặc định ja), `language` trong JSON, `customer-report-text.ts` (ja + vi cùng key), `RISK_CATALOG_VI`, `TABLE_SCHEMA_STATEMENT_VI`, `REPORT_COUNTING_BASIS` (đã có vi), PDF `documentText(lang)`. Nút Xuất Excel/PDF truyền ngôn ngữ UI; tên file `Bao-cao-Assessment_<dự án>_<date>`. Test: cùng key, cùng số từng ô, không còn chữ Nhật ở chuỗi cố định bản vi, tên sheet hợp lệ, route và e2e (UI vi → file vi, UI ja → file ja).
+- **PDF nét:** `a4-pdf.ts` thêm tùy chọn `sharp` (từng trang vẽ ở scale 3, JPEG 0,92) chỉ cho báo cáo Assessment; trước đây tài liệu dài bị hạ scale (chữ mờ). Báo giá giữ nguyên byte. PDF demo 5 trang, khoảng 2,9 MB. Bản vi dùng Segoe UI/Arial vì font tiếng Nhật vẽ rời dấu thanh.
+- **Trang 1 PDF:** bìa gọn (bỏ id/mô hình, mục lục một dòng) + thẻ KPI + phân bố độ phức tạp program; mục 1 chạy tiếp ngay dưới (chỉ 付録 còn ngắt trang cứng).
+- Chưa push.
+
+## 10/11/2026 — Bước 2: header bảng program một dòng; "Cơ sở tính" dùng chevron của Portal
+
+- **Header danh sách program:** mọi header một dòng (`white-space: nowrap`), dấu sắp xếp cùng dòng ngay sau chữ. Nhãn rút gọn, nhãn đầy đủ nằm trong `title`: vi LoC riêng / LoC + chung / Procedure / Bảng / Màn hình / Report / Độ phức tạp; ja 固有LoC / 共通込LoC / 固有Proc / テーブル / 画面 / 帳票 / 複雑度. Độ rộng cột tính lại theo chữ header cộng dấu sắp xếp, padding ngang 7px; "(gốc: N)" / "（元: N）" cùng dòng sau số, chữ nhỏ màu nhạt; chip loại một dòng, cắt bằng dấu … (đầy đủ trong tooltip). Đo ở 1280 và 1600 px, vi và ja: không header nào xuống dòng, không tràn ngang (bảng và trang).
+- **"Cơ sở tính":** bỏ tam giác mặc định của `<details>`, dùng chevron của Portal (xoay khi mở) trong một card có viền; nội dung là danh sách, tiêu đề đậm mỗi mục, đường kẻ giữa các mục. Mục "Ghi file dữ liệu" dùng cùng chevron.
+- Chưa push.
+
+## 10/11/2026 — Quy ước đếm report: khóa Crystal theo đường dẫn, đơn vị theo file, mục "Cơ sở tính" dùng chung
+
+Sửa theo review về quy ước đếm (4 điểm):
+- **Crystal:** khóa theo đường dẫn chuẩn hóa khi code ghi thư mục; chỉ khi chỉ có tên file (hoặc `App.Path & "\x.rpt"`) mới dùng giả định cùng tên là cùng mẫu; tên-only gộp vào mẫu path khi chỉ có một đường dẫn cùng tên file. Mỗi mẫu ghi `identity` (`path` | `name` | `file`); `counts.identityPath/identityName`; test `sales/Detail.rpt` + `stock/Detail.rpt` → 2, tên-only ở 2 file → 1.
+- **Đơn vị in/CSV-Excel = file chứa code** (.frm/.bas/.cls); mọi câu "mỗi form" đổi thành đơn vị quy đổi theo file. **Chồng lấp** tính riêng theo từng cách (một file tối đa 3 đơn vị), `counts.overlapFiles`; test chồng lấp. Tổng gọi "Report theo quy ước Assessment" / 帳票数（算定基準による）.
+- **Cơ sở tính một nguồn:** `REPORT_COUNTING_BASIS` (contracts, vi + ja) dùng cho khối gập ở tab Report, cuối sheet 1 Excel (`算定基準`) và phụ lục PDF; bỏ câu giả định rải rác, giữ nhãn ngắn. Log/tạm ghi "theo quy tắc nhận diện, không bảo đảm loại hết"; phạm vi độ phức tạp "chưa gồm thiết kế layout".
+- **Pilot VB6 (chạy chỉ đọc, chỉ ghi tổng):** 284 program; tổng 175 = Crystal 63 (khóa path 0, khóa name 63: mọi chuỗi .rpt trong pilot không có thư mục xác định) + in bằng code 104 + CSV/Excel 8; số file có đơn vị ở từ hai cách trở lên: 1; ghi file khác không tính 52; log/tmp loại 7. Tổng không đổi so với lần trước vì không có đường dẫn tĩnh để tách thêm.
+- Spec `source-inventory.md` §6.2a, `customer-assessment-report.md`, `AR04.md` đã cập nhật. Chưa push.
+
+## 10/11/2026 — Một tổng 帳票 (Crystal/DataReport + in bằng code + CSV/Excel); bỏ mọi câu "tham khảo/cần xác nhận"
+
+- **Đếm:** `deriveReportSummary` trả `reports[]` (origin crystal/data-report/print/export) và `dataFiles[]`; `counts.total` = tổng 帳票. Crystal/DataReport theo tên mẫu, in và CSV/Excel mỗi form (file) một; ghi file khác chỉ liệt kê, log/tmp loại. Analyzer `screen-report-v3` chấm độ phức tạp cho cả in/CSV theo procedure; `subkind`, `excludeReason` lưu ở dòng dấu hiệu. Spec `source-inventory.md` §6.2a, `customer-assessment-report.md`, `AR04.md` đã cập nhật.
+- **Giao diện bước 2:** 3 thẻ KPI (Màn hình, Report, Batch); tab Report: card phân bố dạng cột như "Phân bố complexity", một bảng report (tìm + lọc Tạo bằng, mở rộng từng dòng với Program/File/Dòng/Procedure, chevron giống danh sách program), mục gập "Ghi file dữ liệu (không tính report)". Cột Report trong danh sách program = số report của program.
+- **Báo cáo khách (AR02 Excel/JSON, AR03 PDF):** "帳票（合計）N" + dòng Crystal/コード印刷/CSV・Excel出力, mỗi dòng một câu "前提"; `reportBreakdown` thay `reportTemplates`/`outputFunctions`; bỏ `suspectedReports` và rủi ro `REPORT_SUSPECTED`. Không còn 参考値/疑い/要確認 (quét vi/ja và danh mục báo cáo khách; test khẳng định).
+- **Pilot VB6 (chạy chỉ đọc, chỉ ghi tổng):** 284 program; 帳票 175 = Crystal 63 (thiếu file thiết kế 63) + in bằng code 104 + CSV/Excel 8; ghi file khác không tính 52; log/tmp loại 7. Phân bố mức: thấp 33, trung bình 85, cao 29, rất cao 28.
+- **Kiểm chứng (Windows x64, Node 24.16):** typecheck, lint, `verify-repository` pass; test với 2 workers: web 387, api và contracts pass (một test xóa project bị timeout khi chạy cùng lúc, pass khi chạy riêng); e2e 21 pass. Giới hạn: chưa push; luật "mỗi form một report" cho in/CSV là giả định, một file có thể chứa nhiều report.
+
+## 10/11/2026 — Tách Excel/CSV khỏi chức năng in; sửa giao diện tab Report
+
+- **Pilot xuất Excel/CSV bằng cách nào (chỉ kỹ thuật + số, source ngoài repo, chỉ đọc):** không có tự động hóa Excel đang chạy: các dòng `Workbooks`, `Excel.`, `Shell … excel`, chuỗi `.xls`, nguồn ADO Excel đều nằm trong comment; không có export của lưới Spread/FlexGrid/TDBGrid. CSV được tạo bằng file văn bản thuần: `Open … For Output/Append` (101 dòng, 44 file) rồi `Write #` (7 dòng) hoặc `Print #` ngăn giá trị bằng chuỗi `","` (371 trong 542 dòng `Print #`, 8 file); chuỗi `.csv` chỉ 14 dòng (9 file, phần lớn là đọc hoặc comment). Vì vậy tên file không đủ để nhận ra CSV.
+- **Nhận diện bổ sung (`screen-report-v2`):** `Open … For Output/Append` thành CSV khi cùng procedure có `Write #` hoặc `Print #` với `","` trước `Close`/`End Sub` (ghi log vẫn bị loại, không thành CSV); `Workbooks.Add/Open`, chuỗi file `.xls/.xlsx/.xlsm`, nguồn ADO `Excel 8.0`, `Shell` chạy Excel. Test dương và âm tính trong `vb6-report-signals.test.ts` (fixture tự viết).
+- **Hai nhóm hiển thị:** KPI "Xuất Excel/CSV" (chức năng / program) và "In / ghi file khác" (print, ghi file khác, thư viện report không có mẫu), cùng "Report (帳票) · số mẫu"; `counts.groups` (contracts) và `scale.outputFunctions.groups` (báo cáo khách). Excel AR02/PDF AR03: 帳票 X 種類, Excel/CSV出力 N 件, 印刷・その他出力 Z 件 (要確認); thiếu file chỉ ghi 設計ファイルなし, bỏ câu yêu cầu khách cung cấp file.
+- **Số pilot mới:** 帳票 **63 mẫu** (A = 0 có file, B = 63 thiếu file); **Excel/CSV: 11 chức năng trong 8 program**; **in/ghi file khác: 432 chức năng trong 228 program** (385 có in trực tiếp, 51 có ghi file khác, 1 chỉ có thư viện report; một chức năng có thể thuộc nhiều loại); 7 chức năng ghi log bị loại. (Trước tách: 443 chức năng trong 230 program.)
+- **Giao diện tab Report khớp danh sách program:** phân bố độ phức tạp là hàng chip (có số và %, bỏ chip "chưa đánh giá" khi 0); dòng "Tham khảo · mô hình …" bỏ, chỉ còn "Chỉ mang tính tham khảo"; ghi chú mỗi nhóm một câu ngắn; badge "Thiếu file" (ja ファイルなし), bỏ "cần xin khách"; bảng mẫu dùng cùng class bảng, tìm kiếm và badge với danh sách program, cột cố định (chữ trái, số phải, header cùng cột); "Nơi dùng" là số thường, cả dòng mở rộng bằng chevron ở cuối dòng và hiện bảng nhỏ Program / File / Dòng / Procedure; focus-visible thay viền focus thô. Lỗi căn lệch trước đó do quy tắc cột của danh sách program (`.program-list`) áp lên bảng mới; bảng report không còn dùng class đó.
+
+## 10/11/2026 — Đếm report theo mẫu và chức năng in/xuất; nút xuất ở bước 2
+
+- **Nút Excel/PDF sát nhau:** slot tiêu đề bước 2 là `<div>` không có layout nên các nút inline dính nhau. Sửa: class `page-title-actions` (flex, gap 8px như nhóm nút bước 5). Ảnh sau: `test-results/step2-ui/after-header-buttons.png`; ảnh trước là ảnh người dùng gửi.
+- **Vấn đề:** tab Report 523 = 65 Crystal + 458 dấu hiệu nghi; đơn vị đếm là dấu hiệu trong code, không phải mẫu: cùng `Invoice.rpt` ở hai procedure là hai mục; Printer.Print/ghi file/log bị cộng vào "report". Tỷ lệ độ phức tạp chia cho 523.
+- **Thiết kế mới** (spec `source-inventory.md` §6.2a, `customer-assessment-report.md`): (1) **mẫu report** (cấp dự án, khử trùng theo tên `.rpt` không phân biệt hoa thường / file `.dsr`), `design-file` A hoặc `missing-file` B, X = A + B, kèm các nơi dùng (file:dòng) và program; (2) **chức năng in/xuất cần xác nhận** Z (print, Excel gồm `Shell EXCEL.EXE`, CSV, ghi file, report runtime không có mẫu), gom theo (file, procedure), không cộng vào X; ghi file vào log/file tạm bị loại và đếm riêng. Cả hai do `deriveReportSummary()` (contracts) suy ra từ các dòng đã lưu nên inventory cũ đọc được ngay (v1 không có csv/loại log). Analyzer `screen-report-v2`: thêm `subkind: csv`, `excludeReason` (optional) và `Shell EXCEL.EXE`.
+- **Hiển thị:** bước 2: KPI "Report (帳票) · số mẫu" (X, "Có file thiết kế A · Thiếu file B") và KPI mới "Chức năng in/xuất (cần xác nhận)" (Z, số program, số chỗ log/tmp đã loại); tab Report có phân bố độ phức tạp chỉ trên mẫu, bảng mẫu (mở rộng xem nơi dùng) và bảng chức năng in/xuất; cột Report của danh sách program = số mẫu (+N in/xuất); tab Màn hình và report của program hiện mẫu và chức năng của program. Excel AR02/PDF AR03: "帳票（種類）X（設計ファイルあり A／未提供 B）" và "印刷・出力機能（要確認）Z", sheet 5 `REPORT_FILE_MISSING` một dòng mỗi mẫu thiếu, sheet 6 một dòng mỗi mẫu và loại `出力機能` riêng.
+- **Quyết định khác thiết kế gợi ý:** (a) không thêm trường `reportTemplates`/`outputFunctions` vào inventory mà suy ra khi đọc (ít đổi schema, inventory cũ dùng được; chi phí tính mỗi lần mở, nhỏ); (b) `designFile` là đường dẫn `.rpt` như code viết (không lưu đường dẫn đã resolve); (c) tên report động không được analyzer phát hiện nên không có nhóm "tên động"; (d) loại log/tmp theo từ trong biểu thức đường dẫn, kể cả tên file kết thúc bằng `log`/`tmp`/`temp` (loại trừ `catalog`, `dialog`...), và `excludeReason` là loại (`log`, `temp`, `debug`, `error`) chứ không lưu tên khớp; (e) trường JSON `scale.screenReport.reports` của báo cáo khách đổi nghĩa (mẫu / chức năng), version `customer-assessment-report-v1` giữ nguyên; (f) chưa nhận diện ghi CSV bằng `Print #` ngoài `Open`, và `Shell` chạy chương trình khác.
+- **Số pilot (source ngoài repo, chỉ đọc, chỉ số tổng):** trước: 65 Crystal, 458 dấu hiệu nghi, 233 program (tab 523 mục). Sau: **63 mẫu Crystal** (A = 0 có file thiết kế, B = 63 thiếu file: corpus không có `.rpt`/`.dsr`), **443 chức năng in/xuất cần xác nhận** trong **230 program** (385 in, 60 ghi file, 1 CSV, 1 chỉ có thư viện report), **7 chức năng ghi log bị loại**. Phân bố độ phức tạp trên 63 mẫu: medium 36, high 12, very-high 15 (trước: 36 Medium chia cho 523 = 7%; nay 57%). 65 dấu hiệu Crystal thành 63 mẫu vì hai mẫu được gọi ở nhiều procedure.
+- **Test:** `vb6-report-signals.test.ts` (csv, log/tmp, `Shell EXCEL.EXE`, không loại `catalog`/`template`), `report-templates.test.ts` (contracts: cùng `Invoice.rpt` ở hai procedure và hai program → 1 mẫu, design-file/missing-file, 3 dòng print cùng procedure → 1 chức năng, log loại, csv/excel, % chỉ trên mẫu), `customer-report.test.ts` (Excel/JSON: rủi ro, sheet 1, sheet 6), web (KPI, tab, PDF, program), e2e bước 2 (demo inventory có thêm lần dùng thứ hai của `order.rpt`, một CSV và một ghi log).
+
+## 10/11/2026 — Bước 2: sửa giao diện theo góp ý (bảng lệch, bỏ cột UT, bỏ nút kỹ thuật, đổi nhãn nút)
+
+- **Bảng "Danh sách program":** AR04 thêm cột Màn hình/Report nhưng CSS vẫn đặt độ rộng theo bố cục cũ (cột thứ 8 = 15%) và header bị cắt bằng `nowrap` + ellipsis. Sửa: 11 cột, độ rộng cộng 100% (14/14/12/7/8/8/8/6/7/13/3), header xuống dòng thay vì bị cắt, cột số căn phải cùng header, badge trạng thái/độ phức tạp không bị cắt, ghi chú "(gốc: N)" xuống dòng dưới số bảng. Ảnh dự án demo (1280 và 1600 px, scale 2) ở `test-results/step2-ui/`, không commit.
+- **Bỏ cột "Điểm test UT"** khỏi UI bước 2 (cột, khóa sắp xếp, i18n, test). Giữ `programs[].utPoints` và checklist TC01 ở BE cho agent bước 3. Spec `ut-test-spec.md`, TC01.md, TC02.md cập nhật; TC02 không thêm cột IT.
+- **Bỏ nút "Dữ liệu kỹ thuật (Excel, nội bộ)" (AR01)** khỏi UI. Route `/report` và builder giữ nguyên; e2e AR01 giờ gọi thẳng route và kiểm UI không còn nút; test web của nút chuyển sang nút báo cáo Assessment (cùng component). Spec `inventory-report.md` ghi rõ UI không còn nút.
+- **Nhãn:** nhóm "Báo cáo Assessment" (ja アセスメント報告書) với "Xuất Excel" / "Xuất PDF" (ja Excel出力 / PDF出力); bỏ chữ "cho khách"/"Dữ liệu kỹ thuật". Tên file tải xuống không đổi. Nhãn nút xuất Excel ở bước Báo giá cũng bị đổi nhầm thành "Dữ liệu kỹ thuật (Excel, nội bộ)" ở vi ở vòng AR01 (ja vẫn "Excel 出力"): đã trả về "Xuất Excel".
+
+## 10/11/2026 — AR03: sửa review lần hai tại `712efd1` (2 P2: chú thích schema)
+
+- (1) **Đúng.** Với báo cáo không có bảng nào mà mapping đã xác nhận (`tablesAssumed = false`, `tables = 0`) PDF mục 4 vẫn ghi "確認済みの既定スキーマ…"; khi chưa có dữ liệu phân tích (`tablesView = null`) lại rơi vào câu "giả định". (2) **Đúng.** Phụ lục luôn ghi "既定スキーマは未確認のため仮定を含みます", mâu thuẫn khi đã xác nhận.
+- **Excel AR02 cũng bị:** ghi chú thứ hai của sheet `4_データベース` là câu cố định "仮定したスキーマ…確認が必要です" cho mọi trường hợp. Đã sửa ở nguồn chung.
+- Sửa: `tableSchemaState()` và `TABLE_SCHEMA_STATEMENT` trong `packages/contracts/src/table-schema-statement.ts` (5 trạng thái: `unanalyzed` / `none` / `raw` / `assumed` / `confirmed`; chỉ nói về schema khi có bảng; JSON cũ không có `tablesAssumed` đọc là giả định). Mục 4 PDF, dòng DBテーブル数 của phụ lục (`appendixDefinitions`) và ghi chú sheet 4 của Excel dùng cùng trạng thái và cùng câu; tiêu đề bảng của Excel chỉ thêm "※スキーマは仮定" ở trạng thái `assumed`.
+- Test fail trước (6): `assessment-document.test.tsx` mục "table name statement (AR03 review 2)" và `customer-report.test.ts` mục "AR03 review 2".
+
+## 09/11/2026 — AR03: sửa review độc lập tại `f8794eb` (2 P2, 1 P3)
+
+- (1) **P2 đúng.** Mục 4 của PDF luôn viết "既定スキーマを仮定して…データベース管理者による確認が必要です" cho view `normalized`, kể cả khi mapping đã được xác nhận; JSON đã có `scale.tablesAssumed`. Sửa: chú thích đọc `tablesAssumed`: `true` hoặc thiếu (JSON cũ) giữ câu "giả định"; `false` ghi "確認済みの既定スキーマで名称を統一", không còn yêu cầu xác nhận. Excel AR02 đã dùng cùng trường.
+- (2) **P2 đúng.** Bảng module là `<table>` đơn, không chia khối, nên bảng dài tràn trang thiếu header (AC03 cho phép "lặp header hoặc ghi rõ chưa làm", progress cũ không ghi chưa làm). Sửa: bảng module (kèm dòng 合計) dùng `KeyedTable` như các bảng dài khác, mỗi khối lặp header. Renderer `a4-pdf.ts` không đổi, nên PDF báo giá không đổi (test AC02 vẫn pass).
+- (3) **P3 đúng một phần.** Spec ghi "có fallback ASCII". Khác Excel, PDF được lưu phía client qua thẻ `<a download>`, không có header `Content-Disposition` để mang hai tên. Sửa: `customerPdfAsciiFileName` (cùng quy tắc ASCII của server: chữ, số, `.`, `-`; ví dụ `assessment-report_<project>_<YYYYMMDD>.pdf`); nếu lưu bằng tên tiếng Nhật ném lỗi thì lưu lại bằng tên ASCII. Tên tiếng Nhật vẫn là tên mặc định.
+- Test fail trước (4): `assessment-document.test.tsx` (header module nhiều khối, chú thích schema), `customer-pdf-button.test.tsx` (tên ASCII, lưu lại khi lỗi).
+
+
 ## 06/11/2026 — TC01: test case UT (単体テスト仕様書)
 
 - **Nhánh chồng:** `feat/tc01-ut-test-cases` cắt từ `feat/ar03-customer-pdf` tại `689376b` (sau review AR04 vòng 4, hotfix master `471222b` và hai vòng sửa review AR02; các lần cắt trước `456c3ce`, `c27a625` đã bỏ) để thư mục đang checkout có đủ AR01–AR04. Spec TC01.md ghi "nhánh mới từ master"; làm theo chỉ dẫn xếp chồng của coordinator. TC01 thực sự chỉ phụ thuộc AR04 (screens/reports và độ phức tạp report trong inventory); không phụ thuộc AR02/AR03. Nếu cần merge riêng, cherry-pick các commit TC01 lên nhánh AR04.

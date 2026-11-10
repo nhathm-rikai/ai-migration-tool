@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import type { ArtifactEnvelope } from '@portal/contracts';
 import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
@@ -53,7 +54,7 @@ import {
   type RenderCustomerPdf,
 } from './customer-pdf-button';
 import { ReportsTab, ScreenReportKpis } from './screen-report-panels';
-import { reportListRows } from './screen-report-model';
+import { deriveReportSummary } from '@portal/contracts';
 import { useRunAssessment } from './use-run-assessment';
 
 // Analysis step of one succeeded run (UI02, demo02 layout over F03/F04):
@@ -114,11 +115,17 @@ export function AssessmentOverview({
       {state.status === 'empty' && <p className="empty-state">{copy.empty}</p>}
       {state.status === 'ready' && (
         <>
+          {headerSlot &&
+            createPortal(
+              <span className="export-group-title">
+                {copy.report.groupTitle}
+              </span>,
+              headerSlot,
+            )}
           <ReportExportButton
             api={api}
             artifact={state.artifact}
             slot={headerSlot}
-            kind="customer"
             {...(saveFile ? { save: saveFile } : {})}
           />
           <CustomerPdfButton
@@ -127,13 +134,6 @@ export function AssessmentOverview({
             slot={headerSlot}
             {...(saveFile ? { save: saveFile } : {})}
             {...(renderCustomerPdf ? { render: renderCustomerPdf } : {})}
-          />
-          <ReportExportButton
-            api={api}
-            artifact={state.artifact}
-            slot={headerSlot}
-            kind="technical"
-            {...(saveFile ? { save: saveFile } : {})}
           />
           <ArtifactView artifact={state.artifact} projectId={projectId} />
         </>
@@ -245,7 +245,7 @@ function ArtifactView({
   );
   const counts: Record<Tab, number | null> = {
     programs: summary.programs.length,
-    reports: reportListRows(artifact.payload)?.length ?? null,
+    reports: deriveReportSummary(artifact.payload)?.counts.total ?? null,
     graph: null,
     tables: tableCount,
   };
@@ -775,7 +775,7 @@ function TechnicalInfo({
   );
 }
 
-const COLUMNS = 12;
+const COLUMNS = 11;
 
 // List row: the table count shown first is the mapped one when there is a
 // mapped view (configured or inferred); the count as written stays beside it.
@@ -948,11 +948,18 @@ function ProgramList({
                     copy.columns.codeLines,
                     copy.columnHints.codeLines,
                   )}
-                  {header('procedures', copy.columns.procedures)}
-                  {header('tables', copy.columns.tables)}
+                  {header(
+                    'procedures',
+                    copy.columns.procedures,
+                    copy.columnHints.procedures,
+                  )}
+                  {header(
+                    'tables',
+                    copy.columns.tables,
+                    copy.columnHints.tables,
+                  )}
                   {header('screens', copy.columns.screens)}
                   {header('reports', copy.columns.reports)}
-                  {header('utPoints', copy.columns.utPoints)}
                   {header(
                     'complexity',
                     copy.columns.complexity,
@@ -1016,7 +1023,6 @@ function ProgramList({
                           {row.rawTables !== null &&
                             row.rawTables !== row.tables && (
                               <span className="muted raw-count">
-                                {' '}
                                 {copy.rawTables(number(row.rawTables))}
                               </span>
                             )}
@@ -1026,16 +1032,6 @@ function ProgramList({
                         </td>
                         <td className="num" data-col="reports">
                           {metric(row.reports)}
-                          {row.suspectedReports !== null &&
-                            row.suspectedReports > 0 && (
-                              <span className="muted raw-count">
-                                {' '}
-                                +{number(row.suspectedReports)}?
-                              </span>
-                            )}
-                        </td>
-                        <td className="num" data-col="utPoints">
-                          {metric(row.utPoints)}
                         </td>
                         <td>
                           <span className="cx-cell">

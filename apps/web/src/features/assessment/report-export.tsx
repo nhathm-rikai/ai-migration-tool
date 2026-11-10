@@ -4,12 +4,12 @@ import type {
   ArtifactEnvelope,
   InventoryReportFormat,
 } from '@portal/contracts';
-import type { ArtifactsApi, ReportKind } from '../../shared/api/artifacts-api';
+import type { ArtifactsApi } from '../../shared/api/artifacts-api';
 import { ApiError } from '../../shared/api/api-error';
 import { saveBlob } from '../../shared/files/save-blob';
 import { useLocale } from '../../shared/i18n/locale-context';
 
-// 'Dữ liệu kỹ thuật (Excel, nội bộ)' of step 2 (AR01): downloads the assessment report of the
+// 'Xuất Excel' of step 2 (AR02): downloads the Assessment report of the
 // exact inventory version on screen. A new project or version aborts the
 // request in flight and drops its answer; a failure shows a message and
 // saves nothing.
@@ -21,18 +21,14 @@ export function ReportExportButton({
   artifact,
   slot = null,
   save = saveBlob,
-  kind = 'technical',
 }: {
   api: ArtifactsApi;
   artifact: ArtifactEnvelope;
-  // customer = the six-sheet Japanese report (AR02, the main button);
-  // technical = the 16-sheet data workbook (AR01, internal).
-  kind?: ReportKind;
   // Header of the step page; the button renders in place when absent.
   slot?: HTMLElement | null;
   save?: SaveFile;
 }) {
-  const { messages } = useLocale();
+  const { messages, locale } = useLocale();
   const copy = messages.assessment.report;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<unknown>(null);
@@ -58,7 +54,8 @@ export function ReportExportButton({
         version,
         format,
         own.signal,
-        kind,
+        'customer',
+        locale === 'vi' ? 'vi' : 'ja',
       );
       if (own.signal.aborted) return;
       save(file.fileName ?? 'assessment.' + format, file.blob);
@@ -73,16 +70,12 @@ export function ReportExportButton({
   const button = (
     <button
       type="button"
-      className={kind === 'customer' ? 'button primary' : 'button'}
+      className="button primary"
       onClick={() => void download('xlsx')}
       disabled={busy}
-      data-report-kind={kind}
+      data-report-kind="customer"
     >
-      {busy
-        ? copy.exporting
-        : kind === 'customer'
-          ? copy.exportCustomer
-          : copy.export}
+      {busy ? copy.exporting : copy.exportCustomer}
     </button>
   );
   const tooLarge =

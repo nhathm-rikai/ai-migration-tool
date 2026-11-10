@@ -13,12 +13,14 @@ import { LocaleProvider } from '../../shared/i18n/locale-provider';
 import { json, requestUrl, testCredentials } from '../../testing/fixtures';
 import { REAL_WRITER_XLSX_BASE64 } from '../../testing/real-writer-xlsx';
 
-// AR01-AC06: the export button of the analysis step.
+// AR01-AC06 / AR02-AC07: the Excel export button of the analysis step. The
+// technical (AR01) button is gone from the UI (the route stays); these tests
+// run on the Assessment report button, which has the same download rules.
 
 const projectId = FIXTURE_IDS.project;
 const runId = FIXTURE_IDS.runs.succeeded;
 const artifactId = FIXTURE_IDS.artifact;
-const reportUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/report?format=xlsx`;
+const reportUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=xlsx&lang=vi`;
 
 type Pending = {
   resolve: (response: Response) => void;
@@ -86,11 +88,11 @@ describe('Assessment report export button (AR01)', () => {
     render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     await waitFor(() => expect(ctx.save).toHaveBeenCalledTimes(1));
-    expect(ctx.calls.filter((url) => url.includes('/report'))).toEqual([
+    expect(ctx.calls.filter((url) => url.includes('report?format'))).toEqual([
       reportUrl,
     ]);
     expect(ctx.save.mock.calls[0]?.[0]).toBe('assessment-受注-20261106.xlsx');
@@ -110,7 +112,7 @@ describe('Assessment report export button (AR01)', () => {
     );
     render(ctx.view());
     const button = await screen.findByRole('button', {
-      name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+      name: 'Xuất Excel',
     });
     fireEvent.click(button);
     const busy = await screen.findByRole('button', { name: 'Đang xuất…' });
@@ -121,7 +123,7 @@ describe('Assessment report export button (AR01)', () => {
     await waitFor(() => expect(ctx.save).toHaveBeenCalledTimes(1));
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }).disabled,
     ).toBe(false);
   });
@@ -133,7 +135,7 @@ describe('Assessment report export button (AR01)', () => {
     render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -147,7 +149,7 @@ describe('Assessment report export button (AR01)', () => {
     render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -169,7 +171,7 @@ describe('Assessment report export button (AR01)', () => {
     render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -178,7 +180,7 @@ describe('Assessment report export button (AR01)', () => {
     expect(ctx.save).not.toHaveBeenCalled();
     expect(
       screen.getByRole<HTMLButtonElement>('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }).disabled,
     ).toBe(false);
   });
@@ -190,7 +192,7 @@ describe('Assessment report export button (AR01)', () => {
     render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     expect((await screen.findByRole('alert')).textContent).toContain(
@@ -205,9 +207,9 @@ describe('Assessment report export button (AR01)', () => {
     const tooLarge = () => json(errorResponseFixture('REPORT_TOO_LARGE'), 422);
     const report = (patch: Record<string, unknown> = {}) =>
       JSON.stringify({
-        reportVersion: 'inventory-report-v1',
+        reportVersion: 'customer-assessment-report-v1',
         source: { origin: { artifactId, artifactVersion: 1 } },
-        programs: [],
+        scale: {},
         ...patch,
       });
     const jsonResponse = (body: BodyInit = report()) =>
@@ -219,7 +221,7 @@ describe('Assessment report export button (AR01)', () => {
         },
       });
     const asked = (ctx: ReturnType<typeof setup>) =>
-      ctx.calls.filter((url) => url.includes('/report'));
+      ctx.calls.filter((url) => url.includes('report?format'));
 
     it('offers the JSON button only in that error state', async () => {
       const ctx = setup(tooLarge);
@@ -227,7 +229,7 @@ describe('Assessment report export button (AR01)', () => {
       expect(screen.queryByRole('button', { name: 'Tải bản JSON' })).toBeNull();
       fireEvent.click(
         await screen.findByRole('button', {
-          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+          name: 'Xuất Excel',
         }),
       );
       await screen.findByRole('button', { name: 'Tải bản JSON' });
@@ -241,7 +243,7 @@ describe('Assessment report export button (AR01)', () => {
       render(ctx.view());
       fireEvent.click(
         await screen.findByRole('button', {
-          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+          name: 'Xuất Excel',
         }),
       );
       await screen.findByRole('alert');
@@ -255,7 +257,7 @@ describe('Assessment report export button (AR01)', () => {
       render(ctx.view());
       fireEvent.click(
         await screen.findByRole('button', {
-          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+          name: 'Xuất Excel',
         }),
       );
       fireEvent.click(
@@ -278,7 +280,7 @@ describe('Assessment report export button (AR01)', () => {
         '[]',
         '{"ok":true}',
         report({ reportVersion: 'other' }),
-        report({ programs: null }),
+        report({ scale: null }),
         report({ source: { origin: null } }),
         report({ source: {} }),
         report({ source: { origin: { artifactId: 'x', artifactVersion: 1 } } }),
@@ -290,7 +292,7 @@ describe('Assessment report export button (AR01)', () => {
         const view = render(ctx.view());
         fireEvent.click(
           await screen.findByRole('button', {
-            name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+            name: 'Xuất Excel',
           }),
         );
         fireEvent.click(
@@ -316,7 +318,7 @@ describe('Assessment report export button (AR01)', () => {
       const { rerender } = render(ctx.view());
       fireEvent.click(
         await screen.findByRole('button', {
-          name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+          name: 'Xuất Excel',
         }),
       );
       fireEvent.click(
@@ -343,7 +345,7 @@ describe('Assessment report export button (AR01)', () => {
     const { rerender } = render(ctx.view());
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Dữ liệu kỹ thuật (Excel, nội bộ)',
+        name: 'Xuất Excel',
       }),
     );
     await screen.findByRole('button', { name: 'Đang xuất…' });
@@ -373,11 +375,8 @@ describe('fileNameFromDisposition', () => {
 
 // AR02-AC07 (web): two separate buttons, each downloads its own file.
 describe('Customer report export button (AR02)', () => {
-  const customerUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=xlsx`;
-  const customer = () =>
-    screen.findByRole('button', { name: 'Báo cáo cho khách (Excel)' });
-  const technical = () =>
-    screen.findByRole('button', { name: 'Dữ liệu kỹ thuật (Excel, nội bộ)' });
+  const customerUrl = reportUrl;
+  const customer = () => screen.findByRole('button', { name: 'Xuất Excel' });
 
   it('downloads the customer file from its own route and saves it by the server name', async () => {
     const { view, save, calls } = setup(() =>
@@ -390,17 +389,13 @@ describe('Customer report export button (AR02)', () => {
       'アセスメント報告書_Demo_20261106.xlsx',
     );
     expect(calls).toContain(customerUrl);
-    expect(calls).not.toContain(reportUrl);
   });
 
-  it('keeps the technical data button apart and labelled internal', async () => {
-    const { view, save, calls } = setup(() => fileResponse());
+  it('has no technical data button any more (AR01 UI removed, route stays)', async () => {
+    const { view } = setup(() => fileResponse());
     render(view());
     expect((await customer()).className).toContain('primary');
-    fireEvent.click(await technical());
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-    expect(calls).toContain(reportUrl);
-    expect(calls).not.toContain(customerUrl);
+    expect(screen.queryByRole('button', { name: /kỹ thuật/i })).toBeNull();
   });
 
   it('shows a failure and saves nothing when the file is not a workbook', async () => {

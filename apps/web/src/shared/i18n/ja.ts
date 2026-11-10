@@ -326,22 +326,21 @@ export const jaMessages = {
       kpis: {
         screens: '画面',
         screensSub: (shared: string) => `共通 ${shared} 件（1回のみ集計）`,
-        reports: '帳票（検出分）',
-        reportsSub: (programs: string, suspected: string) =>
-          `帳票出力の疑いがあるプログラム ${programs} 件（疑い ${suspected} 件は合計に含めません）`,
+        reports: '帳票数（算定基準による）',
+        reportsSub: (crystal: string, print: string, exports: string) =>
+          `Crystal ${crystal} · コード印刷 ${print} · CSV・Excel出力 ${exports}`,
+        reportsMissing: (missing: string) =>
+          `設計ファイルなし（.rpt）: ${missing}`,
         batches: 'バッチ',
         batchesSub: 'フォームがなく Sub Main で起動するプログラム',
         noData: 'データなし',
         noDataHelp:
           'この解析結果は画面・帳票・バッチの集計機能より前に作成されています。再解析が必要です。データがない項目を 0 とは表示しません。',
       },
-      reference: (version: string | null) =>
-        version === null ? '参考値' : `参考値 · モデル ${version}`,
       distribution: {
-        title: '帳票の分布',
-        help: '帳票ごとの複雑度は参考分類です。帳票を呼び出すプロシージャで評価しており、工数ではありません。',
+        title: '帳票の複雑度',
+        help: '複雑度は、帳票を作成するコード（分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数）から算出しており、レイアウトの設計内容は含みません。',
         byLevel: '複雑度別',
-        byKind: '種類別',
         total: '合計',
         level: {
           low: '低',
@@ -350,14 +349,54 @@ export const jaMessages = {
           'very-high': '非常に高',
           unrated: '未評価',
         },
-        kind: {
-          'data-report': 'DataReport / ActiveReports',
-          crystal: 'Crystal Reports',
-          excel: 'Excel出力（疑い）',
-          print: '印刷（疑い）',
-          'file-output': 'ファイル出力（疑い）',
-          unknown: '不明（疑い）',
+      },
+      reports: {
+        title: '帳票の一覧',
+        help: '各行は、算定基準による帳票の1単位です。',
+        none: '帳票は見つかりませんでした。',
+        originFilter: '作成方法',
+        columns: {
+          name: '帳票',
+          origin: '作成方法',
+          status: '設計ファイル',
+          programs: 'プログラム',
+          uses: '使用箇所',
+          complexity: '複雑度',
+          details: '使用箇所の詳細',
         },
+        origin: {
+          crystal: 'Crystal Reports',
+          'data-report': 'DataReport',
+          print: 'コード印刷',
+          export: 'CSV・Excel出力',
+        },
+        status: {
+          'design-file': 'あり',
+          'missing-file': 'なし',
+        },
+      },
+      dataFiles: {
+        title: 'データファイル出力（帳票に含めない）',
+        help: '合計には含めません（算定基準を参照）。',
+        excluded: (count: string) =>
+          `ログ・一時ファイルとみられる出力 ${count} 件を識別ルールにより除外しました。`,
+        none: 'ありません。',
+        columns: {
+          program: 'プログラム',
+          kind: '種類',
+          location: '根拠（ファイル:行）',
+          procedure: 'プロシージャ',
+        },
+        kind: {
+          'file-output': 'ファイル出力',
+          unknown: '帳票ライブラリのみ（帳票なし）',
+        },
+      },
+      usage: {
+        program: 'プログラム',
+        file: 'ファイル',
+        line: '行',
+        procedure: 'プロシージャ',
       },
       list: {
         title: '帳票一覧',
@@ -378,7 +417,7 @@ export const jaMessages = {
           name: '名前',
           location: 'ファイル:行',
           confidence: '信頼度',
-          complexity: '複雑度（参考）',
+          complexity: '複雑度',
         },
         sortBy: (label: string) => `${label} で並べ替え`,
         morePrograms: (count: string) => `ほか ${count} プログラム`,
@@ -390,17 +429,18 @@ export const jaMessages = {
         previous: '前のページ',
         next: '次のページ',
       },
-      confidence: {
-        detected: '検出',
-        referenced: '参照',
-        suspected: '疑い',
-      },
       reasons: {
-        SUSPECTED: '兆候のみで、帳票様式の数は不明です',
         NO_PROCEDURE:
           '帳票を呼び出すプロシージャを特定できないため評価していません',
         DESIGN_NOT_ANALYZED_FLOOR:
-          '帳票デザインは未解析です。呼び出しコードのみ評価し、低レベルにはしません',
+          '帳票デザイン（.rpt）が未解析のため、最低レベルは「中」です',
+      },
+      complexityDetail: {
+        title: '複雑度の算出根拠',
+        factor: '要因',
+        measured: '計測値',
+        points: '加点',
+        score: (score: string) => `合計点: ${score}`,
       },
       factors: {
         decisionPoints: '分岐数',
@@ -411,8 +451,7 @@ export const jaMessages = {
         'design-not-analyzed': 'デザイン未解析',
       },
       warnings: {
-        REPORT_FILE_MISSING:
-          'ソースに .rpt がありません。お客様に提供を依頼してください',
+        REPORT_FILE_MISSING: 'ソースに .rpt がありません',
         SCREEN_FILE_MISSING: 'ソースにフォームファイルがありません',
         SCREEN_FILE_NOT_ANALYZED: 'フォームファイルを解析できませんでした',
       },
@@ -434,11 +473,9 @@ export const jaMessages = {
           name: '名前',
           location: 'ファイル:行',
           confidence: '信頼度',
-          complexity: '複雑度（参考）',
+          complexity: '複雑度',
           notes: '備考',
         },
-        suspectedNote:
-          '「疑い」の行は帳票を出力している可能性を示すだけで、帳票の合計には含めません。',
       },
     },
     dashboard: {
@@ -459,7 +496,7 @@ export const jaMessages = {
           `マッピング後 · スキーマ ${schema} と仮定`,
         tablesRaw: 'ソース記載の名前',
         high: '高・非常に高のプログラム',
-        highSub: (analyzed: string) => `解析済み ${analyzed} 本中 · 参考`,
+        highSub: (analyzed: string) => `解析済み ${analyzed} 本中`,
       },
       analysedAt: (time: string) => `解析完了 ${time}`,
       files: (count: string) => `${count} ファイル`,
@@ -634,6 +671,8 @@ export const jaMessages = {
       UNCLASSIFIED_LINES: '分類できない行があります。',
       TABLE_NAMES_NOT_CONFIRMED: 'テーブル名マッピングは未確認です。',
       COMPLEXITY_DRAFT: '複雑度の計算式はドラフトです。',
+      SCREEN_REPORT_OUTDATED:
+        '解析結果が古い帳票検出ルールで作成されています。CSV・Excel出力の件数、ログ・一時ファイルの除外、コード印刷の複雑度が反映されていません。再解析が必要です。',
     },
     programs: {
       title: 'プログラム一覧',
@@ -647,6 +686,7 @@ export const jaMessages = {
       none: 'インベントリにプログラムがありません。',
       notAnalyzed: '未解析',
       rawTables: (count: string) => `（元: ${count}）`,
+      outputShort: (count: string) => `＋${count} 出力`,
       draft: 'ドラフト',
       declaredName: (name: string) => `プロジェクト内の名前: ${name}`,
       sortBy: (column: string) => `${column}で並べ替え`,
@@ -660,18 +700,20 @@ export const jaMessages = {
         kind: '種類',
         state: '状態',
         ownCodeLines: '固有LoC',
-        codeLines: 'LoC（共通込み）',
-        procedures: '固有プロシージャ',
-        tables: 'テーブル数',
+        codeLines: '共通込LoC',
+        procedures: '固有Proc',
+        tables: 'テーブル',
         screens: '画面',
         reports: '帳票',
-        utPoints: 'UTテスト観点数',
         complexity: '複雑度',
       },
       columnHints: {
         codeLines:
-          '共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
-        complexity: '参考の複雑度。見積ドラフトではこのレベルを係数に使います',
+          'LoC（共通込み）：共通ファイルを含むLoC（共通ファイルは宣言する各プログラムで数える）',
+        procedures: '固有プロシージャ',
+        tables: 'テーブル数',
+        complexity:
+          'プログラムの複雑度。見積ドラフトではこのレベルを係数に使います',
       },
       state: {
         complete: '完全',
@@ -838,9 +880,9 @@ export const jaMessages = {
       },
     },
     report: {
-      export: '技術データ（Excel・社内用）',
-      exportCustomer: 'お客様向け報告書（Excel）',
-      exportCustomerPdf: 'お客様向け報告書（PDF）',
+      groupTitle: 'アセスメント報告書',
+      exportCustomer: 'Excel出力',
+      exportCustomerPdf: 'PDF出力',
       pdfFailed:
         'PDF を作成できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
       exporting: '出力中…',
@@ -1149,7 +1191,7 @@ export const jaMessages = {
       `チーム ${devs} 名 · ${months} か月`,
     moduleTitle: 'モジュール別明細',
     shareNote:
-      'モジュールをクリックするとプログラム、プログラム（またはモジュール先頭の行）をクリックすると項目別の工数を表示します。複雑度は参考表示で係数には使いません',
+      'モジュールをクリックするとプログラム、プログラム（またはモジュール先頭の行）をクリックすると項目別の工数を表示します。複雑度は工数の係数に使いません。',
     itemsTitle: '項目別工数',
     toggleRow: '詳細を開く / 閉じる',
     items: {

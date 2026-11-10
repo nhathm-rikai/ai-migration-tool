@@ -10,7 +10,7 @@ import { saveBlob } from '../../shared/files/save-blob';
 import { useLocale } from '../../shared/i18n/locale-context';
 import { renderAssessmentPdf } from './assessment-pdf';
 
-// "Báo cáo cho khách (PDF)" of step 2 (AR03): reads the customer report JSON
+// "Xuất PDF" of step 2 (AR03): reads the customer report JSON
 // of the exact inventory version on screen, draws the Japanese PDF from it
 // and saves it. Same rules as the Excel buttons: disabled while it works, a
 // new artifact or project drops the answer in flight, a failure shows a
@@ -29,13 +29,32 @@ const withoutControls = (text: string) =>
     .filter((char) => char.charCodeAt(0) > 0x1f && char.charCodeAt(0) !== 0x7f)
     .join('');
 
-// アセスメント報告書_<project>_<YYYYMMDD>.pdf
-export function customerPdfFileName(projectName: string, date: Date): string {
+// アセスメント報告書_<project>_<YYYYMMDD>.pdf (Japanese) or
+// Bao-cao-Assessment_<project>_<YYYYMMDD>.pdf (Vietnamese).
+export function customerPdfFileName(
+  projectName: string,
+  date: Date,
+  lang: 'ja' | 'vi' = 'ja',
+): string {
   const day = date.toISOString().slice(0, 10).replaceAll('-', '');
   const cleaned = withoutControls(projectName.normalize('NFC'))
     .replace(UNSAFE_NAME, '_')
     .replace(/^[._]+|[._]+$/g, '');
-  return `アセスメント報告書_${cleaned === '' ? 'project' : cleaned}_${day}.pdf`;
+  const prefix = lang === 'vi' ? 'Bao-cao-Assessment' : 'アセスメント報告書';
+  return `${prefix}_${cleaned === '' ? 'project' : cleaned}_${day}.pdf`;
+}
+
+// The same fallback the server gives the Excel downloads
+// (Content-Disposition `filename`): ASCII letters, digits, dot and dash only.
+export function customerPdfAsciiFileName(
+  projectName: string,
+  date: Date,
+): string {
+  const day = date.toISOString().slice(0, 10).replaceAll('-', '');
+  const cleaned = projectName
+    .replace(/[^A-Za-z0-9.-]+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '');
+  return `assessment-report_${cleaned === '' ? 'project' : cleaned}_${day}.pdf`;
 }
 
 export function CustomerPdfButton({
@@ -51,7 +70,8 @@ export function CustomerPdfButton({
   save?: SaveFile;
   render?: RenderCustomerPdf;
 }) {
-  const { messages } = useLocale();
+  const { messages, locale } = useLocale();
+  const lang = locale === 'vi' ? 'vi' : 'ja';
   const copy = messages.assessment.report;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<unknown>(null);
@@ -75,15 +95,23 @@ export function CustomerPdfButton({
         id,
         version,
         own.signal,
+        lang,
       );
       if (own.signal.aborted) return;
       const now = new Date();
       const bytes = await render(report, now.toISOString().slice(0, 10));
       if (own.signal.aborted) return;
-      save(
-        customerPdfFileName(report.source.origin?.projectName ?? '', now),
-        new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }),
-      );
+      const blob = new Blob([new Uint8Array(bytes)], {
+        type: 'application/pdf',
+      });
+      const projectName = report.source.origin?.projectName ?? '';
+      try {
+        save(customerPdfFileName(projectName, now, lang), blob);
+      } catch {
+        // A browser or file system that refuses the Japanese name still gets
+        // the file under the ASCII name.
+        save(customerPdfAsciiFileName(projectName, now), blob);
+      }
     } catch (error) {
       if (!own.signal.aborted) setFailed(error);
     } finally {

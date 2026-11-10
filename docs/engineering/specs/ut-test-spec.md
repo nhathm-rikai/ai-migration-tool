@@ -7,7 +7,7 @@ Phạm vi: tài liệu `ut-test-spec.md` (単体テスト仕様書) sinh ở bư
 - Tính từ inventory (`buildUtChecklist(inventory, projectPath)`), thuần và ổn định: cùng inventory cho cùng danh sách và ID.
 - Mức hạng mục: `procedure`, `event` (event handler VB: `Tên_Sự kiện` trong form/class), `sql` (mỗi lệnh INSERT/SELECT/UPDATE/DELETE/DDL theo `sqlTables`), `report` (từ `programs[].reports`). Nhánh bên trong procedure KHÔNG nằm trong checklist; agent tự liệt kê, mỗi case có `file:line`.
 - ID: `UT-<tên file>-<procedure>-<n>`; trùng tên procedure giữa các file thì thêm tiền tố tên file. Code ngoài procedure thuộc nhóm `_file_<tên file>`.
-- `programs[].utPoints` (optional, số hạng mục) hiển thị ở cột "Điểm test UT" của bước 2; inventory cũ không có thì hiện "Chưa phân tích", không phải 0.
+- `programs[].utPoints` (optional, số hạng mục) được giữ trong inventory; bước 2 KHÔNG còn cột "Điểm test UT" (bỏ 10/11/2026, người dùng không cần). Inventory cũ không có trường này vẫn hợp lệ.
 - Checklist được ghi vào workspace agent tại `context/p1/1.4-ut-skeleton.json` chỉ khi run có chọn `ut-test-spec`.
 
 ## 2. Tài liệu và validator

@@ -87,7 +87,7 @@ export type CodeFileAnalysis =
     }
   | { status: 'unsupported'; reason: string; line: number | null };
 
-// A lexical hint that code can produce a report (screen-report-v1).
+// A lexical hint that code can produce a report (AR04).
 // `crystal` names the .rpt file; the others are suspected outputs.
 export type ReportSignalKind = 'crystal' | 'excel' | 'print' | 'file-output';
 export type ReportSignal = {
@@ -99,6 +99,11 @@ export type ReportSignal = {
   // against the source tree, so `name` is then the file name alone.
   path?: string;
   absolute?: boolean;
+  // file-output only: a .csv path.
+  subkind?: 'csv';
+  // file-output only: the word that says the file is a log or a temporary
+  // file, not a report output (the function is listed but not counted).
+  excludeReason?: string;
 };
 
 // What a project reference says about reports, by runtime component.

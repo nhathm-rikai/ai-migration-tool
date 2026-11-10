@@ -6112,3 +6112,29 @@ fieldset.doc-card {
   outline-offset: 2px;
   border-radius: 4px;
 }
+.report-basis {
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--bg-2, transparent);
+}
+.report-basis > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.report-basis dl {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.report-basis dt {
+  font-size: 12px;
+  font-weight: 600;
+}
+.report-basis dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--fg-2);
+}

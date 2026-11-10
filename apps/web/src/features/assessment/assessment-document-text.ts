@@ -1,4 +1,6 @@
 import {
+  REPORT_COUNTING_BASIS,
+  REPORT_TOTAL_LABEL,
   TABLE_SCHEMA_STATEMENT,
   type TableSchemaState,
 } from '@portal/contracts';
@@ -41,7 +43,7 @@ export const SECTIONS = {
 export const KPI = {
   screens: '画面',
   screensSub: (shared: string) => `うち共通 ${shared}`,
-  reports: '帳票',
+  reports: REPORT_TOTAL_LABEL.ja,
   reportsSub: (crystal: string, print: string, exports: string) =>
     `Crystal ${crystal} · コード印刷 ${print} · CSV・Excel出力 ${exports}`,
   reportsMissing: (missing: string) => `設計ファイルなし（.rpt）: ${missing}`,
@@ -120,14 +122,14 @@ export const CHARTS = {
   notApplicable: '対象外（旧モデル）',
   top: '複雑なプログラム（上位）',
   reportNote: (version: string | null) =>
-    `前提：帳票の複雑度は、帳票を作成するプロシージャを点数化して低・中・高・非常に高の4段階に分類します${version ? `（モデル ${version}）` : ''}。Crystal 帳票は定義ファイルの中身を解析しないため最低でも「中」とし、作成するプロシージャを特定できないものは「未評価」と表示します。`,
+    `帳票の複雑度は、帳票を作成するコードから算出しており、レイアウトの設計内容は含みません${version ? `（モデル ${version}）` : ''}。Crystal 帳票は最低でも「中」、作成するプロシージャを特定できないものは「未評価」と表示します。`,
   programNote: (version: string) =>
     `プログラムの複雑度は移行の難しさの分類です（モデル ${version}）。工数・金額ではありません。`,
 };
 
 export const SECTION_NOTES = {
   scale:
-    '解析結果から求めた移行対象の規模です。帳票は Crystal／DataReport・コード印刷・CSV・Excel出力の合計で、数え方の前提は付録に記載しています。',
+    '解析結果から求めた移行対象の規模です。帳票数は Crystal／DataReport・コード印刷・CSV・Excel出力の合計で、算定基準は付録に記載しています。',
   dependencies:
     '複数のプログラムから参照される共通部品と、外部コンポーネント・外部ライブラリの一覧です。',
   // The statement about the table names comes from the report's own state
@@ -149,18 +151,17 @@ export const APPENDIX = {
     '物理行数：ファイルの全行数。プロシージャ：Sub・Function・Property の数。',
     'モジュール：プロジェクトファイルのあるフォルダ。複数のプログラムが共有するファイルは「共通」に集計します。',
   ],
-  countingTitle: '画面・帳票・バッチの数え方',
+  countingTitle: '画面・帳票・バッチの数え方（算定基準）',
   counting: [
     '画面：プロジェクトが宣言するフォーム（ユーザードキュメント含む）のファイル数。複数のプログラムで使う画面は共通として1回のみ数えます。ファイルが不足・解析不可の画面も数え、備考に記載します。',
     'バッチ：フォームを持たず、起動オブジェクトが Sub Main のプログラム。フォームがあるプログラムは画面として数えます。',
-    '帳票：Crystal Reports の .rpt（コード上で指定されたファイル名）と DataReport / ActiveReports の定義は、名称ごとに1件です（同じ名称は複数のフォーム・プログラムから呼ばれても1件）。コードで直接印刷（Printer.Print 等）するフォーム（ファイル）、CSV・Excel へ出力するフォーム（ファイル）は、それぞれ1つを1件とします。',
-    '前提：CSV・Excel 以外のファイル出力はデータ・連携用とし、帳票に数えません。パスに log／tmp／temp／debug／err を含む出力はログ・一時ファイルとして除外します。定義ファイルがソースにあれば「設計ファイルあり」、名称のみなら「設計ファイルなし」とします。',
+    ...REPORT_COUNTING_BASIS.map((item) => `${item.ja.label}：${item.ja.text}`),
     '数え方はソースコードの機械的な読み取り（字句解析）です。実行時に決まるファイル名や、コード以外で行う出力は検出できません。',
   ],
   complexityTitle: '帳票の複雑度',
   complexity: [
     '帳票ごとに、帳票を呼び出す処理の分岐数・実行行数・アクセステーブル数・動的SQLの有無・他の処理の呼び出し数を点数化し、低・中・高・非常に高の4段階に分類します。',
-    '前提：定義ファイル（.rpt・.dsr）の中身は解析しないため、Crystal 帳票は呼び出しコードのみを評価し最低でも「中」とします。帳票を作成するプロシージャを特定できないものは「未評価」です。コード印刷・CSV・Excel出力は、出力を行うプロシージャで同じ点数化を行います。',
+    '帳票を作成するプロシージャ（コード印刷・CSV・Excel出力は出力を行うプロシージャ）で同じ点数化を行い、複数の箇所がある場合は最も高い値とします。',
     '複雑度は移行の難しさの目安であり、工数や金額を示すものではありません。',
   ],
   modelsTitle: '解析モデルの版',

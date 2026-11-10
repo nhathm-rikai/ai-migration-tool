@@ -9,12 +9,12 @@ export const CUSTOMER_PROVIDED_COUNT = 'お客様提示数：未入力';
 export const NOT_ANALYZED = '未解析（再解析が必要）';
 export const NOT_APPLICABLE = '該当なし';
 export const UNRATED = '未評価';
-// The rule behind the complexity levels, stated once as the assumption it is.
-export const COMPLEXITY_RULE =
-  '前提：複雑度は、処理の分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数を点数化し、低・中・高・非常に高の4段階に分類します。Crystal 帳票は定義ファイルの中身を解析しないため、最低でも「中」とします。';
-// How reports are counted, stated once as the assumptions they are.
-export const REPORT_COUNT_RULE =
-  '前提：Crystal／DataReport は帳票定義の名称ごとに1件、コード印刷と CSV・Excel出力は該当するフォーム（ファイル）1つを1件として数えます。CSV・Excel以外のファイル出力は帳票に含めません。';
+// The conventions behind the report total (the same text step 2 and the PDF
+// show) come from contracts: REPORT_COUNTING_BASIS.
+export const REPORT_BASIS_POINTER =
+  '帳票数の算定基準は、このシート末尾の「算定基準」に記載しています。';
+export const COMPLEXITY_LEVEL_RULE =
+  '前提：複雑度は、処理の分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数を点数化し、低・中・高・非常に高の4段階に分類します。範囲は「1_規模概要」の算定基準に記載しています。';
 export const SHARED_MODULE = '共通';
 export const UNASSIGNED_MODULE = 'プログラム未所属';
 
@@ -39,11 +39,11 @@ export const SHEET_NOTES: Record<(typeof SHEET_NAMES)[number], string[]> = {
   '1_規模概要': [
     'このシートの見方：ソースコードの解析結果から求めた移行対象の規模です。数値は解析時点のものです。',
     '共通モジュールのファイルは「共通」の行に1回だけ集計し、合計はソース全体の実数に一致します。',
-    REPORT_COUNT_RULE,
+    REPORT_BASIS_POINTER,
   ],
   '2_複雑度': [
     'このシートの見方：プログラムと帳票の複雑度の分布です。工数や金額ではありません。',
-    COMPLEXITY_RULE,
+    COMPLEXITY_LEVEL_RULE,
   ],
   '3_依存関係': [
     'このシートの見方：複数のプログラムから参照される共通部品と、外部コンポーネント（COM/OCX）・Windows API の一覧です。',
@@ -59,7 +59,7 @@ export const SHEET_NOTES: Record<(typeof SHEET_NAMES)[number], string[]> = {
   '6_画面・帳票一覧': [
     'このシートの見方：画面・帳票・バッチを1行ずつ列挙した一覧です。お客様の台帳との照合にご利用ください。',
     '帳票の設計ファイル：あり＝ソース内に定義ファイルがある、なし＝コード上に名前のみ（設計ファイルなし）。',
-    'コード印刷・CSV・Excel出力の帳票は、該当するフォーム（ファイル）1つを1件としています。複雑度の前提は「2_複雑度」シートに記載しています。',
+    '帳票の数え方は「1_規模概要」の算定基準によります（コード印刷・CSV・Excel出力は、該当するソースファイル1つを1件とする換算単位）。',
   ],
 };
 

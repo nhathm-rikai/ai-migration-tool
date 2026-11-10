@@ -326,7 +326,7 @@ export const jaMessages = {
       kpis: {
         screens: '画面',
         screensSub: (shared: string) => `共通 ${shared} 件（1回のみ集計）`,
-        reports: '帳票',
+        reports: '帳票数（算定基準による）',
         reportsSub: (crystal: string, print: string, exports: string) =>
           `Crystal ${crystal} · コード印刷 ${print} · CSV・Excel出力 ${exports}`,
         reportsMissing: (missing: string) =>
@@ -339,7 +339,7 @@ export const jaMessages = {
       },
       distribution: {
         title: '帳票の複雑度',
-        help: '分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数で点数化し、帳票を作成するプロシージャで評価します（複数箇所の場合は最も高い値）。',
+        help: '複雑度は、帳票を作成するコード（分岐数・実行行数・アクセステーブル数・動的SQL・呼び出し数）から算出しており、レイアウトの設計内容は含みません。',
         byLevel: '複雑度別',
         total: '合計',
         level: {
@@ -352,7 +352,7 @@ export const jaMessages = {
       },
       reports: {
         title: '帳票の一覧',
-        help: '前提：.rpt の名称ごとに1件（同じ名称は、複数のフォーム・プログラムから呼ばれても1件）、コード印刷と CSV・Excel出力は該当するフォーム（ファイル）1つを1件として数えます。',
+        help: '各行は、算定基準による帳票の1単位です。',
         none: '帳票は見つかりませんでした。',
         originFilter: '作成方法',
         columns: {
@@ -377,9 +377,9 @@ export const jaMessages = {
       },
       dataFiles: {
         title: 'データファイル出力（帳票に含めない）',
-        help: '前提：CSV・Excel以外のファイル出力はデータ・連携用とし、パスに log／tmp／temp／debug／err を含むものはログ・一時ファイルとして除外します。',
+        help: '合計には含めません（算定基準を参照）。',
         excluded: (count: string) =>
-          `ログ・一時ファイルへの出力 ${count} 件は除外しました。`,
+          `ログ・一時ファイルとみられる出力 ${count} 件を識別ルールにより除外しました。`,
         none: 'ありません。',
         columns: {
           program: 'プログラム',

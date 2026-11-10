@@ -134,7 +134,9 @@ describe('AssessmentDocument sections 2 to 6', () => {
           .querySelector(`[data-bar="report-${level}"]`)
           ?.getAttribute('data-count'),
       ).toBe(String(count));
-    expect(complexity.textContent).toContain('前提：帳票の複雑度');
+    expect(complexity.textContent).toContain(
+      'レイアウトの設計内容は含みません',
+    );
     expect(complexity.textContent).toContain('report-complexity-v1-draft');
     expect(complexity.querySelectorAll('[data-top-row]')).toHaveLength(
       report.complexity.top.length,
@@ -341,10 +343,16 @@ describe('AssessmentDocument sections 2 to 6', () => {
     for (const rule of [
       '画面：',
       'バッチ：',
-      '帳票：',
-      '前提：CSV・Excel 以外のファイル出力',
+      'Crystal ／ DataReport：',
+      'コード印刷、CSV・Excel出力：',
+      '作成方法の重複：',
+      'その他のファイル出力：',
+      'ログ・一時ファイル：',
+      '複雑度の範囲：',
     ])
       expect(appendix).toContain(rule);
+    expect(appendix).toContain('換算単位');
+    expect(appendix).toContain('業務上の帳票数ではありません');
     expect(appendix).toContain('帳票の複雑度');
     expect(appendix).toContain('report-complexity-v1-draft');
   });

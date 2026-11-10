@@ -333,3 +333,81 @@ describe('totals', () => {
     ).toBeUndefined();
   });
 });
+
+describe('identity of a Crystal template: path when the code gives one', () => {
+  const total = (names: string[], file = 'a/Main.bas') =>
+    deriveReportSummary(
+      inventory({
+        'p/A.vbp': names.map((name, index) =>
+          crystal(name, { file, line: index + 1 }),
+        ),
+      }),
+    );
+
+  it('keeps sales/Detail.rpt and stock/Detail.rpt apart', () => {
+    const summary = total(['sales/Detail.rpt', 'stock/Detail.rpt']);
+    expect(summary?.counts.crystal).toBe(2);
+    expect(summary?.counts.identityPath).toBe(2);
+    expect(summary?.reports.map((r) => r.file)).toEqual([
+      'sales/Detail.rpt',
+      'stock/Detail.rpt',
+    ]);
+  });
+
+  it('merges slash, case and ./ variants of the same path', () => {
+    const summary = total(['sales\\Detail.rpt', './Sales/DETAIL.rpt']);
+    expect(summary?.counts.crystal).toBe(1);
+  });
+
+  it('counts a name written without folder in two files once (same name, same template)', () => {
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [crystal('Detail.rpt', { file: 'a/F1.frm' })],
+        'p/B.vbp': [crystal('Detail.rpt', { file: 'b/F2.frm' })],
+      }),
+    );
+    expect(summary?.counts.crystal).toBe(1);
+    expect(summary?.counts.identityName).toBe(1);
+    expect(summary?.reports[0]?.identity).toBe('name');
+  });
+
+  it('joins a bare name to the only path with that file name', () => {
+    const summary = total(['sales/Detail.rpt', 'Detail.rpt']);
+    expect(summary?.counts.crystal).toBe(1);
+    expect(summary?.counts.identityPath).toBe(1);
+    expect(summary?.counts.identityName).toBe(0);
+  });
+
+  it('keeps a bare name apart when two paths share its file name', () => {
+    const summary = total([
+      'sales/Detail.rpt',
+      'stock/Detail.rpt',
+      'Detail.rpt',
+    ]);
+    expect(summary?.counts.crystal).toBe(3);
+    expect(summary?.counts.identityName).toBe(1);
+  });
+});
+
+describe('one file that makes output in several ways', () => {
+  it('counts each way on its own, up to three units for one file', () => {
+    const file = 'a/Form1.frm';
+    const summary = deriveReportSummary(
+      inventory({
+        'p/A.vbp': [
+          crystal('Invoice.rpt', { file, procedureId: 'F.A' }),
+          print(10, 'F.B', file),
+          csv(20, 'F.C', file),
+          print(30, 'a/Other.bas#P', 'a/Other.bas'),
+        ],
+      }),
+    );
+    expect(summary?.counts).toMatchObject({
+      total: 4,
+      crystal: 1,
+      print: 2,
+      export: 1,
+      overlapFiles: 1,
+    });
+  });
+});

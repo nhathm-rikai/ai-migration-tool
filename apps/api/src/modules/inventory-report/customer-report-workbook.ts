@@ -1,4 +1,9 @@
-import { TABLE_SCHEMA_STATEMENT, tableSchemaState } from '@portal/contracts';
+import {
+  REPORT_COUNTING_BASIS,
+  REPORT_TOTAL_LABEL,
+  TABLE_SCHEMA_STATEMENT,
+  tableSchemaState,
+} from '@portal/contracts';
 import type { CustomerReport } from './customer-report.js';
 import {
   LEVEL_LABELS,
@@ -126,7 +131,7 @@ function sheet1(report: CustomerReport): Sheet {
   );
   const breakdown = scale.reportBreakdown;
   b.row(
-    '帳票（合計）',
+    REPORT_TOTAL_LABEL.ja,
     sr ? sr.reports.counted : NOT_ANALYZED,
     breakdown
       ? `Crystal ${breakdown.crystal}／コード印刷 ${breakdown.print}／CSV・Excel出力 ${breakdown.export}`
@@ -136,29 +141,15 @@ function sheet1(report: CustomerReport): Sheet {
     '　Crystal Reports / DataReport',
     breakdown ? breakdown.crystal : NOT_ANALYZED,
     breakdown
-      ? `前提：帳票定義の名称（.rpt／.dsr）ごとに1件。設計ファイルあり ${breakdown.designFile}／なし ${breakdown.missingFile}`
+      ? `設計ファイルあり ${breakdown.designFile}／なし ${breakdown.missingFile}`
       : null,
   );
-  b.row(
-    '　コードによる印刷',
-    breakdown ? breakdown.print : NOT_ANALYZED,
-    breakdown
-      ? '前提：印刷コード（Printer.Print 等）を持つフォーム（ファイル）1つを1帳票とする'
-      : null,
-  );
-  b.row(
-    '　CSV・Excel出力',
-    breakdown ? breakdown.export : NOT_ANALYZED,
-    breakdown
-      ? '前提：CSV・Excel出力コードを持つフォーム（ファイル）1つを1帳票とする'
-      : null,
-  );
+  b.row('　コードによる印刷', breakdown ? breakdown.print : NOT_ANALYZED);
+  b.row('　CSV・Excel出力', breakdown ? breakdown.export : NOT_ANALYZED);
   b.row(
     'データファイル出力（帳票に含めない）',
     breakdown ? breakdown.dataFiles : NOT_ANALYZED,
-    breakdown
-      ? `前提：CSV・Excel以外のファイル出力はデータ・連携用とする。パスに log／tmp／temp／debug／err を含むものはログ・一時ファイルとして除外（${breakdown.excluded} 件）`
-      : null,
+    breakdown ? `ログ・一時ファイルとして除外 ${breakdown.excluded} 件` : null,
   );
   b.row('バッチ', sr ? sr.batches : NOT_ANALYZED);
   b.row('画面・帳票（お客様提示）', CUSTOMER_PROVIDED_COUNT);
@@ -222,6 +213,10 @@ function sheet1(report: CustomerReport): Sheet {
         ]
       : []),
   ]);
+
+  b.heading('算定基準');
+  for (const item of REPORT_COUNTING_BASIS)
+    b.row(`${item.ja.label}：${item.ja.text}`);
 
   b.heading('今後の進め方');
   for (const line of report.recommendations) b.row(line);

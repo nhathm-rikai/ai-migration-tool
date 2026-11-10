@@ -340,7 +340,7 @@ export const viMessages = {
       kpis: {
         screens: 'Màn hình (画面)',
         screensSub: (shared: string) => `${shared} dùng chung, tính một lần`,
-        reports: 'Report (帳票)',
+        reports: 'Report theo quy ước Assessment',
         reportsSub: (crystal: string, print: string, exports: string) =>
           `Crystal ${crystal} · In bằng code ${print} · CSV/Excel ${exports}`,
         reportsMissing: (missing: string) => `Thiếu file .rpt: ${missing}`,
@@ -352,7 +352,7 @@ export const viMessages = {
       },
       distribution: {
         title: 'Độ phức tạp của report',
-        help: 'Chấm theo số nhánh, dòng thực thi, bảng truy cập, SQL động và lời gọi của procedure tạo report (lấy mức cao nhất nếu nhiều nơi).',
+        help: 'Độ phức tạp tính từ code tạo report (số nhánh, dòng thực thi, bảng truy cập, SQL động, lời gọi), chưa gồm thiết kế layout.',
         byLevel: 'Theo mức phức tạp',
         total: 'Tổng',
         level: {
@@ -365,7 +365,7 @@ export const viMessages = {
       },
       reports: {
         title: 'Danh sách report',
-        help: 'Giả định: mỗi tên file .rpt là 1 report (cùng tên chỉ tính 1 mẫu, dù được gọi từ nhiều form hay program); in bằng code và xuất CSV/Excel tính 1 report cho mỗi form (file) có lệnh đó.',
+        help: 'Mỗi dòng là một đơn vị report theo Cơ sở tính.',
         none: 'Không tìm thấy report nào.',
         originFilter: 'Tạo bằng',
         columns: {
@@ -390,8 +390,9 @@ export const viMessages = {
       },
       dataFiles: {
         title: 'Ghi file dữ liệu (không tính report)',
-        help: 'Giả định: ghi file không phải CSV/Excel là file dữ liệu hoặc trao đổi, không phải report; đường dẫn chứa log, tmp, temp, debug, err được coi là file log/tạm và bị loại.',
-        excluded: (count: string) => `Đã loại ${count} chỗ ghi log/file tạm.`,
+        help: 'Không tính vào tổng (xem Cơ sở tính).',
+        excluded: (count: string) =>
+          `Đã loại ${count} chỗ ghi log/file tạm theo quy tắc nhận diện.`,
         none: 'Không có.',
         columns: {
           program: 'Program',

@@ -5,20 +5,25 @@ import { normalizeScreenReportTotals } from './screen-report-items.js';
 //
 // The analyzer writes one row per sign in the code (a .rpt string in a
 // procedure, a Printer.Print, an Open For Output ...). A customer asks how
-// many report forms there are, so this module turns the signs into reports
-// by three rules, each an explicit assumption:
+// many report forms there are, so this module turns the signs into output
+// units by three conventions (REPORT_COUNTING_BASIS states them):
 //
-//  1. Crystal / DataReport: every template name is one report (a .rpt name
-//     without folder, case-insensitive, or a .dsr file), however many places
-//     name it. It has its design file, or it is missing.
-//  2. Print in code (Printer.Print, PrintForm, EndDoc): every source file
-//     (form or module) that prints is one report.
-//  3. CSV / Excel export: every source file that exports is one report.
+//  1. Crystal / DataReport: one unit per template. A .rpt written with a
+//     folder in the code is identified by its normalized path (case-insensitive,
+//     "/" and "\" alike): sales/Detail.rpt and stock/Detail.rpt are two. A
+//     .rpt written by name only (also App.Path & "\x.rpt") is identified by
+//     the file name, assuming the same name is the same template; such a name
+//     joins the path-identified template when it is the only path with that
+//     file name in the project. A .dsr is identified by its file.
+//  2. Print in code (Printer.Print, PrintForm, EndDoc): one unit per source
+//     file (.frm / .bas / .cls) that prints.
+//  3. CSV / Excel export: one unit per source file that exports.
 //
-// File output that is neither (plain data or exchange files) is listed apart
-// and not counted; paths with log, tmp, temp, debug, err words are log or
-// temporary files and are left out. A report runtime without a template (an
-// OCX alone) is listed apart and not counted.
+// The origins are counted apart: a file that calls Crystal, prints and
+// exports is up to three units. File output that is neither (plain data or
+// exchange files) is listed apart and not counted; paths with log, tmp, temp,
+// debug, err words are taken as log or temporary files and left out. A report
+// runtime without a template (an OCX alone) is listed apart and not counted.
 //
 // Pure and derived on read from the stored rows, so an inventory stored
 // before this existed gets the same answer.
@@ -55,9 +60,14 @@ export type ReportEntry = {
   name: string;
   // Crystal origin only.
   kind: ReportTemplateKind | null;
+  // What the report is told apart by: the normalized path written in the code,
+  // the bare file name (assumed the same template), or the source file
+  // (print / export).
+  identity: 'path' | 'name' | 'file';
   designFile: string | null;
   status: ReportTemplateStatus | null;
-  // Print / export origin: the file (form or module) that makes the report.
+  // Print / export origin: the source file that makes the report. Crystal: the
+  // path written in the code, when it has a folder.
   file: string | null;
   complexity: ReportComplexity;
   usages: ReportUsage[];
@@ -88,6 +98,11 @@ export type ReportSummary = {
     print: number;
     export: number;
     byLevel: Record<Level, number>;
+    // Of the Crystal / DataReport reports: told apart by path or by name only.
+    identityPath: number;
+    identityName: number;
+    // Source files that make output in two or more of the three ways.
+    overlapFiles: number;
     dataFiles: number;
     // Log and temporary file outputs left out, per (file, procedure).
     excluded: number;
@@ -144,6 +159,7 @@ export function deriveReportSummary(
     origin: ReportOrigin;
     name: string;
     kind: ReportTemplateKind | null;
+    identity: 'path' | 'name' | 'file';
     designFile: string | null;
     file: string | null;
     complexity: ReportComplexity;
@@ -159,6 +175,33 @@ export function deriveReportSummary(
   };
   const dataDrafts = new Map<string, DataDraft>();
   const excludedKeys = new Set<string>();
+
+  const items = totals.reportItems as Item[];
+  const slashed = (name: string) => name.replaceAll('\\', '/');
+  const normalizedPath = (name: string) =>
+    slashed(name)
+      .replace(/^(?:\.\/)+/, '')
+      .toLowerCase();
+  // The paths written in the code, by file name: a name without folder joins
+  // the path of its file name when there is only one.
+  const pathsOf = new Map<string, Set<string>>();
+  for (const item of items) {
+    if (item.confidence === 'suspected' || item.kind !== 'crystal') continue;
+    const path = normalizedPath(item.name);
+    if (!path.includes('/')) continue;
+    const name = baseName(path);
+    const paths = pathsOf.get(name) ?? new Set<string>();
+    paths.add(path);
+    pathsOf.set(name, paths);
+  }
+  const crystalIdentity = (name: string): { key: string; byPath: boolean } => {
+    const path = normalizedPath(name);
+    if (path.includes('/')) return { key: path, byPath: true };
+    const paths = pathsOf.get(path);
+    return paths?.size === 1
+      ? { key: [...paths][0] ?? path, byPath: true }
+      : { key: path, byPath: false };
+  };
 
   const add = (
     key: string,
@@ -176,6 +219,13 @@ export function deriveReportSummary(
       drafts.set(key, draft);
     } else if ((item.complexity.score ?? -1) > (draft.complexity.score ?? -1))
       draft.complexity = complexityOf(item);
+    if (
+      draft.origin === 'crystal' &&
+      draft.kind === 'crystal' &&
+      draft.file === null &&
+      slashed(item.name).includes('/')
+    )
+      draft.file = slashed(item.name);
     if (item.confidence === 'detected' && draft.designFile === null)
       draft.designFile =
         draft.origin === 'crystal'
@@ -199,13 +249,12 @@ export function deriveReportSummary(
     for (const program of programs) draft.programs.add(program);
   };
 
-  for (const item of totals.reportItems as Item[]) {
+  for (const item of items) {
     if (item.confidence !== 'suspected') {
       const crystal = item.kind === 'crystal';
       if (!crystal && item.kind !== 'data-report') continue;
-      const identity = crystal
-        ? baseName(item.name).toLowerCase()
-        : item.file.toLowerCase();
+      const found = crystal ? crystalIdentity(item.name) : null;
+      const identity = found ? found.key : item.file.toLowerCase();
       add(
         `crystal\u0000${item.kind}\u0000${identity}`,
         {
@@ -213,6 +262,7 @@ export function deriveReportSummary(
           origin: 'crystal',
           name: crystal ? baseName(item.name) : item.name,
           kind: crystal ? 'crystal' : 'data-report',
+          identity: found && !found.byPath ? 'name' : 'path',
           designFile: null,
           file: null,
         },
@@ -240,6 +290,7 @@ export function deriveReportSummary(
           origin,
           name: stemOf(item.file),
           kind: null,
+          identity: 'file',
           designFile: null,
           file: item.file,
         },
@@ -284,6 +335,7 @@ export function deriveReportSummary(
         origin: draft.origin,
         name: draft.name,
         kind: draft.kind,
+        identity: draft.identity,
         designFile: draft.designFile,
         status,
         file: draft.file,
@@ -325,6 +377,15 @@ export function deriveReportSummary(
   ) as Record<Level, number>;
   for (const report of reports) byLevel[report.complexity.level] += 1;
   const crystal = reports.filter((report) => report.origin === 'crystal');
+  // The source files that make output: where Crystal is called, printed in and
+  // exported from.
+  const originsOfFile = new Map<string, Set<ReportOrigin>>();
+  for (const report of reports)
+    for (const usage of report.usages) {
+      const origins = originsOfFile.get(usage.file) ?? new Set<ReportOrigin>();
+      origins.add(report.origin);
+      originsOfFile.set(usage.file, origins);
+    }
   return {
     reports,
     dataFiles,
@@ -336,6 +397,10 @@ export function deriveReportSummary(
       print: reports.filter((r) => r.origin === 'print').length,
       export: reports.filter((r) => r.origin === 'export').length,
       byLevel,
+      identityPath: crystal.filter((r) => r.identity === 'path').length,
+      identityName: crystal.filter((r) => r.identity === 'name').length,
+      overlapFiles: [...originsOfFile.values()].filter((o) => o.size > 1)
+        .length,
       dataFiles: dataFiles.length,
       excluded: excludedKeys.size,
     },

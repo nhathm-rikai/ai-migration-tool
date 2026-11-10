@@ -1,5 +1,14 @@
 # Tiến độ kỹ thuật Portal
 
+## 10/11/2026 — Quy ước đếm report: khóa Crystal theo đường dẫn, đơn vị theo file, mục "Cơ sở tính" dùng chung
+
+Sửa theo review về quy ước đếm (4 điểm):
+- **Crystal:** khóa theo đường dẫn chuẩn hóa khi code ghi thư mục; chỉ khi chỉ có tên file (hoặc `App.Path & "\x.rpt"`) mới dùng giả định cùng tên là cùng mẫu; tên-only gộp vào mẫu path khi chỉ có một đường dẫn cùng tên file. Mỗi mẫu ghi `identity` (`path` | `name` | `file`); `counts.identityPath/identityName`; test `sales/Detail.rpt` + `stock/Detail.rpt` → 2, tên-only ở 2 file → 1.
+- **Đơn vị in/CSV-Excel = file chứa code** (.frm/.bas/.cls); mọi câu "mỗi form" đổi thành đơn vị quy đổi theo file. **Chồng lấp** tính riêng theo từng cách (một file tối đa 3 đơn vị), `counts.overlapFiles`; test chồng lấp. Tổng gọi "Report theo quy ước Assessment" / 帳票数（算定基準による）.
+- **Cơ sở tính một nguồn:** `REPORT_COUNTING_BASIS` (contracts, vi + ja) dùng cho khối gập ở tab Report, cuối sheet 1 Excel (`算定基準`) và phụ lục PDF; bỏ câu giả định rải rác, giữ nhãn ngắn. Log/tạm ghi "theo quy tắc nhận diện, không bảo đảm loại hết"; phạm vi độ phức tạp "chưa gồm thiết kế layout".
+- **Pilot VB6 (chạy chỉ đọc, chỉ ghi tổng):** 284 program; tổng 175 = Crystal 63 (khóa path 0, khóa name 63: mọi chuỗi .rpt trong pilot không có thư mục xác định) + in bằng code 104 + CSV/Excel 8; số file có đơn vị ở từ hai cách trở lên: 1; ghi file khác không tính 52; log/tmp loại 7. Tổng không đổi so với lần trước vì không có đường dẫn tĩnh để tách thêm.
+- Spec `source-inventory.md` §6.2a, `customer-assessment-report.md`, `AR04.md` đã cập nhật. Chưa push.
+
 ## 10/11/2026 — Một tổng 帳票 (Crystal/DataReport + in bằng code + CSV/Excel); bỏ mọi câu "tham khảo/cần xác nhận"
 
 - **Đếm:** `deriveReportSummary` trả `reports[]` (origin crystal/data-report/print/export) và `dataFiles[]`; `counts.total` = tổng 帳票. Crystal/DataReport theo tên mẫu, in và CSV/Excel mỗi form (file) một; ghi file khác chỉ liệt kê, log/tmp loại. Analyzer `screen-report-v3` chấm độ phức tạp cho cả in/CSV theo procedure; `subkind`, `excludeReason` lưu ở dòng dấu hiệu. Spec `source-inventory.md` §6.2a, `customer-assessment-report.md`, `AR04.md` đã cập nhật.

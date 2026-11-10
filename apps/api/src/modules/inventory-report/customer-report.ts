@@ -916,7 +916,7 @@ function buildItems(
       score: null,
       modelVersion: null,
       factors: '',
-      note: '前提：CSV・Excel以外のファイル出力は、データ・連携用ファイルとして帳票に数えません。',
+      note: '算定基準：CSV・Excel以外のファイル出力は帳票に数えません。',
     });
   }
   return items.sort(

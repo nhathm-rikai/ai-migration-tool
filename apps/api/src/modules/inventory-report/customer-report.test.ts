@@ -1,5 +1,6 @@
 import {
   CustomerReportSchema,
+  REPORT_COUNTING_BASIS,
   inventoryKpis,
   type SourceInventoryDocument,
 } from '@portal/contracts';
@@ -266,7 +267,7 @@ describe('AR02-AC04/AC09 screen and report list', () => {
     expect(sheet.columns.map((c) => c.header)).toEqual(
       expect.arrayContaining(['複雑度', '点数', 'モデル版', '評価要因']),
     );
-    expect(sheet.notes?.join('')).toContain('複雑度の前提');
+    expect(sheet.notes?.join('')).toContain('算定基準');
   });
 
   it('shows the report counts by kind and level on sheet 1 and the level split on sheet 2', () => {
@@ -291,7 +292,9 @@ describe('AR02-AC05 inventory without AR04 data', () => {
     expect(old.items).toEqual([]);
     const sheet1 = sheetOf('1_規模概要', old);
     const lines = sheet1.rows.filter((row) =>
-      ['画面', '帳票（合計）', 'バッチ'].some((label) => row[0] === label),
+      ['画面', '帳票数（算定基準による）', 'バッチ'].some(
+        (label) => row[0] === label,
+      ),
     );
     expect(lines).toHaveLength(3);
     for (const row of lines) expect(row[1]).toBe(NOT_ANALYZED);
@@ -967,7 +970,7 @@ describe('report count (customer report)', () => {
 
   it('sheet 1: one total, the three kinds, each with its assumption, and the file output left out', () => {
     const rows = sheetOf('1_規模概要').rows;
-    const total = rows.find((r) => r[0] === '帳票（合計）');
+    const total = rows.find((r) => r[0] === '帳票数（算定基準による）');
     expect(total?.[1]).toBe(6);
     expect(total?.[2]).toBe('Crystal 3／コード印刷 1／CSV・Excel出力 2');
     const crystal = rows.find((r) => r[0] === '　Crystal Reports / DataReport');
@@ -975,15 +978,15 @@ describe('report count (customer report)', () => {
     expect(String(crystal?.[2])).toContain('設計ファイルあり 2／なし 1');
     const print = rows.find((r) => r[0] === '　コードによる印刷');
     expect(print?.[1]).toBe(1);
-    expect(String(print?.[2])).toContain('前提');
+    expect(print?.[2] ?? null).toBeNull();
     const exports = rows.find((r) => r[0] === '　CSV・Excel出力');
     expect(exports?.[1]).toBe(2);
-    expect(String(exports?.[2])).toContain('前提');
+    expect(exports?.[2] ?? null).toBeNull();
     const data = rows.find(
       (r) => r[0] === 'データファイル出力（帳票に含めない）',
     );
     expect(data?.[1]).toBe(1);
-    expect(String(data?.[2])).toContain('ログ・一時ファイルとして除外（1 件）');
+    expect(String(data?.[2])).toContain('ログ・一時ファイルとして除外 1 件');
     // No uncertain wording is left.
     const text = JSON.stringify(sheetOf('1_規模概要').rows);
     for (const word of ['疑い', '要確認', '参考値'])
@@ -1024,6 +1027,23 @@ describe('report count (customer report)', () => {
   it('an inventory without screen/report data has no report numbers (not 0)', () => {
     const old = buildCustomerReport(legacy(), origin);
     expect(old.scale.reportBreakdown).toBeNull();
+  });
+
+  it('sheet 1 ends with the counting basis, the same text as step 2 and the PDF', () => {
+    const rows = sheetOf('1_規模概要').rows;
+    const heading = rows.findIndex((r) => r[0] === '算定基準');
+    expect(heading).toBeGreaterThan(0);
+    const lines = rows
+      .slice(heading + 1, heading + 1 + REPORT_COUNTING_BASIS.length)
+      .map((r) => String(r[0]));
+    expect(lines).toEqual(
+      REPORT_COUNTING_BASIS.map((item) => `${item.ja.label}：${item.ja.text}`),
+    );
+    const text = lines.join('\n');
+    expect(text).toContain('換算単位');
+    expect(text).toContain('レイアウトの設計内容は含みません');
+    expect(text).toContain('すべてを除外できるとは限りません');
+    expect(text).toContain('業務上の帳票数ではありません');
   });
 
   it('says no uncertain thing in the fixed texts: assumptions only', () => {

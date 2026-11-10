@@ -1,4 +1,6 @@
 import {
+  REPORT_COUNTING_BASIS,
+  REPORT_COUNTING_BASIS_TITLE,
   deriveReportSummary,
   type DataFileOutput,
   type ReportEntry,
@@ -484,6 +486,26 @@ function DataFileTable({
   );
 }
 
+// "Cơ sở tính": the conventions behind the total, the same text as the Excel
+// report and the PDF (contracts REPORT_COUNTING_BASIS).
+function CountingBasis() {
+  const { locale } = useLocale();
+  const lang = locale === 'ja' ? 'ja' : 'vi';
+  return (
+    <details className="report-basis" data-testid="report-basis">
+      <summary>{REPORT_COUNTING_BASIS_TITLE[lang]}</summary>
+      <dl>
+        {REPORT_COUNTING_BASIS.map((item) => (
+          <div key={item.id} data-basis={item.id}>
+            <dt>{item[lang].label}</dt>
+            <dd>{item[lang].text}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
+
 type OriginFilter = 'all' | ReportOrigin;
 
 // "Report" tab: the complexity of the reports, the list of reports (all three
@@ -529,6 +551,7 @@ export function ReportsTab({ inventory }: { inventory: Inventory }) {
       <section className="report-list" aria-label={copy.reports.title}>
         <h4>{copy.reports.title}</h4>
         <p className="muted">{copy.reports.help}</p>
+        <CountingBasis />
         <div className="program-filters">
           <label>
             <span>{copy.list.search}</span>

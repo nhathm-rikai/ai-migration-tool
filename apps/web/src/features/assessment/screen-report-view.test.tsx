@@ -145,7 +145,7 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     await waitFor(() => expect(kpi('screens').textContent).toContain('画面'));
     expect(kpi('screens').textContent).toContain('共通 1 件');
-    expect(kpi('reports').textContent).toContain('帳票');
+    expect(kpi('reports').textContent).toContain('帳票数（算定基準による）');
     expect(kpi('reports').textContent).toContain(
       'Crystal 3 · コード印刷 1 · CSV・Excel出力 1',
     );
@@ -219,13 +219,27 @@ describe('AR04-AC11/AC12 one list of reports', () => {
     ).toBe('true');
   });
 
-  it('states the counting rule as an assumption, with no word of doubt', async () => {
+  it('has one "Cơ sở tính" block with the conventions, and no word of doubt', async () => {
     await openReports();
+    const basis = screen.getByTestId('report-basis');
+    expect(basis.textContent).toContain('Cơ sở tính');
+    for (const id of [
+      'template',
+      'file-unit',
+      'overlap',
+      'other-output',
+      'log-temp',
+      'complexity',
+    ])
+      expect(basis.querySelector(`[data-basis="${id}"]`)).not.toBeNull();
+    expect(basis.textContent).toContain('sales/Detail.rpt');
+    expect(basis.textContent).toContain('không bảo đảm loại hết');
+    expect(basis.textContent).toContain('chưa gồm thiết kế layout');
     const text = document.body.textContent ?? '';
-    expect(text).toContain('Giả định: mỗi tên file .rpt là 1 report');
-    expect(text).toContain('cùng tên chỉ tính 1 mẫu');
-    for (const word of ['tham khảo', 'cần xác nhận', 'nghi', 'chưa chứng minh'])
+    expect(text).not.toContain('Giả định:');
+    for (const word of ['tham khảo', 'cần xác nhận', 'chưa chứng minh'])
       expect(text).not.toContain(word);
+    expect(text).not.toMatch(/(?<!\p{L})nghi(?!\p{L})/u);
   });
 
   it('filters by how the report is made and by name', async () => {
@@ -255,7 +269,12 @@ describe('AR04-AC11/AC12 one list of reports', () => {
     await openReports();
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     await waitFor(() =>
-      expect(screen.getByText(/^前提：\.rpt の名称ごとに1件/)).toBeTruthy(),
+      expect(screen.getByTestId('report-basis').textContent).toContain(
+        '算定基準',
+      ),
+    );
+    expect(screen.getByTestId('report-basis').textContent).toContain(
+      '換算単位',
     );
     expect(
       within(screen.getByTestId('report-template-table')).getByText(

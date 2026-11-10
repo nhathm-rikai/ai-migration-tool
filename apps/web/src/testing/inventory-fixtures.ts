@@ -420,7 +420,7 @@ export function screenReportCorpus(): Inventory {
       ],
     }),
   ];
-  inventory.screenReportVersion = 'screen-report-v3';
+  inventory.screenReportVersion = 'screen-report-v4';
   inventory.reportComplexityVersion = REPORT_VERSION;
   inventory.totals.screenReport = {
     screens: 3,

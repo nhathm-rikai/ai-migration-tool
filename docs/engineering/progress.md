@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (4) — Review vòng 2 đạt; 3 P3 nhỏ và đổi version
+
+- Dấu "=" gán nay tìm ở độ sâu ngoặc 0 (`Cells(IIf(a = 1, 2, 3), 1).Value = x` không còn bị cắt); thêm ca vào bộ mẫu (64 ca).
+- `SCREEN_REPORT_VERSION` = `screen-report-v4` vì luật nhận diện đổi trên nhánh này: inventory đã lưu hiện cảnh báo "cần phân tích lại". Cập nhật test/fixture và spec.
+- Bỏ version cũ trong hai comment. Chưa push.
+
 ## 11/11/2026 (3) — Review vòng 2 tại b4351cc: xuất Excel qua mẫu
 
 - **P2:** `Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/`.Formula` không SaveAs bị sót. Thêm ca vào bộ mẫu chấp nhận trước (4 ca fail), rồi sửa: các lời gọi đó trên đối tượng Excel đã biết là ghi; đích gán phải KẾT THÚC bằng Cells/Range/Item/Offset(..)/.Value/.Formula nên chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không tính (đóng luôn mục N "định dạng bị tính").

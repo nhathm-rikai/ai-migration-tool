@@ -557,6 +557,11 @@ const cases: [string, string[], Expected][] = [
     { export: 1 },
   ],
   [
+    'a cell assigned whose index holds a comparison',
+    sub(...XL, '    wb.Sheets(1).Cells(IIf(a = 1, 2, 3), 1).Value = x'),
+    { export: 1 },
+  ],
+  [
     'a template opened, only formatting (colour, font, width)',
     sub(
       ...XL,

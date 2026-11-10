@@ -2,7 +2,7 @@ import type { ReportSignal } from '../language-analyzer.js';
 import { vb6CodeStart, type Vb6ModuleKind } from './vb6-code-file.js';
 import { lexVb6Line, type Vb6Continuation } from './vb6-line-lexer.js';
 
-// Lexical detection of report outputs in VB6 code (screen-report-v1). A hit
+// Lexical detection of report outputs in VB6 code (AR04). A hit
 // is evidence that code can produce a report, never proof of how many
 // templates exist: comments and string contents are ignored by lexing, not
 // by substring search.
@@ -232,6 +232,25 @@ function listItems(text: string): string[] {
   }
   items.push(text.slice(start));
   return items;
+}
+
+// The position of the "=" that assigns, at parenthesis depth 0 (strings are
+// already blanked); -1 when the statement assigns nothing.
+function assignmentAt(masked: string): number {
+  let depth = 0;
+  for (let at = 0; at < masked.length; at += 1) {
+    const char = masked[at];
+    if (char === '(') depth += 1;
+    else if (char === ')') depth -= 1;
+    else if (
+      char === '=' &&
+      depth === 0 &&
+      !'<>=!'.includes(masked[at - 1] ?? ' ') &&
+      masked[at + 1] !== '='
+    )
+      return at;
+  }
+  return -1;
 }
 
 class ExcelWrites {
@@ -465,8 +484,9 @@ class ExcelWrites {
       wrote = true;
     // Data pasted or copied in from a recordset (a template filled, no SaveAs).
     if (FILLS_EXCEL.test(masked) && this.isExcel(masked)) wrote = true;
-    // A cell, range or value assigned (the first "=" of the statement).
-    const equals = masked.search(/(?<![<>=!])=(?!=)/);
+    // A cell, range or value assigned (the "=" of the statement, outside any
+    // parentheses: Cells(IIf(a = 1, 2, 3), 1).Value = x).
+    const equals = assignmentAt(masked);
     if (equals > 0) {
       const target = masked.slice(0, equals);
       if (CELL_TARGET.test(target) && this.isExcel(target)) wrote = true;

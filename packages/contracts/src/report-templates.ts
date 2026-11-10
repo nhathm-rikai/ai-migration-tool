@@ -37,7 +37,7 @@ type Level = 'low' | 'medium' | 'high' | 'very-high' | 'unrated';
 // inventory stored with an older one has no CSV / Excel detection, no log
 // exclusion and no complexity for the code print / export reports, and
 // cannot be derived: it needs an analysis again.
-export const SCREEN_REPORT_VERSION = 'screen-report-v3';
+export const SCREEN_REPORT_VERSION = 'screen-report-v4';
 export const isScreenReportOutdated = (inventory: {
   screenReportVersion?: string | undefined;
 }): boolean =>

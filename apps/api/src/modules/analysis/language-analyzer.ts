@@ -87,7 +87,7 @@ export type CodeFileAnalysis =
     }
   | { status: 'unsupported'; reason: string; line: number | null };
 
-// A lexical hint that code can produce a report (screen-report-v1).
+// A lexical hint that code can produce a report (AR04).
 // `crystal` names the .rpt file; the others are suspected outputs.
 export type ReportSignalKind = 'crystal' | 'excel' | 'print' | 'file-output';
 export type ReportSignal = {

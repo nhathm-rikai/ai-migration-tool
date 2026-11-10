@@ -538,3 +538,207 @@ describe('a write counts only on an Excel object', () => {
     expect(signal?.subkind).toBe('csv');
   });
 });
+
+// Variables are followed by procedure and by connection (review 10/11, third
+// round): a name means what it was last declared or set to in its procedure,
+// and a write counts on the Excel connection it runs on.
+describe('Excel objects and connections are followed by scope', () => {
+  const kinds = (...lines: string[]) => scan(...lines).map((s) => s.kind);
+
+  it('a variable of another procedure with the same name is not Excel', () => {
+    expect(
+      kinds(
+        'Sub Read()',
+        '    Dim xl As Object, wb As Object',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Open("in.xls")',
+        'End Sub',
+        'Sub Dump()',
+        '    Dim wb As ADODB.Recordset',
+        '    Set wb = New ADODB.Recordset',
+        '    wb.Save "data.xml"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+  });
+  it('a local variable hides a module variable of the same name', () => {
+    expect(
+      kinds(
+        'Private wb As Excel.Workbook',
+        'Sub A()',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Dim wb As ADODB.Recordset',
+        '    wb.Save "data.xml"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+  });
+  it('a module variable set in one procedure is Excel in another', () => {
+    expect(
+      kinds(
+        'Private xl As Object',
+        'Sub Init()',
+        '    Set xl = CreateObject("Excel.Application")',
+        'End Sub',
+        'Sub Save()',
+        '    xl.ActiveWorkbook.SaveAs "out.xls"',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('a variable set again in the same procedure takes its new kind', () => {
+    expect(
+      kinds(
+        'Sub A()',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = xl.Workbooks.Open("in.xls")',
+        '    Set wb = New ADODB.Recordset',
+        '    wb.Save "data.xml"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+    expect(
+      kinds(
+        'Sub A()',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    Set wb = Nothing',
+        '    Set wb = xl.Workbooks.Open("in.xls")',
+        '    wb.Save',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('a parameter is declared in its procedure', () => {
+    expect(
+      kinds(
+        'Sub Fill(wb As Excel.Workbook)',
+        '    wb.Sheets(1).Cells(1, 1) = "a"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+    expect(
+      kinds(
+        'Sub Fill(wb As Excel.Workbook)',
+        '    Set xl = CreateObject("Excel.Application")',
+        '    wb.Sheets(1).Cells(1, 1) = "a"',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+
+  const excelCn = [
+    '    Set excelCn = New ADODB.Connection',
+    '    excelCn.Open "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=a.xls;Extended Properties=""Excel 8.0"""',
+  ];
+  it('reading from an Excel connection and writing to another is not an Excel output', () => {
+    expect(
+      kinds(
+        'Sub Move()',
+        ...excelCn,
+        '    Set rs = excelCn.Execute("SELECT * FROM [Sheet1$]")',
+        '    Set dbCn = New ADODB.Connection',
+        '    dbCn.Open "Provider=SQLOLEDB;Data Source=srv"',
+        '    dbCn.Execute "UPDATE t SET a = 1"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+  });
+  it('INSERT / UPDATE on the Excel connection is an Excel output', () => {
+    expect(
+      kinds(
+        'Sub Fill()',
+        ...excelCn,
+        '    excelCn.Execute "INSERT INTO [Sheet1$] VALUES (1)"',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('the SQL in a variable, run on the Excel connection', () => {
+    expect(
+      kinds(
+        'Sub Fill()',
+        ...excelCn,
+        '    sql = "UPDATE [Sheet1$] SET a = 1"',
+        '    excelCn.Execute sql',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('a connection string in a module constant', () => {
+    expect(
+      kinds(
+        'Const CONN = "Provider=Microsoft.Jet.OLEDB.4.0;Data Source=a.xls;Extended Properties=""Excel 8.0"""',
+        'Sub Fill()',
+        '    Set cn = New ADODB.Connection',
+        '    cn.Open CONN',
+        '    cn.Execute "INSERT INTO [Sheet1$] VALUES (1)"',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('a recordset opened on the Excel connection then changed', () => {
+    expect(
+      kinds(
+        'Sub Fill()',
+        ...excelCn,
+        '    Set rs = New ADODB.Recordset',
+        '    rs.Open "SELECT * FROM [Sheet1$]", excelCn, adOpenDynamic, adLockOptimistic',
+        '    rs.AddNew',
+        '    rs.Update',
+        'End Sub',
+      ),
+    ).toContain('excel');
+  });
+  it('a recordset opened on another connection is not Excel', () => {
+    expect(
+      kinds(
+        'Sub Fill()',
+        ...excelCn,
+        '    Set rs = New ADODB.Recordset',
+        '    rs.Open "SELECT * FROM t", dbCn',
+        '    rs.AddNew',
+        '    rs.Update',
+        'End Sub',
+      ),
+    ).toEqual([]);
+  });
+  it('a connection string that cannot be resolved counts for nothing', () => {
+    expect(
+      kinds(
+        'Sub Fill()',
+        '    Set cn = New ADODB.Connection',
+        '    cn.Open GetSetting("app", "db", "conn")',
+        '    cn.Execute "INSERT INTO [Sheet1$] VALUES (1)"',
+        'End Sub',
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('every signal comes from a split statement', () => {
+  it('Open For Output after Then, then Write #, is a CSV', () => {
+    const [signal] = scan(
+      'Sub Out()',
+      '    If ok Then Open "out.csv" For Output As #1',
+      '    Write #1, a, b',
+      '    Close #1',
+      'End Sub',
+    );
+    expect(signal).toMatchObject({ kind: 'file-output', subkind: 'csv' });
+    const [other] = scan(
+      'Sub Out()',
+      '    If ok Then Open sOut For Output As #1',
+      '    Write #1, a, b',
+      '    Close #1',
+      'End Sub',
+    );
+    expect(other).toMatchObject({ kind: 'file-output', subkind: 'csv' });
+  });
+  it('a print or a report after Else', () => {
+    const found = scan(
+      '    If a Then n = 1 Else Printer.Print "x"',
+      '    If b Then rpt.ReportFileName = "a.rpt"',
+    ).map((s) => s.kind);
+    expect(found).toEqual(['print', 'crystal']);
+  });
+});

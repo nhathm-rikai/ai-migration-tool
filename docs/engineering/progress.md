@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 — Nhận diện Excel/CSV: một lượt quét theo procedure (review tại 902023b, 3 lỗi P2)
+
+- **Cấu trúc:** mọi tín hiệu (Crystal, in, Open/Write/Print #, Excel, ADO) sinh từ lệnh đã tách (If một dòng = điều kiện + lệnh sau Then/Else), không quét dòng gốc. Bảng ký hiệu theo procedure (biến khai báo che biến module, quên ở End Sub, gán lại đổi loại, Set ... = Nothing). Theo dõi connection ADO (cn.Open/ConnectionString, rs.Open ... cn, ActiveConnection) và recordset/command trên connection Excel.
+- Ba lỗi: wb cùng tên ở hai procedure khác kiểu; đọc Excel + UPDATE DB khác; Open CSV sau Then. Test tái hiện fail trên 902023b (6 test), pass sau sửa.
+- Quy tắc và giới hạn còn lại: spec source-inventory.md §6.2a. Chưa push.
+
 ## 10/11/2026 (đêm, 3) — Sửa 2 lỗi P2 nhận diện ghi Excel (review tại 4dd4d79)
 
 - **Ghi Excel phải gắn với đối tượng Excel:** theo dõi biến Excel (khai báo `As Excel.*`, gán từ CreateObject/GetObject/New Excel.Application/Workbooks.Add/Open, Set từ đối tượng Excel, khối With); `rs.Save`, `Text1.Value =`, `grid.Cells(...) =`, UPDATE/INSERT DB thường không còn mở khóa tính Excel. INSERT/UPDATE chỉ tính khi file có nguồn ADO Excel (mức file; giới hạn đã biết).

@@ -299,16 +299,18 @@ describe('review round 2: one project-level entry per shared report', () => {
       knownPaths: ['r.rpt'],
     });
   };
-  it('scores the same report differently per program (the premise)', () => {
+  // AR06 review 2: a Crystal template is one unit over all its uses, each use
+  // resolved in its own program (B resolves Foo, Bar and Baz; A does not), so
+  // the template has one score whatever the program that lists it.
+  it('scores a Crystal template once over its uses, resolved per program', () => {
     const inventory = build('AB');
-    expect(program(inventory, 'a/A.vbp').reports?.[0]?.complexity.level).toBe(
-      'medium',
-    );
-    expect(program(inventory, 'b/B.vbp').reports?.[0]?.complexity.level).toBe(
-      'high',
-    );
+    for (const path of ['a/A.vbp', 'b/B.vbp'])
+      expect(program(inventory, path).reports?.[0]?.complexity).toMatchObject({
+        level: 'high',
+        score: 6,
+      });
   });
-  it('keeps the highest score once, with every program own score recorded', () => {
+  it('keeps one entry, with every program score recorded', () => {
     const entries = ['AB', 'BA'].map((order) => {
       const items = build(order as 'AB' | 'BA').totals.screenReport
         ?.reportItems;
@@ -329,7 +331,7 @@ describe('review round 2: one project-level entry per shared report', () => {
         ]),
       ),
     ).toEqual({
-      'a/A.vbp': ['medium', 5],
+      'a/A.vbp': ['high', 6],
       'b/B.vbp': ['high', 6],
     });
   });

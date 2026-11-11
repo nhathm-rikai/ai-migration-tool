@@ -346,36 +346,65 @@ export function reportScope(
   return [...tiers].map(([id, tier]) => ({ id, tier }));
 }
 
-// Measures of a scope, together: the measures are merged first and scored
-// once (not a sum of scores). Branches and executable lines add up per
-// procedure; tables are a union of names; dynamic SQL a union of places;
-// calls a union of (caller, callee) pairs.
-function measureScope(
-  scope: readonly { id: string; tier: 0 | 1 | 2 }[],
-  context: ProgramContext,
-): { evidence: ReportEvidence; printOps: PrintOps; unresolvedCalls: number } {
+// One use of a report: the procedures scored for it and the program whose call
+// graph resolved them.
+type ScopePart = {
+  scope: readonly { id: string; tier: 0 | 1 | 2 }[];
+  context: ProgramContext;
+};
+
+// Measures of the scopes of a unit, together: the measures are merged first and
+// scored once (not a sum of scores). A procedure counts once however many
+// parts hold it. Branches and executable lines add up per procedure; tables
+// are a union of names; dynamic SQL a union of places; calls a union of
+// (caller, callee) pairs, each resolved in the program of its part and only
+// when the callee is inside that part's scope (an edge below the last tier
+// is not scored).
+function measureScope(parts: readonly ScopePart[]): {
+  scope: { id: string; tier: 0 | 1 | 2 }[];
+  evidence: ReportEvidence;
+  printOps: PrintOps;
+  unresolvedCalls: number;
+} {
+  const tiers = new Map<string, 0 | 1 | 2>();
+  const unresolved = new Map<string, number>();
+  const pairs = new Set<string>();
+  const facts = new Map<string, ProcedureFacts>();
+  for (const part of parts) {
+    const inScope = new Set(part.scope.map((item) => item.id));
+    for (const { id, tier } of part.scope) {
+      tiers.set(id, Math.min(tiers.get(id) ?? tier, tier) as 0 | 1 | 2);
+      const own = part.context.factsOf(id);
+      if (own) facts.set(id, own);
+      unresolved.set(
+        id,
+        Math.max(
+          unresolved.get(id) ?? 0,
+          part.context.unresolvedCallsOf(id) + (own?.dynamicCalls ?? 0),
+        ),
+      );
+      for (const callee of part.context.calleesOf(id))
+        if (inScope.has(callee)) pairs.add(`${id}\u0000${callee}`);
+    }
+  }
   const tables = new Set<string>();
   const dynamicSql = new Set<string>();
-  const pairs = new Set<string>();
   const printOps: PrintOps = { content: 0, drawing: 0, position: 0 };
   let decisionPoints = 0;
   let executableLines = 0;
-  let unresolvedCalls = 0;
-  for (const { id } of scope) {
-    const facts = context.factsOf(id);
-    if (!facts) continue;
-    decisionPoints += facts.decisionPoints;
-    executableLines += facts.executableLines;
-    for (const table of facts.tables) tables.add(table);
-    for (const place of facts.dynamicSql) dynamicSql.add(place);
-    printOps.content += facts.printOps.content;
-    printOps.drawing += facts.printOps.drawing;
-    printOps.position += facts.printOps.position;
-    unresolvedCalls += context.unresolvedCallsOf(id) + facts.dynamicCalls;
-    for (const callee of context.calleesOf(id))
-      pairs.add(`${id}\u0000${callee}`);
+  for (const id of tiers.keys()) {
+    const own = facts.get(id);
+    if (!own) continue;
+    decisionPoints += own.decisionPoints;
+    executableLines += own.executableLines;
+    for (const table of own.tables) tables.add(table);
+    for (const place of own.dynamicSql) dynamicSql.add(place);
+    printOps.content += own.printOps.content;
+    printOps.drawing += own.printOps.drawing;
+    printOps.position += own.printOps.position;
   }
   return {
+    scope: [...tiers].map(([id, tier]) => ({ id, tier })),
     evidence: {
       decisionPoints,
       executableLines,
@@ -384,7 +413,7 @@ function measureScope(
       calls: pairs.size,
     },
     printOps,
-    unresolvedCalls,
+    unresolvedCalls: [...unresolved.values()].reduce((sum, n) => sum + n, 0),
   };
 }
 
@@ -474,63 +503,84 @@ export function designerReportRow(
 }
 
 // The unit a row is scored with, by the same conventions as the report count
-// (contracts/report-templates.ts): a Crystal template is one unit wherever it is
-// used; code print and CSV / Excel export are one unit per source file and per
-// way; any other row (not counted as a report) is its own unit.
-function unitKeys(drafts: readonly ReportDraft[]): string[] {
+// (contracts/report-templates.ts): a Crystal template is one unit wherever it
+// is used, in any program; code print and CSV / Excel export are one unit per
+// source file and per way (and per program); any other row (not counted as a
+// report) is its own unit.
+function unitKeys(
+  programs: readonly { drafts: readonly ReportDraft[] }[],
+): string[][] {
   const slashed = (name: string) =>
     name
       .replaceAll('\\', '/')
       .replace(/^(?:\.\/)+/, '')
       .toLowerCase();
-  // A name without a folder joins the path of its file name when this program
+  // A name without a folder joins the path of its file name when the project
   // writes only one path for it.
   const pathsOf = new Map<string, Set<string>>();
-  for (const draft of drafts) {
-    if (draft.kind !== 'crystal') continue;
-    const path = slashed(draft.name);
-    if (!path.includes('/')) continue;
-    const name = path.split('/').at(-1) ?? path;
-    pathsOf.set(name, (pathsOf.get(name) ?? new Set()).add(path));
-  }
-  return drafts.map((draft, index) => {
-    if (draft.kind === 'crystal') {
+  for (const { drafts } of programs)
+    for (const draft of drafts) {
+      if (draft.kind !== 'crystal') continue;
       const path = slashed(draft.name);
-      const paths = path.includes('/') ? undefined : pathsOf.get(path);
-      return `crystal\u0000${paths?.size === 1 ? ([...paths][0] ?? path) : path}`;
+      if (!path.includes('/')) continue;
+      const name = path.split('/').at(-1) ?? path;
+      pathsOf.set(name, (pathsOf.get(name) ?? new Set()).add(path));
     }
-    if (draft.excludeReason !== undefined) return `row\u0000${index}`;
-    if (draft.kind === 'print') return `print\u0000${draft.file}`;
-    if (
-      draft.kind === 'excel' ||
-      (draft.kind === 'file-output' && draft.subkind === 'csv')
-    )
-      return `export\u0000${draft.file}`;
-    return `row\u0000${index}`;
-  });
+  return programs.map(({ drafts }, program) =>
+    drafts.map((draft, index) => {
+      if (draft.kind === 'crystal') {
+        const path = slashed(draft.name);
+        const paths = path.includes('/') ? undefined : pathsOf.get(path);
+        return `crystal\u0000${paths?.size === 1 ? ([...paths][0] ?? path) : path}`;
+      }
+      if (draft.excludeReason !== undefined)
+        return `row\u0000${program}\u0000${index}`;
+      if (draft.kind === 'print')
+        return `print\u0000${program}\u0000${draft.file}`;
+      if (
+        draft.kind === 'excel' ||
+        (draft.kind === 'file-output' && draft.subkind === 'csv')
+      )
+        return `export\u0000${program}\u0000${draft.file}`;
+      return `row\u0000${program}\u0000${index}`;
+    }),
+  );
 }
 
-// Scores every row of a program: the rows of one unit share one score, taken
-// over the union of their procedures and what those call (AR06).
-function scoreProgramReports<Row extends ReportDraft>(
-  drafts: readonly Row[],
-  context: ProgramContext,
+// Scores every row of the project: the rows of one unit share one score, taken
+// over the union of their procedures and what those call (AR06). A unit used
+// in several programs (a Crystal template) is scored once over all its uses,
+// each use resolved by the call graph of its own program.
+export function scoreProjectReports<Row extends ReportDraft>(
+  programs: readonly { context: ProgramContext; drafts: readonly Row[] }[],
   config: ReportComplexityConfig = DEFAULT_REPORT_COMPLEXITY_CONFIG,
-): (Omit<Row, 'complexity'> & { complexity: ReportComplexity })[] {
-  const keys = unitKeys(drafts);
-  const roots = new Map<string, string[]>();
-  drafts.forEach((draft, index) => {
-    if (draft.complexity !== null || draft.procedureId === null) return;
-    const key = keys[index] ?? '';
-    roots.set(key, [...(roots.get(key) ?? []), draft.procedureId]);
-  });
+): (Omit<Row, 'complexity'> & { complexity: ReportComplexity })[][] {
+  const keys = unitKeys(programs);
+  // Per unit, the root procedures of each program that uses it.
+  const roots = new Map<string, Map<number, string[]>>();
+  programs.forEach(({ drafts }, program) =>
+    drafts.forEach((draft, index) => {
+      if (draft.complexity !== null || draft.procedureId === null) return;
+      const key = keys[program]?.[index] ?? '';
+      const perProgram = roots.get(key) ?? new Map<number, string[]>();
+      perProgram.set(program, [
+        ...(perProgram.get(program) ?? []),
+        draft.procedureId,
+      ]);
+      roots.set(key, perProgram);
+    }),
+  );
   const scored = new Map<string, ReportComplexity>();
-  for (const [key, procedures] of roots) {
-    const scope = reportScope(procedures, context);
-    const { evidence, printOps, unresolvedCalls } = measureScope(
-      scope,
-      context,
+  for (const [key, perProgram] of roots) {
+    const parts: ScopePart[] = [...perProgram].flatMap(
+      ([program, procedures]) => {
+        const context = programs[program]?.context;
+        return context
+          ? [{ scope: reportScope(procedures, context), context }]
+          : [];
+      },
     );
+    const { scope, evidence, printOps, unresolvedCalls } = measureScope(parts);
     scored.set(
       key,
       scoreReportComplexity(evidence, config, {
@@ -541,13 +591,15 @@ function scoreProgramReports<Row extends ReportDraft>(
       }),
     );
   }
-  return drafts.map((draft, index) => ({
-    ...draft,
-    complexity:
-      draft.complexity ??
-      scored.get(keys[index] ?? '') ??
-      unratedComplexity('NO_PROCEDURE', draft.kind === 'crystal'),
-  }));
+  return programs.map(({ drafts }, program) =>
+    drafts.map((draft, index) => ({
+      ...draft,
+      complexity:
+        draft.complexity ??
+        scored.get(keys[program]?.[index] ?? '') ??
+        unratedComplexity('NO_PROCEDURE', draft.kind === 'crystal'),
+    })),
+  );
 }
 
 // ---- Per program -----------------------------------------------------------
@@ -581,11 +633,12 @@ export function buildProgramScreenReport(input: {
 }): {
   programType: ProgramType;
   screens: ProgramScreen[];
-  reports: ProgramReport[];
+  // Not scored yet: scoreProjectReports scores them with the other programs'.
+  drafts: (ReportDraft & { shared: boolean })[];
+  context: ProgramContext;
 } {
   const { analyzer } = input;
   const screens: ProgramScreen[] = [];
-  const reports: ProgramReport[] = [];
   const drafts: (ReportDraft & { shared: boolean })[] = [];
   const seenScreens = new Set<string>();
   const seenFiles = new Set<string>();
@@ -614,21 +667,15 @@ export function buildProgramScreenReport(input: {
         shared: member.shared,
       });
   }
-  reports.push(
-    ...scoreProgramReports(drafts, {
-      ...input.context,
-      projectPath: input.projectPath,
-    }),
-  );
 
   // A report runtime (Crystal, DataReport) among the references without a
   // report of its own kind found: one suspected row keeps the gap visible.
   const gap = input.externalReferences.find((reference) => {
     const runtime = analyzer.reportRuntimeOf(reference);
-    return runtime !== null && !reports.some((row) => row.kind === runtime);
+    return runtime !== null && !drafts.some((row) => row.kind === runtime);
   });
   if (gap)
-    reports.push({
+    drafts.push({
       kind: 'unknown',
       // File name only: the reference may carry a path of the author's
       // machine (the same rule as the redacted external references).
@@ -648,7 +695,12 @@ export function buildProgramScreenReport(input: {
       : analyzer.isBatchStartup(input.startup)
         ? 'batch'
         : 'unknown';
-  return { programType, screens, reports };
+  return {
+    programType,
+    screens,
+    drafts,
+    context: { ...input.context, projectPath: input.projectPath },
+  };
 }
 
 // ---- Project totals --------------------------------------------------------

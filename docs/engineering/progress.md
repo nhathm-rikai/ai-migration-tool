@@ -1,5 +1,15 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (6) — AR06 sửa sau review PR #23: `report-complexity-v3-draft`
+
+- Base `8c85d1b` (PR #23 đã merge), nhánh `fix/ar06-review-2`. Ba điểm review đều tái hiện bằng test fail trước khi sửa (6 test fail, pass sau sửa).
+- **P2 AC04:** yếu tố `calls` chỉ đếm cặp (caller, callee) mà callee thuộc tập chấm của chính nơi dùng; cạnh từ tầng 2 xuống tầng 3 không còn đổi điểm. Bỏ giới hạn tương ứng khỏi spec §6.3.
+- **P2 AC06:** mẫu Crystal dùng ở nhiều program là một đơn vị chấm cấp project: lấy hợp mọi nơi dùng, mỗi nơi phân giải lời gọi theo call graph của program chứa nó, gộp dữ liệu đo rồi chấm một lần. Định danh mẫu (đường dẫn/tên) tính trên toàn project, giống bộ đếm. In bằng code và xuất CSV/Excel vẫn chấm theo từng program, cấp project lấy điểm cao nhất. Việc chấm chuyển từ `buildProgramScreenReport` sang `scoreProjectReports` (gọi sau khi mọi program có bản nháp). Test cũ "chấm khác nhau theo program" của mẫu Crystal ở file dùng chung được đổi: nay hai program cùng điểm (cao, 6), còn điểm theo program của in/xuất giữ trong test mới.
+- **P3 AC08:** mọi khai báo trong procedure (tham số, `Dim`, có hoặc không có `As`) che tên module cùng tên; `target As PictureBox` không còn bị tính là máy in.
+- `REPORT_COMPLEXITY_VERSION` = `report-complexity-v3-draft` (inventory v2 cũ được báo cần phân tích lại). Cơ sở tính vi/ja và spec §6.3 cập nhật (quy ước điểm dòng theo program và cấp project). Ngưỡng và cách đếm tổng không đổi.
+- **Pilot cùng snapshot** (`2e0db2e5…ebe68`, 175 report = 63 + 104 + 8): trước (`8c85d1b`) và sau cùng phân bố **thấp 18, trung bình 36, cao 24, rất cao 97**; không report nào đổi mức. Điểm: 2 tăng, 168 giữ, 5 giảm. Tổng điểm yếu tố lời gọi 261 → 256, rẽ nhánh 340 → 342 (mẫu Crystal gộp nhiều program), số procedure gốc 459 → 461.
+- Kiểm chứng (Windows x64, Node 24.16.0): lint, typecheck, test (contracts 73, API 973, web 395), `verify-repository` pass. Chưa chạy lại e2e, chưa macOS/Linux. Chưa push.
+
 ## 11/11/2026 (5) — AR06: mô hình độ phức tạp report v2 (`report-complexity-v2-draft`)
 
 - **Quyết định của người dùng (ghi trước khi làm):** độ sâu call graph 2 tầng; không đi lên handler (giữ giới hạn "gọi trước ở nơi khác" trong Cơ sở tính); ngưỡng in/vẽ đề xuất làm cấu hình ban đầu (in nội dung 20/60/120 → 1/2/3 điểm, vẽ đường/khung 10/30/60 → 1/2/3 điểm, yếu tố = `min(3, in + vẽ)`); procedure dùng chung được tính đủ trong từng report; chạy pilot trước/sau và **không tự đổi ngưỡng hay cách đếm tổng report** theo kết quả pilot.

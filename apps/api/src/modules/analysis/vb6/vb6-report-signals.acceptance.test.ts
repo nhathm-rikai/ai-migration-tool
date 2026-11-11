@@ -704,3 +704,71 @@ describe('report signals: the Excel evidence is a write', () => {
     expect(row?.line).toBeGreaterThan(reader.length + 1);
   });
 });
+
+// Every procedure that writes Excel is evidence at its own write line, so the
+// level of the one report of the file does not depend on the order of the
+// procedures, and an Open / Create line is never the evidence.
+describe('report signals: each writer procedure is its own evidence', () => {
+  const heavy = Array.from(
+    { length: 30 },
+    (_, i) => `    If x${i} Then y = ${i}`,
+  );
+  const simple = [
+    'Public Sub A(wb As Excel.Workbook)',
+    '    wb.Save',
+    'End Sub',
+  ];
+  const complex = [
+    'Public Sub B(wb As Excel.Workbook)',
+    ...heavy,
+    '    wb.Save',
+    'End Sub',
+  ];
+  const inventoryOf = (...code: string[]) =>
+    buildSourceInventory({
+      profile,
+      files: [
+        {
+          relativePath: 'a/A.vbp',
+          bytes: encode('Type=Exe', 'Module=M; M.bas', 'Name="P"'),
+        },
+        {
+          relativePath: 'a/M.bas',
+          bytes: encode('Attribute VB_Name = "M"', ...code),
+        },
+      ],
+    });
+  const reportsOf = (...code: string[]) =>
+    deriveReportSummary(inventoryOf(...code))?.reports ?? [];
+
+  it('gives one report whose level does not depend on the order', () => {
+    const first = reportsOf(...simple, ...complex);
+    const second = reportsOf(...complex, ...simple);
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(first[0]?.complexity.level).toBe(second[0]?.complexity.level);
+    expect(first[0]?.complexity.score).toBe(second[0]?.complexity.score);
+    expect(first[0]?.complexity.level).not.toBe(
+      reportsOf(...simple)[0]?.complexity.level,
+    );
+  });
+  it('is a write line, not the Open line, in a procedure that opens and saves', () => {
+    const code = [
+      'Public Sub W()',
+      '    Set xl = CreateObject("Excel.Application")',
+      '    Set wb = xl.Workbooks.Open("t.xlt")',
+      '    wb.Save',
+      'End Sub',
+    ];
+    const [report] = reportsOf(...code);
+    // Line 1 is the Attribute line: Save is on line 5.
+    expect(report?.usages.map((usage) => usage.line)).toEqual([5]);
+  });
+  it('has one usage per writer procedure', () => {
+    const [report] = reportsOf(...simple, ...complex);
+    expect(report?.usages.map((usage) => usage.procedure)).toEqual([
+      'a/M.bas#sub:A',
+      'a/M.bas#sub:B',
+    ]);
+  });
+});

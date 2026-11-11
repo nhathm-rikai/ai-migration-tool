@@ -1,5 +1,10 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (7) — Review ngoài tại 3117ff6: 2 lỗi P2 (nhánh fix/report-signal-write-evidence-v2)
+
+- **P2 #1 (đã tái hiện):** hai procedure cùng ghi Excel (tham số `As Excel.Workbook`, không có `CreateObject`): đặt procedure đơn giản trước thì mức `low`/0 điểm, đảo thứ tự thì `medium`/4 điểm; cùng 1 report. Nguyên nhân: khi không còn tín hiệu Excel nào, chỉ giữ dòng ghi đầu tiên của cả file. Sửa: ghi nhận dòng ghi đầu tiên của TỪNG procedure ghi, mỗi procedure một tín hiệu `Excel`, bỏ tín hiệu mở/tạo Excel khi đã biết có ghi; vẫn gộp thành một report của file; AR06 chấm trên hợp các procedure ghi. Thêm ca chấp nhận trước (3 ca fail), các test đang ghim tên tín hiệu cũ (`Workbooks`, `Excel file`, `EXCEL.EXE`) cập nhật sang dòng ghi.
+- **P2 #2:** test web AR06-AC01 ghim cứng `screen-report-v4`: dùng `SCREEN_REPORT_VERSION`. Giới hạn "ghi Excel ở mức module" của §6.2b không còn (mức module là procedure 0, có dòng ghi riêng); bỏ khỏi danh sách.
+
 ## 11/11/2026 (6) — Hotfix 2 lỗi P2 nhận diện Excel (nhánh fix/report-signal-write-evidence)
 
 - **P2 #1:** khi file đã có ghi Excel, mọi tín hiệu Excel được giữ, kể cả `Workbooks.Open`/`CreateObject` ở procedure chỉ đọc, nên dòng đại diện (chấm độ phức tạp) có thể rơi vào procedure đọc. Sửa: chỉ giữ tín hiệu Excel ở procedure có ghi; nếu không còn tín hiệu nào thì đặt tại dòng ghi đầu tiên. Số report theo file không đổi.

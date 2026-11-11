@@ -568,15 +568,13 @@ export function findVb6ReportSignals(
   const opens = new Map<string, ReportSignal>();
   // Excel signals count only when the file writes to an Excel object.
   const excel = new ExcelWrites();
-  // The first line that writes to a known Excel object or connection.
-  let firstWrite: number | undefined;
-  // The procedures (0 = module level) that hold a write, and the procedure of
-  // each Excel signal: the evidence of an export, which complexity is scored
-  // from, must be a procedure that writes, never one that only reads Excel.
+  // The first line of each procedure (0 = module level) that writes to a known
+  // Excel object or connection: the evidence of an export, which complexity is
+  // scored from, is a line that writes in each procedure that writes, never a
+  // line that opens or creates Excel, nor the first writer of the file only.
   let procedure = 0;
   let procedures = 0;
-  const writers = new Set<number>();
-  const procedureOf = new Map<ReportSignal, number>();
+  const writes = new Map<number, number>();
   for (const statement of vb6Statements(lines, options)) {
     const body = statement.text;
     const masked = maskStrings(body);
@@ -586,10 +584,8 @@ export function findVb6ReportSignals(
       procedures += 1;
       procedure = procedures;
     } else if (ENDS_PROCEDURE.test(masked)) procedure = 0;
-    if (excel.read(body)) {
-      firstWrite ??= statement.line;
-      writers.add(procedure);
-    }
+    if (excel.read(body) && !writes.has(procedure))
+      writes.set(procedure, statement.line);
     if (/^\s*Close\b/i.test(masked)) {
       // Close #1, #2 closes those; a bare Close closes every file.
       const handles = masked
@@ -616,26 +612,23 @@ export function findVb6ReportSignals(
     for (const signal of signalsOf(body)) {
       const found: ReportSignal = { ...signal, line: statement.line };
       signals.push(found);
-      if (found.kind === 'excel') procedureOf.set(found, procedure);
       if (found.kind === 'file-output' && handle !== undefined)
         opens.set(handle, found);
     }
   }
   // Opening, starting or reading Excel is not an output.
   if (!excel.any) return signals.filter((signal) => signal.kind !== 'excel');
-  // Excel signals count only in a procedure that writes: a Workbooks.Open or
-  // CreateObject in a procedure that only reads is not the evidence.
-  const kept = signals.filter(
-    (signal) =>
-      signal.kind !== 'excel' || writers.has(procedureOf.get(signal) ?? 0),
-  );
-  // A write on an Excel object known only by its declaration (a parameter
-  // As Excel.Workbook), or one whose signals are in another procedure (a
-  // module variable set in Init and saved elsewhere), is a signal where it is
-  // written.
-  if (firstWrite !== undefined && !kept.some((s) => s.kind === 'excel'))
-    kept.push({ kind: 'excel', name: 'Excel', line: firstWrite });
-  return kept;
+  // Once writes are known, the signals that open, create or start Excel are
+  // dropped: each writer procedure is one signal at its first write line. They
+  // are one report of the file, so the count does not change.
+  return [
+    ...signals.filter((signal) => signal.kind !== 'excel'),
+    ...[...writes.values()].map((line): ReportSignal => ({
+      kind: 'excel',
+      name: 'Excel',
+      line,
+    })),
+  ];
 }
 
 // A DataReport / ActiveReports designer (.dsr) starts a top-level

@@ -62,14 +62,22 @@ export function findVb6OutputOperations(
   options: { module: Vb6ModuleKind },
 ): OutputOperation[] {
   const operations: OutputOperation[] = [];
-  const modules = new Set<string>();
-  let locals = new Set<string>();
+  // Module-level names typed as a printer / report object.
+  const modulePrinters = new Set<string>();
+  // Names declared in the procedure being read, of any type (a parameter or a
+  // Dim hides a module name of the same spelling), and those typed as a
+  // printer / report object.
+  let localNames = new Set<string>();
+  let localPrinters = new Set<string>();
   let inProcedure = false;
   const withs: boolean[] = [];
-  const isPrinter = (name: string) =>
-    name.toLowerCase() === 'printer' ||
-    locals.has(name.toLowerCase()) ||
-    modules.has(name.toLowerCase());
+  const isPrinter = (name: string) => {
+    const key = name.toLowerCase();
+    if (key === 'printer') return true;
+    return localNames.has(key)
+      ? localPrinters.has(key)
+      : modulePrinters.has(key);
+  };
   const add = (
     line: number,
     group: OutputOperation['group'],
@@ -77,19 +85,28 @@ export function findVb6OutputOperations(
   ) => {
     for (let n = 0; n < count; n += 1) operations.push({ line, group });
   };
-  const declare = (name: string) =>
-    (inProcedure ? locals : modules).add(name.toLowerCase());
+  const declare = (name: string, printer: boolean) => {
+    const key = name.toLowerCase();
+    if (inProcedure) {
+      localNames.add(key);
+      if (printer) localPrinters.add(key);
+      else localPrinters.delete(key);
+    } else if (printer) modulePrinters.add(key);
+    else modulePrinters.delete(key);
+  };
 
   for (const { text, line } of vb6Statements(lines, options)) {
     const masked = maskStrings(text);
     if (END_PROCEDURE.test(masked)) {
-      locals = new Set();
+      localNames = new Set();
+      localPrinters = new Set();
       withs.length = 0;
       inProcedure = false;
       continue;
     }
     if (PROCEDURE_START.test(masked.trim())) {
-      locals = new Set();
+      localNames = new Set();
+      localPrinters = new Set();
       withs.length = 0;
       inProcedure = true;
     }
@@ -108,10 +125,12 @@ export function findVb6OutputOperations(
         );
       for (const item of listItems(list)) {
         const match =
-          /^\s*(?:Optional\s+|ByVal\s+|ByRef\s+|ParamArray\s+|WithEvents\s+)*([A-Za-z_]\w*)(?:\(\s*\d*\s*\))?\s+As\s+(?:New\s+)?([A-Za-z_][\w.]*)/i.exec(
+          /^\s*(?:Optional\s+|ByVal\s+|ByRef\s+|ParamArray\s+|WithEvents\s+)*([A-Za-z_]\w*)(?:\(\s*\d*\s*\))?(?:\s+As\s+(?:New\s+)?([A-Za-z_][\w.]*))?/i.exec(
             item,
           );
-        if (match && PRINT_TYPE.test(match[2] ?? '')) declare(match[1] ?? '');
+        // Every declared name hides a module name; only a printer type makes
+        // it a printer.
+        if (match) declare(match[1] ?? '', PRINT_TYPE.test(match[2] ?? ''));
       }
       continue;
     }
@@ -130,7 +149,7 @@ export function findVb6OutputOperations(
       continue;
     }
     const aliased = SET_FROM_PRINTER.exec(masked)?.[1];
-    if (aliased !== undefined) declare(aliased);
+    if (aliased !== undefined) declare(aliased, true);
 
     // PrintForm prints the form on the printer.
     add(line, 'content', countOf(masked, /(?<!\w)PrintForm\b/gi));

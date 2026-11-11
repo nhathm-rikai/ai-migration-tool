@@ -98,9 +98,9 @@ const printRows = (reports: ReturnType<typeof programOf>['reports']) =>
   reports.filter((r) => r.kind === 'print');
 
 describe('AR06-AC01 model version', () => {
-  it('writes report-complexity-v2 on the inventory and on every scored report', () => {
+  it('writes report-complexity-v3 on the inventory and on every scored report', () => {
     const { inventory, reports } = programOf([bas('M', ...sub('Root', print))]);
-    expect(REPORT_COMPLEXITY_VERSION).toBe('report-complexity-v2-draft');
+    expect(REPORT_COMPLEXITY_VERSION).toBe('report-complexity-v3-draft');
     expect(inventory.reportComplexityVersion).toBe(REPORT_COMPLEXITY_VERSION);
     expect(reports[0]?.complexity.version).toBe(REPORT_COMPLEXITY_VERSION);
   });
@@ -641,5 +641,128 @@ describe('AR06 compatibility with an inventory stored by v1', () => {
     for (const item of v1.totals.screenReport?.reportItems ?? [])
       delete (item.complexity as { scope?: unknown }).scope;
     expect(Check(SourceInventorySchema, v1)).toBe(true);
+  });
+});
+
+describe('AR06 review 2 — AC04: an edge below tier 2 does not score', () => {
+  const chain = (withTier3: boolean) =>
+    programOf([
+      bas(
+        'M',
+        ...sub('Root', print, '    Call L1'),
+        ...sub('L1', '    Call L2'),
+        ...sub('L2', ...(withTier3 ? ['    Call L3'] : ['    x = 1'])),
+        ...sub('L3'),
+      ),
+    ]);
+
+  it('counts only the calls whose callee is in the scored set', () => {
+    const [row] = printRows(chain(true).reports);
+    expect(scopeOf(row)).toEqual(['Root:0', 'L1:1', 'L2:2']);
+    // Root->L1 and L1->L2; L2->L3 leaves the scope.
+    expect(factor(row, 'calls')?.value).toBe(2);
+  });
+
+  it('gives the same score with or without the call to tier 3', () => {
+    const [withIt] = printRows(chain(true).reports);
+    const [without] = printRows(chain(false).reports);
+    expect(withIt?.complexity.factors).toEqual(without?.complexity.factors);
+    expect(withIt?.complexity.score).toBe(without?.complexity.score);
+  });
+});
+
+describe('AR06 review 2 — AC06: one template used in several programs is scored once', () => {
+  const user = (name: string, callee: string) =>
+    bas(
+      name,
+      ...sub(
+        `Use${name}`,
+        '    rpt.ReportFileName = "invoice.rpt"',
+        `    Call ${callee}`,
+      ),
+      ...sub(callee, ...branches(3)),
+    );
+  const inventoryOf = (split: boolean) =>
+    buildSourceInventory({
+      profile,
+      files: split
+        ? [
+            file('a/A.vbp', 'Type=Exe', 'Module=M1; M1.bas'),
+            file('a/B.vbp', 'Type=Exe', 'Module=M2; M2.bas'),
+            user('M1', 'Load1'),
+            user('M2', 'Load2'),
+          ]
+        : [
+            file(
+              'a/A.vbp',
+              'Type=Exe',
+              'Module=M1; M1.bas',
+              'Module=M2; M2.bas',
+            ),
+            user('M1', 'Load1'),
+            user('M2', 'Load2'),
+          ],
+      knownPaths: ['invoice.rpt'],
+    });
+  const itemOf = (inventory: ReturnType<typeof inventoryOf>) =>
+    (inventory.totals.screenReport?.reportItems ?? []).filter(
+      (i) => i.kind === 'crystal',
+    );
+
+  it('gives a template the same score whether its uses share a program or not', () => {
+    const together = inventoryOf(false).programs[0]?.reports?.[0];
+    const split = inventoryOf(true);
+    // 3 + 3 branches over both uses: 6, over the threshold of 5.
+    expect(factor(together, 'decisionPoints')?.value).toBe(6);
+    for (const item of itemOf(split))
+      expect(factor(item, 'decisionPoints')?.value).toBe(6);
+    for (const program of split.programs)
+      for (const row of program.reports ?? [])
+        expect(row.complexity.score).toBe(together?.complexity.score);
+  });
+
+  it('resolves the calls of each use in the program of that use', () => {
+    const split = inventoryOf(true);
+    const item = itemOf(split)[0];
+    expect(scopeOf(item).sort()).toEqual([
+      'Load1:1',
+      'Load2:1',
+      'UseM1:0',
+      'UseM2:0',
+    ]);
+  });
+});
+
+describe('AR06 review 2 — AC08: a declaration in a procedure hides the module name', () => {
+  const previews = (parameter: string, ...inside: string[]) =>
+    programOf([
+      bas(
+        'M',
+        'Private target As Printer',
+        `Public Sub Preview(${parameter})`,
+        '    Printer.EndDoc',
+        ...inside,
+        ...repeat(21, '    target.Print "x"'),
+        'End Sub',
+      ),
+    ]);
+
+  it('does not count a parameter of another type with the name of a module printer', () => {
+    const { reports } = previews('target As PictureBox');
+    expect(printRows(reports)[0]?.complexity.scope?.printOps.content).toBe(0);
+  });
+
+  it('does not count a Dim of any type, typed or not, with that name', () => {
+    for (const dim of ['    Dim target As Long', '    Dim target'])
+      expect(
+        printRows(previews('', dim).reports)[0]?.complexity.scope?.printOps
+          .content,
+      ).toBe(0);
+  });
+
+  it('still counts the module printer where no procedure declares the name', () => {
+    expect(
+      printRows(previews('').reports)[0]?.complexity.scope?.printOps.content,
+    ).toBe(21);
   });
 });

@@ -42,7 +42,7 @@ export const SCREEN_REPORT_VERSION = 'screen-report-v5';
 // The report complexity model has its own version (AR06): scores stored by an
 // older model are never recomputed on read, so an older one also needs a new
 // analysis, even when the counting version is current.
-export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v2-draft';
+export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v3-draft';
 export const isScreenReportOutdated = (inventory: {
   screenReportVersion?: string | undefined;
   reportComplexityVersion?: string | undefined;

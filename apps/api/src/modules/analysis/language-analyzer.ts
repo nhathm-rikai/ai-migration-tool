@@ -87,7 +87,7 @@ export type CodeFileAnalysis =
     }
   | { status: 'unsupported'; reason: string; line: number | null };
 
-// A lexical hint that code can produce a report (screen-report-v1).
+// A lexical hint that code can produce a report (AR04).
 // `crystal` names the .rpt file; the others are suspected outputs.
 export type ReportSignalKind = 'crystal' | 'excel' | 'print' | 'file-output';
 export type ReportSignal = {
@@ -99,7 +99,22 @@ export type ReportSignal = {
   // against the source tree, so `name` is then the file name alone.
   path?: string;
   absolute?: boolean;
+  // file-output only: a .csv path.
+  subkind?: 'csv';
+  // file-output only: the word that says the file is a log or a temporary
+  // file, not a report output (the function is listed but not counted).
+  excludeReason?: string;
 };
+
+// A statement that works toward a printed report or leaves the call graph
+// (AR06). Counted per statement, never multiplied by loops.
+//  content: prints text to a printer or report object;
+//  drawing: draws a line, a box, a circle or a point on one;
+//  position: sets or measures the print position (recorded, not scored);
+//  dynamic-call: a call by name at run time (CallByName), not resolvable.
+export type OutputOperationGroup =
+  'content' | 'drawing' | 'position' | 'dynamic-call';
+export type OutputOperation = { line: number; group: OutputOperationGroup };
 
 // What a project reference says about reports, by runtime component.
 // Names the report kind it should produce.
@@ -153,6 +168,12 @@ export interface LanguageAnalyzer {
   isBatchStartup(startup: string | undefined): boolean;
   // Output hints in one analyzed code file (outside designer sections).
   findReportSignals(relativePath: string, lines: string[]): ReportSignal[];
+  // Print / draw / position statements and dynamic calls of one code file,
+  // by line (AR06); the pipeline attributes them to procedures.
+  findOutputOperations(
+    relativePath: string,
+    lines: string[],
+  ): OutputOperation[];
   // Header of a designer member file that is a report; null otherwise.
   detectReportDesigner(lines: string[]): { line: number; name: string } | null;
   // Report runtime a reference/OCX belongs to, or null.

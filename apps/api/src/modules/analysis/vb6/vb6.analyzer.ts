@@ -4,6 +4,7 @@ import {
   findVb6References,
   type Vb6ModuleKind,
 } from './vb6-code-file.js';
+import { findVb6OutputOperations } from './vb6-output-operations.js';
 import { parseVb6ProjectFile } from './vb6-project-file.js';
 import {
   detectVb6ReportDesigner,
@@ -63,6 +64,8 @@ export const vb6Analyzer: LanguageAnalyzer = {
     startup !== undefined && /^sub\s+main$/i.test(startup.trim()),
   findReportSignals: (relativePath, lines) =>
     findVb6ReportSignals(lines, { module: moduleKind(relativePath) }),
+  findOutputOperations: (relativePath, lines) =>
+    findVb6OutputOperations(lines, { module: moduleKind(relativePath) }),
   detectReportDesigner: detectVb6ReportDesigner,
   reportRuntimeOf(reference) {
     const text = `${reference.fileName ?? ''} ${reference.description ?? ''}`;

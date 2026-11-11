@@ -1,8 +1,13 @@
-import { SourceInventorySchema } from '@portal/contracts';
+import {
+  deriveReportSummary,
+  REPORT_COUNTING_BASIS,
+  SourceInventorySchema,
+} from '@portal/contracts';
 import { Check } from 'typebox/value';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REPORT_COMPLEXITY_CONFIG,
+  REPORT_COMPLEXITY_VERSION,
   scoreReportComplexity,
 } from './screen-report.js';
 import { buildSourceInventory } from './source-inventory.js';
@@ -239,7 +244,11 @@ describe('AR04-AC04/AC11 totals', () => {
         'M',
         ...sub('P1', '    Printer.Print "a"', '    Printer.EndDoc'),
         ...sub('P2', '    Printer.Print "b"'),
-        ...sub('X', '    Set x = CreateObject("Excel.Application")'),
+        ...sub(
+          'X',
+          '    Set x = CreateObject("Excel.Application")',
+          '    x.ActiveSheet.Cells(1, 1).Value = "x"',
+        ),
       ),
     ),
   );
@@ -276,12 +285,16 @@ describe('AR04-AC04/AC11 totals', () => {
       Object.values(record ?? {}).reduce((a, b) => a + b, 0);
     expect(sum(reports?.byKind)).toBe(reports?.rows);
     expect(sum(reports?.byLevel)).toBe(reports?.rows);
-    expect(reports?.byLevel.unrated).toBeGreaterThanOrEqual(3);
+    // Prints and exports are scored too; only rows with no holding procedure
+    // (the DataReport design, file-level code) stay unrated.
+    expect(reports?.byLevel.unrated).toBeLessThan(reports?.rows ?? 0);
   });
 });
 
 describe('AR04-AC09/AC10 report complexity', () => {
-  const rpt = '    rpt.ReportFileName = "r.rpt"';
+  // One template per procedure: procedures of the same template are one unit
+  // and are scored together (AR06).
+  const rptOf = (name: string) => `    rpt.ReportFileName = "${name}.rpt"`;
   const branches = (count: number) =>
     Array.from({ length: count }, (_, i) => [
       `    If a${i} > 0 Then`,
@@ -295,15 +308,15 @@ describe('AR04-AC09/AC10 report complexity', () => {
         vbp('a/A.vbp', 'Module=M; M.bas'),
         at('a/M.bas', bas('M', ...procedures.flat())),
       ],
-      knownPaths: ['r.rpt'],
+      knownPaths: ['r.rpt', 'r1.rpt', 'r2.rpt', 'r3.rpt'],
     });
     return program(inventory, 'a/A.vbp').reports ?? [];
   };
 
-  const simple = sub('Simple', rpt);
+  const simple = sub('Simple', rptOf('r1'));
   const branchy = sub(
     'Branchy',
-    rpt,
+    rptOf('r2'),
     ...branches(35),
     '    s = "SELECT A FROM T1"',
     '    s = "SELECT A FROM T2"',
@@ -312,7 +325,7 @@ describe('AR04-AC09/AC10 report complexity', () => {
   );
   const dynamic = sub(
     'Dynamic',
-    rpt,
+    rptOf('r3'),
     ...branches(35),
     '    s = "SELECT A FROM T1"',
     '    s = "SELECT A FROM T2"',
@@ -335,7 +348,7 @@ describe('AR04-AC09/AC10 report complexity', () => {
       reason: 'DESIGN_NOT_ANALYZED_FLOOR',
     });
     for (const report of reports) {
-      expect(report.complexity.version).toBe('report-complexity-v1-draft');
+      expect(report.complexity.version).toBe(REPORT_COMPLEXITY_VERSION);
       expect(
         report.complexity.factors.reduce((sum, f) => sum + f.points, 0),
       ).toBe(report.complexity.score);
@@ -380,14 +393,40 @@ describe('AR04-AC09/AC10 report complexity', () => {
     expect(stricter.level).toBe('very-high');
   });
 
-  it('never rates missing data as low: suspected and no-procedure rows are unrated', () => {
+  it('scores a print or export on the procedure that holds it, without a design floor', () => {
+    const inventory = build(
+      vbp('a/A.vbp', 'Module=M; M.bas'),
+      at(
+        'a/M.bas',
+        bas(
+          'M',
+          'Sub Pr()',
+          '    If a Then',
+          '        Printer.Print "x"',
+          '    End If',
+          'End Sub',
+        ),
+      ),
+    );
+    const [row] = program(inventory, 'a/A.vbp').reports ?? [];
+    expect(row?.kind).toBe('print');
+    expect(row?.complexity.level).not.toBe('unrated');
+    expect(row?.complexity.score).not.toBeNull();
+    // No design file, so no design factor and no floor.
+    expect(row?.complexity.reason).toBeUndefined();
+    expect(
+      row?.complexity.factors.some((f) => f.factor === 'design-not-analyzed'),
+    ).toBe(false);
+  });
+
+  it('never rates missing data as low: no-procedure rows are unrated', () => {
     const inventory = build(
       vbp('a/A.vbp', 'Module=M; M.bas'),
       at('a/M.bas', bas('M', 'Printer.Print "top"')),
     );
     const [row] = program(inventory, 'a/A.vbp').reports ?? [];
     expect(row?.complexity).toMatchObject({ level: 'unrated', score: null });
-    expect(row?.complexity.reason).toBe('SUSPECTED');
+    expect(row?.complexity.reason).toBe('NO_PROCEDURE');
     const noProcedure = buildSourceInventory({
       profile,
       files: [
@@ -453,5 +492,47 @@ describe('AR04-AC05 compatibility', () => {
       delete p['reports'];
     }
     expect(Check(SourceInventorySchema, legacy)).toBe(true);
+  });
+});
+
+// The counting basis says what the counting does: Crystal per template, code
+// print and CSV/Excel export at most one unit each per file.
+describe('counting basis: one file with 2 templates, a print and a CSV', () => {
+  const inventory = build(
+    vbp('a/A.vbp', 'Module=M; M.bas'),
+    at(
+      'a/M.bas',
+      bas(
+        'M',
+        ...sub(
+          'Go',
+          '    rpt.ReportFileName = "one.rpt"',
+          '    rpt.ReportFileName = "two.rpt"',
+          '    Printer.Print "a"',
+          '    Printer.Print "b"',
+          '    Open sOut For Output As #1',
+          '    Write #1, a, b',
+          '    Close #1',
+        ),
+      ),
+    ),
+  );
+
+  it('totals 2 Crystal + 1 print + 1 CSV = 4 (not at most 3)', () => {
+    const summary = deriveReportSummary(inventory);
+    expect(summary?.counts).toMatchObject({
+      total: 4,
+      crystal: 2,
+      print: 1,
+      export: 1,
+    });
+  });
+
+  it('the basis text states that rule in both languages', () => {
+    const overlap = REPORT_COUNTING_BASIS.find((item) => item.id === 'overlap');
+    expect(overlap?.vi.text).toContain('2 + 1 + 1 = 4');
+    expect(overlap?.ja.text).toContain('2 + 1 + 1 = 4');
+    for (const text of [overlap?.vi.text, overlap?.ja.text])
+      expect(text).not.toMatch(/tối đa 3 đơn vị|最大3件/);
   });
 });

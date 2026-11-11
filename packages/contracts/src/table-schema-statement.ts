@@ -19,6 +19,7 @@ export function tableSchemaState(scale: {
 }
 
 const DEFINITION = 'DBテーブル数：SQL からアクセスされるテーブル名の種類数。';
+const DEFINITION_VI = 'Số bảng DB: số loại tên bảng được truy cập từ SQL. ';
 
 export const TABLE_SCHEMA_STATEMENT: Record<
   TableSchemaState,
@@ -46,3 +47,38 @@ export const TABLE_SCHEMA_STATEMENT: Record<
     definition: DEFINITION + '既定スキーマは確認済みです。',
   },
 };
+
+// The same statements in Vietnamese (customer report with lang=vi).
+export const TABLE_SCHEMA_STATEMENT_VI: Record<
+  TableSchemaState,
+  { note: string; definition: string }
+> = {
+  unanalyzed: {
+    note: 'Chưa thống kê bảng vì chưa có dữ liệu phân tích (cần phân tích lại).',
+    definition: 'Số bảng DB: chưa thống kê vì chưa có dữ liệu phân tích.',
+  },
+  none: {
+    note: 'Không phát hiện bảng nào được truy cập từ SQL.',
+    definition: DEFINITION_VI + 'Trong kết quả phân tích này là 0.',
+  },
+  raw: {
+    note: 'Tên bảng được thống kê đúng theo tên trong mã nguồn.',
+    definition: DEFINITION_VI + 'Thống kê đúng theo tên trong mã nguồn.',
+  },
+  assumed: {
+    note: 'Tên bảng được thống nhất theo schema giả định khi phân tích; quản trị viên cơ sở dữ liệu chưa xác nhận schema này.',
+    definition:
+      DEFINITION_VI +
+      'Từ đồng nghĩa và schema mặc định chưa được xác nhận nên có chứa giả định.',
+  },
+  confirmed: {
+    note: 'Tên bảng được thống nhất theo schema mặc định đã xác nhận.',
+    definition: DEFINITION_VI + 'Schema mặc định đã được xác nhận.',
+  },
+};
+
+export const tableSchemaStatement = (
+  state: TableSchemaState,
+  lang: 'ja' | 'vi',
+) =>
+  (lang === 'vi' ? TABLE_SCHEMA_STATEMENT_VI : TABLE_SCHEMA_STATEMENT)[state];

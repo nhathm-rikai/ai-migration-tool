@@ -1,4 +1,8 @@
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  deriveReportSummary,
+  isScreenReportOutdated,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 
 // View model of one inventory artifact (F03). It only selects and counts
 // what the inventory already states: unique totals come from
@@ -25,7 +29,8 @@ export type AssessmentWarning =
   | 'FILES_SKIPPED'
   | 'UNCLASSIFIED_LINES'
   | 'TABLE_NAMES_NOT_CONFIRMED'
-  | 'COMPLEXITY_DRAFT';
+  | 'COMPLEXITY_DRAFT'
+  | 'SCREEN_REPORT_OUTDATED';
 
 export type ComplexityView = {
   score: number;
@@ -53,7 +58,6 @@ export type ProgramRow = {
   screens: number | null;
   // detected + referenced; suspected outputs are counted apart.
   reports: number | null;
-  suspectedReports: number | null;
   members: Program['members'];
   sharedMembers: number;
   unresolvedMembers: number;
@@ -104,7 +108,12 @@ function complexityView(complexity: Complexity): ComplexityView {
   };
 }
 
-function programRow(program: Program): ProgramRow {
+type ReportCounts = { reports: number };
+
+function programRow(
+  program: Program,
+  reportCounts: ReportCounts | null,
+): ProgramRow {
   const analysis = program.analysis;
   const state: ProgramState =
     program.status === 'unsupported' || !analysis
@@ -126,12 +135,9 @@ function programRow(program: Program): ProgramRow {
     complexity: analysis ? complexityView(analysis.complexity) : null,
     programType: program.programType ?? null,
     screens: program.screens ? program.screens.length : null,
-    reports: program.reports
-      ? program.reports.filter((row) => row.confidence !== 'suspected').length
-      : null,
-    suspectedReports: program.reports
-      ? program.reports.filter((row) => row.confidence === 'suspected').length
-      : null,
+    // Report templates the program uses, and the print / export functions
+    // in it that need confirmation (not added to the templates).
+    reports: reportCounts ? reportCounts.reports : null,
     members: program.members,
     sharedMembers: program.members.filter((member) => member.shared).length,
     // A case-only difference still finds the file (Windows), so it is not
@@ -164,7 +170,19 @@ function memberTarget(projectPath: string, declaredPath: string): string {
 export function summarizeInventory(
   inventory: SourceInventoryDocument,
 ): AssessmentSummary {
-  const programs = inventory.programs.map(programRow);
+  const reportSummary = deriveReportSummary(inventory);
+  const programs = inventory.programs.map((program) =>
+    programRow(
+      program,
+      reportSummary
+        ? {
+            reports: reportSummary.reports.filter((r) =>
+              r.programs.includes(program.projectPath),
+            ).length,
+          }
+        : null,
+    ),
+  );
   const sharedPaths = new Set<string>();
   for (const program of inventory.programs)
     for (const member of program.members)
@@ -202,6 +220,8 @@ export function summarizeInventory(
     isDraft(inventory.complexityVersion) ||
       programs.some((row) => row.complexity?.draft),
   );
+
+  warn('SCREEN_REPORT_OUTDATED', isScreenReportOutdated(inventory));
 
   const missing = new Map<string, MissingMember>();
   for (const program of inventory.programs) {

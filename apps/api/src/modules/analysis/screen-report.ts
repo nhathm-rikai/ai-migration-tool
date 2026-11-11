@@ -1,4 +1,7 @@
-import { projectReportItems } from '@portal/contracts';
+import {
+  projectReportItems,
+  REPORT_COMPLEXITY_VERSION,
+} from '@portal/contracts';
 import { redactWithId } from './redact-path.js';
 import type {
   CodeFileAnalysis,
@@ -11,8 +14,10 @@ import type {
 // lexical evidence: a report row says where code can produce output, and a
 // `suspected` row is never added to the report total.
 
-export const SCREEN_REPORT_VERSION = 'screen-report-v1';
-export const REPORT_COMPLEXITY_VERSION = 'report-complexity-v1-draft';
+export {
+  REPORT_COMPLEXITY_VERSION,
+  SCREEN_REPORT_VERSION,
+} from '@portal/contracts';
 
 type AnalyzedFile = Extract<CodeFileAnalysis, { status: 'analyzed' }>;
 
@@ -40,23 +45,37 @@ export const REPORT_LEVEL_LIST: readonly ReportLevel[] = [
 
 // ---- Complexity of one report (R10, reference only) -----------------------
 
-// Evidence read from the procedure that holds the report line.
+// Measures of the procedures scored for one report (AR06): the procedure that
+// makes it and what it calls (REPORT_CALL_DEPTH levels), measured together.
 export type ReportEvidence = {
   decisionPoints: number;
   executableLines: number;
-  // Distinct tables accessed in the procedure.
+  // Distinct tables accessed.
   tables: number;
-  // SQL with a runtime table name or concatenated runtime values.
+  // SQL with a runtime table name or concatenated runtime values, by place.
   dynamicSql: number;
-  // Distinct other procedures called (depth 1).
+  // Distinct (caller, callee) pairs of resolved calls made by the scored
+  // procedures.
   calls: number;
 };
+
+// Statements that print, draw or position on a printer / report object.
+export type PrintOps = { content: number; drawing: number; position: number };
+
+// How far down the resolved call graph a report is scored, from the procedure
+// that makes it (decided 11/11/2026: 2 levels, never up into a handler).
+export const REPORT_CALL_DEPTH = 2;
+
+type Steps = readonly (readonly [number, number])[];
 
 // Step tables: [value at least, points]. The highest step reached counts.
 // Changing these constants changes levels without touching the logic; bump
 // REPORT_COMPLEXITY_VERSION when they change.
 export type ReportComplexityConfig = {
-  steps: Record<keyof ReportEvidence, readonly (readonly [number, number])[]>;
+  steps: Record<keyof ReportEvidence, Steps>;
+  // Print / draw density: each group has its own steps and the factor is
+  // min(cap, content points + drawing points). Position adds nothing.
+  printDensity: { content: Steps; drawing: Steps; cap: number };
   // Score at which medium, high and very-high start.
   levelThresholds: readonly [number, number, number];
 };
@@ -85,16 +104,37 @@ export const DEFAULT_REPORT_COMPLEXITY_CONFIG: ReportComplexityConfig = {
       [15, 3],
     ],
   },
+  // Initial thresholds decided 11/11/2026; to be reviewed with the pilot.
+  printDensity: {
+    content: [
+      [20, 1],
+      [60, 2],
+      [120, 3],
+    ],
+    drawing: [
+      [10, 1],
+      [30, 2],
+      [60, 3],
+    ],
+    cap: 3,
+  },
   levelThresholds: [3, 6, 9],
 };
 
 export type ReportFactor = { factor: string; value: number; points: number };
+// What was scored (stored with the report as evidence).
+export type ReportScope = {
+  procedures: { id: string; tier: 0 | 1 | 2 }[];
+  unresolvedCalls: number;
+  printOps: PrintOps;
+};
 export type ReportComplexity = {
   version: string;
   level: ReportLevel;
   score: number | null;
   factors: ReportFactor[];
   reason?: string;
+  scope?: ReportScope;
 };
 
 const FACTOR_ORDER: (keyof ReportEvidence)[] = [
@@ -111,20 +151,39 @@ const DESIGN_FACTOR: ReportFactor = {
 };
 const RATED: RatedLevel[] = ['low', 'medium', 'high', 'very-high'];
 
+const pointsOf = (value: number, steps: Steps) =>
+  steps.reduce(
+    (best, [atLeast, step]) => (value >= atLeast ? Math.max(best, step) : best),
+    0,
+  );
+
 export function scoreReportComplexity(
   evidence: ReportEvidence,
   config: ReportComplexityConfig = DEFAULT_REPORT_COMPLEXITY_CONFIG,
-  options: { designNotAnalyzed?: boolean } = {},
+  options: {
+    designNotAnalyzed?: boolean;
+    printOps?: PrintOps;
+    scope?: ReportScope;
+  } = {},
 ): ReportComplexity {
-  const factors: ReportFactor[] = FACTOR_ORDER.map((factor) => {
-    const value = evidence[factor];
-    const points = config.steps[factor].reduce(
-      (best, [atLeast, step]) =>
-        value >= atLeast ? Math.max(best, step) : best,
-      0,
-    );
-    return { factor, value, points };
-  });
+  const printOps = options.printOps ?? { content: 0, drawing: 0, position: 0 };
+  const factors: ReportFactor[] = [
+    ...FACTOR_ORDER.map((factor) => ({
+      factor,
+      value: evidence[factor],
+      points: pointsOf(evidence[factor], config.steps[factor]),
+    })),
+    {
+      factor: 'printDensity',
+      // Position statements are recorded in the scope, not scored.
+      value: printOps.content + printOps.drawing,
+      points: Math.min(
+        config.printDensity.cap,
+        pointsOf(printOps.content, config.printDensity.content) +
+          pointsOf(printOps.drawing, config.printDensity.drawing),
+      ),
+    },
+  ];
   const score = factors.reduce((sum, factor) => sum + factor.points, 0);
   const [medium, high, veryHigh] = config.levelThresholds;
   let level: RatedLevel =
@@ -135,8 +194,15 @@ export function scoreReportComplexity(
         : score < veryHigh
           ? 'high'
           : 'very-high';
+  const scope = options.scope ? { scope: options.scope } : {};
   if (!options.designNotAnalyzed)
-    return { version: REPORT_COMPLEXITY_VERSION, level, score, factors };
+    return {
+      version: REPORT_COMPLEXITY_VERSION,
+      level,
+      score,
+      factors,
+      ...scope,
+    };
   // The design (.rpt/.dsr) is not analyzed, so only the calling code is
   // scored; that must not read as a low report.
   const reason =
@@ -150,6 +216,7 @@ export function scoreReportComplexity(
     score,
     factors: [...factors, DESIGN_FACTOR],
     ...(reason ? { reason } : {}),
+    ...scope,
   };
 }
 
@@ -177,6 +244,10 @@ export type ReportRow = {
   procedureId: string | null;
   warnings: string[];
   complexity: ReportComplexity;
+  // file-output: a .csv path (screen-report-v2).
+  subkind?: 'csv';
+  // file-output: a log or temporary file, not a report output (v2).
+  excludeReason?: string;
 };
 
 export type ProgramReport = ReportRow & { shared: boolean };
@@ -215,20 +286,116 @@ export type ScreenReportTotals = {
   reportItems: ProjectReport[];
 };
 
+// Facts of one procedure that a report score may need, whatever file it is in.
+export type ProcedureFacts = {
+  decisionPoints: number;
+  executableLines: number;
+  // Tables accessed, lower case.
+  tables: readonly string[];
+  // Places (file:line) of SQL with a runtime table name or concatenated values.
+  dynamicSql: readonly string[];
+  printOps: PrintOps;
+  // Calls by name at run time (CallByName): never resolvable.
+  dynamicCalls: number;
+};
+
 // What only the program a row is listed under can tell: whether the design
 // file of a Crystal report resolves from that program's project file, and the
-// procedures the report's procedure calls inside that program.
+// call graph this program resolves (a shared module resolves calls differently
+// in each program that lists it).
 export type ProgramContext = {
   projectPath: string;
   // A design file path as written (relative, "/" separated) found in the
   // source from this project's folder or from the source root.
   designExists(projectPath: string, written: string): boolean;
-  // Distinct procedures the program resolves from this procedure (local or
-  // program level; ambiguous and native calls are not counted).
-  callsOf(procedureId: string): number;
+  factsOf(procedureId: string): ProcedureFacts | undefined;
+  // Procedures this program resolves from a procedure (local or program
+  // level; ambiguous and native calls are not followed).
+  calleesOf(procedureId: string): readonly string[];
+  // Distinct calls of the procedure that stay unresolved here (ambiguous,
+  // native); CallByName is counted in the facts.
+  unresolvedCallsOf(procedureId: string): number;
+};
+
+// The procedures scored for a set of root procedures: the roots (tier 0) and
+// what they call within `depth` levels. A tier is the SHORTEST call path, so
+// A->X->B and A->B make B tier 1; a procedure is in the scope once (cycles
+// end at a procedure already seen). Only resolved calls are followed.
+export function reportScope(
+  roots: readonly string[],
+  context: Pick<ProgramContext, 'factsOf' | 'calleesOf'>,
+  depth = REPORT_CALL_DEPTH,
+): { id: string; tier: 0 | 1 | 2 }[] {
+  const tiers = new Map<string, 0 | 1 | 2>();
+  let frontier: string[] = [];
+  for (const id of roots)
+    if (!tiers.has(id) && context.factsOf(id)) {
+      tiers.set(id, 0);
+      frontier.push(id);
+    }
+  for (let tier = 1; tier <= Math.min(depth, 2); tier += 1) {
+    const next: string[] = [];
+    for (const id of frontier)
+      for (const callee of context.calleesOf(id)) {
+        if (tiers.has(callee) || !context.factsOf(callee)) continue;
+        tiers.set(callee, tier as 1 | 2);
+        next.push(callee);
+      }
+    frontier = next;
+  }
+  return [...tiers].map(([id, tier]) => ({ id, tier }));
+}
+
+// Measures of a scope, together: the measures are merged first and scored
+// once (not a sum of scores). Branches and executable lines add up per
+// procedure; tables are a union of names; dynamic SQL a union of places;
+// calls a union of (caller, callee) pairs.
+function measureScope(
+  scope: readonly { id: string; tier: 0 | 1 | 2 }[],
+  context: ProgramContext,
+): { evidence: ReportEvidence; printOps: PrintOps; unresolvedCalls: number } {
+  const tables = new Set<string>();
+  const dynamicSql = new Set<string>();
+  const pairs = new Set<string>();
+  const printOps: PrintOps = { content: 0, drawing: 0, position: 0 };
+  let decisionPoints = 0;
+  let executableLines = 0;
+  let unresolvedCalls = 0;
+  for (const { id } of scope) {
+    const facts = context.factsOf(id);
+    if (!facts) continue;
+    decisionPoints += facts.decisionPoints;
+    executableLines += facts.executableLines;
+    for (const table of facts.tables) tables.add(table);
+    for (const place of facts.dynamicSql) dynamicSql.add(place);
+    printOps.content += facts.printOps.content;
+    printOps.drawing += facts.printOps.drawing;
+    printOps.position += facts.printOps.position;
+    unresolvedCalls += context.unresolvedCallsOf(id) + facts.dynamicCalls;
+    for (const callee of context.calleesOf(id))
+      pairs.add(`${id}\u0000${callee}`);
+  }
+  return {
+    evidence: {
+      decisionPoints,
+      executableLines,
+      tables: tables.size,
+      dynamicSql: dynamicSql.size,
+      calls: pairs.size,
+    },
+    printOps,
+    unresolvedCalls,
+  };
+}
+
+// A row of a file before its complexity is scored: a report is scored per
+// report (a unit), over the rows that make it in one program, so the score is
+// given when the program's rows are all known. `null`: not scored yet.
+export type ReportDraft = Omit<ReportRow, 'complexity'> & {
+  complexity: ReportComplexity | null;
 };
 // A row of a file, completed for one program.
-export type FileReport = (context: ProgramContext) => ReportRow;
+export type FileReport = (context: ProgramContext) => ReportDraft;
 
 // Report rows of one analyzed code file, each finished per program.
 export function buildCodeFileReportRows(input: {
@@ -236,7 +403,6 @@ export function buildCodeFileReportRows(input: {
   relativePath: string;
   lines: string[];
   analysis: AnalyzedFile;
-  config?: ReportComplexityConfig;
 }): FileReport[] {
   const { analysis, relativePath } = input;
   const seen = new Set<string>();
@@ -251,7 +417,7 @@ export function buildCodeFileReportRows(input: {
     );
     // A Crystal report is told apart by the path written in the code, so
     // two reports with the same file name in different folders stay two.
-    const key = `${signal.kind}\u0000${(signal.path ?? signal.name).toLowerCase()}\u0000${procedure?.id ?? ''}`;
+    const key = `${signal.kind}\u0000${(signal.path ?? signal.name).toLowerCase()}\u0000${procedure?.id ?? ''}\u0000${signal.subkind ?? ''}\u0000${signal.excludeReason ?? ''}`;
     if (seen.has(key)) continue;
     seen.add(key);
     const crystal = signal.kind === 'crystal';
@@ -266,19 +432,6 @@ export function buildCodeFileReportRows(input: {
         : found
           ? 'detected'
           : 'referenced';
-      const complexity: ReportComplexity =
-        confidence === 'suspected'
-          ? unratedComplexity('SUSPECTED', false)
-          : !procedure
-            ? unratedComplexity('NO_PROCEDURE', true)
-            : scoreReportComplexity(
-                {
-                  ...evidenceOf(procedure.id, analysis),
-                  calls: context.callsOf(procedure.id),
-                },
-                input.config,
-                { designNotAnalyzed: true },
-              );
       return {
         kind: signal.kind,
         name: signal.name,
@@ -287,32 +440,19 @@ export function buildCodeFileReportRows(input: {
         confidence,
         procedureId: procedure?.id ?? null,
         warnings: confidence === 'referenced' ? ['REPORT_FILE_MISSING'] : [],
-        complexity,
+        // A report with no procedure is unrated; the others are scored with
+        // the rest of their unit (see scoreProgramReports).
+        complexity: procedure
+          ? null
+          : unratedComplexity('NO_PROCEDURE', crystal),
+        ...(signal.subkind ? { subkind: signal.subkind } : {}),
+        ...(signal.excludeReason
+          ? { excludeReason: signal.excludeReason }
+          : {}),
       };
     });
   }
   return rows;
-}
-
-// Evidence of the procedure that holds a report, without its calls (those
-// depend on the program, see ProgramContext.callsOf).
-function evidenceOf(
-  procedureId: string,
-  analysis: AnalyzedFile,
-): Omit<ReportEvidence, 'calls'> {
-  const procedure = analysis.procedures.find((item) => item.id === procedureId);
-  const own = (fact: { procedureId: string | null }) =>
-    fact.procedureId === procedureId;
-  return {
-    decisionPoints: procedure?.decisionPoints ?? 0,
-    executableLines: procedure?.executableLines ?? 0,
-    tables: new Set(
-      analysis.sqlTables.filter(own).map((access) => access.table),
-    ).size,
-    dynamicSql:
-      analysis.dynamicSql.filter(own).length +
-      analysis.concatenatedSql.filter(own).length,
-  };
 }
 
 // A report designer member (e.g. a DataReport .dsr). Design is not parsed, so
@@ -331,6 +471,83 @@ export function designerReportRow(
     warnings: [],
     complexity: unratedComplexity('NO_PROCEDURE', true),
   });
+}
+
+// The unit a row is scored with, by the same conventions as the report count
+// (contracts/report-templates.ts): a Crystal template is one unit wherever it is
+// used; code print and CSV / Excel export are one unit per source file and per
+// way; any other row (not counted as a report) is its own unit.
+function unitKeys(drafts: readonly ReportDraft[]): string[] {
+  const slashed = (name: string) =>
+    name
+      .replaceAll('\\', '/')
+      .replace(/^(?:\.\/)+/, '')
+      .toLowerCase();
+  // A name without a folder joins the path of its file name when this program
+  // writes only one path for it.
+  const pathsOf = new Map<string, Set<string>>();
+  for (const draft of drafts) {
+    if (draft.kind !== 'crystal') continue;
+    const path = slashed(draft.name);
+    if (!path.includes('/')) continue;
+    const name = path.split('/').at(-1) ?? path;
+    pathsOf.set(name, (pathsOf.get(name) ?? new Set()).add(path));
+  }
+  return drafts.map((draft, index) => {
+    if (draft.kind === 'crystal') {
+      const path = slashed(draft.name);
+      const paths = path.includes('/') ? undefined : pathsOf.get(path);
+      return `crystal\u0000${paths?.size === 1 ? ([...paths][0] ?? path) : path}`;
+    }
+    if (draft.excludeReason !== undefined) return `row\u0000${index}`;
+    if (draft.kind === 'print') return `print\u0000${draft.file}`;
+    if (
+      draft.kind === 'excel' ||
+      (draft.kind === 'file-output' && draft.subkind === 'csv')
+    )
+      return `export\u0000${draft.file}`;
+    return `row\u0000${index}`;
+  });
+}
+
+// Scores every row of a program: the rows of one unit share one score, taken
+// over the union of their procedures and what those call (AR06).
+function scoreProgramReports<Row extends ReportDraft>(
+  drafts: readonly Row[],
+  context: ProgramContext,
+  config: ReportComplexityConfig = DEFAULT_REPORT_COMPLEXITY_CONFIG,
+): (Omit<Row, 'complexity'> & { complexity: ReportComplexity })[] {
+  const keys = unitKeys(drafts);
+  const roots = new Map<string, string[]>();
+  drafts.forEach((draft, index) => {
+    if (draft.complexity !== null || draft.procedureId === null) return;
+    const key = keys[index] ?? '';
+    roots.set(key, [...(roots.get(key) ?? []), draft.procedureId]);
+  });
+  const scored = new Map<string, ReportComplexity>();
+  for (const [key, procedures] of roots) {
+    const scope = reportScope(procedures, context);
+    const { evidence, printOps, unresolvedCalls } = measureScope(
+      scope,
+      context,
+    );
+    scored.set(
+      key,
+      scoreReportComplexity(evidence, config, {
+        // Only a Crystal report has a design that is not analyzed.
+        designNotAnalyzed: key.startsWith('crystal\u0000'),
+        printOps,
+        scope: { procedures: scope, unresolvedCalls, printOps },
+      }),
+    );
+  }
+  return drafts.map((draft, index) => ({
+    ...draft,
+    complexity:
+      draft.complexity ??
+      scored.get(keys[index] ?? '') ??
+      unratedComplexity('NO_PROCEDURE', draft.kind === 'crystal'),
+  }));
 }
 
 // ---- Per program -----------------------------------------------------------
@@ -369,6 +586,7 @@ export function buildProgramScreenReport(input: {
   const { analyzer } = input;
   const screens: ProgramScreen[] = [];
   const reports: ProgramReport[] = [];
+  const drafts: (ReportDraft & { shared: boolean })[] = [];
   const seenScreens = new Set<string>();
   const seenFiles = new Set<string>();
   for (const member of input.members) {
@@ -391,11 +609,17 @@ export function buildProgramScreenReport(input: {
     if (seenFiles.has(member.relativePath)) continue;
     seenFiles.add(member.relativePath);
     for (const finish of input.rowsByFile.get(member.relativePath) ?? [])
-      reports.push({
+      drafts.push({
         ...finish({ ...input.context, projectPath: input.projectPath }),
         shared: member.shared,
       });
   }
+  reports.push(
+    ...scoreProgramReports(drafts, {
+      ...input.context,
+      projectPath: input.projectPath,
+    }),
+  );
 
   // A report runtime (Crystal, DataReport) among the references without a
   // report of its own kind found: one suspected row keeps the gap visible.

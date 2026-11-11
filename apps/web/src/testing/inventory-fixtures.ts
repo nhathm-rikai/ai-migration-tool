@@ -1,5 +1,8 @@
 import { mappedInventoryFixture } from '@portal/contracts/fixtures';
-import type { SourceInventoryDocument } from '@portal/contracts';
+import {
+  REPORT_COMPLEXITY_VERSION,
+  type SourceInventoryDocument,
+} from '@portal/contracts';
 
 type Inventory = SourceInventoryDocument;
 
@@ -267,7 +270,7 @@ export function procedureCorpus(): Inventory {
 type ScreenReportProgram = Inventory['programs'][number];
 type Report = NonNullable<ScreenReportProgram['reports']>[number];
 
-const REPORT_VERSION = 'report-complexity-v1-draft';
+const REPORT_VERSION = REPORT_COMPLEXITY_VERSION;
 const reportRow = (row: Partial<Report> & Pick<Report, 'kind' | 'name'>) =>
   ({
     file: 'x.bas',
@@ -360,6 +363,17 @@ export function screenReportCorpus(): Inventory {
               { factor: 'executableLines', value: 80, points: 2 },
               { factor: 'design-not-analyzed', value: 1, points: 0 },
             ],
+            // What a v2 analysis stores: the procedures scored with their
+            // tier, the unresolved calls and the print / draw statements.
+            scope: {
+              procedures: [
+                { id: 'programs/Order/Order.bas#Sub:Show', tier: 0 },
+                { id: 'programs/Order/Order.bas#Sub:LoadOrder', tier: 1 },
+                { id: 'cmn/Common.bas#Sub:Format', tier: 2 },
+              ],
+              unresolvedCalls: 2,
+              printOps: { content: 25, drawing: 4, position: 7 },
+            },
           },
         }),
         common,
@@ -420,7 +434,7 @@ export function screenReportCorpus(): Inventory {
       ],
     }),
   ];
-  inventory.screenReportVersion = 'screen-report-v1';
+  inventory.screenReportVersion = 'screen-report-v4';
   inventory.reportComplexityVersion = REPORT_VERSION;
   inventory.totals.screenReport = {
     screens: 3,

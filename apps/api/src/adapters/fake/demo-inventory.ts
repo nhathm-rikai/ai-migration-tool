@@ -313,6 +313,20 @@ const unrated = (reason: string, design = false) => ({
     : [],
   reason,
 });
+// A print or export scored on its procedure, like a Crystal report but with
+// no design floor.
+const scored = (level: 'low' | 'medium', score: number, lines: number) => ({
+  version: VERSION,
+  level,
+  score,
+  factors: [
+    { factor: 'decisionPoints', value: 4, points: 0 },
+    { factor: 'executableLines', value: lines, points: score },
+    { factor: 'tables', value: 1, points: 0 },
+    { factor: 'dynamicSql', value: 0, points: 0 },
+    { factor: 'calls', value: 0, points: 0 },
+  ],
+});
 const orderReports: Report[] = [
   reportRow({
     kind: 'crystal',
@@ -335,6 +349,28 @@ const orderReports: Report[] = [
       ],
     },
   }),
+  // The same template named in a second procedure: two signs, one template.
+  reportRow({
+    kind: 'crystal',
+    name: 'order.rpt',
+    file: 'programs/ORDER/ORDER.BAS',
+    line: 160,
+    confidence: 'detected',
+    procedureId: 'programs/ORDER/ORDER.BAS#Sub:PrintOrderList',
+    complexity: {
+      version: VERSION,
+      level: 'medium',
+      score: 4,
+      factors: [
+        { factor: 'decisionPoints', value: 9, points: 1 },
+        { factor: 'executableLines', value: 60, points: 1 },
+        { factor: 'tables', value: 2, points: 1 },
+        { factor: 'dynamicSql', value: 0, points: 0 },
+        { factor: 'calls', value: 3, points: 1 },
+        { factor: 'design-not-analyzed', value: 1, points: 0 },
+      ],
+    },
+  }),
 ];
 const customerReports: Report[] = [
   reportRow({
@@ -344,7 +380,28 @@ const customerReports: Report[] = [
     line: 70,
     confidence: 'suspected',
     procedureId: 'programs/CUSTOMER/CUSTOMER.BAS#Sub:SearchCustomer',
-    complexity: unrated('SUSPECTED'),
+    complexity: scored('medium', 3, 45),
+  }),
+  // A CSV export, and a log file that is not a report output (listed apart).
+  reportRow({
+    kind: 'file-output',
+    name: 'Open For Output',
+    subkind: 'csv',
+    file: 'programs/CUSTOMER/CUSTOMER.BAS',
+    line: 90,
+    confidence: 'suspected',
+    procedureId: 'programs/CUSTOMER/CUSTOMER.BAS#Sub:ExportCustomers',
+    complexity: scored('low', 1, 20),
+  }),
+  reportRow({
+    kind: 'file-output',
+    name: 'Open For Append',
+    excludeReason: 'log',
+    file: 'programs/CUSTOMER/CUSTOMER.BAS',
+    line: 95,
+    confidence: 'suspected',
+    procedureId: 'programs/CUSTOMER/CUSTOMER.BAS#Sub:WriteLog',
+    complexity: scored('low', 0, 5),
   }),
 ];
 const reportReports: Report[] = [
@@ -386,7 +443,17 @@ const reportReports: Report[] = [
     line: 60,
     confidence: 'suspected',
     procedureId: 'programs/REPORT/REPORT.BAS#Sub:PrintMonthly',
-    complexity: unrated('SUSPECTED'),
+    complexity: scored('low', 2, 70),
+  }),
+  // Plain file output: a data file, listed and not counted as a report.
+  reportRow({
+    kind: 'file-output',
+    name: 'Open For Output',
+    file: 'programs/REPORT/REPORT.BAS',
+    line: 80,
+    confidence: 'suspected',
+    procedureId: 'programs/REPORT/REPORT.BAS#Sub:WriteDump',
+    complexity: scored('low', 0, 12),
   }),
 ];
 

@@ -70,16 +70,20 @@ test(
       page.waitForEvent('download'),
       customer.click(),
     ]);
+    // The Portal is in Vietnamese: so is the report (Japanese with the
+    // Japanese UI, see the next test).
     expect(download.suggestedFilename()).toMatch(
-      /^アセスメント報告書_AR02 export \d+_\d{8}\.xlsx$/,
+      /^Bao-cao-Assessment_AR02 export \d+_\d{8}\.xlsx$/,
     );
     const bytes = await readFile(await download.path());
+    await mkdir('test-results/customer-report-vi', { recursive: true });
+    await download.saveAs('test-results/customer-report-vi/report-vi.xlsx');
     expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
-    for (let sheet = 1; sheet <= 6; sheet++)
+    for (let sheet = 1; sheet <= 7; sheet++)
       expect(
         bytes.includes(Buffer.from(`xl/worksheets/sheet${sheet}.xml`)),
       ).toBe(true);
-    expect(bytes.includes(Buffer.from('xl/worksheets/sheet7.xml'))).toBe(false);
+    expect(bytes.includes(Buffer.from('xl/worksheets/sheet8.xml'))).toBe(false);
 
     await expect(page.getByRole('alert')).toHaveCount(0);
   },
@@ -103,7 +107,7 @@ test(
       pdf.click(),
     ]);
     expect(download.suggestedFilename()).toMatch(
-      /^アセスメント報告書_AR03_export_\d+_\d{8}\.pdf$/,
+      /^Bao-cao-Assessment_AR03_export_\d+_\d{8}\.pdf$/,
     );
     const path = await download.path();
     const bytes = await readFile(path);
@@ -116,7 +120,48 @@ test(
     expect(text).toContain('/MediaBox [0 0 595.50 842.25]');
     await mkdir('test-results/ar03-demo', { recursive: true });
     await download.saveAs('test-results/ar03-demo/customer-report-demo.pdf');
+    await mkdir('test-results/customer-report-vi', { recursive: true });
+    await download.saveAs('test-results/customer-report-vi/report-vi.pdf');
+    // Sharp pages: at most a few MB for the demo.
+    expect(bytes.length).toBeLessThan(12 * 1024 * 1024);
     await expect(pdf).toBeEnabled();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  },
+);
+
+// The report follows the language of the Portal: with the Japanese UI the
+// Excel and the PDF are Japanese (the customer's language).
+test(
+  'analysis step exports the Japanese report when the UI is Japanese',
+  { tag: '@smoke' },
+  async ({ page }) => {
+    await openNewDemoProject(page, `AR02 ja ${Date.now()}`);
+    await page.getByRole('button', { name: 'Quét source' }).click();
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/analysis\/[^/]+$/, {
+      timeout: 20_000,
+    });
+    await page.getByRole('radio', { name: '日本語' }).check({ force: true });
+    const excel = page.getByRole('button', { name: 'Excel出力' });
+    await expect(excel).toBeEnabled({ timeout: 20_000 });
+    const [xlsx] = await Promise.all([
+      page.waitForEvent('download'),
+      excel.click(),
+    ]);
+    expect(xlsx.suggestedFilename()).toMatch(
+      /^アセスメント報告書_AR02 ja \d+_\d{8}\.xlsx$/,
+    );
+    await mkdir('test-results/customer-report-vi', { recursive: true });
+    await xlsx.saveAs('test-results/customer-report-vi/report-ja.xlsx');
+    const pdf = page.getByRole('button', { name: 'PDF出力' });
+    await expect(pdf).toBeEnabled();
+    const [file] = await Promise.all([
+      page.waitForEvent('download', { timeout: 60_000 }),
+      pdf.click(),
+    ]);
+    expect(file.suggestedFilename()).toMatch(
+      /^アセスメント報告書_AR02_ja_\d+_\d{8}\.pdf$/,
+    );
+    await file.saveAs('test-results/customer-report-vi/report-ja.pdf');
     await expect(page.getByRole('alert')).toHaveCount(0);
   },
 );

@@ -441,7 +441,7 @@ function StepPage({
               ? messages.quote.title(project.name)
               : copy.pageTitles[step]}
           </h1>
-          <div ref={setHeaderSlot} />
+          <div ref={setHeaderSlot} className="page-title-actions" />
         </div>
         {step === 'source' && (
           <p className="page-lead">{messages.sourceStep.lead}</p>

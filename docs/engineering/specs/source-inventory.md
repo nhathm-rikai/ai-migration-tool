@@ -176,6 +176,8 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - `CreateObject("ADODB.Connection")` (late-bound) chưa được phân loại là connection: recordset mở trên nó vẫn giữ loại Excel đã gán trước đó: N.
 - Chuỗi `".rpt"` nằm trong phép so sánh (ví dụ `If Right(f, 4) = ".rpt"`) vẫn cho tín hiệu Crystal: N.
 - File tên `ErrorList.csv` bị loại trừ như log (từ `Error` trong tên): S (nhãn N trong ghi chú review là chưa đúng: file bị bỏ, không bị tính thêm).
+- Biến đích của `With` bị gán lại trong chính khối (`Set cn = ...` giữa `With cn`): lệnh `.Member` sau đó đọc theo loại HIỆN TẠI của biến; `With` chỉ theo dõi theo tên, không theo phạm vi: có thể S hoặc N.
+- Ghi Excel ở mức module (ví dụ khai báo toàn cục `Public xl As New Excel.Application` rồi gán ô ngoài procedure) thuộc "procedure 0": bằng chứng lùi về dòng ghi đầu tiên của file. Số report không đổi; dòng và procedure chấm độ phức tạp có thể không phải procedure mong đợi.
 - Bằng chứng (dòng, procedure chấm độ phức tạp) của một file xuất Excel chỉ lấy từ procedure CÓ ghi; `Workbooks.Open`/`CreateObject` ở procedure chỉ đọc bị bỏ, số report theo file không đổi. Nếu đối tượng khởi tạo ở procedure khác (biến module) thì dòng ghi đầu tiên là bằng chứng. Ghi qua tham số/biến module ở procedure khác với nhiều procedure ghi: mức phức tạp lấy cao nhất trong các procedure ghi.
 - Ghi Excel qua mẫu (`Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/gán `.Formula`/`.Value`) được tính; chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không được tính.
 

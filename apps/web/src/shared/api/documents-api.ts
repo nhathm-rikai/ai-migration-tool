@@ -103,6 +103,22 @@ export function createDocumentsApi(
             isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
         },
       ),
+    // TC02: the same for the integration test specification.
+    itSpecExcel: (
+      projectId: string,
+      runId: string,
+      item: number,
+      signal: AbortSignal,
+    ) =>
+      request.download(
+        run(projectId, runId) + '/items/' + String(item) + '/it-test-spec',
+        signal,
+        {
+          mediaType: INVENTORY_REPORT_CONTENT_TYPES.xlsx,
+          isValid: async (blob) =>
+            isWellFormedXlsx(new Uint8Array(await readBlob(blob, 'bytes'))),
+        },
+      ),
     reviewBoard: (projectId: string, signal: AbortSignal) =>
       request(
         `/projects/${encodeURIComponent(projectId)}/document-reviews`,

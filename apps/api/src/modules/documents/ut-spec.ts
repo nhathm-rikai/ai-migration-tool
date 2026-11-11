@@ -70,6 +70,30 @@ function cellsOf(line: string): string[] | null {
   return inner.split('|').map((cell) => clean(cell));
 }
 
+// Shared with the integration test specification (it-spec.ts), which has the
+// same contract with other columns: the data rows of the first table whose
+// second header cell is the item ID column, null when there is none.
+export function itemTableRows(markdown: string): string[][] | null {
+  const lines = markdown.split(/\r?\n/);
+  const start = lines.findIndex((line) => {
+    const cells = cellsOf(line);
+    return cells !== null && ID_HEADERS.has((cells[1] ?? '').toLowerCase());
+  });
+  if (start < 0) return null;
+  const rows: string[][] = [];
+  for (const line of lines.slice(start + 1)) {
+    const cells = cellsOf(line);
+    if (cells === null) break;
+    if (cells.every((cell) => /^:?-{2,}:?$/.test(cell))) continue;
+    rows.push(cells);
+  }
+  return rows;
+}
+
+// The 区分 cell marks an exclusion, in the languages of the pack.
+export const isExcludedKind = (cell: string) =>
+  EXCLUDED.some((word) => cell.toLowerCase().startsWith(word));
+
 // The case rows of the first table whose second header cell is the item ID
 // column; null when there is none.
 export function parseUtSpec(markdown: string): { cases: UtCase[] } | null {
@@ -111,7 +135,72 @@ export function parseUtSpec(markdown: string): { cases: UtCase[] } | null {
   return { cases };
 }
 
-const EVIDENCE = /^(.+?):(\d+)(?:\s*[-–]\s*\d+)?$/;
+const EVIDENCE = /^(.+?):(\d+)(?:\s*-\s*\d+)?$/;
+
+// Agents write the location with Japanese punctuation, a suffix or a note
+// that says nothing about where the code is ("M.bas：１２０", "M.bas:120行",
+// "M.bas:120〜134", "M.bas:120 (Calc)", or two references in one cell). Those
+// are normalized away before matching, so a run is not lost over the shape of
+// the string; what must still hold is checked at the call site - a file of
+// this program and a real line.
+export function normalizeEvidence(raw: string): string {
+  // Only the first reference when the cell holds several.
+  const [first = ''] = raw.replaceAll('\\', '/').split(/[,;、]/);
+  return (
+    first
+      .replace(/[０-９]/g, (digit) =>
+        String.fromCharCode(digit.charCodeAt(0) - 0xfee0),
+      )
+      .replaceAll('：', ':')
+      .replace(/[〜～–—]/g, '-')
+      // "M.bas (120)": the line in parentheses instead of after a colon. Only
+      // when the parentheses hold the number itself, so the note stripped
+      // below ("M.bas:120 (Calc)") still reaches that rule.
+      .replace(/^(.*?)\s*[(（](\d+(?:\s*-\s*\d+)?)[)）]\s*$/, '$1:$2')
+      // A note appended to the location: "(Calc)", "行", "行目", "line".
+      .replace(/\s*[(（][^)）]*[)）]\s*$/, '')
+      .replace(/\s*(?:行目|行|lines?)\s*$/i, '')
+      // "M.bas:L120", "M.bas: line 120".
+      .replace(/:\s*(?:lines?|L)\s*(?=\d)/i, ':')
+      .trim()
+  );
+}
+
+// The file of this program the evidence points at, or null. The source is
+// Windows VB6, so the comparison ignores case; a bare file name is accepted
+// when exactly one file of the program carries that name, because agents
+// often drop the directory.
+function evidenceFileOf(
+  path: string,
+  programFiles: ReadonlySet<string>,
+): string | null {
+  // The agent sees the program under source/: accept that prefix.
+  const wanted = path
+    .trim()
+    .replace(/^source\//, '')
+    .toLowerCase();
+  if (wanted === '') return null;
+  const exact = [...programFiles].find((file) => file.toLowerCase() === wanted);
+  if (exact !== undefined) return exact;
+  const name = wanted.split('/').pop() ?? wanted;
+  const named = [...programFiles].filter(
+    (file) => (file.toLowerCase().split('/').pop() ?? '') === name,
+  );
+  return named.length === 1 ? (named[0] as string) : null;
+}
+
+// True when the cell is a file:line of a file of the program, line >= 1.
+export function isProgramEvidence(
+  raw: string,
+  programFiles: ReadonlySet<string>,
+): boolean {
+  const match = EVIDENCE.exec(normalizeEvidence(raw));
+  return (
+    match?.[1] !== undefined &&
+    evidenceFileOf(match[1], programFiles) !== null &&
+    Number(match[2]) >= 1
+  );
+}
 
 export function validateUtSpec(
   markdown: string,
@@ -151,15 +240,10 @@ export function validateUtSpec(
       });
       continue;
     }
-    const match = EVIDENCE.exec(testCase.evidence.replaceAll('\\', '/'));
-    // The agent sees the program under source/: accept that prefix.
-    const evidenceFile = match?.[1]?.trim().replace(/^source\//, '');
-    if (
-      !match ||
-      evidenceFile === undefined ||
-      !programFiles.has(evidenceFile) ||
-      Number(match[2]) < 1
-    )
+    const match = EVIDENCE.exec(normalizeEvidence(testCase.evidence));
+    const evidenceFile =
+      match?.[1] === undefined ? null : evidenceFileOf(match[1], programFiles);
+    if (!match || evidenceFile === null || Number(match[2]) < 1)
       errors.push({
         code: 'NO_EVIDENCE',
         id,

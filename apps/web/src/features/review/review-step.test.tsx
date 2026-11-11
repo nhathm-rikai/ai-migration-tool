@@ -76,10 +76,26 @@ describe('ReviewStep', () => {
     expect(screen.getByTestId('ut-excel')).toBeTruthy();
   });
 
+  it('offers the integration Excel for the integration test specification (TC02)', async () => {
+    const api = setup(board({ name: 'it-test-spec.md' }));
+    api.packageFile.mockResolvedValue({
+      runId: 'r',
+      program: 'src/P.vbp',
+      name: 'it-test-spec.md',
+      sha256: 'a'.repeat(64),
+      byteLength: 3,
+      content: '# IT',
+    });
+    await screen.findByRole('heading', { level: 1, name: 'IT' });
+    expect(screen.getByTestId('it-excel')).toBeTruthy();
+    expect(screen.queryByTestId('ut-excel')).toBeNull();
+  });
+
   it('has no Excel button for other documents', async () => {
     setup(board());
     await screen.findByRole('heading', { level: 1, name: 'Tài liệu' });
     expect(screen.queryByTestId('ut-excel')).toBeNull();
+    expect(screen.queryByTestId('it-excel')).toBeNull();
   });
 
   it('points to step 3 when no document exists', async () => {

@@ -35,6 +35,12 @@ export const viMessages = {
       failed:
         'Không xuất được Excel của test case UT. Thử lại sau; không có file nào được lưu.',
     },
+    itExcel: {
+      download: 'Tải Excel (結合テスト仕様書)',
+      busy: 'Đang xuất…',
+      failed:
+        'Không xuất được Excel của test case IT. Thử lại sau; không có file nào được lưu.',
+    },
     language: 'Ngôn ngữ',
     session: {
       pending: 'Đang kết nối backend cục bộ…',
@@ -975,6 +981,11 @@ export const viMessages = {
         detail:
           'Agent liệt kê case mức nhánh theo checklist của Portal; có Excel',
       },
+      'it-test-spec': {
+        name: 'Test case IT (結合テスト仕様書)',
+        detail:
+          'Agent viết scenario tích hợp theo checklist của Portal (module dùng chung, chuỗi DB, report, program khác); có Excel',
+      },
     },
     companion: 'sinh kèm',
     always:
@@ -1124,6 +1135,7 @@ export const viMessages = {
       'db-design': 'Thiết kế CSDL',
       'security-audit': 'Security audit',
       'ut-test-spec': 'Test case UT',
+      'it-test-spec': 'Test case IT',
     },
     comments: 'Nhận xét',
     noComments: 'Chưa có nhận xét.',

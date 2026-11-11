@@ -15,15 +15,15 @@ Phạm vi: tài liệu `ut-test-spec.md` (単体テスト仕様書) sinh ở bư
 - Bảng case 13 cột: No, 対象ID, 大項目, 中項目, 小項目, 前提条件, 入力データ, 手順, 期待結果, 確認観点, 根拠(file:行), 区分, 対象外理由.
 - `validateUtSpec(markdown, checklist, programFiles)` chạy sau `parsePackage`; sai thì run lỗi `AGENT_OUTPUT_INVALID` (log nêu mã lỗi, tối đa vài mục):
   1. mọi hạng mục checklist có ít nhất một case, hoặc `対象外` kèm lý do;
-  2. mọi case có bằng chứng `file:line` (chấp nhận `a:5` hoặc `a:5-9`, bỏ tiền tố `source/`) trỏ tới file của program;
+  2. mọi case có bằng chứng `file:line` trỏ tới file của program. Chuỗi được chuẩn hóa trước khi so (`normalizeEvidence`): bỏ tiền tố `source/`, `\` → `/`, dấu `：` và chữ số toàn chiều → nửa chiều, `〜`/`～`/`–`/`—` → `-`, bỏ hậu tố `行`/`行目`/`line`, bỏ ghi chú trong ngoặc ở cuối, `:L5` → `:5`, `a (5)` → `a:5`, và lấy ref đầu nếu ô có nhiều (`,`/`;`/`、`). Khớp file không phân biệt chữ hoa/thường; chỉ ghi tên file thì chấp nhận khi **duy nhất một** file của program có tên đó, nhiều file cùng tên vẫn là `NO_EVIDENCE`. Dòng phải ≥ 1. Lý do chuẩn hóa: một run fail là một run mất (gói bị từ chối không được lưu, tốn quota), và cách viết chuỗi không nói gì về chất lượng test case;
   3. không case nào tham chiếu ID ngoài checklist của program.
-- Prompt `spec-design-task-v7`; template `docs/specification-design/templates/ut-test-spec.md` (bộ template 0.11.0-draft).
+- Prompt `spec-design-task-v8` (v8 thêm đoạn cho `it-test-spec`, đoạn của UT không đổi); template `docs/specification-design/templates/ut-test-spec.md` (bộ template 0.13.0-draft; nội dung template UT không đổi từ 0.12.0-draft).
 
 ## 3. Excel
 
-`GET /api/v1/projects/:projectId/document-runs/:runId/items/:item/ut-test-spec` trả `.xlsx` cho đúng run + program (không có "latest"): sheet `表紙` (program, phiên bản tài liệu, ngày, tác giả AI, trạng thái review, lưu ý), `テストケース` (13 cột, ba cột cuối 実施日/結果/確認者 để trống cho người test) và `カバレッジ` (hạng mục × số case, 対象外 + lý do). Tên file `単体テスト仕様書_<program>.xlsx`. Hiển thị ở bước 3 (khi xem file) và bước 4 (xem trước).
+`GET /api/v1/projects/:projectId/document-runs/:runId/items/:item/ut-test-spec` trả `.xlsx` cho đúng run + program (không có "latest"): sheet `表紙` (program, phiên bản tài liệu, ngày, tác giả AI, trạng thái review, lưu ý), `テストケース` (14 cột: No, ID, 大項目, 中項目, 小項目, 前提条件, 入力, 手順, 期待結果, **確認観点**, 根拠(file:行), và ba cột cuối 実施日/結果/確認者 để trống cho người test; hàng `対象外` để trống 期待結果/確認観点 và ghi lý do trong 手順) và `カバレッジ` (9 cột: hạng mục, 種別, 手続き, 対象, 根拠, ケース数, **テスト**, **対象外**, 対象外理由 — đếm theo `区分` thay vì một nhãn, để hạng mục vừa có nhánh kiểm được vừa có phần không kiểm được không bị đọc thành đã test hết). Tên file `単体テスト仕様書_<program>.xlsx`. Hiển thị ở bước 3 (khi xem file) và bước 4 (xem trước).
 
 ## 4. Giới hạn
 
 - Checklist không có vị trí từng nhánh: chất lượng case mức nhánh phụ thuộc agent và việc TL đọc lại; validator chỉ đảm bảo độ phủ hạng mục và bằng chứng tồn tại, không chứng minh case đúng.
-- Chỉ test đơn vị (UT). Test tích hợp (TC02) chưa làm.
+- Chỉ test đơn vị (UT). Test tích hợp là tài liệu riêng: [it-test-spec](it-test-spec.md).

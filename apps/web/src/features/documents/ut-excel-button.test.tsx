@@ -9,7 +9,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Download } from '../../shared/api/api-client';
 import type { DocumentsApi } from '../../shared/api/documents-api';
 import { LocaleProvider } from '../../shared/i18n/locale-provider';
-import { UtExcelButton } from './ut-excel-button';
+import {
+  ItExcelButton,
+  SpecExcelButton,
+  UtExcelButton,
+} from './ut-excel-button';
 
 afterEach(cleanup);
 
@@ -67,5 +71,61 @@ describe('UtExcelButton', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+// TC02-AC05: the same button for the integration test specification.
+describe('ItExcelButton', () => {
+  it('downloads the integration Excel of this run and item, with its own label', async () => {
+    const blob = new Blob(['x']);
+    const api = vi
+      .fn<DocumentsApi['itSpecExcel']>()
+      .mockResolvedValue({ blob, fileName: '結合テスト仕様書_A.xlsx' });
+    const save = vi.fn();
+    render(
+      <LocaleProvider>
+        <ItExcelButton
+          api={{ itSpecExcel: api }}
+          projectId="p"
+          runId="r"
+          item={2}
+          save={save}
+        />
+      </LocaleProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /結合テスト仕様書/ }));
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(api.mock.calls[0]?.slice(0, 3)).toEqual(['p', 'r', 2]);
+    expect(save).toHaveBeenCalledWith('結合テスト仕様書_A.xlsx', blob);
+  });
+});
+
+describe('SpecExcelButton', () => {
+  const api = { utSpecExcel: vi.fn(), itSpecExcel: vi.fn() };
+  const show = (fileName: string) =>
+    render(
+      <LocaleProvider>
+        <SpecExcelButton
+          fileName={fileName}
+          api={api}
+          projectId="p"
+          runId="r"
+          item={0}
+        />
+      </LocaleProvider>,
+    );
+
+  it.each([
+    ['ut-test-spec.md', 'ut-excel'],
+    ['it-test-spec.md', 'it-excel'],
+  ])('shows the button of %s', (fileName, testId) => {
+    show(fileName);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByTestId(testId)).toBeTruthy();
+  });
+
+  it('shows nothing for a document without an Excel', () => {
+    show('detail-design.md');
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });

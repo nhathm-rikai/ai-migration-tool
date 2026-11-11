@@ -68,6 +68,7 @@ describe('TC01-AC04 workbook', () => {
       '入力',
       '手順',
       '期待結果',
+      '確認観点',
       '根拠(file:行)',
       '実施日',
       '結果',
@@ -78,12 +79,48 @@ describe('TC01-AC04 workbook', () => {
     expect(cases?.rows).toHaveLength(2);
   });
 
+  it('keeps 確認観点 in its own column instead of inside 期待結果', () => {
+    const [test, excluded] = sheets[1]?.rows ?? [];
+    // Columns 8 and 9: 期待結果, then 確認観点.
+    expect(test?.[8]).toBe('期待');
+    expect(test?.[9]).toBe('観点');
+    // An excluded item has neither, only the reason in 手順.
+    expect(excluded?.[8]).toBeNull();
+    expect(excluded?.[9]).toBeNull();
+    expect(excluded?.[7]).toContain('対象外');
+  });
+
   it('lists every checklist ID on the coverage sheet with its case count', () => {
     const coverage = sheets[2];
     const ids = coverage?.rows.map((row) => row[0]);
     expect(ids).toEqual(checklist.items.map((item) => item.id));
     expect(coverage?.rows.map((row) => row[5])).toEqual([1, 1]);
-    expect(JSON.stringify(coverage?.rows[1])).toContain('対象外');
+    // ケース数, テスト, 対象外, 対象外理由 of the fully excluded item.
+    expect(coverage?.rows[1]?.slice(5, 9)).toEqual([1, 0, 1, 'テスト用DBなし']);
+    expect(coverage?.rows[0]?.slice(5, 9)).toEqual([1, 1, 0, null]);
+  });
+
+  // An item with one testable branch and one untestable one (a report that
+  // needs a real printer) must not read as fully tested.
+  it('counts テスト and 対象外 cases per item instead of one label', () => {
+    const [first, second] = parsed.cases;
+    if (!first || !second) throw new Error('fixture');
+    const mixed = utSpecSheets({
+      ...meta,
+      checklist: { ...checklist, items: [checklist.items[0]!] },
+      cases: [
+        { ...first, itemId: 'UT-A-Calc-1' },
+        {
+          ...second,
+          itemId: 'UT-A-Calc-1',
+          excluded: true,
+          reason: 'プリンタなし',
+        },
+      ],
+    })[2];
+    const row = mixed?.rows[0];
+    // ケース数, テスト, 対象外, 対象外理由.
+    expect(row?.slice(5, 9)).toEqual([2, 1, 1, 'プリンタなし']);
   });
 
   it('shows program, document version, date, author and review state on the cover', () => {

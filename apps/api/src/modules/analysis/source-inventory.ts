@@ -26,11 +26,14 @@ import {
   buildCodeFileReportRows,
   buildProgramScreenReport,
   buildScreenReportTotals,
+  scoreProjectReports,
   designerReportRow,
   REPORT_COMPLEXITY_VERSION,
   SCREEN_REPORT_VERSION,
   type ProcedureFacts,
+  type ProgramContext,
   type ProgramReport,
+  type ReportDraft,
   type ProgramScreen,
   type ProgramType,
   type FileReport,
@@ -440,6 +443,14 @@ export function buildSourceInventory(input: {
       rowsByFile.set(path, header ? [designerReportRow(path, header)] : []);
     }
 
+  // Report rows of each parsed program, not scored yet: a report is scored
+  // over the whole project (a template used in several programs once), see
+  // scoreProjectReports.
+  const pending: {
+    program: InventoryProgram;
+    context: ProgramContext;
+    drafts: (ReportDraft & { shared: boolean })[];
+  }[] = [];
   const programs = parsedProjects.map(
     ({ path, parsed, members: resolved }): InventoryProgram => {
       if (parsed?.status !== 'parsed')
@@ -532,7 +543,7 @@ export function buildSourceInventory(input: {
           };
         }),
       });
-      return {
+      const program: InventoryProgram = {
         projectPath: path,
         status: 'parsed',
         issue: null,
@@ -544,10 +555,22 @@ export function buildSourceInventory(input: {
           members.every((member) => member.fileStatus === 'analyzed') &&
           counters.unclassifiedLines === 0,
         analysis,
-        ...screenReport,
+        programType: screenReport.programType,
+        screens: screenReport.screens,
+        reports: [],
       };
+      pending.push({
+        program,
+        context: screenReport.context,
+        drafts: screenReport.drafts,
+      });
+      return program;
     },
   );
+  scoreProjectReports(pending).forEach((reports, index) => {
+    const entry = pending[index];
+    if (entry) entry.program.reports = reports;
+  });
 
   const inventoryFiles = [...files.values()];
   // TC01: size of each program's unit test checklist (step 2 shows it).

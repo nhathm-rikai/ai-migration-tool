@@ -571,6 +571,64 @@ const cases: [string, string[], Expected][] = [
     ),
     { export: 0 },
   ],
+  // --- A With block: a leading ".Method" is the With target's.
+  [
+    'With cn, .Execute UPDATE on an Excel connection',
+    sub(
+      '    Set cn = CreateObject("ADODB.Connection")',
+      EXCEL_CONN,
+      '    With cn',
+      '        .Execute "UPDATE [S$] SET a = 1"',
+      '    End With',
+    ),
+    { export: 1 },
+  ],
+  [
+    'cn.Execute UPDATE on an Excel connection (the plain form)',
+    sub(
+      '    Set cn = CreateObject("ADODB.Connection")',
+      EXCEL_CONN,
+      '    cn.Execute "UPDATE [S$] SET a = 1"',
+    ),
+    { export: 1 },
+  ],
+  [
+    'With rs, .AddNew / .Update on a recordset of an Excel connection',
+    sub(
+      '    Set cn = CreateObject("ADODB.Connection")',
+      EXCEL_CONN,
+      '    Set rs = CreateObject("ADODB.Recordset")',
+      '    rs.Open "SELECT * FROM [S$]", cn',
+      '    With rs',
+      '        .AddNew',
+      '        .Update',
+      '    End With',
+    ),
+    { export: 1 },
+  ],
+  [
+    'With cn on a connection that is not Excel, .Execute UPDATE',
+    sub(
+      '    Set cn = CreateObject("ADODB.Connection")',
+      '    cn.Open "Provider=SQLOLEDB;Data Source=srv"',
+      '    With cn',
+      '        .Execute "UPDATE t SET a = 1"',
+      '    End With',
+    ),
+    { export: 0 },
+  ],
+  [
+    'With rs on a recordset that is not Excel, .AddNew / .Update',
+    sub(
+      '    cn.Open "Provider=SQLOLEDB;Data Source=srv"',
+      '    rs.Open "SELECT * FROM t", cn',
+      '    With rs',
+      '        .AddNew',
+      '        .Update',
+      '    End With',
+    ),
+    { export: 0 },
+  ],
 ];
 
 describe('report signals: the acceptance set, through the report total', () => {
@@ -579,5 +637,138 @@ describe('report signals: the acceptance set, through the report total', () => {
   });
   it.each(cases)('%s', (_name, code, expected) => {
     expect(counts(...code)).toMatchObject(expected);
+  });
+});
+
+// The evidence line of an Excel export is a line that writes, and the
+// procedure that holds it is the one scored (a reader in the same file is not).
+describe('report signals: the Excel evidence is a write', () => {
+  const reader = [
+    'Public Sub ReadIn()',
+    '    Set xl = CreateObject("Excel.Application")',
+    '    Set wb = xl.Workbooks.Open("in.xls")',
+    ...Array.from({ length: 40 }, (_, i) => `    If a${i} Then b = ${i}`),
+    '    v = wb.Sheets(1).Cells(1, 1).Value',
+    'End Sub',
+  ];
+  const writer = [
+    'Public Sub WriteOut()',
+    '    Set xl = CreateObject("Excel.Application")',
+    '    Set wb = xl.Workbooks.Add',
+    '    wb.SaveAs "out.xls"',
+    'End Sub',
+  ];
+  const levelOf = (...code: string[]) => {
+    const inventory = buildSourceInventory({
+      profile,
+      files: [
+        {
+          relativePath: 'a/A.vbp',
+          bytes: encode('Type=Exe', 'Module=M; M.bas', 'Name="P"'),
+        },
+        {
+          relativePath: 'a/M.bas',
+          bytes: encode('Attribute VB_Name = "M"', ...code),
+        },
+      ],
+    });
+    const reports = deriveReportSummary(inventory)?.reports ?? [];
+    return reports.map((report) => ({
+      level: report.complexity.level,
+      line: report.usages[0]?.line,
+      procedure: report.usages[0]?.procedure,
+    }));
+  };
+
+  it('is the writer, not a reader of the same file', () => {
+    const both = levelOf(...reader, ...writer);
+    const writerOnly = levelOf(...writer);
+    expect(both).toHaveLength(1);
+    expect(writerOnly).toHaveLength(1);
+    expect(both[0]?.level).toBe(writerOnly[0]?.level);
+    expect(both[0]?.procedure).toMatch(/WriteOut/);
+  });
+  it('does not depend on which procedure comes first', () => {
+    const readerFirst = levelOf(...reader, ...writer);
+    const writerFirst = levelOf(...writer, ...reader);
+    expect(writerFirst).toEqual(
+      readerFirst.map((row) => ({
+        ...row,
+        line: expect.any(Number) as number,
+      })),
+    );
+  });
+  it('is a write line, never the reader line', () => {
+    const [row] = levelOf(...reader, ...writer);
+    // Line 1 is the Attribute line; the writer starts after the reader.
+    expect(row?.line).toBeGreaterThan(reader.length + 1);
+  });
+});
+
+// Every procedure that writes Excel is evidence at its own write line, so the
+// level of the one report of the file does not depend on the order of the
+// procedures, and an Open / Create line is never the evidence.
+describe('report signals: each writer procedure is its own evidence', () => {
+  const heavy = Array.from(
+    { length: 30 },
+    (_, i) => `    If x${i} Then y = ${i}`,
+  );
+  const simple = [
+    'Public Sub A(wb As Excel.Workbook)',
+    '    wb.Save',
+    'End Sub',
+  ];
+  const complex = [
+    'Public Sub B(wb As Excel.Workbook)',
+    ...heavy,
+    '    wb.Save',
+    'End Sub',
+  ];
+  const inventoryOf = (...code: string[]) =>
+    buildSourceInventory({
+      profile,
+      files: [
+        {
+          relativePath: 'a/A.vbp',
+          bytes: encode('Type=Exe', 'Module=M; M.bas', 'Name="P"'),
+        },
+        {
+          relativePath: 'a/M.bas',
+          bytes: encode('Attribute VB_Name = "M"', ...code),
+        },
+      ],
+    });
+  const reportsOf = (...code: string[]) =>
+    deriveReportSummary(inventoryOf(...code))?.reports ?? [];
+
+  it('gives one report whose level does not depend on the order', () => {
+    const first = reportsOf(...simple, ...complex);
+    const second = reportsOf(...complex, ...simple);
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(first[0]?.complexity.level).toBe(second[0]?.complexity.level);
+    expect(first[0]?.complexity.score).toBe(second[0]?.complexity.score);
+    expect(first[0]?.complexity.level).not.toBe(
+      reportsOf(...simple)[0]?.complexity.level,
+    );
+  });
+  it('is a write line, not the Open line, in a procedure that opens and saves', () => {
+    const code = [
+      'Public Sub W()',
+      '    Set xl = CreateObject("Excel.Application")',
+      '    Set wb = xl.Workbooks.Open("t.xlt")',
+      '    wb.Save',
+      'End Sub',
+    ];
+    const [report] = reportsOf(...code);
+    // Line 1 is the Attribute line: Save is on line 5.
+    expect(report?.usages.map((usage) => usage.line)).toEqual([5]);
+  });
+  it('has one usage per writer procedure', () => {
+    const [report] = reportsOf(...simple, ...complex);
+    expect(report?.usages.map((usage) => usage.procedure)).toEqual([
+      'a/M.bas#sub:A',
+      'a/M.bas#sub:B',
+    ]);
   });
 });

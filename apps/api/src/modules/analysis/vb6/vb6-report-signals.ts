@@ -258,7 +258,9 @@ class ExcelWrites {
   private locals = new Map<string, Kind>();
   private readonly commandText = new Set<string>();
   private inProcedure = false;
-  private readonly withs: boolean[] = [];
+  // The With blocks open: whether the target is an Excel object, and its name
+  // when the target is a bare variable (its kind is read when a call is made).
+  private readonly withs: { excel: boolean; name?: string }[] = [];
   private written = false;
 
   get any(): boolean {
@@ -290,7 +292,7 @@ class ExcelWrites {
     const root = STATEMENT_ROOT.exec(expression)?.[1];
     if (root === undefined) return false;
     return root === '.'
-      ? this.withs[this.withs.length - 1] === true
+      ? this.withs[this.withs.length - 1]?.excel === true
       : this.kindOf(root) === 'excel';
   }
 
@@ -339,7 +341,7 @@ class ExcelWrites {
 
   // True when the statement is a write to Excel.
   read(statement: string): boolean {
-    const masked = maskStrings(statement);
+    let masked = maskStrings(statement);
     if (/^\s*End\s+(?:Sub|Function|Property)\b/i.test(masked)) {
       this.locals = new Map();
       this.commandText.clear();
@@ -354,6 +356,14 @@ class ExcelWrites {
       this.inProcedure = true;
     }
     if (DECLARING.test(masked)) this.declareNames(masked);
+    // A statement that starts with ".Member" inside a With block is a call on
+    // the With target: read it as "target.Member".
+    const withName = this.withs[this.withs.length - 1]?.name;
+    if (withName !== undefined)
+      masked = masked.replace(
+        /^(\s*(?:Call\s+|Set\s+)?)\.(?=\s*[A-Za-z_])/i,
+        `$1${withName}.`,
+      );
     const literals = [...statement.matchAll(STRING_LITERAL)].map((m) => m[0]);
     const identifiers = (masked.match(/[A-Za-z_]\w*/g) ?? []).map((word) =>
       word.toLowerCase(),
@@ -369,7 +379,11 @@ class ExcelWrites {
       kinds(list).some((kind) => kind === 'excel-conn' || kind === 'excel-rs');
     const withBlock = /^\s*With\s+(.+)$/i.exec(masked);
     if (withBlock) {
-      this.withs.push(this.isExcel(withBlock[1] ?? ''));
+      const target = (withBlock[1] ?? '').trim();
+      this.withs.push({
+        excel: this.isExcel(target),
+        ...(/^[A-Za-z_]\w*$/.test(target) ? { name: target } : {}),
+      });
       return false;
     }
     if (/^\s*End\s+With\b/i.test(masked)) {
@@ -554,12 +568,24 @@ export function findVb6ReportSignals(
   const opens = new Map<string, ReportSignal>();
   // Excel signals count only when the file writes to an Excel object.
   const excel = new ExcelWrites();
-  // The first line that writes to a known Excel object or connection.
-  let firstWrite: number | undefined;
+  // The first line of each procedure (0 = module level) that writes to a known
+  // Excel object or connection: the evidence of an export, which complexity is
+  // scored from, is a line that writes in each procedure that writes, never a
+  // line that opens or creates Excel, nor the first writer of the file only.
+  let procedure = 0;
+  let procedures = 0;
+  const writes = new Map<number, number>();
   for (const statement of vb6Statements(lines, options)) {
     const body = statement.text;
-    if (excel.read(body)) firstWrite ??= statement.line;
     const masked = maskStrings(body);
+    // Procedure 0 is the module level; each Sub / Function / Property is its
+    // own.
+    if (PROCEDURE_START.test(masked.trim())) {
+      procedures += 1;
+      procedure = procedures;
+    } else if (ENDS_PROCEDURE.test(masked)) procedure = 0;
+    if (excel.read(body) && !writes.has(procedure))
+      writes.set(procedure, statement.line);
     if (/^\s*Close\b/i.test(masked)) {
       // Close #1, #2 closes those; a bare Close closes every file.
       const handles = masked
@@ -592,11 +618,17 @@ export function findVb6ReportSignals(
   }
   // Opening, starting or reading Excel is not an output.
   if (!excel.any) return signals.filter((signal) => signal.kind !== 'excel');
-  // A write on an Excel object known only by its declaration (a parameter
-  // As Excel.Workbook) is a signal where it is written.
-  if (firstWrite !== undefined && !signals.some((s) => s.kind === 'excel'))
-    signals.push({ kind: 'excel', name: 'Excel', line: firstWrite });
-  return signals;
+  // Once writes are known, the signals that open, create or start Excel are
+  // dropped: each writer procedure is one signal at its first write line. They
+  // are one report of the file, so the count does not change.
+  return [
+    ...signals.filter((signal) => signal.kind !== 'excel'),
+    ...[...writes.values()].map((line): ReportSignal => ({
+      kind: 'excel',
+      name: 'Excel',
+      line,
+    })),
+  ];
 }
 
 // A DataReport / ActiveReports designer (.dsr) starts a top-level

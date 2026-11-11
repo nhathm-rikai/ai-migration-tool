@@ -1,5 +1,11 @@
 # Tiến độ kỹ thuật Portal
 
+## 11/11/2026 (6) — Hotfix 2 lỗi P2 nhận diện Excel (nhánh fix/report-signal-write-evidence)
+
+- **P2 #1:** khi file đã có ghi Excel, mọi tín hiệu Excel được giữ, kể cả `Workbooks.Open`/`CreateObject` ở procedure chỉ đọc, nên dòng đại diện (chấm độ phức tạp) có thể rơi vào procedure đọc. Sửa: chỉ giữ tín hiệu Excel ở procedure có ghi; nếu không còn tín hiệu nào thì đặt tại dòng ghi đầu tiên. Số report theo file không đổi.
+- **P2 #2:** `With cn` … `.Execute "UPDATE …"` trên connection Excel ra 0 còn `cn.Execute` ra 1. Sửa: stack `With` nhớ tên biến; lệnh bắt đầu bằng `.Member` đọc như `tên.Member` theo loại hiện tại của biến (excel-conn / excel-rs), áp dụng cho Execute/Open/AddNew/Update/Delete/UpdateBatch.
+- Thêm ca chấp nhận TRƯỚC (5 ca fail trên master), rồi sửa. `SCREEN_REPORT_VERSION` = `screen-report-v5` vì inventory đã lưu có thể cho kết quả khác; cập nhật test/fixture/spec §6.2a, §6.2b. Chưa push, chưa merge; không đổi ngưỡng hay cách đếm tổng.
+
 ## 11/11/2026 (5) — AR06: mô hình độ phức tạp report v2 (`report-complexity-v2-draft`)
 
 - **Quyết định của người dùng (ghi trước khi làm):** độ sâu call graph 2 tầng; không đi lên handler (giữ giới hạn "gọi trước ở nơi khác" trong Cơ sở tính); ngưỡng in/vẽ đề xuất làm cấu hình ban đầu (in nội dung 20/60/120 → 1/2/3 điểm, vẽ đường/khung 10/30/60 → 1/2/3 điểm, yếu tố = `min(3, in + vẽ)`); procedure dùng chung được tính đủ trong từng report; chạy pilot trước/sau và **không tự đổi ngưỡng hay cách đếm tổng report** theo kết quả pilot.

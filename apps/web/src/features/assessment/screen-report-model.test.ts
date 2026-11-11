@@ -18,7 +18,7 @@ describe('AR04-AC06/AC11 screen and report model', () => {
       screens: 3,
       sharedScreens: 1,
       batches: 1,
-      reportVersion: 'screen-report-v4',
+      reportVersion: 'screen-report-v5',
       complexityVersion: REPORT_COMPLEXITY_VERSION,
     });
   });

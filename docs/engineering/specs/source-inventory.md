@@ -121,7 +121,7 @@ Tất cả là fact từ code/project file, không gọi AI. Trường mới đ�
 
 Giới hạn: lexical. `file-output` gồm cả ghi log/work file; xuất Excel bằng `Shell` hoặc file CSV không phải `excel`; một `.rpt` được dựng động từ biến không thấy; số mẫu report thật không biết với `suspected`.
 
-### 6.2a. Report theo quy ước Assessment (10/11/2026, `screen-report-v4`; v4 = nhận diện ghi Excel/CSV theo phạm vi biến, connection và lệnh đã tách, §6.2b)
+### 6.2a. Report theo quy ước Assessment (10/11/2026, `screen-report-v5`; v4 = nhận diện ghi Excel/CSV theo phạm vi biến, connection và lệnh đã tách, §6.2b; v5 = bằng chứng Excel là procedure có ghi, `With` trên connection/recordset Excel)
 
 Các dòng ở 6.2 là **dấu hiệu** (một chuỗi `.rpt` trong một procedure, một `Printer.Print`, một `Open ... For Output`), không phải số report: cùng `Invoice.rpt` ở hai procedure là hai dòng. Mọi chỗ hiển thị và xuất báo cáo dùng `deriveReportSummary()` (contracts, `report-templates.ts`), suy ra từ các dòng đã lưu (inventory cũ vẫn đọc được; `subkind`, `excludeReason` và điểm theo procedure cho in/CSV cần phân tích lại với `screen-report-v3`). Tổng `counts.total` là **số đơn vị đầu ra theo quy ước Assessment**, không phải số báo cáo nghiệp vụ; nhãn: vi "Report theo quy ước Assessment", ja 「帳票数（算定基準による）」. Tổng = Crystal/DataReport + in bằng code + xuất CSV/Excel:
 
@@ -155,7 +155,7 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - **Ghi Excel** chỉ tính là một LỜI GỌI/phép gán ghi: `Workbooks.Add`; `.SaveAs/.Save` và gán ô/range/`.Value` trên đối tượng Excel (hoặc trong `With` trên nó); trên connection Excel: `Execute`/`Open` của INSERT/UPDATE/DELETE chạy trên connection đó hoặc recordset/command gắn với nó (command theo `CommandText`), và `AddNew/Update/Delete/UpdateBatch` của recordset mở trên connection Excel. In chuỗi SQL, hoặc biến connection cùng câu với SQL (`Debug.Print cn.State, sql`) không phải lời gọi. Ghi trên đối tượng Excel chỉ biết qua khai báo (tham số `As Excel.Workbook`) sinh một tín hiệu Excel ngay tại dòng ghi đầu tiên của file.
 - **CSV:** `Write #h` hoặc `Print #h` có chuỗi `","` ngăn giá trị vào đúng `Open … For Output/Append As #h` còn mở trong procedure (handle số hoặc biến `FreeFile`); `Close #h`, mở lại handle hoặc hết procedure thì quên; đường dẫn có `.csv` là CSV. File log/tmp/debug/error (theo từ trong đường dẫn) bị loại trừ và không thành CSV.
 
-**Bộ mẫu chấp nhận:** `apps/api/src/modules/analysis/vb6/vb6-report-signals.acceptance.test.ts` (64 ca, đi qua inventory → tổng report): Excel automation (CreateObject/GetObject/New, Workbooks.Add/Open, SaveAs/Save, gán Cells/Range/Value, With, tham số `As Excel.*`, biến module Set ở procedure khác, If một dòng), ADO Excel (chuỗi kết nối Excel kể cả hằng module, Execute INSERT/UPDATE, biến SQL, recordset AddNew/Update, command CommandText, đọc SELECT không tính, đổi connection/ConnectionString/ActiveConnection), CSV (Open For Output/Append + Print #/Write #, theo handle và FreeFile, If một dòng, `:`, log/tmp loại trừ, Open For Input), in bằng Printer/PrintForm, Crystal `.rpt` (một và nhiều mẫu, trong comment), và các ca âm (Recordset.Save, control.Value, check box Value, grid.Cells, Debug.Print, Picture1.Print, UPDATE DB thường, biến cùng tên ở procedure khác, tham số không kiểu che biến module). Ca mới được thêm vào đây khi gặp pattern phổ biến hoặc ca làm đổi số pilot.
+**Bộ mẫu chấp nhận:** `apps/api/src/modules/analysis/vb6/vb6-report-signals.acceptance.test.ts` (69 ca và 3 ca bằng chứng ghi, đi qua inventory → tổng report): Excel automation (CreateObject/GetObject/New, Workbooks.Add/Open, SaveAs/Save, gán Cells/Range/Value, With, tham số `As Excel.*`, biến module Set ở procedure khác, If một dòng), ADO Excel (chuỗi kết nối Excel kể cả hằng module, Execute INSERT/UPDATE, biến SQL, recordset AddNew/Update, command CommandText, đọc SELECT không tính, đổi connection/ConnectionString/ActiveConnection), CSV (Open For Output/Append + Print #/Write #, theo handle và FreeFile, If một dòng, `:`, log/tmp loại trừ, Open For Input), in bằng Printer/PrintForm, Crystal `.rpt` (một và nhiều mẫu, trong comment), và các ca âm (Recordset.Save, control.Value, check box Value, grid.Cells, Debug.Print, Picture1.Print, UPDATE DB thường, biến cùng tên ở procedure khác, tham số không kiểu che biến module). Ca mới được thêm vào đây khi gặp pattern phổ biến hoặc ca làm đổi số pilot.
 
 **Giới hạn đã biết** (S = có thể SÓT, N = có thể NHẦM):
 - Đối tượng Excel truyền qua tham số không khai `As Excel.*` (Object/Variant): S.
@@ -168,7 +168,7 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - Code không chạy tới (nhánh chết, procedure không được gọi) vẫn được tính: N (phân tích tĩnh).
 - Biến không khai báo (không `Option Explicit`) trùng tên biến module ở procedure khác: có thể N.
 - `With` chứa nhiều cấp đối tượng lồng nhau: S.
-- Khối `With Printer ... End With` (lệnh bắt đầu bằng dấu chấm): S.
+- Khối `With Printer ... End With` (lệnh bắt đầu bằng dấu chấm): S. `With cn` / `With rs` (biến trần): lệnh `.Execute`/`.Open`/`.AddNew`/`.Update`/`.Delete`/`.UpdateBatch` được đọc như `cn.` / `rs.` theo loại hiện tại của biến; `With` trên biểu thức (`With a.b`) chỉ nhận đối tượng Excel: S.
 - ProgID có số phiên bản (`Excel.Application.8`): S (chỉ nhận `Excel.Application`).
 - `ActiveWorkbook.SaveAs` không có tiền tố đối tượng Excel đã biết: S.
 - `SELECT … INTO` / `INSERT INTO [Excel 8.0;…]` chạy trên connection thường (đích Excel nằm trong câu SQL): S.
@@ -176,6 +176,7 @@ Nhận diện là phân tích **từ vựng** (không chạy code, không có ki
 - `CreateObject("ADODB.Connection")` (late-bound) chưa được phân loại là connection: recordset mở trên nó vẫn giữ loại Excel đã gán trước đó: N.
 - Chuỗi `".rpt"` nằm trong phép so sánh (ví dụ `If Right(f, 4) = ".rpt"`) vẫn cho tín hiệu Crystal: N.
 - File tên `ErrorList.csv` bị loại trừ như log (từ `Error` trong tên): S (nhãn N trong ghi chú review là chưa đúng: file bị bỏ, không bị tính thêm).
+- Bằng chứng (dòng, procedure chấm độ phức tạp) của một file xuất Excel chỉ lấy từ procedure CÓ ghi; `Workbooks.Open`/`CreateObject` ở procedure chỉ đọc bị bỏ, số report theo file không đổi. Nếu đối tượng khởi tạo ở procedure khác (biến module) thì dòng ghi đầu tiên là bằng chứng. Ghi qua tham số/biến module ở procedure khác với nhiều procedure ghi: mức phức tạp lấy cao nhất trong các procedure ghi.
 - Ghi Excel qua mẫu (`Workbooks.Open("t.xlt")` rồi `CopyFromRecordset`/`Paste`/`PasteSpecial`/gán `.Formula`/`.Value`) được tính; chỉ định dạng (`.Interior.Color`, `.Font.Bold`, `.ColumnWidth`) không được tính.
 
 ### 6.3. Độ phức tạp từng report (`report-complexity-v2-draft`)

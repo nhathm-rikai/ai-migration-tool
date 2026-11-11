@@ -117,6 +117,16 @@ export const DOCUMENTS_API_OPERATIONS = {
     response: Type.Unknown(),
     errorCodes: [...RUN_READ_ERRORS, 'DOCUMENT_NOT_FOUND'],
   },
+  // TC02: the integration test specification of one program's package as
+  // the Japanese Excel (表紙 / テストシナリオ / カバレッジ), same rules.
+  exportItTestSpec: {
+    method: 'GET',
+    path: `${RunsPath}/:runId/items/:item/it-test-spec`,
+    params: PackageFileParamsSchemaWithoutFile,
+    querystring: EmptyQuerySchema,
+    response: Type.Unknown(),
+    errorCodes: [...RUN_READ_ERRORS, 'DOCUMENT_NOT_FOUND'],
+  },
   getReviewBoard: {
     method: 'GET',
     path: ReviewsPath,

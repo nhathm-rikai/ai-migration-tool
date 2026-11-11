@@ -16,6 +16,12 @@ export const jaMessages = {
       failed:
         '単体テスト仕様書の Excel を出力できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
     },
+    itExcel: {
+      download: 'Excel をダウンロード（結合テスト仕様書）',
+      busy: '出力中…',
+      failed:
+        '結合テスト仕様書の Excel を出力できませんでした。後でもう一度お試しください。ファイルは保存されていません。',
+    },
     language: '言語',
     session: {
       pending: 'ローカルバックエンドに接続しています…',
@@ -900,6 +906,11 @@ export const jaMessages = {
         detail:
           'ポータルのチェックリストに沿ってエージェントが分岐単位でケースを作成（Excel出力あり）',
       },
+      'it-test-spec': {
+        name: '結合テスト仕様書',
+        detail:
+          'ポータルのチェックリストに沿ってエージェントが結合シナリオを作成（共通モジュール・DB連携・帳票・他プログラム、Excel出力あり）',
+      },
     },
     companion: '自動追加',
     always:
@@ -1054,6 +1065,7 @@ export const jaMessages = {
       'db-design': 'DB設計',
       'security-audit': 'セキュリティ監査',
       'ut-test-spec': '単体テスト仕様書',
+      'it-test-spec': '結合テスト仕様書',
     },
     comments: 'コメント',
     noComments: 'コメントはありません。',

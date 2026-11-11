@@ -136,6 +136,7 @@ function fakeApi(current: CurrentDocumentRunResponse) {
       }),
     ),
     utSpecExcel: vi.fn(),
+    itSpecExcel: vi.fn(),
     reviewBoard: vi.fn(),
     addReview: vi.fn(),
   } satisfies Record<keyof DocumentsApi, unknown>;
@@ -238,6 +239,25 @@ describe('DocumentsStep', () => {
       documents: ['business-rules', 'detail-design'],
       model: 'sonnet',
       outputLanguage: 'vi',
+    });
+  });
+
+  // TC02-AC05: the integration test specification is the seventh choice.
+  it('offers Test case IT and sends it with the other documents', async () => {
+    const api = fakeApi({ run: null, ...ready });
+    renderStep(api, 'src/CUSTOMER.VBP');
+    await screen.findByText('CUSTOMER');
+    expect(screen.getAllByRole('checkbox', { name: /Test case/ })).toHaveLength(
+      2,
+    );
+    fireEvent.click(screen.getByLabelText(/Test case IT/));
+    // It pulls no other document in.
+    expect(screen.queryByText('sinh kèm')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Bắt đầu generate/ }));
+    await waitFor(() => expect(api.start).toHaveBeenCalledTimes(1));
+    expect(api.start.mock.calls[0]?.[2]).toMatchObject({
+      programs: ['src/CUSTOMER.VBP'],
+      documents: ['business-rules', 'it-test-spec'],
     });
   });
 

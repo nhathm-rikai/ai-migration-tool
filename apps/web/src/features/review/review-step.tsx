@@ -22,7 +22,7 @@ import { useLocale } from '../../shared/i18n/locale-context';
 import type { Messages } from '../../shared/i18n/vi';
 import { hasErrorCode, runRequestErrorMessage } from '../jobs/run-messages';
 import { downloadMarkdown } from '../documents/download-markdown';
-import { UtExcelButton } from '../documents/ut-excel-button';
+import { SpecExcelButton } from '../documents/ut-excel-button';
 import {
   countUnresolvedPoints,
   isUnresolvedHeading,
@@ -433,8 +433,9 @@ export function ReviewStep({
                         {messages.documents.downloadMd}
                       </button>
                     )}
-                    {file && file.name === 'ut-test-spec.md' && (
-                      <UtExcelButton
+                    {file && (
+                      <SpecExcelButton
+                        fileName={file.name}
                         api={api}
                         projectId={projectId}
                         runId={current.program.runId}

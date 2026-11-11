@@ -23,8 +23,11 @@ import { AppError } from '../../shared/app-error.js';
 import { requestFingerprint as fingerprint } from '../jobs/job.service.js';
 import type { DocumentJobControl } from './document-dispatcher.js';
 import { programName, SPEC_TASK_VERSION } from './spec-context.js';
+import { buildItChecklist } from '../analysis/it-checklist.js';
 import { buildUtChecklist } from '../analysis/ut-checklist.js';
 import { SheetLimitError, writeXlsx } from '../inventory-report/xlsx-writer.js';
+import { parseItSpec } from './it-spec.js';
+import { itSpecSheets } from './it-spec-workbook.js';
 import { parseUtSpec } from './ut-spec.js';
 import { utSpecSheets } from './ut-spec-workbook.js';
 import type { DocumentRunRepository } from './document-run.repository.js';
@@ -295,6 +298,57 @@ export function createDocumentRunService(deps: {
             }),
           ),
           fileName: `単体テスト仕様書_${checklist.program}.xlsx`,
+        };
+      } catch (error) {
+        if (error instanceof SheetLimitError)
+          throw new AppError('REPORT_TOO_LARGE');
+        throw error;
+      }
+    },
+
+    // TC02: the same for the integration test specification.
+    async itSpecExcel(
+      projectId: string,
+      runId: string,
+      itemIndex: string,
+      reviewOf: (file: {
+        name: string;
+        sha256: string;
+      }) => 'approved' | 'pending',
+    ): Promise<{ bytes: Uint8Array; fileName: string }> {
+      const file = await this.packageFile(
+        projectId,
+        runId,
+        itemIndex,
+        'it-test-spec.md',
+      );
+      const run = findRun(projectId, runId);
+      const item = run.items[Number(itemIndex)];
+      const inventory = await deps.loadInventory(projectId, run.inventory);
+      const program = inventory.programs.find(
+        (entry) => entry.projectPath === item?.program,
+      );
+      const parsed = parseItSpec(file.content);
+      if (!item || !program || !parsed)
+        throw new AppError('DOCUMENT_NOT_FOUND');
+      const checklist = buildItChecklist(inventory, program.projectPath);
+      try {
+        return {
+          bytes: writeXlsx(
+            itSpecSheets({
+              program: program.projectPath,
+              runId: run.id,
+              sha256: file.sha256,
+              specPack: run.config.specPack,
+              createdAt: item.finishedAt ?? run.updatedAt,
+              model: run.config.model,
+              runner: run.config.runner,
+              review: reviewOf({ name: file.name, sha256: file.sha256 }),
+              scenarios: parsed.scenarios,
+              checklist,
+            }),
+          ),
+          fileName: `結合テスト仕様書_${checklist.program}.xlsx`,
         };
       } catch (error) {
         if (error instanceof SheetLimitError)

@@ -37,7 +37,7 @@ type Level = 'low' | 'medium' | 'high' | 'very-high' | 'unrated';
 // inventory stored with an older one has no CSV / Excel detection, no log
 // exclusion and no complexity for the code print / export reports, and
 // cannot be derived: it needs an analysis again.
-export const SCREEN_REPORT_VERSION = 'screen-report-v4';
+export const SCREEN_REPORT_VERSION = 'screen-report-v5';
 //
 // The report complexity model has its own version (AR06): scores stored by an
 // older model are never recomputed on read, so an older one also needs a new

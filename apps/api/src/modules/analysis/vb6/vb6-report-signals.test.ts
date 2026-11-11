@@ -20,30 +20,6 @@ describe('AR04-AC02 report signals in VB6 code', () => {
       ['    f = App.Path & "\\reports\\daily.rpt"'],
       'reports/daily.rpt',
     ],
-    [
-      'excel',
-      [
-        '    Set xl = CreateObject("Excel.Application")',
-        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
-      ],
-      'Excel.Application',
-    ],
-    [
-      'excel',
-      [
-        '    Set xl = GetObject(, "Excel.Application")',
-        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
-      ],
-      'Excel.Application',
-    ],
-    [
-      'excel',
-      [
-        '    Dim xl As New Excel.Application',
-        '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
-      ],
-      'Excel.Application',
-    ],
     ['print', ['    Printer.Print "hello"'], 'Printer'],
     ['print', ['    Printer.EndDoc'], 'Printer'],
     ['print', ['    Me.PrintForm'], 'PrintForm'],
@@ -52,6 +28,18 @@ describe('AR04-AC02 report signals in VB6 code', () => {
   ])('positive %s: %j', (kind, lines, name) => {
     expect(scan(...lines)).toEqual([
       expect.objectContaining({ kind, name, line: 1 }),
+    ]);
+  });
+
+  // The evidence of an Excel export is the line that writes (here line 2), not
+  // the line that creates or opens Excel.
+  it.each([
+    ['    Set xl = CreateObject("Excel.Application")'],
+    ['    Set xl = GetObject(, "Excel.Application")'],
+    ['    Dim xl As New Excel.Application'],
+  ])('positive excel at the write line: %s', (create) => {
+    expect(scan(create, '    xl.ActiveSheet.Cells(1, 1).Value = "x"')).toEqual([
+      { kind: 'excel', name: 'Excel', line: 2 },
     ]);
   });
 
@@ -175,7 +163,7 @@ describe('output signals for the output-function list', () => {
         '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       ),
-    ).toEqual([{ kind: 'excel', name: 'EXCEL.EXE', line: 1 }]);
+    ).toEqual([{ kind: 'excel', name: 'Excel', line: 3 }]);
     expect(scan('    Shell "notepad.exe " & f')).toEqual([]);
   });
 });
@@ -251,7 +239,7 @@ describe('CSV and Excel output signals', () => {
   it('detects an Excel workbook object, file and ADO source', () => {
     expect(scan('    Set wb = xl.Workbooks.Add')[0]).toMatchObject({
       kind: 'excel',
-      name: 'Workbooks',
+      name: 'Excel',
     });
     expect(
       scan(
@@ -261,7 +249,7 @@ describe('CSV and Excel output signals', () => {
       )[0],
     ).toMatchObject({
       kind: 'excel',
-      name: 'Excel file',
+      name: 'Excel',
     });
     expect(
       scan(
@@ -269,7 +257,7 @@ describe('CSV and Excel output signals', () => {
         '    Dim xl As Excel.Application',
         '    xl.ActiveSheet.Cells(1, 1).Value = "x"',
       )[0],
-    ).toMatchObject({ kind: 'excel', name: 'Excel (ADO)' });
+    ).toMatchObject({ kind: 'excel', name: 'Excel' });
     expect(
       scan(
         '    Shell "excel.exe " & f',

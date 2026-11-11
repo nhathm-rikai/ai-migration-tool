@@ -10,6 +10,17 @@
 - **Pilot cùng snapshot** (`2e0db2e5…ebe68`, 175 report = 63 + 104 + 8): trước (`8c85d1b`) và sau cùng phân bố **thấp 18, trung bình 36, cao 24, rất cao 97**; không report nào đổi mức. Điểm: 2 tăng, 168 giữ, 5 giảm. Tổng điểm yếu tố lời gọi 261 → 256, rẽ nhánh 340 → 342 (mẫu Crystal gộp nhiều program), số procedure gốc 459 → 461.
 - Kiểm chứng (Windows x64, Node 24.16.0): lint, typecheck, test (contracts 73, API 973, web 395), `verify-repository` pass. Chưa chạy lại e2e, chưa macOS/Linux. Chưa push.
 
+## 11/11/2026 (7) — Review ngoài tại 3117ff6: 2 lỗi P2 (nhánh fix/report-signal-write-evidence-v2)
+
+- **P2 #1 (đã tái hiện):** hai procedure cùng ghi Excel (tham số `As Excel.Workbook`, không có `CreateObject`): đặt procedure đơn giản trước thì mức `low`/0 điểm, đảo thứ tự thì `medium`/4 điểm; cùng 1 report. Nguyên nhân: khi không còn tín hiệu Excel nào, chỉ giữ dòng ghi đầu tiên của cả file. Sửa: ghi nhận dòng ghi đầu tiên của TỪNG procedure ghi, mỗi procedure một tín hiệu `Excel`, bỏ tín hiệu mở/tạo Excel khi đã biết có ghi; vẫn gộp thành một report của file; AR06 chấm trên hợp các procedure ghi. Thêm ca chấp nhận trước (3 ca fail), các test đang ghim tên tín hiệu cũ (`Workbooks`, `Excel file`, `EXCEL.EXE`) cập nhật sang dòng ghi.
+- **P2 #2:** test web AR06-AC01 ghim cứng `screen-report-v4`: dùng `SCREEN_REPORT_VERSION`. Giới hạn "ghi Excel ở mức module" của §6.2b không còn (mức module là procedure 0, có dòng ghi riêng); bỏ khỏi danh sách.
+
+## 11/11/2026 (6) — Hotfix 2 lỗi P2 nhận diện Excel (nhánh fix/report-signal-write-evidence)
+
+- **P2 #1:** khi file đã có ghi Excel, mọi tín hiệu Excel được giữ, kể cả `Workbooks.Open`/`CreateObject` ở procedure chỉ đọc, nên dòng đại diện (chấm độ phức tạp) có thể rơi vào procedure đọc. Sửa: chỉ giữ tín hiệu Excel ở procedure có ghi; nếu không còn tín hiệu nào thì đặt tại dòng ghi đầu tiên. Số report theo file không đổi.
+- **P2 #2:** `With cn` … `.Execute "UPDATE …"` trên connection Excel ra 0 còn `cn.Execute` ra 1. Sửa: stack `With` nhớ tên biến; lệnh bắt đầu bằng `.Member` đọc như `tên.Member` theo loại hiện tại của biến (excel-conn / excel-rs), áp dụng cho Execute/Open/AddNew/Update/Delete/UpdateBatch.
+- Thêm ca chấp nhận TRƯỚC (5 ca fail trên master), rồi sửa. `SCREEN_REPORT_VERSION` = `screen-report-v5` vì inventory đã lưu có thể cho kết quả khác; cập nhật test/fixture/spec §6.2a, §6.2b. Chưa push, chưa merge; không đổi ngưỡng hay cách đếm tổng.
+
 ## 11/11/2026 (5) — AR06: mô hình độ phức tạp report v2 (`report-complexity-v2-draft`)
 
 - **Quyết định của người dùng (ghi trước khi làm):** độ sâu call graph 2 tầng; không đi lên handler (giữ giới hạn "gọi trước ở nơi khác" trong Cơ sở tính); ngưỡng in/vẽ đề xuất làm cấu hình ban đầu (in nội dung 20/60/120 → 1/2/3 điểm, vẽ đường/khung 10/30/60 → 1/2/3 điểm, yếu tố = `min(3, in + vẽ)`); procedure dùng chung được tính đủ trong từng report; chạy pilot trước/sau và **không tự đổi ngưỡng hay cách đếm tổng report** theo kết quả pilot.

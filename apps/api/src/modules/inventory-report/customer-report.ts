@@ -1,24 +1,22 @@
 import {
   crudTables,
+  deriveReportSummary,
   inventoryKpis,
   sqlUses,
   normalizeScreenReportTotals,
   type SourceInventoryDocument,
 } from '@portal/contracts';
+import { CUSTOMER_REPORT_VERSION } from './customer-report-constants.js';
 import {
-  CONFIDENCE_LABELS,
-  CUSTOMER_REPORT_VERSION,
-  FACTOR_LABELS,
-  LEVEL_LABELS,
-  REASON_LABELS,
-  RECOMMENDATIONS,
-  REPORT_KIND_LABELS,
-  SHARED_MODULE,
-  UNASSIGNED_MODULE,
-} from './customer-report-constants.js';
+  reportText,
+  type ItemTypeCode,
+  type Lang,
+  type ReportText,
+} from './customer-report-text.js';
 import {
   OTHER_RISK_CODE,
   RISK_CATALOG,
+  riskCatalog,
   type RiskSeverity,
 } from './customer-risk-catalog.js';
 import {
@@ -46,7 +44,6 @@ export type ModuleRow = {
   programs: number;
   screens: number;
   reports: number;
-  suspectedReports: number;
   batches: number;
   files: number;
   codeLines: number;
@@ -58,7 +55,8 @@ export type RiskRow = {
   // taken from the data (external components, native APIs).
   source: 'warning' | 'data';
   category: string;
-  severity: RiskSeverity;
+  // The label in the language of the report (高／中／低, Cao／Trung bình／Thấp).
+  severity: string;
   count: number;
   content: string;
   programs: string[];
@@ -67,7 +65,9 @@ export type RiskRow = {
 };
 
 export type ItemRow = {
-  type: '画面' | '帳票' | 'バッチ';
+  // The label in the language of the report: 画面／帳票／バッチ／出力機能 in
+  // Japanese (出力機能 = file output that is not counted as a report).
+  type: string;
   kindLabel: string;
   programs: string;
   module: string;
@@ -81,13 +81,17 @@ export type ItemRow = {
   levelLabel: string | null;
   score: number | null;
   modelVersion: string | null;
+  // Where the report is made (reports only), a number so a sheet can show it.
+  usages: number | null;
+  // How a report is made (crystal, data-report, print, export); null otherwise.
+  reportKind: string | null;
   factors: string;
   note: string;
 };
 
 export type CustomerReport = {
   reportVersion: typeof CUSTOMER_REPORT_VERSION;
-  language: 'ja';
+  language: Lang;
   source: InventoryReport['source'];
   scale: {
     programs: number;
@@ -105,7 +109,24 @@ export type CustomerReport = {
     // The table names rest on an assumed or unconfirmed schema mapping.
     tablesAssumed: boolean;
     // null: the inventory has no screen/report data (not zero).
+    // reports.counted / rows = the reports of the system (Crystal / DataReport
+    // templates, files that print in code, files that export CSV / Excel);
+    // reports.suspected is 0. The split is in `reportBreakdown`.
     screenReport: ScreenReportTotals | null;
+    // The counting rule behind the number of reports; null when the inventory
+    // has no screen/report data (not zero).
+    reportBreakdown: {
+      total: number;
+      crystal: number;
+      designFile: number;
+      missingFile: number;
+      print: number;
+      export: number;
+      // Other file output, listed and not counted; log / temporary files left
+      // out of both.
+      dataFiles: number;
+      excluded: number;
+    } | null;
   };
   modules: ModuleRow[];
   complexity: {
@@ -191,7 +212,10 @@ export function buildRisks(
     count: 0,
     programIds: [],
   },
+  lang: Lang = 'ja',
 ): RiskRow[] {
+  const t = reportText(lang);
+  const catalog = riskCatalog(lang);
   type Group = { count: number; programs: Set<string>; known: boolean };
   const groups = new Map<string, Group>();
   const add = (
@@ -210,8 +234,7 @@ export function buildRisks(
     groups.set(code, group);
   };
   for (const warning of warnings) {
-    const known =
-      warning.code in RISK_CATALOG && warning.code !== OTHER_RISK_CODE;
+    const known = warning.code in catalog && warning.code !== OTHER_RISK_CODE;
     add(
       known ? warning.code : OTHER_RISK_CODE,
       warning.programIds ?? (warning.programId ? [warning.programId] : []),
@@ -231,14 +254,14 @@ export function buildRisks(
     }
   const rows: RiskRow[] = [];
   const push = (code: string, source: RiskRow['source'], group: Group) => {
-    const entry = RISK_CATALOG[code] ?? RISK_CATALOG[OTHER_RISK_CODE];
+    const entry = catalog[code] ?? catalog[OTHER_RISK_CODE];
     if (!entry) throw new Error('risk catalog has no fallback');
     const programs = [...group.programs].sort(byText);
     rows.push({
       code,
       source,
       category: entry.category,
-      severity: entry.severity,
+      severity: t.severity[entry.severity],
       count: group.count,
       content: entry.content,
       programs: programs.slice(0, MAX_LISTED_PROGRAMS),
@@ -260,11 +283,14 @@ export function buildRisks(
       programs: new Set(concatenatedSql.programIds),
       known: true,
     });
+  // Ranked by the internal severity code, not by the label of the language.
+  const rank = (row: RiskRow) =>
+    SEVERITY_ORDER.indexOf(
+      (RISK_CATALOG[row.code] ?? RISK_CATALOG[OTHER_RISK_CODE])?.severity ??
+        '中',
+    );
   return rows.sort(
-    (a, b) =>
-      SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity) ||
-      b.count - a.count ||
-      byText(a.code, b.code),
+    (a, b) => rank(a) - rank(b) || b.count - a.count || byText(a.code, b.code),
   );
 }
 
@@ -339,7 +365,9 @@ function unsupportedWarnings(inventory: Inventory): RiskWarning[] {
 export function buildCustomerReport(
   inventory: Inventory,
   origin: ReportOrigin | null = null,
+  lang: Lang = 'ja',
 ): CustomerReport {
+  const t = reportText(lang);
   const core = buildInventoryReport(inventory, ALL_PROGRAMS, origin);
   // The unique totals are those of the whole inventory, every analyzed file
   // (also one no project lists), exactly what step 2 shows; the technical
@@ -354,15 +382,48 @@ export function buildCustomerReport(
   // names and files and stays out of the customer JSON; the items of sheet 6
   // are built from it with redacted paths.
   const normalized = normalizeScreenReportTotals(inventory);
+  // Reports are counted once each: a template name, a form that prints, a
+  // form that exports (the rows of the technical report are signs: the same
+  // template named in two procedures is two rows there).
+  const reportSummary = normalized ? deriveReportSummary(inventory) : undefined;
+  const reportByKind = (): ScreenReportTotals['reports']['byKind'] => {
+    const byKind = {
+      'data-report': 0,
+      crystal: 0,
+      excel: 0,
+      print: 0,
+      'file-output': 0,
+      unknown: 0,
+    };
+    for (const report of reportSummary?.reports ?? [])
+      if (report.origin === 'crystal') byKind[report.kind ?? 'crystal'] += 1;
+      else if (report.origin === 'print') byKind.print += 1;
+      else byKind.excel += 1;
+    return byKind;
+  };
   const screenReport: ScreenReportTotals | null = normalized
     ? {
         screens: normalized.screens,
         sharedScreens: normalized.sharedScreens,
         batches: normalized.batches,
-        reports: normalized.reports,
-        suspectedPrograms: normalized.suspectedPrograms,
+        reports: reportSummary
+          ? {
+              rows: reportSummary.counts.total,
+              counted: reportSummary.counts.total,
+              suspected: 0,
+              byKind: reportByKind(),
+              byLevel: reportSummary.counts.byLevel,
+            }
+          : normalized.reports,
+        suspectedPrograms: 0,
       }
     : null;
+  const idOfPath = new Map(core.programs.map((p) => [p.projectPath, p.id]));
+  const idsOf = (paths: readonly string[]) =>
+    paths.flatMap((path) => {
+      const id = idOfPath.get(path);
+      return id === undefined ? [] : [id];
+    });
   const pathOf = new Map(core.programs.map((p) => [p.id, p.projectPath]));
   const moduleOfProgram = (id: string) => moduleOf(pathOf.get(id) ?? '');
 
@@ -388,7 +449,6 @@ export function buildCustomerReport(
         programs: 0,
         screens: 0,
         reports: 0,
-        suspectedReports: 0,
         batches: 0,
         files: 0,
         codeLines: 0,
@@ -397,14 +457,13 @@ export function buildCustomerReport(
     }
     return row;
   };
-  const sharedRow = moduleRow(SHARED_MODULE, 'shared');
+  const sharedRow = moduleRow(t.sharedModule, 'shared');
   sharedRow.files = sharedFiles.length;
   sharedRow.codeLines = sharedFiles.reduce(
     (sum, file) => sum + (file.counters?.codeLines ?? 0),
     0,
   );
   const seenScreens = new Set<string>();
-  const seenReports = new Set<string>();
   for (const program of inventory.programs) {
     const row = moduleRow(moduleOf(program.projectPath), 'module');
     row.programs += 1;
@@ -419,20 +478,16 @@ export function buildCustomerReport(
       seenScreens.add(key);
       (screen.shared ? sharedRow : row).screens += 1;
     }
-    for (const report of program.reports ?? []) {
-      const key = [
-        report.kind,
-        report.file,
-        report.line,
-        report.name.toLowerCase(),
-      ].join('\u0000');
-      if (seenReports.has(key)) continue;
-      seenReports.add(key);
-      const target = report.shared ? sharedRow : row;
-      if (report.confidence === 'suspected') target.suspectedReports += 1;
-      else target.reports += 1;
-    }
   }
+  // A report used by programs of one module belongs to that module; one used
+  // across modules goes on the shared row.
+  const rowOfPrograms = (paths: readonly string[]) => {
+    const names = new Set(paths.map((path) => moduleOf(path)));
+    const only = names.size === 1 ? [...names][0] : undefined;
+    return only === undefined ? sharedRow : moduleRow(only, 'module');
+  };
+  for (const report of reportSummary?.reports ?? [])
+    rowOfPrograms(report.programs).reports += 1;
   const rest = {
     files:
       inventory.totals.analyzedCodeFiles -
@@ -442,7 +497,7 @@ export function buildCustomerReport(
       [...modules.values()].reduce((sum, row) => sum + row.codeLines, 0),
   };
   if (rest.files > 0 || rest.codeLines > 0) {
-    const row = moduleRow(UNASSIGNED_MODULE, 'unassigned');
+    const row = moduleRow(t.unassignedModule, 'unassigned');
     row.files = Math.max(0, rest.files);
     row.codeLines = Math.max(0, rest.codeLines);
   }
@@ -477,8 +532,10 @@ export function buildCustomerReport(
       score: complexity.score,
       codeLines: program.counters.codeLines,
       screens: program.screens ? program.screens.length : null,
-      reports: program.reports
-        ? program.reports.filter((r) => r.confidence !== 'suspected').length
+      reports: reportSummary
+        ? reportSummary.reports.filter((r) =>
+            r.programs.includes(program.projectPath),
+          ).length
         : null,
     });
   }
@@ -500,7 +557,9 @@ export function buildCustomerReport(
   >();
   for (const ref of core.externalReferences) {
     if (ref.kind !== 'component' && ref.kind !== 'reference') continue;
-    const key = `${ref.kind}|${ref.identifier}|${ref.fileName ?? ''}`;
+    // One row per file name whatever its case (COMDLG32.OCX, comdlg32.ocx),
+    // counted over distinct programs.
+    const key = `${ref.kind}|${(ref.fileName ?? ref.identifier).toLowerCase()}`;
     const entry = components.get(key) ?? {
       kind: ref.kind,
       identifier: ref.identifier,
@@ -511,6 +570,8 @@ export function buildCustomerReport(
     };
     entry.ids.add(ref.programId);
     entry.programs = entry.ids.size;
+    if (!entry.description && ref.description)
+      entry.description = ref.description;
     components.set(key, entry);
   }
   const apis = new Map<
@@ -540,10 +601,10 @@ export function buildCustomerReport(
     for (const row of rows) {
       const label =
         row.usedBy.length > 1
-          ? SHARED_MODULE
+          ? t.sharedModule
           : row.usedBy[0] !== undefined
             ? moduleOfProgram(row.usedBy[0])
-            : UNASSIGNED_MODULE;
+            : t.unassignedModule;
       const kind =
         row.usedBy.length > 1
           ? 'shared'
@@ -577,7 +638,7 @@ export function buildCustomerReport(
 
   return {
     reportVersion: CUSTOMER_REPORT_VERSION,
-    language: 'ja',
+    language: lang,
     source: core.source,
     scale: {
       programs: inventory.programs.length,
@@ -595,6 +656,18 @@ export function buildCustomerReport(
       tablesView: !crud.analyzed ? null : crud.mapped ? 'normalized' : 'raw',
       tablesAssumed: crud.analyzed && crud.assumed,
       screenReport,
+      reportBreakdown: reportSummary
+        ? {
+            total: reportSummary.counts.total,
+            crystal: reportSummary.counts.crystal,
+            designFile: reportSummary.counts.designFile,
+            missingFile: reportSummary.counts.missingFile,
+            print: reportSummary.counts.print,
+            export: reportSummary.counts.export,
+            dataFiles: reportSummary.counts.dataFiles,
+            excluded: reportSummary.counts.excluded,
+          }
+        : null,
     },
     modules: moduleList,
     complexity: {
@@ -602,7 +675,7 @@ export function buildCustomerReport(
       levels,
       notAnalyzed,
       reportModelVersion: inventory.reportComplexityVersion ?? null,
-      reportLevels: screenReport ? screenReport.reports.byLevel : null,
+      reportLevels: reportSummary ? reportSummary.counts.byLevel : null,
       top: ranked.slice(0, TOP_PROGRAMS),
     },
     dependencies: {
@@ -653,8 +726,25 @@ export function buildCustomerReport(
         ...core.warnings.filter(
           (warning) =>
             warning.code !== 'DYNAMIC_SQL' &&
-            warning.code !== 'FILE_UNSUPPORTED',
+            // Definitions of the complexity, in the counting basis, not risks.
+            warning.code !== 'COMPLEXITY_REFERENCE_ONLY' &&
+            warning.code !== 'COMPLEXITY_DRAFT' &&
+            warning.code !== 'FILE_UNSUPPORTED' &&
+            warning.code !== 'REPORT_FILE_MISSING' &&
+            warning.code !== 'REPORT_SUSPECTED',
         ),
+        // One row per Crystal report whose design file is missing (the
+        // technical report warns once per sign).
+        ...(reportSummary?.reports ?? [])
+          .filter((report) => report.status === 'missing-file')
+          .map((report) => ({
+            code: 'REPORT_FILE_MISSING',
+            programId: null,
+            programIds: idsOf(report.programs),
+            relativePath: report.name,
+            line: null,
+            detail: report.name,
+          })),
         ...unsupportedWarnings(inventory),
         ...unlistedFileWarnings(inventory, usedByFile),
         ...dynamicRows.map((row) => ({
@@ -672,25 +762,25 @@ export function buildCustomerReport(
         count: concatenatedRows.length,
         programIds: concatenatedRows.flatMap((row) => row.usedBy),
       },
+      lang,
     ),
-    items: buildItems(inventory),
-    recommendations: RECOMMENDATIONS,
+    items: buildItems(inventory, reportSummary, t),
+    // No "next steps" in the report any more (kept empty for the contract).
+    recommendations: [],
   };
 }
 
 // ---- Screen and report list -----------------------------------------------
 
-const ITEM_TYPE_ORDER = ['画面', '帳票', 'バッチ'];
-const WARNING_LABELS: Record<string, string> = {
-  SCREEN_FILE_MISSING: '画面ファイルがソースにありません',
-  SCREEN_FILE_NOT_ANALYZED:
-    '画面ファイルを解析できません（画面数には含みます）',
-  REPORT_FILE_MISSING: '帳票定義ファイル(.rpt)がソースにありません',
-};
+const ITEM_TYPE_ORDER: ItemTypeCode[] = ['画面', '帳票', 'バッチ', '出力機能'];
+type ItemDraft = Omit<ItemRow, 'type'> & { type: ItemTypeCode };
 
-function buildItems(inventory: Inventory): ItemRow[] {
-  const projectReports = normalizeScreenReportTotals(inventory);
-  if (!projectReports) return [];
+function buildItems(
+  inventory: Inventory,
+  summary: ReturnType<typeof deriveReportSummary>,
+  t: ReportText,
+): ItemRow[] {
+  if (!summary) return [];
   type Owner = { label: string; module: string };
   const screens = new Map<
     string,
@@ -699,14 +789,7 @@ function buildItems(inventory: Inventory): ItemRow[] {
       owners: Owner[];
     }
   >();
-  const reports = new Map<
-    string,
-    {
-      row: NonNullable<Inventory['programs'][number]['reports']>[number];
-      owners: Owner[];
-    }
-  >();
-  const items: ItemRow[] = [];
+  const items: ItemDraft[] = [];
   for (const program of inventory.programs) {
     const owner = {
       label: programLabel(program.projectPath),
@@ -723,7 +806,7 @@ function buildItems(inventory: Inventory): ItemRow[] {
     if (program.programType === 'batch')
       items.push({
         type: 'バッチ',
-        kindLabel: 'バッチ（Sub Main 起動・画面なし）',
+        kindLabel: t.items.batchKind,
         programs: owner.label,
         module: owner.module,
         name: program.name ?? owner.label,
@@ -731,91 +814,137 @@ function buildItems(inventory: Inventory): ItemRow[] {
         line: null,
         shared: false,
         confidence: 'detected',
-        confidenceLabel: CONFIDENCE_LABELS['detected'] ?? '',
+        confidenceLabel: t.confidenceLabels['detected'] ?? '',
         level: null,
         levelLabel: null,
         score: null,
         modelVersion: null,
+        usages: null,
+        reportKind: null,
         factors: '',
         note: '',
       });
   }
-  // Reports come from the project-level list the analyzer computed once (a
-  // shared report at its highest score), never from the program rows.
-  for (const item of projectReports.reportItems)
-    reports.set(
-      [item.kind, item.file, item.line, item.name.toLowerCase()].join('\u0000'),
-      {
-        row: item,
-        owners: item.programs.map((entry) => ({
-          label: programLabel(entry.program),
-          module: moduleOf(entry.program),
-        })),
-      },
-    );
   const who = (owners: Owner[]) => {
     const labels = [...new Set(owners.map((o) => o.label))];
     return labels.length <= 3
-      ? labels.join('、')
-      : `${labels.slice(0, 3).join('、')} 他${labels.length - 3}件`;
+      ? labels.join(t.wb.joinPrograms)
+      : t.items.morePrograms(labels.slice(0, 3), labels.length - 3);
   };
   for (const { row, owners } of screens.values())
     items.push({
       type: '画面',
-      kindLabel: '画面（フォーム）',
+      kindLabel: t.items.screenKind,
       programs: who(owners),
-      module: row.shared ? SHARED_MODULE : (owners[0]?.module ?? ''),
+      module: row.shared ? t.sharedModule : (owners[0]?.module ?? ''),
       name: row.name ?? '',
       file: redactAbsolutePath(row.file),
       line: null,
       shared: row.shared,
       confidence: 'detected',
-      confidenceLabel: CONFIDENCE_LABELS['detected'] ?? '',
+      confidenceLabel: t.confidenceLabels['detected'] ?? '',
       level: null,
       levelLabel: null,
       score: null,
       modelVersion: null,
+      usages: null,
+      reportKind: null,
       factors: '',
-      note: row.warnings.map((code) => WARNING_LABELS[code] ?? code).join('；'),
+      note: row.warnings
+        .map((code) => t.warningLabels[code] ?? code)
+        .join(t.items.sep),
     });
-  for (const { row, owners } of reports.values()) {
-    const complexity = row.complexity;
-    const notes = [
-      ...(complexity.reason
-        ? [REASON_LABELS[complexity.reason] ?? complexity.reason]
-        : []),
-      ...row.warnings.map((code) => WARNING_LABELS[code] ?? code),
-    ];
+  const ownersOf = (paths: readonly string[]): Owner[] =>
+    paths.map((path) => ({
+      label: programLabel(path),
+      module: moduleOf(path),
+    }));
+  const moduleOfOwners = (owners: Owner[]) =>
+    new Set(owners.map((o) => o.module)).size === 1
+      ? (owners[0]?.module ?? '')
+      : t.sharedModule;
+  // One row per report: a template name, a form that prints, a form that
+  // exports.
+  for (const report of summary.reports) {
+    const owners = ownersOf(report.programs);
+    const first = report.usages[0];
+    const complexity = report.complexity;
     items.push({
       type: '帳票',
-      kindLabel: REPORT_KIND_LABELS[row.kind] ?? row.kind,
+      kindLabel:
+        report.origin === 'crystal'
+          ? (t.reportKindLabels[report.kind ?? 'crystal'] ?? 'Crystal Reports')
+          : (t.originLabels[report.origin] ?? report.origin),
       programs: who(owners),
-      module: row.shared ? SHARED_MODULE : (owners[0]?.module ?? ''),
-      name: redactAbsolutePath(row.name),
-      file: redactAbsolutePath(row.file),
-      line: row.line,
-      shared: row.shared,
-      confidence: row.confidence,
-      confidenceLabel: CONFIDENCE_LABELS[row.confidence] ?? row.confidence,
+      module: moduleOfOwners(owners),
+      name: redactAbsolutePath(report.name),
+      file: redactAbsolutePath(
+        report.designFile ?? report.file ?? first?.file ?? '',
+      ),
+      line: report.origin === 'crystal' ? null : (first?.line ?? null),
+      shared: owners.length > 1,
+      confidence: report.status ?? 'detected',
+      confidenceLabel:
+        report.status === null
+          ? (t.originLabels[report.origin] ?? '')
+          : t.templateStatus[report.status],
       level: complexity.level,
-      levelLabel: LEVEL_LABELS[complexity.level] ?? complexity.level,
+      levelLabel: t.levelLabels[complexity.level] ?? complexity.level,
       score: complexity.score,
       modelVersion: complexity.version,
+      usages: report.usages.length,
+      reportKind:
+        report.origin === 'crystal'
+          ? (report.kind ?? 'crystal')
+          : report.origin,
       factors: complexity.factors
         .map((f) =>
           f.factor === 'design-not-analyzed'
-            ? (FACTOR_LABELS[f.factor] ?? f.factor)
-            : `${FACTOR_LABELS[f.factor] ?? f.factor} ${f.value} (+${f.points})`,
+            ? (t.factorLabels[f.factor] ?? f.factor)
+            : `${t.factorLabels[f.factor] ?? f.factor} ${f.value} (+${f.points})`,
         )
-        .join('；'),
-      note: notes.join('；'),
+        .join(t.items.sep),
+      note: [
+        ...(complexity.reason
+          ? [t.reasonLabels[complexity.reason] ?? complexity.reason]
+          : []),
+        ...(report.status === 'missing-file'
+          ? [t.warningLabels['REPORT_FILE_MISSING'] ?? '']
+          : []),
+      ].join(t.items.sep),
     });
   }
-  return items.sort(
-    (a, b) =>
-      ITEM_TYPE_ORDER.indexOf(a.type) - ITEM_TYPE_ORDER.indexOf(b.type) ||
-      byText(a.module, b.module) ||
-      byText(a.file, b.file) ||
-      (a.line ?? 0) - (b.line ?? 0),
-  );
+  // Other file output: listed, not counted as a report.
+  for (const entry of summary.dataFiles) {
+    const owners = ownersOf(entry.programs);
+    items.push({
+      type: '出力機能',
+      kindLabel: t.items.dataFileKind,
+      programs: who(owners),
+      module: moduleOfOwners(owners),
+      name: entry.procedure ?? '',
+      file: redactAbsolutePath(entry.file),
+      line: entry.evidence[0]?.line ?? null,
+      shared: owners.length > 1,
+      confidence: 'suspected',
+      confidenceLabel: t.items.dataFileConfidence,
+      level: null,
+      levelLabel: null,
+      score: null,
+      modelVersion: null,
+      usages: null,
+      reportKind: null,
+      factors: '',
+      note: t.items.dataFileNote,
+    });
+  }
+  return items
+    .sort(
+      (a, b) =>
+        ITEM_TYPE_ORDER.indexOf(a.type) - ITEM_TYPE_ORDER.indexOf(b.type) ||
+        byText(a.module, b.module) ||
+        byText(a.file, b.file) ||
+        (a.line ?? 0) - (b.line ?? 0),
+    )
+    .map((item) => ({ ...item, type: t.itemType[item.type] }));
 }

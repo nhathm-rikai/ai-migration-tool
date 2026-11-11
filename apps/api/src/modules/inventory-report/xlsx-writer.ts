@@ -32,6 +32,23 @@ export type Sheet = {
   headingRows?: readonly number[];
   // Data rows (0-based) whose first cell links to the sheet it names.
   linkRows?: ReadonlyMap<number, string>;
+  // Data rows (0-based) that are plain section titles: bold text, no fill, no
+  // border. Used for sheets made of several tables (the customer report).
+  sectionRows?: readonly number[];
+  // Data rows (0-based) of plain text (default font, no border, may run on
+  // over the empty cells next to it); the first cell stays bold.
+  plainRows?: readonly number[];
+  // How many cells of each data row belong to its table; the cells after them
+  // are not written (no border, no fill), so a narrow table is not stretched
+  // to the widest one. 0 = a blank row, -1 = a thin blank row (a small gap
+  // between a title and its header). Default: every column.
+  rowSpans?: readonly number[];
+  // The first N data rows form the table the autofilter covers (a second
+  // table below it is not filtered). Default: all rows.
+  filterRows?: number;
+  // No header row, no frozen pane, no autofilter: the first data row follows
+  // the notes (sheets of several tables, each with its own header row).
+  noHeader?: boolean;
   // First column in bold (key/value layout).
   boldFirstColumn?: boolean;
   // Autofilter on the header; default on.
@@ -62,13 +79,15 @@ const STYLE = {
   wrapped: 9,
   link: 10,
   note: 11,
+  section: 12,
+  keyPlain: 13,
 } as const;
 
 // Excel limits per worksheet.
 export const MAX_SHEET_ROWS = 1_048_576;
 export const MAX_SHEET_COLUMNS = 16_384;
 // Widest column the layout asks for; longer text runs on (wrap is opt-in).
-export const MAX_COLUMN_WIDTH = 60;
+export const MAX_COLUMN_WIDTH = 100;
 const TITLE_ROWS = 2;
 
 export class SheetLimitError extends Error {
@@ -151,8 +170,13 @@ function cellXml(ref: string, value: CellValue, kind: CellKind): string {
 function sheetXml(sheet: Sheet): string {
   const width = sheet.columns.length;
   const headerRow = headerRowOf(sheet);
+  const noHeader = sheet.noHeader === true;
+  // Row of the first data row: after the header, or right after the notes.
+  const firstData = noHeader ? headerRow : headerRow + 1;
   const headings = new Set(sheet.headingRows ?? []);
   const subHeaders = new Set(sheet.subHeaderRows ?? []);
+  const sections = new Set(sheet.sectionRows ?? []);
+  const plains = new Set(sheet.plainRows ?? []);
   const rowsXml: string[] = [];
   if (sheet.title !== undefined) {
     rowsXml.push(
@@ -173,35 +197,54 @@ function sheetXml(sheet: Sheet): string {
       }),
     )
     .join('');
-  rowsXml.push(`<row r="${headerRow}">${header}</row>`);
+  if (!noHeader) rowsXml.push(`<row r="${headerRow}">${header}</row>`);
   sheet.rows.forEach((row, index) => {
-    const r = headerRow + 1 + index;
+    const r = firstData + index;
     if (row.length !== width)
       throw new Error(
         `Sheet ${sheet.name} row ${index + 2} has ${row.length} cells, expected ${width}`,
       );
     const heading = headings.has(index);
     const subHeader = subHeaders.has(index);
+    const section = sections.has(index);
+    const plain = plains.has(index);
+    const span = sheet.rowSpans?.[index] ?? width;
+    // A blank spacer row has no cells (a thin one is a short row).
+    if (span === -1) {
+      rowsXml.push(`<row r="${r}" ht="6" customHeight="1"/>`);
+      return;
+    }
+    if (span === 0) return;
     const cells = row
+      .slice(0, span)
       .map((value, c) => {
         const column = sheet.columns[c];
         const kind: CellKind = subHeader
           ? { text: STYLE.header, empty: STYLE.header }
-          : heading
-            ? { text: STYLE.heading, empty: STYLE.heading }
-            : sheet.linkRows?.has(index) && c === 0
-              ? { text: STYLE.link, empty: STYLE.text }
-              : c === 0 && sheet.boldFirstColumn
-                ? { text: STYLE.key, empty: STYLE.key }
-                : column?.wrap
-                  ? { text: STYLE.wrapped, empty: STYLE.text }
-                  : { text: STYLE.text, empty: STYLE.text };
+          : section
+            ? { text: STYLE.section, empty: STYLE.section }
+            : plain
+              ? c === 0
+                ? { text: STYLE.keyPlain, empty: 0 }
+                : { text: 0, empty: 0 }
+              : heading
+                ? { text: STYLE.heading, empty: STYLE.heading }
+                : sheet.linkRows?.has(index) && c === 0
+                  ? { text: STYLE.link, empty: STYLE.text }
+                  : c === 0 && sheet.boldFirstColumn
+                    ? { text: STYLE.key, empty: STYLE.key }
+                    : column?.wrap
+                      ? { text: STYLE.wrapped, empty: STYLE.text }
+                      : { text: STYLE.text, empty: STYLE.text };
         return cellXml(`${columnName(c)}${r}`, value, kind);
       })
       .join('');
     rowsXml.push(`<row r="${r}">${cells}</row>`);
   });
-  const lastRow = headerRow + sheet.rows.length;
+  const lastRow =
+    firstData +
+    Math.min(sheet.filterRows ?? sheet.rows.length, sheet.rows.length) -
+    1;
   const cols = sheet.columns
     .map(
       (column, c) =>
@@ -211,7 +254,7 @@ function sheetXml(sheet: Sheet): string {
   const links = [...(sheet.linkRows ?? [])]
     .map(
       ([index, target]) =>
-        `<hyperlink ref="A${headerRow + 1 + index}" location="${escapeXml(`'${target.replaceAll("'", "''")}'!A1`)}" display="${escapeXml(target)}"/>`,
+        `<hyperlink ref="A${firstData + index}" location="${escapeXml(`'${target.replaceAll("'", "''")}'!A1`)}" display="${escapeXml(target)}"/>`,
     )
     .join('');
   return (
@@ -221,7 +264,9 @@ function sheetXml(sheet: Sheet): string {
       ? `<sheetPr><tabColor rgb="${sheet.tabColor}"/></sheetPr>`
       : '') +
     '<sheetViews><sheetView workbookViewId="0" showGridLines="0">' +
-    `<pane ySplit="${headerRow}" topLeftCell="A${headerRow + 1}" activePane="bottomLeft" state="frozen"/>` +
+    (noHeader
+      ? ''
+      : `<pane ySplit="${headerRow}" topLeftCell="A${headerRow + 1}" activePane="bottomLeft" state="frozen"/>`) +
     '</sheetView></sheetViews>' +
     `<cols>${cols}</cols>` +
     `<sheetData>${rowsXml.join('')}</sheetData>` +
@@ -235,19 +280,22 @@ function sheetXml(sheet: Sheet): string {
 
 // Section headings and the index sheet are read, not filtered.
 const sheetFilters = (sheet: Sheet) =>
-  sheet.filter !== false && (sheet.headingRows ?? []).length === 0;
+  sheet.filter !== false &&
+  sheet.noHeader !== true &&
+  (sheet.headingRows ?? []).length === 0;
 
 const BORDER = 'borderId="1"';
 const STYLES_XML =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
   '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-  '<fonts count="6">' +
+  '<fonts count="7">' +
   '<font><sz val="11"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
   '<font><b/><sz val="16"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' +
   '<font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font>' +
   '<font><i/><sz val="10"/><color rgb="FF595959"/><name val="Calibri"/></font>' +
+  '<font><b/><sz val="12"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' +
   '</fonts>' +
   '<fills count="4"><fill><patternFill patternType="none"/></fill>' +
   '<fill><patternFill patternType="gray125"/></fill>' +
@@ -257,7 +305,7 @@ const STYLES_XML =
   '<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right>' +
   '<top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border></borders>' +
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-  '<cellXfs count="12">' +
+  '<cellXfs count="14">' +
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
   `<xf numFmtId="0" fontId="1" fillId="2" ${BORDER} xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>` +
   `<xf numFmtId="49" fontId="0" fillId="0" ${BORDER} xfId="0" quotePrefix="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
@@ -270,6 +318,8 @@ const STYLES_XML =
   `<xf numFmtId="0" fontId="0" fillId="0" ${BORDER} xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>` +
   `<xf numFmtId="0" fontId="4" fillId="0" ${BORDER} xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>` +
   '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+  '<xf numFmtId="0" fontId="6" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="bottom"/></xf>' +
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="left" vertical="top"/></xf>' +
   '</cellXfs>' +
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   '</styleSheet>';

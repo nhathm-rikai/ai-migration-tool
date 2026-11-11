@@ -346,22 +346,20 @@ export const viMessages = {
       kpis: {
         screens: 'Màn hình (画面)',
         screensSub: (shared: string) => `${shared} dùng chung, tính một lần`,
-        reports: 'Report (帳票) phát hiện',
-        reportsSub: (programs: string, suspected: string) =>
-          `${programs} program nghi có xuất report (${suspected} dòng nghi, không cộng vào tổng)`,
+        reports: 'Report theo quy ước Assessment',
+        reportsSub: (crystal: string, print: string, exports: string) =>
+          `Crystal ${crystal} · In bằng code ${print} · CSV/Excel ${exports}`,
+        reportsMissing: (missing: string) => `Thiếu file .rpt: ${missing}`,
         batches: 'Batch (バッチ)',
         batchesSub: 'Program không có form, khởi động bằng Sub Main',
         noData: 'Chưa có dữ liệu',
         noDataHelp:
           'Kết quả phân tích này được tạo trước khi có đếm màn hình, report và batch. Cần phân tích lại để có số liệu; Portal không hiện 0 thay cho dữ liệu chưa có.',
       },
-      reference: (version: string | null) =>
-        version === null ? 'Tham khảo' : `Tham khảo · mô hình ${version}`,
       distribution: {
-        title: 'Phân bố report',
-        help: 'Mức phức tạp của từng report chỉ là phân loại tham khảo, chấm trên procedure chứa dòng gọi report; không phải effort.',
+        title: 'Độ phức tạp của report',
+        help: 'Độ phức tạp tính từ code tạo report (số nhánh, dòng thực thi, bảng truy cập, SQL động, lời gọi), chưa gồm thiết kế layout.',
         byLevel: 'Theo mức phức tạp',
-        byKind: 'Theo loại',
         total: 'Tổng',
         level: {
           low: 'Thấp',
@@ -370,14 +368,54 @@ export const viMessages = {
           'very-high': 'Rất cao',
           unrated: 'Chưa đánh giá',
         },
-        kind: {
-          'data-report': 'DataReport / ActiveReports',
-          crystal: 'Crystal Reports',
-          excel: 'Xuất Excel (nghi)',
-          print: 'In (nghi)',
-          'file-output': 'Ghi file (nghi)',
-          unknown: 'Chưa xác định (nghi)',
+      },
+      reports: {
+        title: 'Danh sách report',
+        help: 'Mỗi dòng là một đơn vị report theo Cơ sở tính.',
+        none: 'Không tìm thấy report nào.',
+        originFilter: 'Tạo bằng',
+        columns: {
+          name: 'Report',
+          origin: 'Tạo bằng',
+          status: 'File thiết kế',
+          programs: 'Program',
+          uses: 'Nơi dùng',
+          complexity: 'Phức tạp',
+          details: 'Chi tiết nơi dùng',
         },
+        origin: {
+          crystal: 'Crystal Reports',
+          'data-report': 'DataReport',
+          print: 'In bằng code',
+          export: 'Xuất CSV/Excel',
+        },
+        status: {
+          'design-file': 'Có file',
+          'missing-file': 'Thiếu file',
+        },
+      },
+      dataFiles: {
+        title: 'Ghi file dữ liệu (không tính report)',
+        help: 'Không tính vào tổng (xem Cơ sở tính).',
+        excluded: (count: string) =>
+          `Đã loại ${count} chỗ ghi log/file tạm theo quy tắc nhận diện.`,
+        none: 'Không có.',
+        columns: {
+          program: 'Program',
+          kind: 'Loại',
+          location: 'Bằng chứng (file:dòng)',
+          procedure: 'Procedure',
+        },
+        kind: {
+          'file-output': 'Ghi file',
+          unknown: 'Thư viện report, không kèm mẫu',
+        },
+      },
+      usage: {
+        program: 'Program',
+        file: 'File',
+        line: 'Dòng',
+        procedure: 'Procedure',
       },
       list: {
         title: 'Danh sách report',
@@ -398,7 +436,7 @@ export const viMessages = {
           name: 'Tên',
           location: 'File:dòng',
           confidence: 'Tin cậy',
-          complexity: 'Phức tạp (tham khảo)',
+          complexity: 'Phức tạp',
         },
         sortBy: (label: string) => `Sắp xếp theo ${label}`,
         morePrograms: (count: string) => `và ${count} program khác`,
@@ -409,17 +447,33 @@ export const viMessages = {
         previous: 'Trang trước',
         next: 'Trang sau',
       },
-      confidence: {
-        detected: 'Phát hiện',
-        referenced: 'Tham chiếu',
-        suspected: 'Nghi có',
+      complexityDetail: {
+        title: 'Cách xác định độ phức tạp',
+        factor: 'Yếu tố',
+        measured: 'Giá trị đo',
+        points: 'Điểm cộng',
+        score: (score: string) => `Tổng điểm: ${score}`,
+        scope: {
+          title: 'Procedure được chấm',
+          procedure: 'Tên procedure',
+          file: 'File',
+          tier: 'Vị trí',
+          tiers: {
+            '0': 'Gốc (tạo/gọi report)',
+            '1': 'Được gọi, tầng 1',
+            '2': 'Được gọi, tầng 2',
+          } as Record<string, string>,
+          unresolved: (count: string) =>
+            `Lời gọi chưa phân giải (không suy đoán, không đổi điểm): ${count}`,
+          printOps: (content: string, drawing: string, position: string) =>
+            `Lệnh in/vẽ: in nội dung ${content}, vẽ đường/khung ${drawing}, đặt vị trí ${position} (không cộng điểm)`,
+        },
       },
       reasons: {
-        SUSPECTED: 'Chỉ là dấu hiệu, chưa biết có bao nhiêu mẫu report',
         NO_PROCEDURE:
           'Không xác định được procedure chứa dòng report nên không chấm',
         DESIGN_NOT_ANALYZED_FLOOR:
-          'Thiết kế report chưa được phân tích; chỉ chấm phần code gọi và không xếp mức thấp',
+          'Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình',
       } as Record<string, string>,
       factors: {
         decisionPoints: 'Điểm rẽ nhánh',
@@ -427,10 +481,11 @@ export const viMessages = {
         tables: 'Bảng truy cập',
         dynamicSql: 'SQL động / ghép chuỗi',
         calls: 'Lời gọi procedure khác',
+        printDensity: 'Mật độ lệnh in/vẽ',
         'design-not-analyzed': 'Thiết kế chưa phân tích',
       } as Record<string, string>,
       warnings: {
-        REPORT_FILE_MISSING: 'Thiếu file .rpt trong source: cần khách cung cấp',
+        REPORT_FILE_MISSING: 'Thiếu file .rpt trong source',
         SCREEN_FILE_MISSING: 'Thiếu file form trong source',
         SCREEN_FILE_NOT_ANALYZED: 'File form chưa phân tích được',
       } as Record<string, string>,
@@ -452,11 +507,9 @@ export const viMessages = {
           name: 'Tên',
           location: 'File:dòng',
           confidence: 'Tin cậy',
-          complexity: 'Phức tạp (tham khảo)',
+          complexity: 'Phức tạp',
           notes: 'Ghi chú',
         },
-        suspectedNote:
-          'Dòng "Nghi có" chỉ là dấu hiệu program có thể xuất report; không cộng vào tổng report.',
       },
     },
     dashboard: {
@@ -477,8 +530,7 @@ export const viMessages = {
           `Sau ánh xạ · giả định schema ${schema}`,
         tablesRaw: 'Tên như trong source',
         high: 'Program High + Very High',
-        highSub: (analyzed: string) =>
-          `trên ${analyzed} program đã phân tích · tham khảo`,
+        highSub: (analyzed: string) => `trên ${analyzed} program đã phân tích`,
       },
       analysedAt: (time: string) => `Phân tích xong lúc ${time}`,
       files: (count: string) => `${count} file`,
@@ -652,6 +704,8 @@ export const viMessages = {
       UNCLASSIFIED_LINES: 'Có dòng chưa phân loại được.',
       TABLE_NAMES_NOT_CONFIRMED: 'Ánh xạ tên bảng chưa được xác nhận.',
       COMPLEXITY_DRAFT: 'Công thức độ phức tạp là bản nháp.',
+      SCREEN_REPORT_OUTDATED:
+        'Kết quả phân tích này dùng bộ nhận diện report cũ: chưa có số CSV/Excel, chưa loại log/file tạm và chưa có độ phức tạp của report in bằng code, hoặc độ phức tạp report chưa chấm theo phạm vi call graph hiện hành. Cần phân tích lại.',
     } satisfies Record<AssessmentWarning, string>,
     programs: {
       title: 'Danh sách program',
@@ -665,6 +719,7 @@ export const viMessages = {
       none: 'Kiểm kê không có program nào.',
       notAnalyzed: 'Chưa phân tích',
       rawTables: (count: string) => `(gốc: ${count})`,
+      outputShort: (count: string) => `+${count} in/xuất`,
       draft: 'Nháp',
       declaredName: (name: string) => `Tên trong project: ${name}`,
       sortBy: (column: string) => `Sắp xếp theo ${column}`,
@@ -678,18 +733,20 @@ export const viMessages = {
         kind: 'Loại',
         state: 'Trạng thái',
         ownCodeLines: 'LoC riêng',
-        codeLines: 'LoC + dùng chung',
-        procedures: 'Procedure riêng',
-        tables: 'Số bảng',
+        codeLines: 'LoC + chung',
+        procedures: 'Procedure',
+        tables: 'Bảng',
         screens: 'Màn hình',
         reports: 'Report',
         complexity: 'Độ phức tạp',
       },
       columnHints: {
         codeLines:
-          'LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+          'LoC + dùng chung: LoC gồm cả file dùng chung (file dùng chung tính ở mỗi program khai báo nó)',
+        procedures: 'Procedure riêng',
+        tables: 'Số bảng',
         complexity:
-          'Độ phức tạp tham khảo; báo giá nháp dùng mức này làm hệ số',
+          'Độ phức tạp của program; báo giá nháp dùng mức này làm hệ số',
       },
       state: {
         complete: 'Đầy đủ',
@@ -1175,7 +1232,7 @@ export const viMessages = {
       `Team ${devs} dev · ${months} tháng`,
     moduleTitle: 'Chi tiết theo module',
     shareNote:
-      'Bấm module để xem các program, bấm program (hoặc dòng đầu trong module) để xem effort theo hạng mục. Complexity chỉ để tham khảo, không làm hệ số',
+      'Bấm module để xem các program, bấm program (hoặc dòng đầu trong module) để xem effort theo hạng mục. Complexity không được dùng làm hệ số tính effort.',
     itemsTitle: 'Effort theo hạng mục',
     toggleRow: 'mở / đóng chi tiết',
     items: {

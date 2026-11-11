@@ -6,6 +6,8 @@ export * from './local-session.schema.js';
 export * from './folder-picker.schema.js';
 export * from './source-inventory.schema.js';
 export * from './screen-report-items.js';
+export * from './report-counting-basis.js';
+export * from './report-templates.js';
 export * from './table-mapping.js';
 export * from './table-schema-statement.js';
 export * from './inventory-kpis.js';

@@ -2,6 +2,7 @@ import { SOURCE_INVENTORY_SCHEMA_VERSION } from '@portal/contracts';
 import type {
   CodeFileAnalysis,
   CodeReference,
+  OutputOperation,
   SourceFileRole,
   LineCounters,
   ProjectExternalReference,
@@ -28,6 +29,7 @@ import {
   designerReportRow,
   REPORT_COMPLEXITY_VERSION,
   SCREEN_REPORT_VERSION,
+  type ProcedureFacts,
   type ProgramReport,
   type ProgramScreen,
   type ProgramType,
@@ -349,6 +351,64 @@ export function buildSourceInventory(input: {
       (path) => path !== null && knownFiles.has(path.toLowerCase()),
     );
   };
+  // What a report score reads from any procedure of the source (AR06): its
+  // size, tables, SQL places and print / draw statements. A report is scored
+  // over the procedures it calls, which may be in other files.
+  const procedureFacts = new Map<string, ProcedureFacts>();
+  for (const [path, lines] of codeLines) {
+    const analysis = files.get(path)?.analysis;
+    if (analysis?.status !== 'analyzed') continue;
+    const byProcedure = <T extends { procedureId: string | null }>(
+      list: readonly T[],
+    ) => {
+      const grouped = new Map<string, T[]>();
+      for (const item of list)
+        if (item.procedureId !== null)
+          grouped.set(item.procedureId, [
+            ...(grouped.get(item.procedureId) ?? []),
+            item,
+          ]);
+      return grouped;
+    };
+    const tables = byProcedure(analysis.sqlTables);
+    const dynamic = byProcedure(analysis.dynamicSql);
+    const concatenated = byProcedure(analysis.concatenatedSql);
+    const operations = new Map<string, OutputOperation[]>();
+    for (const operation of analyzer.findOutputOperations(path, lines)) {
+      const owner = analysis.procedures.find(
+        (procedure) =>
+          procedure.startLine <= operation.line &&
+          operation.line <= procedure.endLine,
+      );
+      if (owner)
+        operations.set(owner.id, [
+          ...(operations.get(owner.id) ?? []),
+          operation,
+        ]);
+    }
+    for (const procedure of analysis.procedures) {
+      const own = operations.get(procedure.id) ?? [];
+      const count = (group: OutputOperation['group']) =>
+        own.filter((operation) => operation.group === group).length;
+      procedureFacts.set(procedure.id, {
+        decisionPoints: procedure.decisionPoints,
+        executableLines: procedure.executableLines,
+        tables: (tables.get(procedure.id) ?? []).map((access) =>
+          access.table.toLowerCase(),
+        ),
+        dynamicSql: [
+          ...(dynamic.get(procedure.id) ?? []),
+          ...(concatenated.get(procedure.id) ?? []),
+        ].map((use) => `${path}:${use.line}`),
+        printOps: {
+          content: count('content'),
+          drawing: count('drawing'),
+          position: count('position'),
+        },
+        dynamicCalls: count('dynamic-call'),
+      });
+    }
+  }
   const rowsByFile = new Map<string, FileReport[]>();
   for (const [path, lines] of codeLines) {
     const analysis = files.get(path)?.analysis;
@@ -431,9 +491,17 @@ export function buildSourceInventory(input: {
       // Procedures this program resolves from a procedure (call graph of the
       // program, not names of the whole corpus).
       const resolvedCalls = new Map<string, Set<string>>();
+      // Calls that stay unresolved here: the name matches several procedures
+      // or a native library one. Not followed, only counted.
+      const unresolvedCalls = new Map<string, number>();
       for (const call of analysis.calls) {
-        if (call.resolution !== 'local' && call.resolution !== 'program')
+        if (call.resolution === 'ambiguous' || call.resolution === 'external') {
+          unresolvedCalls.set(
+            call.from,
+            (unresolvedCalls.get(call.from) ?? 0) + 1,
+          );
           continue;
+        }
         const targets = resolvedCalls.get(call.from) ?? new Set<string>();
         for (const target of call.targets)
           if (target !== call.from) targets.add(target);
@@ -447,7 +515,12 @@ export function buildSourceInventory(input: {
         rowsByFile,
         context: {
           designExists,
-          callsOf: (procedureId) => resolvedCalls.get(procedureId)?.size ?? 0,
+          factsOf: (procedureId) => procedureFacts.get(procedureId),
+          calleesOf: (procedureId) => [
+            ...(resolvedCalls.get(procedureId) ?? []),
+          ],
+          unresolvedCallsOf: (procedureId) =>
+            unresolvedCalls.get(procedureId) ?? 0,
         },
         members: members.map((member) => {
           const relative = analyzer.toRelativeMemberPath(member.declaredPath);

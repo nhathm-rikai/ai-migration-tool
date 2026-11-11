@@ -61,7 +61,7 @@ const Level = Type.Union([
 
 export const CustomerReportSchema = Type.Object({
   reportVersion: Type.Literal(CUSTOMER_REPORT_VERSION),
-  language: Type.Literal('ja'),
+  language: Type.Union([Type.Literal('ja'), Type.Literal('vi')]),
   source: Type.Object({
     origin: Nullable(Origin),
     snapshotHash: Type.String(),
@@ -88,7 +88,24 @@ export const CustomerReportSchema = Type.Object({
     // The table names rest on an assumed schema mapping (AR02 review 1).
     tablesAssumed: Type.Optional(Type.Boolean()),
     // null: the inventory has no screen/report data (not zero).
+    // reports.counted / rows = the reports of the system (Crystal / DataReport
+    // templates, files that print in code, files that export CSV / Excel);
+    // reports.suspected is 0. The split is in reportBreakdown.
     screenReport: Nullable(ScreenReportTotals),
+    reportBreakdown: Type.Optional(
+      Nullable(
+        Type.Object({
+          total: Count,
+          crystal: Count,
+          designFile: Count,
+          missingFile: Count,
+          print: Count,
+          export: Count,
+          dataFiles: Count,
+          excluded: Count,
+        }),
+      ),
+    ),
   }),
   modules: Type.Array(
     Type.Object({
@@ -101,7 +118,6 @@ export const CustomerReportSchema = Type.Object({
       programs: Count,
       screens: Count,
       reports: Count,
-      suspectedReports: Count,
       batches: Count,
       files: Count,
       codeLines: Count,
@@ -183,11 +199,8 @@ export const CustomerReportSchema = Type.Object({
       code: Type.String(),
       source: Type.Union([Type.Literal('warning'), Type.Literal('data')]),
       category: Type.String(),
-      severity: Type.Union([
-        Type.Literal('高'),
-        Type.Literal('中'),
-        Type.Literal('低'),
-      ]),
+      // The label in the language of the report (高／中／低, Cao／Trung bình／Thấp).
+      severity: Type.String(),
       count: Count,
       content: Type.String(),
       programs: Type.Array(Type.String()),
@@ -197,11 +210,8 @@ export const CustomerReportSchema = Type.Object({
   ),
   items: Type.Array(
     Type.Object({
-      type: Type.Union([
-        Type.Literal('画面'),
-        Type.Literal('帳票'),
-        Type.Literal('バッチ'),
-      ]),
+      // The label in the language of the report (画面／帳票／出力機能／バッチ, ...).
+      type: Type.String(),
       kindLabel: Type.String(),
       programs: Type.String(),
       module: Type.String(),
@@ -215,6 +225,8 @@ export const CustomerReportSchema = Type.Object({
       levelLabel: Nullable(Type.String()),
       score: Nullable(Count),
       modelVersion: Nullable(Type.String()),
+      usages: Type.Optional(Nullable(Count)),
+      reportKind: Type.Optional(Nullable(Type.String())),
       factors: Type.String(),
       note: Type.String(),
     }),

@@ -20,7 +20,7 @@ import { REAL_WRITER_XLSX_BASE64 } from '../../testing/real-writer-xlsx';
 const projectId = FIXTURE_IDS.project;
 const runId = FIXTURE_IDS.runs.succeeded;
 const artifactId = FIXTURE_IDS.artifact;
-const reportUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=xlsx`;
+const reportUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=xlsx&lang=vi`;
 
 type Pending = {
   resolve: (response: Response) => void;

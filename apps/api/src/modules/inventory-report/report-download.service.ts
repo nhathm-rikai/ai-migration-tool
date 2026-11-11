@@ -1,5 +1,6 @@
 import {
   INVENTORY_REPORT_CONTENT_TYPES,
+  type CustomerReportLang,
   type InventoryReportFormat,
   type Project,
   type SourceInventoryArtifact,
@@ -73,15 +74,18 @@ export function reportFileName(
   return `assessment-${safeProjectName(projectName)}-${day}.${format}`;
 }
 
-// アセスメント報告書_<project>_<YYYYMMDD>.<ext> (the ASCII fallback of the
-// header keeps only letters and digits).
+// アセスメント報告書_<project>_<YYYYMMDD>.<ext> (Japanese) or
+// Bao-cao-Assessment_<project>_<YYYYMMDD>.<ext> (Vietnamese); the ASCII
+// fallback of the header keeps only letters and digits.
 export function customerReportFileName(
   projectName: string,
   date: Date,
   format: InventoryReportFormat,
+  lang: CustomerReportLang = 'ja',
 ): string {
   const day = date.toISOString().slice(0, 10).replaceAll('-', '');
-  return `アセスメント報告書_${safeProjectName(projectName)}_${day}.${format}`;
+  const prefix = lang === 'vi' ? 'Bao-cao-Assessment' : 'アセスメント報告書';
+  return `${prefix}_${safeProjectName(projectName)}_${day}.${format}`;
 }
 
 export function contentDisposition(fileName: string): string {
@@ -115,6 +119,7 @@ export function createReportDownloadService(deps: ReportDownloadDeps) {
       artifactId: string,
       version: string,
       format: InventoryReportFormat,
+      lang: CustomerReportLang = 'ja',
     ): Promise<ReportDownload> {
       const project = deps.projects.get(projectId);
       const artifact = await deps.artifacts.getVersion(
@@ -122,16 +127,25 @@ export function createReportDownloadService(deps: ReportDownloadDeps) {
         artifactId,
         version,
       );
-      const report = buildCustomerReport(artifact.payload, {
-        mode: artifact.mode,
-        projectId: artifact.projectId,
-        projectName: project.name,
-        runId: artifact.runId,
-        artifactId: artifact.id,
-        artifactVersion: artifact.version,
-        createdAt: artifact.createdAt,
-      });
-      const fileName = customerReportFileName(project.name, deps.now(), format);
+      const report = buildCustomerReport(
+        artifact.payload,
+        {
+          mode: artifact.mode,
+          projectId: artifact.projectId,
+          projectName: project.name,
+          runId: artifact.runId,
+          artifactId: artifact.id,
+          artifactVersion: artifact.version,
+          createdAt: artifact.createdAt,
+        },
+        lang,
+      );
+      const fileName = customerReportFileName(
+        project.name,
+        deps.now(),
+        format,
+        lang,
+      );
       return {
         body:
           format === 'xlsx'

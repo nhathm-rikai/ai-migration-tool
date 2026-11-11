@@ -77,18 +77,22 @@ afterEach(() => {
 });
 
 describe('AR04-AC06 KPI cards and program columns', () => {
-  it('matches the inventory: 3 screens (1 shared), 3 reports, 1 batch', async () => {
+  it('matches the inventory: 3 screens (1 shared), 5 reports, 1 batch', async () => {
     await open(screenReportCorpus());
     expect(within(kpi('screens')).getByText('3')).toBeTruthy();
     expect(kpi('screens').textContent).toContain('1 dùng chung');
-    expect(within(kpi('reports')).getByText('3')).toBeTruthy();
+    // One total over Crystal, code print and CSV/Excel export.
+    expect(within(kpi('reports')).getByText('5')).toBeTruthy();
     expect(kpi('reports').textContent).toContain(
-      '2 program nghi có xuất report',
+      'Crystal 3 · In bằng code 1 · CSV/Excel 1',
     );
+    expect(kpi('reports').textContent).toContain('Thiếu file .rpt: 1');
     expect(within(kpi('batches')).getByText('1')).toBeTruthy();
+    expect(document.querySelector('[data-kpi="exports"]')).toBeNull();
+    expect(document.querySelector('[data-kpi="prints"]')).toBeNull();
   });
 
-  it('shows screens and reports per program, suspected apart, and sorts', async () => {
+  it('shows screens and reports per program and sorts', async () => {
     await open(screenReportCorpus());
     const rowOf = (name: string) => {
       const row = screen.getByRole('button', { name }).closest('tr');
@@ -99,8 +103,8 @@ describe('AR04-AC06 KPI cards and program columns', () => {
       rowOf(name).querySelector(`[data-col="${col}"]`)?.textContent ?? '';
     expect(cell('Order', 'screens')).toBe('2');
     expect(cell('Order', 'reports')).toBe('2');
-    expect(cell('Invoice', 'reports')).toContain('2');
-    expect(cell('Invoice', 'reports')).toContain('+1?');
+    // bill.rpt, common.rpt and the CSV/Excel export of the form.
+    expect(cell('Invoice', 'reports')).toBe('3');
     expect(cell('Batch', 'screens')).toBe('0');
     fireEvent.click(
       screen.getByRole('button', { name: 'Sắp xếp theo Màn hình' }),
@@ -114,7 +118,7 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     expect(order().at(-1)).toBe('Batch');
   });
 
-  it('lists screens and reports with file:line and confidence in the program tab', async () => {
+  it('lists the screens and the reports of a program in its tab', async () => {
     await open(screenReportCorpus());
     fireEvent.click(screen.getByRole('button', { name: 'Invoice' }));
     fireEvent.click(screen.getByRole('tab', { name: /^Màn hình và report/ }));
@@ -122,14 +126,18 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     expect(within(screens).getByText('frmInvoice')).toBeTruthy();
     expect(within(screens).getByText('Dùng chung')).toBeTruthy();
     const reports = screen.getByTestId('program-reports');
+    expect(within(reports).getByText('common.rpt')).toBeTruthy();
+    expect(within(reports).getByText('bill.rpt')).toBeTruthy();
+    expect(within(reports).getByText('Xuất CSV/Excel')).toBeTruthy();
+    // The uses open from the row: file and line in their own columns.
+    fireEvent.click(within(reports).getByRole('button', { name: 'bill.rpt' }));
     expect(
-      within(reports).getByText('programs/Invoice/Invoice.bas:20'),
-    ).toBeTruthy();
-    expect(
-      within(reports).getByText(/Thiếu file \.rpt trong source/),
-    ).toBeTruthy();
-    expect(within(reports).getByText('Tham chiếu')).toBeTruthy();
-    expect(within(reports).getByText('Nghi có')).toBeTruthy();
+      within(reports).getAllByText('programs/Invoice/Invoice.bas').length,
+    ).toBeGreaterThan(0);
+    expect(within(reports).getAllByText('20').length).toBeGreaterThan(0);
+    expect(within(reports).getAllByText('Thiếu file').length).toBeGreaterThan(
+      0,
+    );
   });
 
   it('shows the same figures in Japanese', async () => {
@@ -137,16 +145,16 @@ describe('AR04-AC06 KPI cards and program columns', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     await waitFor(() => expect(kpi('screens').textContent).toContain('画面'));
     expect(kpi('screens').textContent).toContain('共通 1 件');
-    expect(kpi('reports').textContent).toContain('帳票（検出分）');
+    expect(kpi('reports').textContent).toContain('帳票数（算定基準による）');
+    expect(kpi('reports').textContent).toContain(
+      'Crystal 3 · コード印刷 1 · CSV・Excel出力 1',
+    );
     expect(kpi('batches').textContent).toContain('バッチ');
     fireEvent.click(screen.getByRole('button', { name: 'Invoice' }));
     fireEvent.click(screen.getByRole('tab', { name: /^画面と帳票/ }));
     const reports = screen.getByTestId('program-reports');
-    expect(within(reports).getByText('参照')).toBeTruthy();
-    expect(within(reports).getByText('疑い')).toBeTruthy();
-    expect(
-      within(reports).getByText(/ソースに \.rpt がありません/),
-    ).toBeTruthy();
+    expect(within(reports).getAllByText('なし').length).toBeGreaterThan(0);
+    expect(within(reports).getByText('CSV・Excel出力')).toBeTruthy();
   });
 });
 
@@ -173,95 +181,153 @@ describe('AR04-AC05 inventory without screen/report data', () => {
   });
 });
 
-describe('AR04-AC11/AC12 report distribution and list', () => {
+describe('AR04-AC11/AC12 one list of reports', () => {
   const openReports = async () => {
     await open(screenReportCorpus());
     fireEvent.click(screen.getByRole('tab', { name: /^Report \(帳票\)/ }));
   };
+  const rows = () =>
+    screen
+      .getByTestId('report-template-table')
+      .querySelectorAll('tbody tr.program-row');
 
-  it('keeps total by kind, by level and in the list equal, labelled as reference with its version', async () => {
+  it('counts every report once in the histogram and in the list', async () => {
     await openReports();
     expect(screen.getByTestId('report-rows-by-level').textContent).toBe('5');
-    expect(screen.getByTestId('report-rows-by-kind').textContent).toBe('5');
+    expect(rows()).toHaveLength(5);
+  });
+
+  it('a level raised by the missing design says so and shows no score as a rating', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
+    fireEvent.click(within(table).getByRole('button', { name: 'bill.rpt' }));
+    const detail = within(table).getByTestId('report-complexity-detail');
     expect(
-      screen.getByTestId('report-table').querySelectorAll('tbody tr'),
-    ).toHaveLength(5);
-    expect(screen.getByTestId('report-reference').textContent).toContain(
-      'Tham khảo · mô hình report-complexity-v1-draft',
-    );
-    const unrated = document.querySelector('[data-level="unrated"]');
-    expect(unrated?.textContent).toContain('Chưa đánh giá');
-    expect(unrated?.textContent).toContain('2');
+      within(detail).getByTestId('report-complexity-reason').textContent,
+    ).toBe('Chưa phân tích thiết kế .rpt nên mức tối thiểu là Trung bình');
+    expect(within(detail).queryByTestId('report-complexity-score')).toBeNull();
+    expect(within(detail).getByText('Bảng truy cập')).toBeTruthy();
   });
 
-  it('lists every report with file:line, confidence, level, score and factors in the tooltip', async () => {
+  it('AR06-AC11 the detail lists the scored procedures by tier, the print / draw statements and the unresolved calls', async () => {
     await openReports();
-    const table = screen.getByTestId('report-table');
-    expect(within(table).getByText('programs/Order/Order.bas:12')).toBeTruthy();
-    const high = within(table).getByText(/^Cao · 7/);
-    expect(high.getAttribute('title')).toContain('Điểm rẽ nhánh: 30 → +3');
-    expect(high.getAttribute('title')).toContain('Thiết kế chưa phân tích');
-    // A shared report appears once, for both programs.
+    const table = screen.getByTestId('report-template-table');
+    const row = within(table).getByRole('button', { name: 'order.rpt' });
+    fireEvent.click(row);
+    const scope = within(table).getByTestId('report-complexity-scope');
+    expect(within(scope).getByText('Sub:Show')).toBeTruthy();
+    expect(within(scope).getByText('Sub:LoadOrder')).toBeTruthy();
+    expect(within(scope).getByText('Gốc (tạo/gọi report)')).toBeTruthy();
+    expect(within(scope).getByText('Được gọi, tầng 1')).toBeTruthy();
+    expect(within(scope).getByText('Được gọi, tầng 2')).toBeTruthy();
+    expect(
+      within(scope).getByTestId('report-complexity-print-ops').textContent,
+    ).toBe(
+      'Lệnh in/vẽ: in nội dung 25, vẽ đường/khung 4, đặt vị trí 7 (không cộng điểm)',
+    );
+    expect(
+      within(scope).getByTestId('report-complexity-unresolved').textContent,
+    ).toContain('2');
+  });
+
+  it('AR06-AC11 a report stored by v1 has no scope section', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
+    fireEvent.click(within(table).getByRole('button', { name: 'bill.rpt' }));
+    expect(within(table).queryByTestId('report-complexity-scope')).toBeNull();
+  });
+
+  it('lists a shared template once with its design-file state, and opens its uses from the row', async () => {
+    await openReports();
+    const table = screen.getByTestId('report-template-table');
     expect(within(table).getAllByText('common.rpt')).toHaveLength(1);
-    expect(within(table).getByText('Order, Invoice')).toBeTruthy();
-    const unrated = within(table).getAllByText(/^Chưa đánh giá/)[0];
-    expect(unrated?.textContent).toContain('Chỉ là dấu hiệu');
+    expect(within(table).getByText('Invoice, Order')).toBeTruthy();
+    expect(within(table).getByText('Thiếu file')).toBeTruthy();
+    // The list shows the level only: no score, no factors.
+    const high = within(table).getByText('Cao');
+    expect(high.getAttribute('title')).toBeNull();
+    expect(table.textContent).not.toMatch(/(Cao|Trung bình|Thấp) · [0-9]/);
+    expect(document.body.textContent).not.toContain('report-complexity-v1');
+    const highRow = high.closest('tr');
+    if (!highRow) throw new Error('row');
+    const toggle = within(highRow).getByRole('button');
+    fireEvent.click(toggle);
+    // The score and each factor (measured value and points) are in the detail.
+    const detail = within(table).getByTestId('report-complexity-detail');
+    expect(within(detail).getByText('Điểm rẽ nhánh')).toBeTruthy();
+    expect(detail.textContent).toContain('30');
+    expect(detail.textContent).toContain('+3');
+    expect(
+      within(detail).getByTestId('report-complexity-score').textContent,
+    ).toBe('Tổng điểm: 7');
+    expect(within(table).getAllByText(/.bas$/).length).toBeGreaterThan(0);
+    expect(
+      within(table).getByRole('columnheader', { name: 'Procedure' }),
+    ).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('filters by level and kind and sorts by complexity with unrated last', async () => {
+  it('has one "Cơ sở tính" block with the conventions, and no word of doubt', async () => {
     await openReports();
-    const table = () => screen.getByTestId('report-table');
-    const names = () =>
-      Array.from(table().querySelectorAll('tbody tr')).map(
-        (row) => row.querySelectorAll('td')[2]?.textContent,
-      );
-    expect(names()).toEqual([
-      'common.rpt',
-      'order.rpt',
-      'bill.rpt',
-      'Excel.Application',
-      'Printer',
-    ]);
-    fireEvent.change(screen.getByLabelText('Mức phức tạp'), {
-      target: { value: 'high' },
-    });
-    expect(names()).toEqual(['order.rpt']);
-    fireEvent.change(screen.getByLabelText('Mức phức tạp'), {
-      target: { value: 'all' },
-    });
-    fireEvent.change(screen.getByLabelText('Độ tin cậy'), {
-      target: { value: 'suspected' },
-    });
-    expect(names()).toEqual(['Excel.Application', 'Printer']);
-    fireEvent.change(screen.getByLabelText('Độ tin cậy'), {
-      target: { value: 'all' },
-    });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Sắp xếp theo Phức tạp (tham khảo)' }),
-    );
-    // Ascending: lowest score first, unrated still last.
-    expect(names()).toEqual([
-      'bill.rpt',
-      'order.rpt',
-      'common.rpt',
-      'Excel.Application',
-      'Printer',
-    ]);
+    const basis = screen.getByTestId('report-basis');
+    expect(basis.textContent).toContain('Cơ sở tính');
+    for (const id of [
+      'template',
+      'file-unit',
+      'overlap',
+      'other-output',
+      'log-temp',
+      'complexity',
+    ])
+      expect(basis.querySelector(`[data-basis="${id}"]`)).not.toBeNull();
+    expect(basis.textContent).toContain('sales/Detail.rpt');
+    expect(basis.textContent).toContain('không bảo đảm loại hết');
+    expect(basis.textContent).toContain('chưa gồm thiết kế layout');
+    const text = document.body.textContent ?? '';
+    expect(text).not.toContain('Giả định:');
+    for (const word of ['tham khảo', 'cần xác nhận', 'chưa chứng minh'])
+      expect(text).not.toContain(word);
+    expect(text).not.toMatch(/(?<!\p{L})nghi(?!\p{L})/u);
   });
 
-  it('shows the list in Japanese', async () => {
+  it('filters by how the report is made and by name', async () => {
+    await openReports();
+    fireEvent.change(screen.getByLabelText('Tạo bằng'), {
+      target: { value: 'print' },
+    });
+    expect(rows()).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Tạo bằng'), {
+      target: { value: 'all' },
+    });
+    fireEvent.change(screen.getByLabelText('Tìm report'), {
+      target: { value: 'bill' },
+    });
+    expect(rows()).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('report-template-table')).getByText('bill.rpt'),
+    ).toBeTruthy();
+  });
+
+  it('keeps file output that is not a report in a folded section', async () => {
+    await openReports();
+    expect(screen.getByTestId('data-file-count').textContent).toBe('0');
+  });
+
+  it('shows the tab in Japanese', async () => {
     await openReports();
     fireEvent.click(screen.getByRole('button', { name: 'ja' }));
     await waitFor(() =>
-      expect(screen.getByTestId('report-reference').textContent).toContain(
-        '参考値',
+      expect(screen.getByTestId('report-basis').textContent).toContain(
+        '算定基準',
       ),
     );
-    expect(screen.getByTestId('report-reference').textContent).toContain(
-      '参考値 · モデル report-complexity-v1-draft',
+    expect(screen.getByTestId('report-basis').textContent).toContain(
+      '換算単位',
     );
-    const table = screen.getByTestId('report-table');
-    expect(within(table).getAllByText(/^未評価/)).toHaveLength(2);
-    expect(within(table).getByText(/^高 · 7/)).toBeTruthy();
+    expect(
+      within(screen.getByTestId('report-template-table')).getByText(
+        'コード印刷',
+      ),
+    ).toBeTruthy();
   });
 });

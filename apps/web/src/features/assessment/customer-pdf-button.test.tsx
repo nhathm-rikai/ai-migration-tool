@@ -21,7 +21,7 @@ import {
 const projectId = FIXTURE_IDS.project;
 const runId = FIXTURE_IDS.runs.succeeded;
 const artifactId = FIXTURE_IDS.artifact;
-const jsonUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=json`;
+const jsonUrl = `/api/v1/projects/${projectId}/artifacts/${artifactId}/versions/1/customer-report?format=json&lang=vi`;
 
 function reportResponse() {
   const report = customerReportFixture();
@@ -80,7 +80,7 @@ describe('Customer PDF button (AR03)', () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(calls).toContain(jsonUrl);
     const [name, blob] = save.mock.calls[0] ?? [];
-    expect(name).toMatch(/^アセスメント報告書_デモ受注管理_\d{8}\.pdf$/);
+    expect(name).toMatch(/^Bao-cao-Assessment_デモ受注管理_\d{8}\.pdf$/);
     expect(blob?.type).toBe('application/pdf');
     expect(renderPdf).toHaveBeenCalledTimes(1);
     // The document is drawn from the JSON that was read.
@@ -97,7 +97,7 @@ describe('Customer PDF button (AR03)', () => {
     render(view());
     fireEvent.click(await button());
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
-    expect(save.mock.calls[0]?.[0]).toMatch(/^アセスメント報告書_/);
+    expect(save.mock.calls[0]?.[0]).toMatch(/^Bao-cao-Assessment_/);
     expect(save.mock.calls[1]?.[0]).toMatch(/^[A-Za-z0-9._-]+.pdf$/);
     expect(screen.queryByRole('alert')).toBeNull();
   });

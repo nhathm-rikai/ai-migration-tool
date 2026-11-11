@@ -13,8 +13,13 @@ export const SIDE = 42;
 // Pixels per CSS pixel; lowered for a very long document (canvas limit).
 const MAX_SCALE = 3;
 const MAX_PIXELS = 15000;
+// "Sharp" documents (the assessment report) are drawn page by page at this
+// scale (about 290 dpi on A4), whatever their length.
+const SHARP_SCALE = 3;
 const FONT =
   '"Yu Gothic", "Meiryo", "Hiragino Sans", "Noto Sans JP", sans-serif';
+const FOOTER_FONT =
+  '"Yu Gothic UI", "Segoe UI", "Meiryo", "Hiragino Sans", "Noto Sans JP", sans-serif';
 
 const ns = 'http://www.w3.org/1999/xhtml';
 
@@ -34,6 +39,29 @@ export type A4Options = {
   pageBreakBeforeSelector?: string;
   // The logo image of the document, if it has one, is inlined.
   logoUrl?: string;
+  // Draw every page from its own slice of the document at a fixed high scale
+  // instead of one tall image (whose scale falls as the document grows), so
+  // a long document stays sharp. The quote keeps the original path.
+  sharp?: boolean;
+  // JPEG quality of the pages (default 0.95).
+  jpegQuality?: number;
+  // Lay the document out page by page in the DOM before it is drawn: items
+  // are measured and placed on A4 pages, so no table row, card, paragraph or
+  // heading is ever cut by a page edge; a long table is split between rows
+  // with its header repeated; a heading never ends a page alone. Each page is
+  // then drawn from its own markup (implies a sharp, page by page drawing).
+  paginate?: PaginateOptions;
+};
+
+export type PaginateOptions = {
+  // Elements whose children are the flow items (any other child of the
+  // document root is an item itself).
+  containers: string;
+  // Items that stay on the page of the item that follows them (a heading, its
+  // note, then the block under it).
+  keepWithNext: string;
+  // Blocks with a table that may be split between its rows.
+  splittable: string;
 };
 
 // Rules of the stylesheets that style the document, so they can travel
@@ -80,7 +108,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function toBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+function toBytes(
+  canvas: HTMLCanvasElement,
+  quality = 0.95,
+): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -90,7 +121,7 @@ function toBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
           .then((buffer) => resolve(new Uint8Array(buffer)));
       },
       'image/jpeg',
-      0.95,
+      quality,
     );
   });
 }
@@ -122,6 +153,193 @@ function forcedBreaks(root: HTMLElement, options: A4Options): number[] {
     .map((element) => Math.floor(element.getBoundingClientRect().top - top))
     .filter((y) => y > 0)
     .sort((a, b) => a - b);
+}
+
+// What the layout did, for a check of it (see __a4Probe).
+export type PaginationInfo = {
+  room: number;
+  rowsBefore: number;
+  rowsAfter: number;
+  // How many times the pages were laid out (1 = the first try fitted).
+  attempts: number;
+  // overflow: 1 when anything is drawn past the room; bottom: the lowest row
+  // drawn, in page pixels.
+  pages: { height: number; fill: number; overflow: number; bottom: number }[];
+};
+
+const MIN_SPLIT_ROWS = 2;
+// Room kept free on a page while laying it out, tried in turn until the pages
+// drawn as images fit (see renderA4Pdf); the image is drawn this much taller
+// than the room so an overrun can be seen.
+const PAGINATE_SLACKS = [0, 24, 48, 80, 120, 180, 260];
+const OVERRUN = 300;
+
+// Places the items of the document on pages of `room` pixels, in the frame's
+// DOM. Returns the page elements (the original root is removed).
+function paginateDom(
+  root: HTMLElement,
+  room: number,
+  options: A4Options,
+  paginate: PaginateOptions,
+): { pages: HTMLElement[]; rowsBefore: number } {
+  const rowsBefore = root.querySelectorAll('tbody tr').length;
+  type Item = { element: HTMLElement; breakBefore: boolean };
+  const items: Item[] = [];
+  for (const child of Array.from(root.children) as HTMLElement[]) {
+    if (child.matches(paginate.containers)) {
+      const forced =
+        options.pageBreakBeforeSelector !== undefined &&
+        child.matches(options.pageBreakBeforeSelector);
+      (Array.from(child.children) as HTMLElement[]).forEach((element, index) =>
+        items.push({ element, breakBefore: forced && index === 0 }),
+      );
+    } else items.push({ element: child, breakBefore: false });
+  }
+  // A heading and its note travel with the item after them.
+  const groups: { items: Item[]; breakBefore: boolean }[] = [];
+  let pending: Item[] = [];
+  for (const item of items) {
+    pending.push(item);
+    if (item.element.matches(paginate.keepWithNext)) continue;
+    groups.push({
+      items: pending,
+      breakBefore: pending.some((entry) => entry.breakBefore),
+    });
+    pending = [];
+  }
+  if (pending.length > 0)
+    groups.push({
+      items: pending,
+      breakBefore: pending.some((entry) => entry.breakBefore),
+    });
+
+  const shell = root.cloneNode(false) as HTMLElement;
+  shell.style.display = 'flow-root';
+  const pages: HTMLElement[] = [];
+  const parent = root.parentNode as HTMLElement | null;
+  root.remove();
+  const newPage = () => {
+    const page = shell.cloneNode(false) as HTMLElement;
+    parent?.append(page);
+    pages.push(page);
+    return page;
+  };
+  const height = (page: HTMLElement) => page.getBoundingClientRect().height;
+  const fits = (page: HTMLElement) => height(page) <= room + 0.5;
+  let page = newPage();
+  const empty = () => page.children.length === 0;
+  const startPage = () => {
+    if (!empty()) page = newPage();
+  };
+
+  // A block with a table: as many rows as fit on this page (at least two),
+  // then the rest on the next pages with the header again.
+  // A block with a table: as many rows as fit on this page (at least two)
+  // go in a copy of the block on this page; the rest stays in block (with
+  // its header) for the next page. Returns the rows left, or -1 when the
+  // block cannot be split here (the page is left as it was).
+  const splitBlock = (block: HTMLElement): number => {
+    const table = block.querySelector('table');
+    const body = table?.querySelector('tbody');
+    if (!table || !body) return -1;
+    const rows = Array.from(body.children) as HTMLElement[];
+    if (rows.length <= MIN_SPLIT_ROWS) return -1;
+    const part = block.cloneNode(true) as HTMLElement;
+    const partBody = part.querySelector('tbody');
+    if (!partBody) return -1;
+    partBody.replaceChildren();
+    page.append(part);
+    let taken = 0;
+    for (const row of rows) {
+      partBody.append(row);
+      if (!fits(page)) {
+        body.prepend(row);
+        break;
+      }
+      taken += 1;
+    }
+    if (taken < MIN_SPLIT_ROWS) {
+      for (const row of Array.from(partBody.children).reverse())
+        body.prepend(row);
+      part.remove();
+      return -1;
+    }
+    // Do not leave a single row (often the total) alone on the next page.
+    if (rows.length - taken === 1 && taken > MIN_SPLIT_ROWS) {
+      const last = partBody.lastElementChild;
+      if (last) body.prepend(last);
+    }
+    return body.children.length;
+  };
+  // What is left of a split block goes on the next page, without its title.
+  const continueOnNextPage = (block: HTMLElement) => {
+    page = newPage();
+    block.querySelector('h3')?.remove();
+    placeBlock(block);
+  };
+  function placeBlock(block: HTMLElement) {
+    page.append(block);
+    if (fits(page)) return;
+    block.remove();
+    const splittable =
+      block.matches(paginate.splittable) &&
+      block.querySelector('table') !== null;
+    if (splittable && !empty()) {
+      const left = splitBlock(block);
+      if (left > 0) return continueOnNextPage(block);
+      if (left === 0) return;
+    }
+    if (!empty()) {
+      page = newPage();
+      page.append(block);
+      if (fits(page) || !splittable) return;
+      block.remove();
+    }
+    // Taller than a page: split it from the top of a fresh page.
+    if (splittable) {
+      const left = splitBlock(block);
+      if (left > 0) return continueOnNextPage(block);
+      if (left === 0) return;
+    }
+    page.append(block);
+  }
+
+  for (const group of groups) {
+    if (group.breakBefore) startPage();
+    const elements = group.items.map((entry) => entry.element);
+    // The whole group on this page, or on a new one.
+    for (const element of elements) page.append(element);
+    if (fits(page)) continue;
+    for (const element of elements) element.remove();
+    const last = elements[elements.length - 1];
+    const lead = elements.slice(0, -1);
+    const splittable =
+      last?.matches(paginate.splittable) === true &&
+      last.querySelector('table') !== null;
+    // Try the heading, its note and the first rows of the table here.
+    if (splittable && last && !empty()) {
+      for (const element of lead) page.append(element);
+      if (fits(page)) {
+        const left = splitBlock(last);
+        if (left === 0) continue;
+        if (left > 0) {
+          continueOnNextPage(last);
+          continue;
+        }
+      }
+      for (const element of lead) element.remove();
+    }
+    startPage();
+    for (const element of lead) page.append(element);
+    if (last) placeBlock(last);
+  }
+  for (const element of pages) element.style.display = 'flow-root';
+  // The first item of a page has no gap above it.
+  for (const element of pages) {
+    const first = element.firstElementChild as HTMLElement | null;
+    if (first) first.style.marginTop = '0';
+  }
+  return { pages: pages.filter((p) => p.children.length > 0), rowsBefore };
 }
 
 // [start, end] of the document that goes on each page.
@@ -242,22 +460,172 @@ export async function renderA4Pdf(
     frameDocument.body.append(root);
     await frameDocument.fonts?.ready;
     await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (options.paginate) {
+      const room = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
+      const SCALE = SHARP_SCALE;
+      // The page is drawn into an image taller than the room, so content that
+      // runs past it (text that wraps differently in the image than in the
+      // frame the pages were measured in) can be seen, not just clipped.
+      const drawn = room + OVERRUN;
+      const pageSvg = (page: HTMLElement) =>
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${drawn * SCALE}" viewBox="0 0 ${PAGE_W} ${drawn}">` +
+        `<foreignObject width="${PAGE_W}" height="${drawn}">` +
+        `<div xmlns="${ns}"><style>${escapeText(css)}</style>${new XMLSerializer().serializeToString(page)}</div>` +
+        '</foreignObject></svg>';
+      // The lowest row (in page pixels) with anything drawn on it.
+      const scratch = document.createElement('canvas');
+      scratch.width = PAGE_W * SCALE;
+      scratch.height = drawn * SCALE;
+      const scratchContext = scratch.getContext('2d', {
+        willReadFrequently: true,
+      });
+      if (!scratchContext) throw new Error('The page could not be drawn.');
+      const lowestInk = (image: HTMLImageElement) => {
+        scratchContext.fillStyle = '#ffffff';
+        scratchContext.fillRect(0, 0, scratch.width, scratch.height);
+        scratchContext.drawImage(image, 0, 0);
+        const top = Math.max(0, (room - 160) * SCALE);
+        const data = scratchContext.getImageData(
+          0,
+          top,
+          scratch.width,
+          scratch.height - top,
+        ).data;
+        for (let row = scratch.height - top - 1; row >= 0; row -= 1) {
+          const at = row * scratch.width * 4;
+          for (let x = 0; x < scratch.width; x += 2)
+            if (
+              Math.min(
+                data[at + x * 4] ?? 255,
+                data[at + x * 4 + 1] ?? 255,
+                data[at + x * 4 + 2] ?? 255,
+              ) < 244
+            )
+              return Math.ceil((top + row + 1) / SCALE);
+        }
+        return 0;
+      };
+      // Lay the pages out with a little more room kept free each time until
+      // every page, drawn as it will be, fits (a browser that wraps a line
+      // differently in the image than in the frame is then still safe).
+      const pristine = root.cloneNode(true) as HTMLElement;
+      root.remove();
+      type Placed = {
+        element: HTMLElement;
+        image: HTMLImageElement;
+        bottom: number;
+      };
+      let placed: Placed[] = [];
+      let laid: { pages: HTMLElement[]; rowsBefore: number } | null = null;
+      let attempts = 0;
+      for (const slack of PAGINATE_SLACKS) {
+        attempts += 1;
+        const working = pristine.cloneNode(true) as HTMLElement;
+        frameDocument.body.append(working);
+        laid = paginateDom(working, room - slack, options, options.paginate);
+        placed = [];
+        for (const element of laid.pages) {
+          const image = await loadImage(
+            `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pageSvg(element))}`,
+          );
+          placed.push({ element, image, bottom: lowestInk(image) });
+        }
+        if (placed.every((entry) => entry.bottom <= room - 2)) break;
+        // Too tight: take the pages away and try again with more room free.
+        if (slack !== PAGINATE_SLACKS[PAGINATE_SLACKS.length - 1])
+          for (const entry of placed) entry.element.remove();
+      }
+      if (!laid) throw new Error('The report could not be laid out.');
+      // Never save a PDF with a page that still runs past its room (a row
+      // taller than a page, or a browser that keeps wrapping differently): fail
+      // so the button shows an error and no file is downloaded.
+      if (!placed.every((entry) => entry.bottom <= room - 2))
+        throw new Error('The report could not be laid out without overflow.');
+      const rendered: { jpeg: Uint8Array; width: number; height: number }[] =
+        [];
+      const info: PaginationInfo = {
+        room,
+        rowsBefore: laid.rowsBefore,
+        rowsAfter: 0,
+        attempts,
+        pages: [],
+      };
+      for (const [index, entry] of placed.entries()) {
+        const h = Math.ceil(entry.element.getBoundingClientRect().height);
+        info.rowsAfter += entry.element.querySelectorAll('tbody tr').length;
+        info.pages.push({
+          height: h,
+          fill: Math.max(h, entry.bottom) / room,
+          overflow: entry.bottom > room ? 1 : 0,
+          bottom: entry.bottom,
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = PAGE_W * SCALE;
+        canvas.height = PAGE_H * SCALE;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('The page could not be drawn.');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(entry.image, 0, MARGIN_TOP * SCALE);
+        // Anything past the room would show over the footer: clear it.
+        context.fillRect(
+          0,
+          (MARGIN_TOP + room) * SCALE,
+          canvas.width,
+          canvas.height - (MARGIN_TOP + room) * SCALE,
+        );
+        const footerY = (PAGE_H - 30) * SCALE;
+        context.fillStyle = '#d5dde6';
+        context.fillRect(
+          SIDE * SCALE,
+          footerY - 14 * SCALE,
+          (PAGE_W - SIDE * 2) * SCALE,
+          SCALE,
+        );
+        // A footer as legible as the text: dark, 12px (9pt), medium weight.
+        context.fillStyle = '#3f4756';
+        context.font = `500 ${12 * SCALE}px ${FOOTER_FONT}`;
+        context.textBaseline = 'middle';
+        context.textAlign = 'left';
+        context.fillText(footerLabel, SIDE * SCALE, footerY);
+        context.textAlign = 'right';
+        context.fillText(
+          `${index + 1} / ${placed.length}`,
+          (PAGE_W - SIDE) * SCALE,
+          footerY,
+        );
+        rendered.push({
+          jpeg: await toBytes(canvas, options.jpegQuality),
+          width: canvas.width,
+          height: canvas.height,
+        });
+      }
+      // A seam for a check of the layout (tests); nothing in the app sets it.
+      (
+        window as unknown as { __a4Probe?: (value: PaginationInfo) => void }
+      ).__a4Probe?.(info);
+      return pdf(rendered);
+    }
     const height = Math.ceil(root.getBoundingClientRect().height);
     const points = breakPoints(root, options);
     const forced = forcedBreaks(root, options);
-    const SCALE = Math.max(
-      1,
-      Math.min(MAX_SCALE, Math.floor(MAX_PIXELS / height)),
-    );
+    const sharp = options.sharp === true;
+    const SCALE = sharp
+      ? SHARP_SCALE
+      : Math.max(1, Math.min(MAX_SCALE, Math.floor(MAX_PIXELS / height)));
     const markup = new XMLSerializer().serializeToString(root);
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${height * SCALE}" viewBox="0 0 ${PAGE_W} ${height}">` +
+    // The document as an image; a sharp one shows only the slice [from, to]
+    // of it (the viewBox), so the image is as small as a page.
+    const svgOf = (from: number, to: number) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W * SCALE}" height="${(to - from) * SCALE}" viewBox="0 ${from} ${PAGE_W} ${to - from}">` +
       `<foreignObject width="${PAGE_W}" height="${height}">` +
       `<div xmlns="${ns}"><style>${escapeText(css)}</style>${markup}</div>` +
       '</foreignObject></svg>';
-    const image = await loadImage(
-      `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-    );
+    const imageOf = (from: number, to: number) =>
+      loadImage(
+        `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgOf(from, to))}`,
+      );
+    const image = sharp ? null : await imageOf(0, height);
     const rendered: { jpeg: Uint8Array; width: number; height: number }[] = [];
     const cuts = slices(height, points, forced);
     for (const [index, [start, end]] of cuts.entries()) {
@@ -268,10 +636,11 @@ export async function renderA4Pdf(
       if (!context) throw new Error('The page could not be drawn.');
       context.fillStyle = '#ffffff';
       context.fillRect(0, 0, canvas.width, canvas.height);
+      const pageImage = image ?? (await imageOf(start, end));
       context.drawImage(
-        image,
+        pageImage,
         0,
-        start * SCALE,
+        sharp ? 0 : start * SCALE,
         PAGE_W * SCALE,
         (end - start) * SCALE,
         0,
@@ -299,7 +668,7 @@ export async function renderA4Pdf(
         footerY,
       );
       rendered.push({
-        jpeg: await toBytes(canvas),
+        jpeg: await toBytes(canvas, options.jpegQuality),
         width: canvas.width,
         height: canvas.height,
       });

@@ -2,6 +2,7 @@ import { Check } from 'typebox/value';
 import {
   ArtifactEnvelopeSchema,
   CustomerReportSchema,
+  type CustomerReportLang,
   type CustomerReportDocument,
   ArtifactListSchema,
   INVENTORY_REPORT_CONTENT_TYPES,
@@ -137,6 +138,7 @@ export function createArtifactsApi(
       format: InventoryReportFormat,
       signal: AbortSignal,
       kind: ReportKind = 'technical',
+      lang: CustomerReportLang = 'ja',
     ) =>
       request.download(
         project(projectId) +
@@ -146,7 +148,8 @@ export function createArtifactsApi(
           String(version) +
           REPORT_PATH[kind] +
           '?format=' +
-          format,
+          format +
+          (kind === 'customer' && lang !== 'ja' ? '&lang=' + lang : ''),
         signal,
         reportExpectation(kind, format, artifactId, version),
       ),
@@ -157,6 +160,7 @@ export function createArtifactsApi(
       artifactId: string,
       version: number,
       signal: AbortSignal,
+      lang: CustomerReportLang = 'ja',
     ): Promise<CustomerReportDocument> => {
       const file = await request.download(
         project(projectId) +
@@ -165,7 +169,8 @@ export function createArtifactsApi(
           '/versions/' +
           String(version) +
           REPORT_PATH.customer +
-          '?format=json',
+          '?format=json' +
+          (lang !== 'ja' ? '&lang=' + lang : ''),
         signal,
         reportExpectation('customer', 'json', artifactId, version),
       );

@@ -29,13 +29,19 @@ const withoutControls = (text: string) =>
     .filter((char) => char.charCodeAt(0) > 0x1f && char.charCodeAt(0) !== 0x7f)
     .join('');
 
-// アセスメント報告書_<project>_<YYYYMMDD>.pdf
-export function customerPdfFileName(projectName: string, date: Date): string {
+// アセスメント報告書_<project>_<YYYYMMDD>.pdf (Japanese) or
+// Bao-cao-Assessment_<project>_<YYYYMMDD>.pdf (Vietnamese).
+export function customerPdfFileName(
+  projectName: string,
+  date: Date,
+  lang: 'ja' | 'vi' = 'ja',
+): string {
   const day = date.toISOString().slice(0, 10).replaceAll('-', '');
   const cleaned = withoutControls(projectName.normalize('NFC'))
     .replace(UNSAFE_NAME, '_')
     .replace(/^[._]+|[._]+$/g, '');
-  return `アセスメント報告書_${cleaned === '' ? 'project' : cleaned}_${day}.pdf`;
+  const prefix = lang === 'vi' ? 'Bao-cao-Assessment' : 'アセスメント報告書';
+  return `${prefix}_${cleaned === '' ? 'project' : cleaned}_${day}.pdf`;
 }
 
 // The same fallback the server gives the Excel downloads
@@ -64,7 +70,8 @@ export function CustomerPdfButton({
   save?: SaveFile;
   render?: RenderCustomerPdf;
 }) {
-  const { messages } = useLocale();
+  const { messages, locale } = useLocale();
+  const lang = locale === 'vi' ? 'vi' : 'ja';
   const copy = messages.assessment.report;
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<unknown>(null);
@@ -88,6 +95,7 @@ export function CustomerPdfButton({
         id,
         version,
         own.signal,
+        lang,
       );
       if (own.signal.aborted) return;
       const now = new Date();
@@ -98,7 +106,7 @@ export function CustomerPdfButton({
       });
       const projectName = report.source.origin?.projectName ?? '';
       try {
-        save(customerPdfFileName(projectName, now), blob);
+        save(customerPdfFileName(projectName, now, lang), blob);
       } catch {
         // A browser or file system that refuses the Japanese name still gets
         // the file under the ASCII name.

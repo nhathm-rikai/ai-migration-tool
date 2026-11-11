@@ -357,9 +357,33 @@ const ReportLevelSchema = Type.Union([
   Type.Literal('unrated'),
 ]);
 
+// report-complexity-v2: the procedures that were scored for a report (the
+// procedure that makes it = tier 0, what it calls = tier 1 and 2), the calls
+// that could not be resolved and the print / draw statements counted there.
+// Absent in an inventory written by v1.
+const ReportScopeSchema = Type.Object(
+  {
+    procedures: Type.Array(
+      Type.Object(
+        {
+          id: Type.String(),
+          tier: Type.Union([Type.Literal(0), Type.Literal(1), Type.Literal(2)]),
+        },
+        Strict,
+      ),
+    ),
+    unresolvedCalls: Count,
+    printOps: Type.Object(
+      { content: Count, drawing: Count, position: Count },
+      Strict,
+    ),
+  },
+  Strict,
+);
+
 const ReportComplexitySchema = Type.Object(
   {
-    // report-complexity-v1-draft: reference classification, not effort.
+    // report-complexity-v2: reference classification, not effort.
     version: Type.String(),
     level: ReportLevelSchema,
     // null when unrated.
@@ -373,6 +397,7 @@ const ReportComplexitySchema = Type.Object(
     ),
     // Why a report is unrated or floored (code, e.g. SUSPECTED).
     reason: Type.Optional(Type.String()),
+    scope: Type.Optional(ReportScopeSchema),
   },
   Strict,
 );
@@ -404,6 +429,10 @@ const ProgramReportSchema = Type.Object(
     procedureId: Nullable(Type.String()),
     warnings: Type.Array(Type.String()),
     complexity: ReportComplexitySchema,
+    // screen-report-v2, file-output rows: a .csv path; a log or temporary
+    // file (the word that says so), which is not counted as a report output.
+    subkind: Type.Optional(Type.Literal('csv')),
+    excludeReason: Type.Optional(Type.String()),
   },
   Strict,
 );

@@ -16,7 +16,9 @@ import { unzip } from '../../testing/zip-reader.js';
 import { ALL_PROGRAMS, buildInventoryReport } from './inventory-report.js';
 import { inventoryReportSheets } from './inventory-report-workbook.js';
 import { buildCustomerReport } from './customer-report.js';
-import { SHEET_NAMES } from './customer-report-constants.js';
+import { reportText } from './customer-report-text.js';
+
+const SHEET_NAMES = reportText('ja').sheetNames;
 import {
   contentDisposition,
   createReportDownloadService,
@@ -189,6 +191,30 @@ describe('Assessment report download (AR01)', { timeout: 20_000 }, () => {
         .statusCode,
     ).toBe(404);
     expect((await ctx.inject(url('csv'))).statusCode).toBe(400);
+  });
+
+  it('answers in Vietnamese with lang=vi and rejects an unknown language', async () => {
+    const { ctx, project, ref } = await setup('Demo');
+    const url = (format: string, lang: string) =>
+      `/api/v1/projects/${project.id}/artifacts/${ref.id}/versions/1/customer-report?format=${format}&lang=${lang}`;
+    const xlsx = await ctx.inject(url('xlsx', 'vi'));
+    expect(xlsx.statusCode).toBe(200);
+    const disposition = String(xlsx.headers['content-disposition']);
+    const [, encoded = ''] = disposition.split("filename*=UTF-8''");
+    expect(decodeURIComponent(encoded)).toMatch(
+      new RegExp('^Bao-cao-Assessment_Demo_[0-9]{8}[.]xlsx$'),
+    );
+    const workbook = unzip(xlsx.rawPayload).get('xl/workbook.xml') ?? '';
+    expect(
+      [...workbook.matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]),
+    ).toEqual([...reportText('vi').sheetNames]);
+    const json = await ctx.inject(url('json', 'vi'));
+    expect(json.statusCode).toBe(200);
+    expect(json.json<{ language: string }>().language).toBe('vi');
+    // The default stays Japanese.
+    const plain = await ctx.inject(url('json', 'ja').replace('&lang=ja', ''));
+    expect(plain.json<{ language: string }>().language).toBe('ja');
+    expect((await ctx.inject(url('json', 'en'))).statusCode).toBe(400);
   });
 
   // AR01-AC02

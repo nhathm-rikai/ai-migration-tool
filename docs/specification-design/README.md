@@ -1,6 +1,6 @@
 # Bộ tài liệu specification-design từ source đa ngôn ngữ
 
-**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.11.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.13.0-draft` cho cả chín template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
+**DRAFT — CHỜ DUYỆT**, pack `spec-design-rules-0.11.0-draft`, ngày 30/10/2026; template set `spec-design-templates-0.14.0-draft` cho cả chín template output và phiếu input. Chưa phải pipeline hay tài liệu nghiệp vụ đã sinh.
 
 ## Thứ tự đọc
 

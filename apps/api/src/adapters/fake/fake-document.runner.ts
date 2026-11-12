@@ -88,7 +88,7 @@ function itSpec(
             file: string;
             line: number;
             detail: string;
-            counterpart: string | null;
+            counterparts: string[];
           }[];
         }
       ).items
@@ -96,7 +96,7 @@ function itSpec(
   const used = dropLast ? items.slice(0, -1) : items;
   const rows = used.map(
     (item, index) =>
-      `| ${index + 1} | ${item.id} | ${item.kind} | シナリオ（DEMO） | ${item.detail}${item.counterpart ? `、プログラム ${item.counterpart}` : ''} | 前提条件（DEMO） | 手順（DEMO） | 期待結果（DEMO） | ${item.file}:${item.line} | テスト |  |`,
+      `| ${index + 1} | ${item.id} | ${item.kind} | シナリオ（DEMO） | ${item.detail}${item.counterparts[0] ? `、プログラム ${item.counterparts[0]}` : ''} | 前提条件（DEMO） | 手順（DEMO） | 期待結果（DEMO） | ${item.file}:${item.line} | テスト |  |`,
   );
   return `# 結合テスト仕様書 — DEMO
 

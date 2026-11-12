@@ -9,7 +9,7 @@ import {
 // nghiệp vụ trên Portal", runbook 2.2): the filled input form, the P1 output
 // of the program, and the task text. Pure; files are written by the
 // workspace adapter. Changing the task text changes SPEC_TASK_VERSION.
-export const SPEC_TASK_VERSION = 'spec-design-task-v8';
+export const SPEC_TASK_VERSION = 'spec-design-task-v9';
 
 type Program = SourceInventoryDocument['programs'][number];
 type InventoryFile = SourceInventoryDocument['files'][number];
@@ -253,7 +253,7 @@ Nếu có ut-test-spec: đọc ${WORKSPACE.p1}/${UT_SKELETON_FILE} (checklist t�
     : '';
   const integrationTests = options.generated.includes('it-test-spec')
     ? `
-Nếu có it-test-spec: đọc ${WORKSPACE.p1}/${IT_SKELETON_FILE} (checklist tất định của Portal về sự phối hợp giữa các phần của program: lời gọi sang module dùng chung, bảng được ghi ở procedure này và dùng ở procedure khác, report, bảng dùng chung với program khác; mỗi hạng mục có "id", "kind", "file", "line", "detail", "counterpart"). Với MỖI hạng mục, đọc source liên quan và viết ít nhất một scenario test tích hợp, mỗi scenario một dòng của bảng scenario trong template it-test-spec, "対象ID" là id của hạng mục, "種別" là kind của hạng mục, "根拠" là file:dòng thật (file thuộc program, đường dẫn như trong checklist). Hạng mục có "counterpart" khác null (cross-program) thì cột "関連要素" PHẢI nêu đúng tên program đó. Hạng mục không test được thì một dòng "対象外" kèm lý do. Không lặp lại case mức nhánh của ut-test-spec. Không thêm scenario cho id không có trong checklist và không bỏ hạng mục nào: Portal kiểm từng id và từ chối gói thiếu. Checklist rỗng ("items": []) thì bảng scenario chỉ có hàng tiêu đề và mục 1 ghi rõ program không có hạng mục tích hợp nào trong inventory.
+Nếu có it-test-spec: đọc ${WORKSPACE.p1}/${IT_SKELETON_FILE} (checklist tất định của Portal về sự phối hợp giữa các phần của program: lời gọi sang module dùng chung, bảng được ghi ở procedure này và dùng ở procedure khác, report, bảng dùng chung với program khác; mỗi hạng mục có "id", "kind", "file", "line", "detail", "counterparts"). Với MỖI hạng mục, đọc source liên quan và viết ít nhất một scenario test tích hợp (một scenario cho một hạng mục là đủ; chỉ viết thêm khi hạng mục có nhiều đường phối hợp khác hẳn nhau), mỗi scenario một dòng của bảng scenario trong template it-test-spec, "対象ID" là id của hạng mục, "種別" là kind của hạng mục, "根拠" là file:dòng thật (file thuộc program, đường dẫn như trong checklist). Hạng mục có "counterparts" không rỗng (cross-program: một bảng dùng chung với các program đó) thì cột "関連要素" PHẢI nêu đúng tên ít nhất một program trong danh sách, là program mà scenario kiểm. Hạng mục không test được thì một dòng "対象外" kèm lý do. Không lặp lại case mức nhánh của ut-test-spec. Không thêm scenario cho id không có trong checklist và không bỏ hạng mục nào: Portal kiểm từng id và từ chối gói thiếu. Checklist rỗng ("items": []) thì bảng scenario chỉ có hàng tiêu đề và mục 1 ghi rõ program không có hạng mục tích hợp nào trong inventory.
 `
     : '';
   return `Đọc ${WORKSPACE.input}, sau đó đọc ${WORKSPACE.pack}/README.md theo đúng thứ tự, gồm analysis-method.md và rules/artifacts.md (SD-CT-07). Ở bước template, chỉ đọc template của tài liệu ở mục 3 phiếu input (tài liệu TL chọn + tài liệu sinh kèm); nếu có security-audit thì đọc thêm rules/security-audit.md. Tự nhận diện ngôn ngữ/runtime của source allowlist và ghi vào phần đầu chung của từng tài liệu trước khi phân tích; giữ cấu trúc template output và điền theo ngôn ngữ thực.
@@ -263,6 +263,8 @@ Audit chỉ các file trong ${WORKSPACE.source}/ và output P1 trong ${WORKSPACE
 Sinh đúng các tài liệu ở mục 3 phiếu input theo thứ tự business-rules → db-design → basic-design → detail-design → security-audit → ut-test-spec → it-test-spec, theo mode document-draft và đúng template. Giữ trạng thái DRAFT; không tự điền reviewer, approval, artifact ID, run ID, hash hoặc thời điểm đặc quyền. Claim observed/current_behavior phải có evidence; thiếu căn cứ thì ghi hypothesis hoặc U-ID. Không sửa source, rule/template hay phiếu input.${unitTests}${integrationTests}
 
 OUTPUT LANGUAGE: ${LANGUAGE_NAMES[options.language]} (section 3 of the input form, SD-EV-07). The rules and templates are written in Vietnamese, but every document must be written entirely in ${LANGUAGE_NAMES[options.language]}: titles, section headings, table headers, table cells, labels and prose. No Vietnamese may remain unless the output language is Vietnamese or the text is quoted from the source. Keep section order and numbering. Do not translate: IDs, code identifiers, file paths and quotes from the source.
+
+THIS IS THE ONLY SESSION: there is no next turn, no follow-up and nobody to continue the work. Never end with a promise to continue ("to be continued", "次の回で続けます", "sẽ làm tiếp"). Your final answer must contain a block for EVERY file listed below; a package with a file missing is rejected as a whole and the documents already written are lost. Budget the answer so that the last documents fit: keep prose short and tables to what the checklist and the template require. If a document still cannot be finished, output its block anyway with what is done and the generation status row set to the in-progress value, instead of leaving the file out.
 
 You cannot write files: this session is read-only. Return the whole package in your final answer and nothing else, one block per file, exactly these files in this order: ${files.join(', ')}.
 Each block:
@@ -293,24 +295,47 @@ export function parsePackage(
 ): ParsedPackage {
   const files: { name: string; content: string }[] = [];
   // A block without its end marker was cut by an output limit and the answer
-  // restarted it: only complete blocks count.
-  const pattern =
-    /^=== FILE: ([a-z-]+\.md) ===\r?\n((?:(?!^=== FILE: )[\s\S])*?)\r?\n=== END FILE ===$/gm;
-  for (const match of raw.matchAll(pattern)) {
-    const name = match[1] ?? '';
+  // restarted it: only complete blocks count. Marker lines are compared
+  // trimmed (a trailing space or CR is not a different marker), the same way
+  // the run log recognises them, so a file the log shows as written is not
+  // lost over whitespace.
+  const unclosed: string[] = [];
+  let open: { name: string; lines: string[] } | null = null;
+  for (const line of raw.split('\n')) {
+    const marker = line.trim();
+    const start = /^=== FILE: ([a-z-]+\.md) ===$/.exec(marker)?.[1];
+    if (start !== undefined) {
+      if (open) unclosed.push(open.name);
+      open = { name: start, lines: [] };
+      continue;
+    }
+    if (marker !== FILE_END || !open) {
+      open?.lines.push(line);
+      continue;
+    }
+    const { name, lines } = open;
+    open = null;
     if (!expected.includes(name))
       return { status: 'invalid', reason: `unexpected file ${name}` };
     if (files.some((file) => file.name === name))
       return { status: 'invalid', reason: `duplicate file ${name}` };
-    const content = (match[2] ?? '').trim();
+    const content = lines.join('\n').trim();
     if (!content) return { status: 'invalid', reason: `empty file ${name}` };
     files.push({ name, content: `${content}\n` });
   }
+  if (open) unclosed.push(open.name);
   const missing = expected.filter(
     (name) => !files.some((file) => file.name === name),
   );
-  if (missing.length)
-    return { status: 'invalid', reason: `missing ${missing.join(', ')}` };
+  if (missing.length) {
+    // The answer is not kept, so say what was seen: a file that was started
+    // and never closed is a different failure from one never started.
+    const started = missing.filter((name) => unclosed.includes(name));
+    return {
+      status: 'invalid',
+      reason: `missing ${missing.join(', ')}${started.length ? ` (started without "${FILE_END}": ${started.join(', ')})` : ''}`,
+    };
+  }
   const pending = files
     .map((file) => ({
       name: file.name,

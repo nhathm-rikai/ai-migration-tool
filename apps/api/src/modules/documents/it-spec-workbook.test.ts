@@ -7,7 +7,7 @@ import { itSpecSheets } from './it-spec-workbook.js';
 
 // TC02-AC04: the Japanese Excel of one integration test specification.
 const checklist: ItChecklist = {
-  version: 'it-checklist-v1',
+  version: 'it-checklist-v2',
   program: 'A',
   items: [
     {
@@ -16,7 +16,7 @@ const checklist: ItChecklist = {
       file: 'a/F1.frm',
       line: 6,
       detail: 'ORDERS (CR, 2 procedures)',
-      counterpart: null,
+      counterparts: [],
     },
     {
       id: 'IT-A-cross-program-1',
@@ -24,7 +24,7 @@ const checklist: ItChecklist = {
       file: 'a/F1.frm',
       line: 7,
       detail: 'STOCK: A U / B R',
-      counterpart: 'B',
+      counterparts: ['B'],
     },
   ],
 };
@@ -112,7 +112,7 @@ describe('TC02-AC04 workbook', () => {
     expect(text).toContain('2026-11-10');
     expect(text).toContain('AI');
     expect(text).toContain('未承認');
-    expect(text).toContain('it-checklist-v1');
+    expect(text).toContain('it-checklist-v2');
   });
 
   it('keeps formula-like text as text and has no absolute path in the xlsx', () => {

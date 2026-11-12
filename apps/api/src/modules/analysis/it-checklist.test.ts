@@ -75,6 +75,13 @@ const files: TestFile[] = [
     'Attribute VB_Name = "MB"',
     ...sub('Main', '    s = "SELECT Q FROM STOCK"', '    WriteLog'),
   ),
+  // A third program on the same table: still one item for the table.
+  file('c/C.vbp', 'Type=Exe', 'Module=MC; MC.bas', 'Name="C"'),
+  file(
+    'c/MC.bas',
+    'Attribute VB_Name = "MC"',
+    ...sub('Main', '    s = "SELECT Q FROM STOCK"'),
+  ),
 ];
 
 const inventory = buildSourceInventory({
@@ -133,15 +140,19 @@ describe('TC02-AC01 checklist', () => {
     expect(ofKind('report')[0]?.file).toBe('a/F2.frm');
   });
 
-  it('names the other program of a table one writes and the other reads', () => {
-    const [cross] = ofKind('cross-program');
-    expect(cross?.counterpart).toBe('B');
-    expect(cross?.detail).toBe('STOCK: A U / B R');
-    // Seen from the other side: B reads what A writes.
+  // it-checklist-v2: one item per shared table, however many programs use
+  // it (v1 had one per pair, which made checklists of dozens of items).
+  it('has one item per shared table, naming every other program of it', () => {
+    const cross = ofKind('cross-program');
+    expect(cross).toHaveLength(1);
+    expect(cross[0]?.counterparts).toEqual(['B', 'C']);
+    expect(cross[0]?.detail).toBe('STOCK: A U / B R, C R');
+    // Seen from the other side: B reads what A writes; C only reads too, so
+    // B and C share nothing to test between them.
     const other = buildItChecklist(inventory, 'b/B.vbp');
-    expect(other.items.map((item) => [item.kind, item.counterpart])).toEqual([
-      ['shared-module', null],
-      ['cross-program', 'A'],
+    expect(other.items.map((item) => [item.kind, item.counterparts])).toEqual([
+      ['shared-module', []],
+      ['cross-program', ['A']],
     ]);
   });
 

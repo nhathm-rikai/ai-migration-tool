@@ -17,7 +17,7 @@ Phạm vi: tài liệu `ut-test-spec.md` (単体テスト仕様書) sinh ở bư
   1. mọi hạng mục checklist có ít nhất một case, hoặc `対象外` kèm lý do;
   2. mọi case có bằng chứng `file:line` trỏ tới file của program. Chuỗi được chuẩn hóa trước khi so (`normalizeEvidence`): bỏ tiền tố `source/`, `\` → `/`, dấu `：` và chữ số toàn chiều → nửa chiều, `〜`/`～`/`–`/`—` → `-`, bỏ hậu tố `行`/`行目`/`line`, bỏ ghi chú trong ngoặc ở cuối, `:L5` → `:5`, `a (5)` → `a:5`, và lấy ref đầu nếu ô có nhiều (`,`/`;`/`、`). Khớp file không phân biệt chữ hoa/thường; chỉ ghi tên file thì chấp nhận khi **duy nhất một** file của program có tên đó, nhiều file cùng tên vẫn là `NO_EVIDENCE`. Dòng phải ≥ 1. Lý do chuẩn hóa: một run fail là một run mất (gói bị từ chối không được lưu, tốn quota), và cách viết chuỗi không nói gì về chất lượng test case;
   3. không case nào tham chiếu ID ngoài checklist của program.
-- Prompt `spec-design-task-v8` (v8 thêm đoạn cho `it-test-spec`, đoạn của UT không đổi); template `docs/specification-design/templates/ut-test-spec.md` (bộ template 0.13.0-draft; nội dung template UT không đổi từ 0.12.0-draft).
+- Prompt `spec-design-task-v9` (v8 thêm đoạn cho `it-test-spec`, đoạn của UT không đổi); template `docs/specification-design/templates/ut-test-spec.md` (bộ template 0.14.0-draft; nội dung template UT không đổi từ 0.12.0-draft).
 
 ## 3. Excel
 

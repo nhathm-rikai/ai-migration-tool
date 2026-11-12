@@ -66,6 +66,32 @@ describe('specification-design package', () => {
     expect(prompt).toContain('read-only');
   });
 
+  // A LIVE run ended with "次の回で続けます" before the last document: there
+  // is no next turn, so the package lacked a file and was rejected whole.
+  it('says the session is the only one and every file must be in the answer', () => {
+    const prompt = taskPrompt({
+      generated: ['business-rules', 'it-test-spec'],
+      language: 'ja',
+    });
+    expect(prompt).toContain('THIS IS THE ONLY SESSION');
+    expect(prompt).toContain('Never end with a promise to continue');
+    expect(prompt).toContain('a block for EVERY file listed below');
+    // The rule comes before the file list the fake runner reads.
+    expect(prompt.indexOf('THIS IS THE ONLY SESSION')).toBeLessThan(
+      prompt.indexOf('in this order: business-rules.md, it-test-spec.md.'),
+    );
+  });
+
+  it('describes the integration checklist only when it-test-spec is generated', () => {
+    const withIt = taskPrompt({ generated: ['it-test-spec'], language: 'vi' });
+    expect(withIt).toContain('context/p1/1.5-it-skeleton.json');
+    expect(withIt).toContain('"counterparts"');
+    expect(withIt).toContain('ít nhất một program trong danh sách');
+    const without = taskPrompt({ generated: ['ut-test-spec'], language: 'vi' });
+    expect(without).not.toContain('1.5-it-skeleton.json');
+    expect(without).toContain('context/p1/1.4-ut-skeleton.json');
+  });
+
   it('accepts a package whose documents are all "hoàn tất"', () => {
     const expected = packageFileNames(['business-rules', 'db-design']);
     const parsed = parsePackage(
@@ -107,6 +133,71 @@ describe('specification-design package', () => {
         expected,
       ),
     ).toEqual({ status: 'invalid', reason: 'unexpected file coverage.md' });
+  });
+
+  // A LIVE run of seven documents was rejected as "missing" five files the
+  // log showed as written. The answer is not kept, so the reason has to say
+  // what was seen.
+  it('says which missing files were started and never closed', () => {
+    const expected = packageFileNames(['business-rules', 'db-design']);
+    const raw = [
+      '=== FILE: business-rules.md ===',
+      doc('BR', 'hoàn tất'),
+      '=== FILE: db-design.md ===',
+      doc('DB', 'hoàn tất'),
+      '=== END FILE ===',
+    ].join('\n');
+    expect(parsePackage(raw, expected)).toEqual({
+      status: 'invalid',
+      reason:
+        'missing business-rules.md (started without "=== END FILE ===": business-rules.md)',
+    });
+    // Never started: nothing to add.
+    expect(
+      parsePackage(answer({ 'db-design.md': doc('DB', 'hoàn tất') }), expected),
+    ).toEqual({ status: 'invalid', reason: 'missing business-rules.md' });
+    // Cut at the end of the answer.
+    expect(
+      parsePackage(
+        `${answer({ 'business-rules.md': doc('BR', 'hoàn tất') })}\n=== FILE: db-design.md ===\n# DB`,
+        expected,
+      ),
+    ).toMatchObject({
+      reason:
+        'missing db-design.md (started without "=== END FILE ===": db-design.md)',
+    });
+  });
+
+  it('reads marker lines trimmed: CRLF and trailing spaces are not another marker', () => {
+    const expected = packageFileNames(['business-rules', 'db-design']);
+    const raw = answer({
+      'business-rules.md': doc('BR', 'hoàn tất'),
+      'db-design.md': doc('DB', 'hoàn tất'),
+    });
+    for (const variant of [
+      raw.replaceAll('\n', '\r\n'),
+      raw.replaceAll('=== END FILE ===', '=== END FILE ===  '),
+      raw.replaceAll('=== FILE: ', '  === FILE: '),
+    ]) {
+      const parsed = parsePackage(variant, expected);
+      expect(parsed.status).toBe('ok');
+      if (parsed.status !== 'ok') return;
+      expect(parsed.files.map((file) => file.name)).toEqual(expected);
+      expect(parsed.files[0]?.content).toContain(
+        '| Trạng thái sinh | hoàn tất |',
+      );
+    }
+  });
+
+  it('still counts a restarted block once: the cut copy is dropped', () => {
+    const expected = packageFileNames(['db-design']);
+    const parsed = parsePackage(
+      `=== FILE: db-design.md ===\n# cut\n${answer({ 'db-design.md': doc('DB', 'hoàn tất') })}`,
+      expected,
+    );
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') return;
+    expect(parsed.files[0]?.content.startsWith('# DB')).toBe(true);
   });
 
   it('keeps a package out while a document is "đang sinh" or has no state (SD-CT-08)', () => {

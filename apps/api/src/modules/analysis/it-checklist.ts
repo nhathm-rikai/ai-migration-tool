@@ -19,7 +19,7 @@ import {
 // in the inventory. Listing screen pairs needs the analyzer to record
 // qualified calls first (out of scope of TC02).
 
-export const IT_CHECKLIST_VERSION = 'it-checklist-v1';
+export const IT_CHECKLIST_VERSION = 'it-checklist-v2';
 
 export const IT_ITEM_KINDS = [
   'shared-module',
@@ -38,8 +38,9 @@ export type ItItem = {
   line: number;
   // What works together: "A → Common.bas", a table, a report.
   detail: string;
-  // cross-program only: the other program, which a scenario has to name.
-  counterpart: string | null;
+  // cross-program only: the other programs sharing the table; a scenario has
+  // to name at least one of them. Empty for the other kinds.
+  counterparts: string[];
 };
 
 export type ItChecklist = {
@@ -145,7 +146,7 @@ export function buildItChecklist(
       file: firstWrite.file,
       line: firstWrite.line,
       detail: `${name} (${operationsText(list.map((a) => a.operation))}, ${units.size} procedures)`,
-      counterpart: null,
+      counterparts: [],
     });
   }
 
@@ -154,7 +155,7 @@ export function buildItChecklist(
     file: report.file,
     line: report.line ?? 1,
     detail: `${report.kind} ${report.name} (${report.confidence})`,
-    counterpart: null,
+    counterparts: [],
   }));
 
   // A table this program writes and another reads, or the other way round,
@@ -168,29 +169,41 @@ export function buildItChecklist(
       (view.mapped ? mappedCrud(analysis, mapping) : null) ?? analysis.crud
     );
   };
+  // One item per table, not per pair: a master table shared with dozens of
+  // programs was dozens of items (it-checklist-v1), each needing a scenario,
+  // and the answer of one session could not hold them.
   const crossProgram: Draft[] = [];
   for (const own of viewEntries(program)) {
     if ((view.tables.get(own.table)?.programs.size ?? 0) < 2) continue;
     const ownWrites = own.operations.some((op) => WRITES.has(op));
     const ownReads = own.operations.includes('R');
-    for (const other of inventory.programs) {
-      if (other.projectPath === projectPath) continue;
-      const theirs = viewEntries(other).find(
-        (entry) => entry.table === own.table,
-      );
-      if (!theirs) continue;
-      const theyWrite = theirs.operations.some((op) => WRITES.has(op));
-      const theyRead = theirs.operations.includes('R');
-      if (!(ownWrites && theyRead) && !(ownReads && theyWrite)) continue;
-      const name = stem(other.projectPath);
-      crossProgram.push({
-        kind: 'cross-program',
-        file: own.evidence.relativePath,
-        line: own.evidence.line,
-        detail: `${own.table}: ${key} ${operationsText(own.operations)} / ${name} ${operationsText(theirs.operations)}`,
-        counterpart: name,
-      });
-    }
+    const others = inventory.programs
+      .flatMap((other) => {
+        if (other.projectPath === projectPath) return [];
+        const theirs = viewEntries(other).find(
+          (entry) => entry.table === own.table,
+        );
+        if (!theirs) return [];
+        const theyWrite = theirs.operations.some((op) => WRITES.has(op));
+        const theyRead = theirs.operations.includes('R');
+        return (ownWrites && theyRead) || (ownReads && theyWrite)
+          ? [
+              {
+                name: stem(other.projectPath),
+                operations: operationsText(theirs.operations),
+              },
+            ]
+          : [];
+      })
+      .sort((x, y) => byText(x.name, y.name));
+    if (others.length === 0) continue;
+    crossProgram.push({
+      kind: 'cross-program',
+      file: own.evidence.relativePath,
+      line: own.evidence.line,
+      detail: `${own.table}: ${key} ${operationsText(own.operations)} / ${others.map((other) => `${other.name} ${other.operations}`).join(', ')}`,
+      counterparts: others.map((other) => other.name),
+    });
   }
 
   const ordered: Draft[] = [
@@ -201,7 +214,7 @@ export function buildItChecklist(
         file,
         line,
         detail: `${key} → ${baseName(module)} (${[...names].sort(byText).join(', ')})`,
-        counterpart: null,
+        counterparts: [],
       })),
     ...dbChains.sort((a, b) => byText(a.detail, b.detail)),
     ...reports,

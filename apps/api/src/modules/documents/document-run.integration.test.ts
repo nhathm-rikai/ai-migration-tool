@@ -183,7 +183,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       ],
       runner: 'fake',
       effort: 'medium',
-      promptVersion: 'spec-design-task-v8',
+      promptVersion: 'spec-design-task-v9',
     });
     expect(queued.config.specPack).toMatch(
       /^spec-design-rules-.+ \+ spec-design-templates-/,
@@ -639,7 +639,7 @@ describe('Document runs HTTP -> service -> SQLite', { timeout: 30_000 }, () => {
       expect(started.statusCode).toBe(202);
       const run = await finished(inject, started.json<DocumentRun>());
       expect(run.status).toBe('succeeded');
-      expect(run.config.promptVersion).toBe('spec-design-task-v8');
+      expect(run.config.promptVersion).toBe('spec-design-task-v9');
       expect(run.config.generated).toEqual(['ut-test-spec']);
       expect(run.items).toHaveLength(1);
       expect(run.items[0]?.files.map((file) => file.name)).toEqual([

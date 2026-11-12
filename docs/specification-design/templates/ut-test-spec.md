@@ -1,6 +1,6 @@
 # Đặc tả test đơn vị (単体テスト仕様書) — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.13.0-draft.** [Phần đầu chung](../README.md). Tài liệu này do agent viết theo **checklist tất định** của Portal (`context/p1/1.4-ut-skeleton.json`), không phải theo ý agent về cái gì đáng test.
+**DRAFT TEMPLATE — spec-design-templates-0.14.0-draft.** [Phần đầu chung](../README.md). Tài liệu này do agent viết theo **checklist tất định** của Portal (`context/p1/1.4-ut-skeleton.json`), không phải theo ý agent về cái gì đáng test.
 
 ## 1. Phạm vi và cách làm
 

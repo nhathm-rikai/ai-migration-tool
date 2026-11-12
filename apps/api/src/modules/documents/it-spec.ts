@@ -73,6 +73,15 @@ export function parseItSpec(
   };
 }
 
+// The cell names the program as a word of its own, without case: a program
+// called "C" is not named by the table "STOCK". Japanese text next to the
+// name ("プログラムC") still counts, only Latin letters, digits and "_" do
+// not.
+function namesProgram(cell: string, program: string): boolean {
+  const name = program.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`, 'i').test(cell);
+}
+
 export function validateItSpec(
   markdown: string,
   checklist: ItChecklist,
@@ -125,16 +134,17 @@ export function validateItSpec(
         detail: `Evidence "${scenario.evidence}" is not a file:line of a file of this program.`,
       });
     // Which program the data is shared with is the whole point of the item:
-    // a scenario that does not say it cannot be run by a tester. Excluded
-    // rows too: the reason is about that program.
+    // a scenario that names none of them cannot be run by a tester. One is
+    // enough (the item lists every program of the table). Excluded rows too:
+    // the reason is about those programs.
     if (
-      item.counterpart !== null &&
-      !scenario.related.toLowerCase().includes(item.counterpart.toLowerCase())
+      item.counterparts.length > 0 &&
+      !item.counterparts.some((name) => namesProgram(scenario.related, name))
     )
       errors.push({
         code: 'NO_COUNTERPART',
         id,
-        detail: `Related elements "${scenario.related}" do not name the other program ${item.counterpart}.`,
+        detail: `Related elements "${scenario.related}" name none of the other programs (${item.counterparts.join(', ')}).`,
       });
     if (scenario.excluded) {
       if (scenario.reason === '')

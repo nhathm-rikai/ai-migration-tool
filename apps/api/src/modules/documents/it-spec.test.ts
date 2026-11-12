@@ -4,7 +4,7 @@ import { parseItSpec, validateItSpec } from './it-spec.js';
 
 // TC02-AC02: the validator of the integration test specification.
 const checklist: ItChecklist = {
-  version: 'it-checklist-v1',
+  version: 'it-checklist-v2',
   program: 'A',
   items: [
     {
@@ -13,15 +13,15 @@ const checklist: ItChecklist = {
       file: 'a/F1.frm',
       line: 10,
       detail: 'A → Common.bas (WriteLog)',
-      counterpart: null,
+      counterparts: [],
     },
     {
       id: 'IT-A-cross-program-1',
       kind: 'cross-program',
       file: 'a/F1.frm',
       line: 7,
-      detail: 'STOCK: A U / B R',
-      counterpart: 'B',
+      detail: 'STOCK: A U / B R, C R',
+      counterparts: ['B', 'C'],
     },
   ],
 };
@@ -109,9 +109,22 @@ describe('TC02-AC02 validator', () => {
       id: 'IT-A-cross-program-1',
     });
     expect(result.errors[0]?.detail).toContain('"STOCK"');
-    // The name is matched without case; an exclusion has to name it too.
+    expect(result.errors[0]?.detail).toContain('B, C');
+    // The name is matched without case; an exclusion has to name one too.
     expect(
       codes(doc(SHARED, CROSS.replace('プログラム B', 'program b'))),
+    ).toEqual([]);
+    // A name is a word of its own: "C" is not named by "STOCK" or "ABC",
+    // but Japanese text may touch it.
+    expect(
+      codes(doc(SHARED, CROSS.replace('STOCK、プログラム B', 'STOCK, ABC'))),
+    ).toEqual(['NO_COUNTERPART']);
+    expect(
+      codes(doc(SHARED, CROSS.replace('プログラム B', 'プログラムB'))),
+    ).toEqual([]);
+    // One of the programs of the table is enough.
+    expect(
+      codes(doc(SHARED, CROSS.replace('プログラム B', 'プログラム C'))),
     ).toEqual([]);
     expect(
       codes(

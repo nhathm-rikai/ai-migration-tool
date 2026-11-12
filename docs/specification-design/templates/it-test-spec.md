@@ -1,6 +1,6 @@
 # Đặc tả test tích hợp (結合テスト仕様書) — <PROGRAM>
 
-**DRAFT TEMPLATE — spec-design-templates-0.13.0-draft.** [Phần đầu chung](../README.md). Tài liệu này do agent viết theo **checklist tất định** của Portal (`context/p1/1.5-it-skeleton.json`), không phải theo ý agent về cái gì đáng test. Cùng cơ chế với [đặc tả test đơn vị](ut-test-spec.md); IT **không lặp lại** case mức nhánh của UT.
+**DRAFT TEMPLATE — spec-design-templates-0.14.0-draft.** [Phần đầu chung](../README.md). Tài liệu này do agent viết theo **checklist tất định** của Portal (`context/p1/1.5-it-skeleton.json`), không phải theo ý agent về cái gì đáng test. Cùng cơ chế với [đặc tả test đơn vị](ut-test-spec.md); IT **không lặp lại** case mức nhánh của UT.
 
 ## 1. Phạm vi và cách làm
 
@@ -13,7 +13,7 @@ Quy tắc bắt buộc (validator của Portal kiểm, sai thì gói bị từ c
 - Mỗi hạng mục của checklist (`context/p1/1.5-it-skeleton.json`, trường `items[].id`) có **ít nhất một scenario**, hoặc một dòng loại trừ kèm lý do không test được.
 - Mỗi scenario có evidence `đường/dẫn/file:dòng` là **file thuộc program** (trong `items[].file` hoặc file cùng program), dòng thật của lời gọi/câu lệnh/định nghĩa báo cáo được test.
 - Không thêm scenario cho ID không có trong checklist; không đổi ID.
-- Hạng mục có `counterpart` khác `null` trong checklist (loại `cross-program`) **phải nêu tên program đó** trong cột `関連要素`, viết đúng như giá trị `counterpart`, kể cả khi hàng đó là loại trừ. Thiếu tên này thì gói bị từ chối.
+- Hạng mục có `counterparts` không rỗng trong checklist (loại `cross-program`: một bảng dùng chung với các program trong danh sách) **phải nêu tên ít nhất một program của danh sách** trong cột `関連要素`, viết đúng như trong `counterparts`, kể cả khi hàng đó là loại trừ. Nêu program mà scenario thực sự kiểm; một scenario cho một hạng mục là đủ, không cần một scenario cho mỗi program. Thiếu tên này thì gói bị từ chối.
 - Checklist rỗng (`"items": []`): program không có hạng mục tích hợp nào trong kết quả phân tích. Khi đó bảng mục 2 chỉ có hàng tiêu đề và hàng phân cách, mục 1 ghi rõ điều này; không tự nghĩ ra scenario.
 
 ### 1.1 Định dạng bảng (lỗi định dạng làm cả gói bị từ chối)
@@ -43,7 +43,7 @@ Hai hàng dưới đây là **ví dụ định dạng, phải xóa** và thay b�
 | 2   | IT-ORDER-cross-program-1 | cross-program | ORDERS do program này ghi, KNRO0990 đọc         | Bảng ORDERS, program KNRO0990 | Có máy chạy được cả hai program       |                                                                   |                                                              | frmEntry.frm:120    | 対象外 | Cần chạy program KNRO0990, ngoài môi trường IT hiện có |
 
 - `シナリオ`: luồng cụ thể quan sát được trong code (procedure nào gọi module dùng chung nào, procedure nào ghi rồi procedure nào đọc), không ghi chung chung kiểu "kiểm tra tích hợp".
-- `関連要素`: tên thật của màn hình/module/bảng/báo cáo tham gia, viết như trong source hoặc checklist. Hạng mục có `counterpart` phải có tên program đó (quy tắc ở mục 1).
+- `関連要素`: tên thật của màn hình/module/bảng/báo cáo tham gia, viết như trong source hoặc checklist. Hạng mục có `counterparts` phải có tên ít nhất một program trong đó (quy tắc ở mục 1).
 - `前提条件`: trạng thái dữ liệu/môi trường cần có trước khi chạy (bảng nào có dữ liệu gì, có máy in, có file nào).
 - `手順`: các bước người test thao tác được, đánh số trên một dòng.
 - `期待結果`: kết quả quan sát được theo code hiện tại (giá trị truyền sang module dùng chung, bản ghi được ghi/đọc, nội dung báo cáo), không phải kết quả "nên" có.
